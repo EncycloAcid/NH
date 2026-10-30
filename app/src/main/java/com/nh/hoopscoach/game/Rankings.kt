@@ -5,7 +5,21 @@ import kotlin.math.ln
 import kotlin.math.pow
 
 object Rankings {
-    private const val HOME_ELO = 70.0
+    const val HOME_ELO = 70.0
+
+    /** Home-court edge in Elo for a game: none on a neutral floor, louder for a rivalry. */
+    fun homeElo(lg: League, g: Game): Double = when {
+        g.neutral -> 0.0
+        lg.rivalry(g) != null -> HOME_ELO + Rivalries.HOME_BOOST
+        else -> HOME_ELO
+    }
+
+    /** Pregame win chance for [teamId] in [g], crowd included. */
+    fun winProbFor(lg: League, g: Game, teamId: Int): Double {
+        val adv = homeElo(lg, g)
+        val diff = lg.team(teamId).elo - lg.team(g.opp(teamId)).elo + if (g.home == teamId) adv else -adv
+        return 1.0 / (1.0 + 10.0.pow(-diff / 400.0))
+    }
 
     fun winProb(eloA: Double, eloB: Double, aHome: Int /* 1 home, 0 neutral, -1 away */): Double {
         val diff = eloA - eloB + aHome * HOME_ELO
@@ -29,11 +43,11 @@ object Rankings {
     fun updateElo(lg: League, g: Game) {
         val h = lg.team(g.home)
         val a = lg.team(g.away)
-        val site = if (g.neutral) 0 else 1
-        val pH = winProb(h.elo, a.elo, site)
+        val adv = homeElo(lg, g)
+        val pH = winProbFor(lg, g, h.id)
         val sH = if (g.hs > g.aws) 1.0 else 0.0
         val margin = abs(g.hs - g.aws).toDouble()
-        val eloDiff = (if (sH == 1.0) h.elo - a.elo else a.elo - h.elo) + (if (sH == 1.0) site else -site) * HOME_ELO
+        val eloDiff = if (sH == 1.0) h.elo - a.elo + adv else a.elo - h.elo - adv
         val mult = ln(margin + 1) * (2.2 / (eloDiff * 0.001 + 2.2))
         val k = 22.0
         val delta = k * mult * (sH - pH)
@@ -55,8 +69,7 @@ object Rankings {
         for (t in lg.teams) t.expWins = 0.0
         for (g in reg) {
             val h = lg.team(g.home); val a = lg.team(g.away)
-            val site = if (g.neutral) 0 else 1
-            val p = winProb(h.elo, a.elo, site)
+            val p = winProbFor(lg, g, h.id)
             h.expWins += p
             a.expWins += 1 - p
         }

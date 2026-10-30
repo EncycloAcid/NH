@@ -23,6 +23,7 @@ object SaveIO {
         val text = GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes().toString(Charsets.UTF_8) }
         val lg = json.decodeFromString(League.serializer(), text)
         lg.reindex()
+        Rivalries.ensure(lg)
         return lg
     }
 }

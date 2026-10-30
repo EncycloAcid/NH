@@ -344,6 +344,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
                 Ring(t.prestige, 58.dp, textSize = 22.sp)
             }
         }
+        RivalsList(vm, lg, t)
         Section("NIL")
         Panel {
             Row {
@@ -419,6 +420,7 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 GroupList(Schedule.teamGames(lg, t.id)) { g -> GameRow(vm, lg, g, t.id) }
             }
             else -> item {
+                RivalsList(vm, lg, t)
                 Spacer(Modifier.height(10.dp))
                 if (t.history.isEmpty()) Empty("No completed seasons yet.")
                 GroupList(t.history.reversed()) { h ->
@@ -451,16 +453,19 @@ fun GameRow(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game.Game, me: I
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(teamLabel(opp), style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(gameKind(lg, g), style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(gameKind(lg, g), style = T.small.copy(fontSize = 12.sp), color = if (lg.rivalry(g) != null) P.bad else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (g.played) Text("${g.scoreFor(me)}-${g.scoreAgainst(me)}${if (g.ot > 0) " OT" else ""}", style = T.numSm, color = if (won) P.good else P.bad)
     }
 }
 
-fun gameKind(lg: League, g: com.nh.hoopscoach.game.Game): String = when (g.type) {
-    com.nh.hoopscoach.game.GameType.CONF -> "Conference"
-    com.nh.hoopscoach.game.GameType.NONCONF -> "Non-conference"
-    else -> g.label
+fun gameKind(lg: League, g: com.nh.hoopscoach.game.Game): String {
+    val base = when (g.type) {
+        com.nh.hoopscoach.game.GameType.CONF -> "Conference"
+        com.nh.hoopscoach.game.GameType.NONCONF -> "Non-conference"
+        else -> g.label
+    }
+    return lg.rivalry(g)?.let { "${it.title} · $base" } ?: base
 }
 
 @Composable

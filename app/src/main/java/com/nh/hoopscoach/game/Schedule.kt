@@ -8,6 +8,8 @@ object Schedule {
     const val CT_START = REG_DAYS + 1         // 32..35
     const val NCAA_START = CT_START + 4       // 36 First Four and NIT first round, 37..42 Round of 64 to title game
     const val LAST_DAY = NCAA_START + 6
+    /** Dates for non-conference rivalry games, best first (after the in-season events). */
+    private val RIVAL_DAYS = listOf(10, 12, 8, 11, 13, 9, 7, 3, 2, 1)
 
     fun build(lg: League) {
         lg.games = mutableListOf()
@@ -18,6 +20,7 @@ object Schedule {
         lg.bubble = null
         lg.nextGameId = 1
         lg.reindex()
+        Rivalries.ensure(lg)
         val played = HashSet<Long>()
         fun key(a: Int, b: Int) = if (a < b) a.toLong() * 10000 + b else b.toLong() * 10000 + a
 
@@ -48,9 +51,25 @@ object Schedule {
             }
         }
 
+        // Non-conference rivals get their date first, late in non-conference play.
+        // The home team alternates every year unless the game is always at a neutral site.
+        val busy = HashSet<Long>()
+        fun slot(day: Int, team: Int) = day.toLong() * 100_000 + team
+        for (r in lg.rivals) {
+            val a = lg.team(r.a)
+            val b = lg.team(r.b)
+            if (a.confId == b.confId || key(a.id, b.id) in played) continue
+            val day = RIVAL_DAYS.firstOrNull { slot(it, a.id) !in busy && slot(it, b.id) !in busy } ?: continue
+            val (h, aw) = if ((lg.season + r.a) % 2 == 0) a to b else b to a
+            lg.addGame(Game(lg.nextGameId++, day, h.id, aw.id, r.neutral, GameType.NONCONF))
+            played += key(a.id, b.id)
+            busy += slot(day, a.id)
+            busy += slot(day, b.id)
+        }
+
         // Non-conference days.
         for (day in 1..NC_DAYS) {
-            val avail = lg.teams.filter { day !in EVENT_DAY..EVENT_DAY + 2 || it.id !in eventTeams }
+            val avail = lg.teams.filter { (day !in EVENT_DAY..EVENT_DAY + 2 || it.id !in eventTeams) && slot(day, it.id) !in busy }
             val pairs = pairUp(avail, played)
             for ((a, b) in pairs) {
                 played += key(a.id, b.id)
@@ -63,9 +82,22 @@ object Schedule {
 
         // Conference play: circle method, then a partial second pass to reach 18 games.
         for (c in lg.confs) {
+            // Rivals sit opposite each other so they meet in the first round of the circle. The second
+            // pass starts with that round reversed, so they play home-and-home, the rematch on the last day.
+            val placed = HashSet<Int>()
+            val rivalPairs = mutableListOf<Pair<Int, Int>>()
+            for (r in lg.rivals) {
+                if (r.a !in c.teamIds || r.b !in c.teamIds || r.a in placed || r.b in placed) continue
+                rivalPairs += r.a to r.b
+                placed += r.a
+                placed += r.b
+            }
             // Odd-sized conferences get a bye slot (-1); games against it are skipped.
-            val ids = c.teamIds.shuffled(Rng.r).toMutableList<Int>().also { if (it.size % 2 == 1) it += -1 }
-            val n = ids.size
+            val rest = c.teamIds.filter { it !in placed }.shuffled(Rng.r).toMutableList<Int>().also { if (c.teamIds.size % 2 == 1) it += -1 }
+            val n = c.teamIds.size + c.teamIds.size % 2
+            val ids = MutableList(n) { -1 }
+            rivalPairs.forEachIndexed { i, (x, y) -> ids[i] = x; ids[n - 1 - i] = y }
+            for ((k, pos) in (rivalPairs.size until n - rivalPairs.size).withIndex()) ids[pos] = rest[k]
             val rounds = mutableListOf<List<Pair<Int, Int>>>()
             val rot = ids.toMutableList()
             for (r in 0 until n - 1) {
@@ -86,7 +118,11 @@ object Schedule {
                 all += rounds[k % rounds.size].map { (h, a) -> a to h }
                 k++
             }
-            val order = all.shuffled(Rng.r)
+            // First meeting somewhere in the first half; the reversed rematch closes conference play.
+            val rematch = if (all.size > rounds.size) rounds.size else -1
+            val order = all.filterIndexed { i, _ -> i != 0 && i != rematch }.shuffled(Rng.r).toMutableList()
+            order.add(Rng.int(0, order.size / 2 + 1), all[0])
+            if (rematch >= 0) order += all[rematch]
             order.forEachIndexed { idx, pairs ->
                 val day = NC_DAYS + 1 + idx
                 for ((h, a) in pairs) if (h >= 0 && a >= 0) lg.addGame(Game(lg.nextGameId++, day, h, a, false, GameType.CONF))

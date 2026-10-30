@@ -191,6 +191,10 @@ class Team(
     var tourneys: Int = 0,
     var confTitles: Int = 0,
     var bonuses: MutableList<NilBonus> = mutableListOf(),
+    /** Home arena capacity, set once when the league is created (or an old save loads). */
+    var arena: Int = 0,
+    /** Prestige won or lost in rivalry games this season. */
+    var rivalryDelta: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -248,6 +252,10 @@ class Game(
     var aws: Int = -1,
     var ot: Int = 0,
     var box: BoxScore? = null,
+    /** Crowd size, set when the game tips off. */
+    var att: Int = 0,
+    /** Prestige the winner took from the loser in a rivalry game. */
+    var swing: Int = 0,
 ) {
     val played get() = hs >= 0
     fun winner() = if (hs > aws) home else away
@@ -311,7 +319,27 @@ class Recruit(
 )
 
 @Serializable
-class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false)
+class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1) {
+    /** Rivalry results carry their game so the headline can link to the box score. */
+    val rivalry get() = gameId >= 0
+}
+
+/** A traditional rivalry between two programs, with the series record since the dynasty began. */
+@Serializable
+class Rivalry(
+    val a: Int,
+    val b: Int,
+    val name: String = "",
+    /** Played at a neutral site every year (e.g. Braggin' Rights in St. Louis). */
+    val neutral: Boolean = false,
+    var aWins: Int = 0,
+    var bWins: Int = 0,
+) {
+    fun involves(t: Int) = a == t || b == t
+    fun other(t: Int) = if (a == t) b else a
+    fun winsFor(t: Int) = if (a == t) aWins else bWins
+    val title get() = name.ifEmpty { "Rivalry" }
+}
 
 @Serializable
 class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0)
@@ -469,6 +497,8 @@ class League(
     var ncaa: Bracket? = null,
     var nit: Bracket? = null,
     var bubble: Bubble? = null,
+    val rivals: MutableList<Rivalry> = mutableListOf(),
+    var rivalsReady: Boolean = false,
     var events: MutableList<InSeasonEvent> = mutableListOf(),
     var recruits: MutableList<Recruit> = mutableListOf(),
     var userTeamId: Int,
@@ -493,6 +523,7 @@ class League(
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()
     @Transient private var coachIndex: HashMap<Int, Coach> = HashMap()
+    @Transient private var rivalIndex: HashMap<Long, Rivalry>? = null
 
     fun reindex() {
         playerIndex = HashMap(players.size * 2)
@@ -520,4 +551,18 @@ class League(
     val userCoach get() = coach(userCoachId)
 
     fun rosterOf(t: Team): List<Player> = t.roster.map { player(it) }
+
+    fun rivalry(x: Int, y: Int): Rivalry? {
+        val idx = rivalIndex?.takeIf { it.size == rivals.size } ?: HashMap<Long, Rivalry>().also { m ->
+            for (r in rivals) m[pairKey(r.a, r.b)] = r
+            rivalIndex = m
+        }
+        return idx[pairKey(x, y)]
+    }
+
+    fun rivalry(g: Game): Rivalry? = rivalry(g.home, g.away)
+
+    fun rivalsOf(teamId: Int): List<Rivalry> = rivals.filter { it.involves(teamId) }
+
+    private fun pairKey(x: Int, y: Int): Long = if (x < y) x.toLong() * 100_000 + y else y.toLong() * 100_000 + x
 }

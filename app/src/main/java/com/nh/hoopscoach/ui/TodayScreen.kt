@@ -38,6 +38,7 @@ import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Rankings
 import com.nh.hoopscoach.game.Ratings
+import com.nh.hoopscoach.game.Rivalries
 import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Team
@@ -69,12 +70,13 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
+        Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (today != null) item { NextUp(vm, lg, today) }
         item { Form(vm, lg, u) }
         if (u.gp >= 8) item { Outlook(vm, lg) }
         item { ConfSnapshot(vm, lg, u) }
         item { TopPlayers(vm, lg, u) }
-        item { Headlines(lg) }
+        item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }
@@ -84,7 +86,8 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
     val u = lg.user
     val opp = lg.team(g.opp(u.id))
     val site = when { g.neutral -> 0; g.home == u.id -> 1; else -> -1 }
-    val p = Rankings.winProb(u.elo, opp.elo, site)
+    val p = Rankings.winProbFor(lg, g, u.id)
+    val rivalry = lg.rivalry(g)
     val where = when (site) { 0 -> "Neutral site"; 1 -> "Home"; else -> "Away" }
     val kind = when (g.type) {
         GameType.CONF -> lg.conf(u.confId).abbr
@@ -94,6 +97,10 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
     val seeds = Season.userBracket(lg)?.seeds
     Section(title ?: "Next up", action = "Scout", onAction = { vm.push(Route.TeamPage(opp.id)) })
     Panel {
+        if (rivalry != null) {
+            RivalryPreview(lg, g, rivalry)
+            Spacer(Modifier.height(12.dp))
+        }
         Text("$kind · $where".uppercase(), style = T.label, color = P.sub)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -212,15 +219,18 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
 }
 
 @Composable
-private fun Headlines(lg: League) {
+private fun Headlines(vm: GameViewModel, lg: League) {
     val items = lg.news.filter { it.season == lg.season }.takeLast(6).reversed()
     if (items.isEmpty()) return
     Section("Around the league")
     GroupList(items, inset = 34.dp) { n ->
-        ListRow {
+        ListRow(onClick = if (n.rivalry) ({ vm.push(Route.Box(n.gameId)) }) else null) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (n.mine) P.accent else P.line))
             Spacer(Modifier.width(12.dp))
-            Text(n.text, style = T.body, color = if (n.mine) P.ink else P.sub)
+            Column(Modifier.weight(1f)) {
+                if (n.rivalry) { Tag("RIVALRY", P.bad); Spacer(Modifier.height(3.dp)) }
+                Text(n.text, style = T.body, color = if (n.mine) P.ink else P.sub)
+            }
         }
     }
 }
@@ -249,6 +259,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
+        Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         when {
             today != null -> item { NextUp(vm, lg, today, if (ffDay) "Your First Four game" else "Your game") }
@@ -286,7 +297,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             GroupList(shown.take(8)) { g -> MatchRow(vm, lg, b, g) }
         }
         if (post) item { OtherEvents(vm, lg, b) }
-        item { Headlines(lg) }
+        item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }

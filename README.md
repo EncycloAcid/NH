@@ -29,6 +29,13 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 - **League**: AP Top 25 and NET, standings for all 32 conferences, stat leaders, Bubble Watch, bracketology and brackets, and history.
 - **Bubble Watch**: the projected field, sorted into Locks, Should be in, On the bubble (last four byes and last four in), First four out and Next four out, plus projected automatic bids. Tap any two teams to compare their resumes side by side: record, NET, Quad 1 and Quad 2 records, SOS, non-conference SOS and Wins Above Bubble. After Selection Sunday it shows the committee's final call. The Today screen shows your own outlook from mid-season on.
 - **Career**: your coach's record, honors, job security, coaching skills and history.
+- **Rivalry games**: 45 traditional rivalries, including Duke-North Carolina (Tobacco Road), Kentucky-Louisville (Battle of the Bluegrass), Kansas-Missouri (Border War), Indiana-Purdue, Michigan-Michigan State and Missouri-Illinois (Braggin' Rights, at a neutral site).
+  - **Schedule**: conference rivals play home-and-home, with the rematch closing out conference play. Non-conference rivals meet every year, and the home team alternates.
+  - **Game day**: rivalry games sell out, and the home crowd is worth an extra 25 Elo. The engine and the win odds both include it.
+  - **Prestige**: the winner takes 1 prestige point from the loser, or 2 for an upset. Winning also lifts your players' mood and your job security.
+  - **Headlines**: every result gets a front page in *The Hoops Dispatch*, a newspaper-style banner with headline, score, crowd, prestige swing and series record. It appears on Today and in the box score.
+  - **Rivals list**: rivals and the series record show on team pages and in your Program tab.
+- **Crowds**: every game has an attendance figure based on the home arena, the program and how the team is playing.
 - **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
 - **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, a 68-team NCAA Tournament and a 32-team NIT.
   - **Selection**: 32 automatic bids and 36 at-large. The committee ranks resumes by NET and Wins Above Bubble equally, with credit for Quad 1 wins and a penalty for Quad 4 losses. Bubble Watch uses the same formula, so its projection matches the real selection.

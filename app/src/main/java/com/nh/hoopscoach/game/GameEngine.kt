@@ -39,7 +39,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     var finished = false
         private set
     val events = ArrayList<PlayEvent>()
-    private val homeEdge = if (game.neutral) 0.0 else 1.0
+    /** 1.0 is a normal home crowd; rivalry crowds scale it up to match their extra Elo. */
+    private val homeEdge = Rankings.homeElo(lg, game) / Rankings.HOME_ELO
+
+    init {
+        if (game.att <= 0) game.att = Rivalries.attendance(lg, game)
+    }
     private var committed = false
     private val n: DoubleArray = lg.norms ?: computeNorms(lg).also { lg.norms = it }
     private val skillOff = DoubleArray(2) { if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0 }
@@ -469,7 +474,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         game.hs = score[0]; game.aws = score[1]; game.ot = max(0, period - 2)
         val userInvolved = game.involves(lg.userTeamId)
         val userConfTourney = game.type == GameType.CONF_TOURNEY && teams[0].confId == lg.user.confId
-        if (userInvolved || game.type == GameType.NCAA || userConfTourney) {
+        if (userInvolved || game.type == GameType.NCAA || userConfTourney || lg.rivalry(game) != null) {
             game.box = boxScore()
         }
         val hw = score[0] > score[1]
@@ -507,6 +512,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         teams[0].opp.add(lastTotals(1))
         teams[1].opp.add(lastTotals(0))
         Rankings.updateElo(lg, game)
+        Rivalries.afterGame(lg, game)
     }
 
     private fun lastTotals(side: Int): StatLine {

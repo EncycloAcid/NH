@@ -47,6 +47,7 @@ import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Offense
 import com.nh.hoopscoach.game.PlayEvent
 import com.nh.hoopscoach.game.PlayerLine
+import com.nh.hoopscoach.game.Rankings
 import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.StatLine
 import com.nh.hoopscoach.game.Team
@@ -83,11 +84,13 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     val home = e.teams[0]
     val away = e.teams[1]
     val userHome = home.id == lg.userTeamId
-    val edge = (home.elo - away.elo + if (e.game.neutral) 0.0 else 70.0) / 28.0
+    val edge = (home.elo - away.elo + Rankings.homeElo(lg, e.game)) / 28.0
     Column(Modifier.fillMaxSize()) {
         BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodLabel} half · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
+        CrowdLine(lg, e.game)
+        Spacer(Modifier.height(8.dp))
         Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
             val pts = remember(lv.tick) {
                 val list = mutableListOf(0f to winProb(0, 2400, edge).toFloat())
@@ -247,6 +250,9 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
         item {
             BackBar("Box score", g.label.ifEmpty { "${gameKind(lg, g)}${if (g.day <= Schedule.REG_DAYS) " · game day ${g.day}" else ""}" }, onBack = { vm.back() })
             Scoreboard(away, home, g.aws.coerceAtLeast(0), g.hs.coerceAtLeast(0), if (g.played) "FINAL" else "—", if (g.ot > 0) "${if (g.ot > 1) "${g.ot}" else ""}OT" else "", lg.userTeamId)
+            Spacer(Modifier.height(8.dp))
+            CrowdLine(lg, g)
+            if (g.played && lg.rivalry(g) != null) { Spacer(Modifier.height(10.dp)); NewspaperBanner(vm, lg, g, onClick = null) }
             val b = g.box
             if (b != null) {
                 Spacer(Modifier.height(10.dp))

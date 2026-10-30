@@ -119,6 +119,46 @@ class ScreenshotTest {
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
     }
 
+    /** Duke-North Carolina: preview, live crowd, the newspaper banner and the box score. */
+    @Test
+    fun rivalry() = rivalryShots("R")
+
+    @Test
+    fun rivalryDark() {
+        RuntimeEnvironment.setQualifiers("+night")
+        rivalryShots("RD", full = false)
+    }
+
+    private fun rivalryShots(tag: String, full: Boolean = true) {
+        val lg = league("Duke")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val duke = lg.userTeamId
+        val g = lg.games.filter { it.involves(duke) && lg.rivalry(it) != null }.minBy { it.day }
+        while (lg.day < g.day) Season.playDay(lg)
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        if (full) {
+            shot("${tag}01_next_rivalry")
+            vm.startLive()
+            val lv = vm.live!!
+            lv.speed = 0
+            repeat(120) { lv.engine.step() }
+            lv.tick++
+            shot("${tag}02_live")
+            vm.back()
+        } else {
+            Season.playDay(lg)
+        }
+        rule.waitForIdle()
+        vm.install(lg)
+        scrollTo(0); shot("${tag}03_banner")
+        vm.push(Route.Box(g.id)); shot("${tag}04_box"); vm.back()
+        if (!full) return
+        scrollTo(6); shot("${tag}05_headlines")
+        vm.select(Tab.TEAM); vm.teamTab = 3; scrollTo(1); shot("${tag}06_program_rivals")
+        vm.push(Route.Schedule(duke)); scrollTo(2); shot("${tag}07_schedule"); vm.back()
+    }
+
     private fun run(team: String, tag: String, full: Boolean = true) {
         val lg = league(team)
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())

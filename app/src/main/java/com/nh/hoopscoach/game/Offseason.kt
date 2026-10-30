@@ -292,7 +292,7 @@ object Offseason {
     /** Shared by a brand-new league and every new season. */
     fun setupSeason(lg: League, carryElo: Boolean) {
         for (t in lg.teams) {
-            t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0
+            t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0; t.rivalryDelta = 0
             t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
             if (t.id != lg.userTeamId) Morale.aiNilRefresh(lg, t)
             if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)

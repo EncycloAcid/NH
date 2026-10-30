@@ -160,7 +160,8 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
                         val opp = lg.team(game.opp(u.id))
                         val where = when { game.neutral -> "NEUTRAL"; game.home == u.id -> "HOME"; else -> "AWAY" }
                         val tag = if (game.day <= Schedule.REG_DAYS) "GAME ${u.gp + 1}" else game.label.substringAfter("· ").uppercase()
-                        Text("$tag · $where", style = T.label, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val rival = lg.rivalry(game) != null
+                        Text("$tag · ${if (rival) "RIVALRY · " else ""}$where", style = T.label, color = if (rival) P.bad else P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${if (game.home == u.id || game.neutral) "vs" else "at"} ${teamLabel(opp)}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else {
                         Text(Season.statusLine(lg).uppercase(), style = T.label, color = P.accent, maxLines = 1)

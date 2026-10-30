@@ -8,6 +8,7 @@ import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Recruiting
+import com.nh.hoopscoach.game.Rivalries
 import com.nh.hoopscoach.game.Rng
 import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.Season
@@ -56,6 +57,7 @@ class SimTest {
                     ),
             )
             checkPostseason(lg)
+            checkRivalries(lg)
             val champ = lg.team(lg.history.last().champion)
             println("  Champion: ${champ.name} (${champ.record}, prestige ${champ.prestige}); user ${lg.user.name} ${lg.user.record} → ${lg.wrapUp?.result}")
             val top = lg.players.filter { it.teamId >= 0 }.sortedByDescending { it.stats.ppg }.take(3)
@@ -87,6 +89,46 @@ class SimTest {
             println("  new season ${lg.season}, games scheduled=${lg.games.size}, user exp wins=%.1f".format(lg.user.expWins))
             assertTrue(s >= 0)
         }
+    }
+
+    /** Rivalry games are scheduled, sell out, swing prestige and make headlines. */
+    private fun checkRivalries(lg: League) {
+        val names = lg.teams.map { it.school }.toSet()
+        assertTrue("rivalry schools exist: ${Rivalries.schools - names}", names.containsAll(Rivalries.schools))
+        assertEquals(45, lg.rivals.size)
+        val regular = lg.games.filter { it.played && it.day <= Schedule.REG_DAYS }
+        var twice = 0
+        for (r in lg.rivals) {
+            val meetings = regular.filter { it.involves(r.a) && it.involves(r.b) }
+            assertTrue("${lg.team(r.a).school}-${lg.team(r.b).school} meet", meetings.isNotEmpty())
+            val conf = meetings.filter { it.type == GameType.CONF }
+            if (conf.size >= 2) {
+                twice++
+                assertTrue("home-and-home", conf.map { it.home }.toSet().size == 2)
+            }
+            for (g in meetings) {
+                assertTrue("rivalry sells out", g.att == (if (g.neutral) g.att else lg.team(g.home).arena))
+                assertTrue("prestige swing", g.swing in 1..2)
+            }
+        }
+        val duke = lg.teams.first { it.school == "Duke" }.id
+        val unc = lg.teams.first { it.school == "North Carolina" }.id
+        val dukeUnc = regular.filter { it.involves(duke) && it.involves(unc) && it.type == GameType.CONF }
+        assertEquals("Duke-UNC home-and-home", 2, dukeUnc.size)
+        assertEquals("rematch closes conference play", Schedule.REG_DAYS, dukeUnc.maxOf { it.day })
+        val braggin = lg.rivals.first { it.name == "Braggin' Rights" }
+        assertTrue(regular.first { it.involves(braggin.a) && it.involves(braggin.b) }.neutral)
+        val homeGames = lg.games.filter { it.played && !it.neutral }
+        val rivalHome = homeGames.filter { lg.rivalry(it) != null }
+        val normalFill = homeGames.filter { lg.rivalry(it) == null }.map { it.att.toDouble() / lg.team(it.home).arena }.average()
+        if (lg.rivalsOf(lg.userTeamId).isNotEmpty()) {
+            val sig = lg.wrapUp!!.signals.first { it.label == "Rivalry games" }
+            println("  user rivalry signal: ${sig.detail} ${sig.value}")
+        }
+        val heads = lg.news.filter { it.rivalry && it.season == lg.season }
+        assertTrue(heads.isNotEmpty())
+        println("  rivalries: ${lg.rivals.size}, home-and-home $twice, rivalry home W%%=%.2f (n=%d), normal fill=%.2f, headlines=%d, e.g. \"%s\"".format(
+            rivalHome.count { it.hs > it.aws }.toDouble() / rivalHome.size, rivalHome.size, normalFill, heads.size, heads.last().text))
     }
 
     /** Bubble Watch during conference tournament week. */

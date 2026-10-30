@@ -338,12 +338,13 @@ object Season {
         }
 
         // Prestige, team & coach history.
-        val beforeUser = lg.user.prestige
+        // Season-start prestige: rivalry swings during the year count toward the season's change.
+        val beforeUser = lg.user.prestige - lg.user.rivalryDelta
         for (t in lg.teams) {
             val round = Awards.tourneyRound(lg, t.id)
             val bonus = when (round) { 7 -> 48; 6 -> 40; 5 -> 34; 4 -> 27; 3 -> 20; 2 -> 12; 1 -> 6; else -> 0 }
             val target = 25 + t.winPct * 50 + bonus + if (confChamps[t.confId] == t.id) 3 else 0
-            t.prevPrestige = t.prestige
+            t.prevPrestige = t.prestige - t.rivalryDelta
             t.prestige = (t.prestige * 0.85 + target * 0.15).roundToInt().coerceIn(5, 99)
             if (t.id == nitChamp) t.prestige = (t.prestige + nitBoost).coerceAtMost(99)
             val c = lg.coachOf(t)
@@ -425,6 +426,7 @@ object Season {
             Driver("National awards", if (natAwards > 0) "$natAwards national honor${if (natAwards == 1) "" else "s"} for the program." else "No national honors this year.",
                 if (natAwards > 0) "Award boost" else "None", natAwards > 0),
         ) + listOfNotNull(
+            rivalrySignal(lg, t),
             nitReward?.let { Driver("NIT title", "+${it.prestige} prestige on top of the season's change, and ${it.xp} XP for ${it.players} returning players.", "+${it.prestige}", true) },
         )
         val drivers = mutableListOf(
@@ -441,6 +443,15 @@ object Season {
             mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
             event, rounds.take(path.size), nitReward,
         )
+    }
+
+    private fun rivalrySignal(lg: League, t: Team): Driver? {
+        val games = lg.games.filter { it.played && it.involves(t.id) && lg.rivalry(it) != null }
+        if (games.isEmpty()) return null
+        val w = games.count { it.winner() == t.id }
+        val opps = games.map { lg.team(it.opp(t.id)).school }.distinct().joinToString(" and ")
+        val d = t.rivalryDelta
+        return Driver("Rivalry games", "Went $w-${games.size - w} against $opps.", "%+d prestige".format(d), d >= 0)
     }
 
     /** Short label for where a team's season stands. */
