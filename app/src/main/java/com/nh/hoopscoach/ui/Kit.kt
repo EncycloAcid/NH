@@ -2,6 +2,9 @@ package com.nh.hoopscoach.ui
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -284,9 +287,20 @@ fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = 
 
 // ---------- sports graphics ----------
 
-/** Circular badge in school colors with a monogram. Real logos are not used. */
+/** Circular badge with the school's bundled logo, or a monogram in school colors if none. */
 @Composable
 fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
+    val logo = TeamLogos.forSchool(t.school)
+    if (logo != null) {
+        Box(
+            modifier.size(size).clip(CircleShape).background(Color(0xFFF4F4F4))
+                .border(size * 0.06f, Color(t.primary), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(painterResource(logo), contentDescription = t.school, modifier = Modifier.size(size * 0.72f), contentScale = ContentScale.Fit)
+        }
+        return
+    }
     val primary = Color(t.primary)
     val secondary = Color(t.secondary)
     val ring = if (contrast(primary, secondary) > 1.6f) secondary else onColor(primary)

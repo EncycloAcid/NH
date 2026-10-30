@@ -265,7 +265,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
             Panel {
                 SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { confirm = true }
                 Spacer(Modifier.height(10.dp))
-                Text("Hoops Dynasty 2.0 · Schools and conferences are real; all players and coaches are fictional. Team marks are drawn monograms, not official logos.", style = T.small, color = P.faint)
+                Text("Hoops Dynasty 2.0 · Schools and conferences are real; all players and coaches are fictional. Team logos are from ESPN (personal use); monograms are shown if a logo is missing.", style = T.small, color = P.faint)
             }
             Spacer(Modifier.height(24.dp))
         }
