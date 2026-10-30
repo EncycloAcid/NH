@@ -312,6 +312,8 @@ object Offseason {
         if (lg.news.size > 250) lg.news.subList(0, lg.news.size - 250).clear()
     }
 
+    private fun ordinalWord(n: Int) = "$n" + when { n % 100 in 11..13 -> "th"; n % 10 == 1 -> "st"; n % 10 == 2 -> "nd"; n % 10 == 3 -> "rd"; else -> "th" }
+
     /** Shared by a brand-new league and every new season. */
     fun setupSeason(lg: League, carryElo: Boolean) {
         for (t in lg.teams) {
@@ -338,6 +340,10 @@ object Offseason {
         lg.recruitPoints = Recruiting.dailyPoints(lg)
         val u = lg.user
         lg.news += News(lg.season, 0, if (u.ap > 0) "${u.school} opens the season ranked No. ${u.ap}" else "${u.school} opens the season unranked", true)
+        val preview = Previews.build(lg)
+        lg.preview = preview
+        val top = lg.team(preview.proj.entries.first { it.value.nat == 1 }.key)
+        lg.news += News(lg.season, 0, "The ${lg.season} preview is out: ${top.school} is the preseason No. 1, and ${u.school} is picked ${ordinalWord(preview.proj.getValue(u.id).confRank)} in the ${lg.conf(u.confId).abbr}")
         Season.prepareDay(lg)
     }
 

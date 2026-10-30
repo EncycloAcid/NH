@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -124,6 +125,23 @@ class ScreenshotTest {
         vm.wrapPage = 3; scrollTo(0); shot("P19_wrap_program")
         scrollTo(1); shot("P20_wrap_signals")
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
+    }
+
+    /** The preseason magazine: Today card, cover, Top 25, conference predictions, players to watch, picks. */
+    @Test
+    fun seasonPreview() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Read the issue", substring = true))
+        rule.waitForIdle(); shot("V01_today_card")
+        vm.push(Route.Preview); rule.waitForIdle(); shot("V02_cover")
+        for ((tab, name) in listOf("Top 25" to "V03_top25", "Conferences" to "V04_conferences", "Players" to "V05_players", "Picks" to "V06_picks")) {
+            rule.onAllNodesWithText(tab).onFirst().performClick()
+            rule.mainClock.advanceTimeBy(1500)
+            rule.waitForIdle(); shot(name)
+        }
     }
 
     /** Career pages: a veteran's season-by-season table and honors, a former player's page, and former players. */

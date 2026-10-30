@@ -72,6 +72,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { LatestMyMoment(vm, lg) }
+        item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
         item { Form(vm, lg, u) }
         if (u.gp >= 8) item { Outlook(vm, lg) }

@@ -49,6 +49,7 @@ sealed interface Route {
     data object Leaders : Route
     data object CoachDev : Route
     data object WrapUp : Route
+    data object Preview : Route
 }
 
 /** A game being watched possession by possession. */

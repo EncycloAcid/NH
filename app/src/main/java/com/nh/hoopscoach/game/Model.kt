@@ -590,6 +590,8 @@ class League(
     val moments: MutableList<Moment> = mutableListOf(),
     /** Former players whose careers stay on record: the user's, every draft pick and All-Americans. */
     val alumni: MutableList<Player> = mutableListOf(),
+    /** This season's preview magazine. */
+    var preview: Preview? = null,
     var events: MutableList<InSeasonEvent> = mutableListOf(),
     var recruits: MutableList<Recruit> = mutableListOf(),
     var userTeamId: Int,

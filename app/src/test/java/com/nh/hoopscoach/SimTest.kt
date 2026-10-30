@@ -57,6 +57,7 @@ class SimTest {
         repeat(3) { s ->
             val t0 = System.currentTimeMillis()
             var guard = 0
+            val pv = checkPreview(lg)
             var projected = false
             while (lg.phase != Phase.WRAP_UP && guard++ < 100) {
                 Season.playDay(lg)
@@ -88,6 +89,7 @@ class SimTest {
             checkRivalries(lg)
             checkFans(lg)
             checkMoments(lg)
+            previewAccuracy(lg, pv)
             val champ = lg.team(lg.history.last().champion)
             println("  Champion: ${champ.name} (${champ.record}, prestige ${champ.prestige}); user ${lg.user.name} ${lg.user.record} → ${lg.wrapUp?.result}")
             val top = lg.players.filter { it.teamId >= 0 }.sortedByDescending { it.stats.ppg }.take(3)
@@ -128,6 +130,35 @@ class SimTest {
             println("  new season ${lg.season}, games scheduled=${lg.games.size}, user exp wins=%.1f".format(lg.user.expWins))
             assertTrue(s >= 0)
         }
+    }
+
+    /** The preseason magazine is there every season and its rankings hold together. */
+    private fun checkPreview(lg: League): com.nh.hoopscoach.game.Preview {
+        val pv = lg.preview!!
+        assertEquals(lg.season, pv.season)
+        assertEquals(lg.teams.size, pv.proj.size)
+        assertEquals((1..lg.teams.size).toSet(), pv.proj.values.map { it.nat }.toSet())
+        for (c in lg.confs) assertEquals("conference ranks for ${c.abbr}", (1..c.teamIds.size).toSet(), c.teamIds.map { pv.proj.getValue(it).confRank }.toSet())
+        assertEquals(10, pv.allAmerica.size)
+        assertEquals(5, pv.freshmen.size)
+        assertEquals(4, pv.finalFour.size)
+        assertEquals(lg.confs.size, pv.confPoy.size)
+        assertTrue(pv.proj.values.all { it.w + it.l in 25..34 })
+        return pv
+    }
+
+    private fun previewAccuracy(lg: League, pv: com.nh.hoopscoach.game.Preview) {
+        val f4 = lg.ncaa!!.rounds[4].toSet()
+        var err = 0.0
+        var n = 0
+        for (c in lg.confs) {
+            val st = Season.standings(lg, c.id)
+            st.forEachIndexed { i, t -> err += kotlin.math.abs(i + 1 - pv.proj.getValue(t.id).confRank); n++ }
+        }
+        val pick = lg.team(pv.finalFour[0])
+        val top25 = pv.proj.filterValues { it.nat <= 25 }.keys
+        val made = top25.count { lg.ncaa!!.hasTeam(it) }
+        println("  preview: champion pick ${pick.school} -> ${com.nh.hoopscoach.game.Awards.resultFor(lg, pick.id)}; Final Four picks in F4 ${pv.finalFour.count { it in f4 }}/4; top-25 teams in NCAA field $made/25; avg conference finish error %.1f places".format(err / n))
     }
 
     /** March moments: upsets, buzzer-beaters, Cinderellas and the champion make the highlight reel. */

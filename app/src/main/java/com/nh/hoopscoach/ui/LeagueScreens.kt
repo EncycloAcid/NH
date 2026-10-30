@@ -92,6 +92,18 @@ private fun RankRow(vm: GameViewModel, lg: League, rank: String, t: Team, right:
 private fun LazyListScope.polls(vm: GameViewModel, lg: League) {
     val ap = lg.teams.filter { it.ap > 0 }.sortedBy { it.ap }
     item {
+        if (lg.phase == com.nh.hoopscoach.game.Phase.REGULAR || lg.phase == com.nh.hoopscoach.game.Phase.CONF_TOURNEY || lg.phase == com.nh.hoopscoach.game.Phase.NCAA) {
+            Spacer(Modifier.height(10.dp))
+            GroupList(listOf(0)) {
+                ListRow(onClick = { vm.push(Route.Preview) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("${lg.season} Season Preview", style = T.bodyB, color = P.ink)
+                        Text("Preseason Top 25, predicted conference finishes, players to watch", style = T.small, color = P.sub)
+                    }
+                    Chevron()
+                }
+            }
+        }
         Section(if (lg.user.gp == 0) "Preseason AP Top 25" else "AP Top 25")
         GroupList(ap) { t -> RankRow(vm, lg, "${t.ap}", t, t.record, "NET ${t.net}") }
         Section("NET rankings · top 50")

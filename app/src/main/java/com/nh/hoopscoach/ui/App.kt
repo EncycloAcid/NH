@@ -131,6 +131,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Leaders -> LeadersScreen(vm, lg)
         is Route.CoachDev -> CoachDevScreen(vm, lg)
         is Route.WrapUp -> WrapUpFlow(vm, lg)
+        is Route.Preview -> PreviewScreen(vm, lg)
     }
 }
 

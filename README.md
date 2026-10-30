@@ -50,6 +50,12 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - **Other moments**: multi-overtime classics, Cinderella runs (a 10 seed or lower reaching the Sweet 16, a 7 seed or lower reaching the Final Four) and the national title.
   - **Where they show**: each one gets a tagged headline, and during March, Today shows the latest upset alerts. Bracket winners that pulled an upset get an UPSET tag.
   - **Highlight reel**: every moment is saved to a reel under League → History, with a filter for your team, and the season review lists the year's top March moments. Your own buzzer-beaters count in any month.
+- **Season preview magazine**: every preseason a new issue comes out, announced in the news and on Today. Open it from Today or League → Polls, and swipe through five pages.
+  - **Cover**: the preseason No. 1, with headlines on what's inside.
+  - **Top 25**: ranked by team strength, with projected records and a short write-up on each team's last season, headliner and top newcomer.
+  - **Conferences**: predicted finishes and projected records for all 32 conferences, plus each one's Preseason Player of the Year. Once conference play starts, a NOW column shows who's ahead of or behind the prediction.
+  - **Players to watch**: the Preseason All-America teams, top freshmen, transfers to watch and breakout candidates.
+  - **Picks**: Final Four and champion picks, a sleeper, and your team's outlook, with its key players and newcomers.
 - **Player career pages**: open any player for his full Career tab.
   - **Stats**: a season-by-season table (minutes, points, rebounds, assists, steals, blocks, turnovers and shooting) that switches between per-game and totals, with the season in progress highlighted and a career line. Plus his NCAA Tournament stats, and career highs with the game each one came in.
   - **Honors by season**: each season shows his team, its record and result (Sweet 16, NIT Champion and so on), and every honor: All-American teams, national and conference awards, All-Tournament, draft position, walk-on tryouts and program Hall of Fame.
