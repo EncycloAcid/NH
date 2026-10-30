@@ -308,6 +308,22 @@ class ScreenshotTest {
         rivalryShots("RD", full = false)
     }
 
+    /** The newspaper banner on a narrow phone with slightly larger system text. */
+    @Test
+    fun rivalryNarrow() {
+        RuntimeEnvironment.setQualifiers("w360dp-h780dp-xhdpi")
+        RuntimeEnvironment.setFontScale(1.15f)
+        rivalryShots("RN", full = false)
+    }
+
+    /** The same on a narrow phone in dark mode. */
+    @Test
+    fun rivalryNarrowDark() {
+        RuntimeEnvironment.setQualifiers("w360dp-h780dp-night-xhdpi")
+        RuntimeEnvironment.setFontScale(1.15f)
+        rivalryShots("RND", full = false)
+    }
+
     private fun rivalryShots(tag: String, full: Boolean = true) {
         val lg = league("Duke")
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
