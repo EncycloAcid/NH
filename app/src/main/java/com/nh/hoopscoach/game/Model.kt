@@ -205,12 +205,37 @@ class Team(
     var arena: Int = 0,
     /** Prestige won or lost in rivalry games this season. */
     var rivalryDelta: Int = 0,
+    /** Fan mood 5-100: wins fill the arena and the NIL pool, losses empty them. */
+    var fans: Double = 0.0,
+    var homeGames: Int = 0,
+    var homeAtt: Long = 0,
+    var sellouts: Int = 0,
+    /** Program Hall of Fame; retired jerseys hang in the rafters. */
+    val legends: MutableList<Legend> = mutableListOf(),
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
     val winPct get() = if (gp == 0) 0.0 else w.toDouble() / gp
     val record get() = "$w-$l"
     val confRecord get() = "$cw-$cl"
+}
+
+/** A program legend: Hall of Fame member, and for the very best, a retired jersey. */
+@Serializable
+class Legend(
+    val name: String,
+    val pos: Pos? = null,
+    val number: Int = -1,
+    val from: Int,
+    val to: Int,
+    val line: String,
+    val honors: List<String> = emptyList(),
+    val inducted: Int,
+    val retired: Boolean = false,
+    val coach: Boolean = false,
+    val score: Int = 0,
+) {
+    val years get() = if (from == to) "$from" else "$from-${to % 100}"
 }
 
 @Serializable
@@ -498,6 +523,8 @@ class OffseasonState(
     val tryouts: MutableList<Tryout> = mutableListOf(),
     /** The user's walk-ons who broke out this summer. */
     val breakouts: MutableList<Int> = mutableListOf(),
+    /** Legends the user's program honored this offseason. */
+    val honors: MutableList<Legend> = mutableListOf(),
     /** Closer looks left at tryouts: each one reveals a candidate's overall. */
     var looks: Int = 0,
 )

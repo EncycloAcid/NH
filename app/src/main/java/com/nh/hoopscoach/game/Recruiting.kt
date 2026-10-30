@@ -24,6 +24,7 @@ object Recruiting {
 
     /** Filled during the daily tick so fit() doesn't rescan every recruit. */
     private var needCache: HashMap<Int, Int>? = null
+    private var pipeCache: IntArray? = null
 
     private fun needFactor(lg: League, t: Team, pos: Pos): Double {
         val cache = needCache
@@ -38,6 +39,9 @@ object Recruiting {
         val prestigeF = (1.0 - gap.coerceAtLeast(0) / 40.0).coerceIn(0.25, 1.3) + (if (gap < -20) 0.1 else 0.0)
         val coach = lg.coachOf(t)
         var f = prestigeF * needFactor(lg, t, r.p.pos) * (0.7 + coach.rec / 170.0)
+        // Programs that send players to the pros recruit better.
+        val pipe = pipeCache?.getOrNull(t.id) ?: Pipeline.points(lg, t.id)
+        f *= 1 + Pipeline.bonus(pipe, Pipeline.isTop(r))
         if (t.id == lg.userTeamId) {
             if (coach.has(CoachSkill.RECRUITER)) f *= 1.08
             val ratio = if (r.nilAsk <= 0) 1.0 else r.nilOffer.toDouble() / r.nilAsk
@@ -125,7 +129,8 @@ object Recruiting {
         }
         for (r in lg.recruits) if (r.committed >= 0) need.merge(r.committed * 5 + r.p.pos.ordinal, 1, Int::plus)
         needCache = need
-        try { aiTick(lg, open) } finally { needCache = null }
+        pipeCache = Pipeline.table(lg)
+        try { aiTick(lg, open) } finally { needCache = null; pipeCache = null }
         lg.recruitPoints = dailyPoints(lg)
     }
 
@@ -222,7 +227,7 @@ object Recruiting {
     fun openRoom(lg: League, t: Team) = MAX_ROSTER - Tryouts.scholarships(lg, t) - lg.recruits.count { it.committed == t.id }
 
     fun freeNumber(lg: League, t: Team): Int {
-        val used = t.roster.map { lg.player(it).number }.toSet()
+        val used = t.roster.map { lg.player(it).number }.toSet() + Legacy.retiredNumbers(t)
         return (0..55).filter { it !in used }.let { if (it.isEmpty()) Rng.int(0, 99) else Rng.pick(it) }
     }
 

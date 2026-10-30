@@ -345,6 +345,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
                 Ring(t.prestige, 58.dp, textSize = 22.sp)
             }
         }
+        FanPanel(t)
         RivalsList(vm, lg, t)
         Section("NIL")
         Panel {
@@ -388,6 +389,8 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
                 RingStat("Offense", c.off); RingStat("Defense", c.def); RingStat("Recruit", c.rec); RingStat("Develop", c.dev)
             }
         }
+        PipelinePanel(vm, lg, t)
+        ProgramLegends(t)
     }
 }
 
@@ -421,8 +424,10 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 GroupList(Schedule.teamGames(lg, t.id)) { g -> GameRow(vm, lg, g, t.id) }
             }
             else -> item {
+                ProgramLegends(t)
                 RivalsList(vm, lg, t)
-                Spacer(Modifier.height(10.dp))
+                PipelinePanel(vm, lg, t)
+                Section("Seasons")
                 if (t.history.isEmpty()) Empty("No completed seasons yet.")
                 GroupList(t.history.reversed()) { h ->
                     ListRow {

@@ -406,6 +406,10 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
             ), style = T.numSm)
         }
         Section("Draft decisions")
+        Text(
+            "Your best underclassmen can declare early. Pitch them to come back, or let them go: every player drafted from your program lifts recruiting for four years.",
+            style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, bottom = 8.dp),
+        )
         if (entrants.isEmpty()) Panel { Text("No underclassmen are declaring for the draft.", style = T.body, color = P.sub) }
     }
     entrants.forEach { p ->
@@ -486,6 +490,8 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League) {
         Panel(padding = PaddingValues(vertical = 14.dp)) {
             StatRow(listOf(Triple("Picks", "${picks.size}", null), Triple("Your players", "${mine.size}", P.accent), Triple("Lottery", "${picks.count { it.pick <= 14 }}", null)))
         }
+        HonorsCard(lg.user, lg.offseason?.honors ?: emptyList())
+        PipelinePanel(vm, lg, lg.user)
     }
     for ((label, range) in listOf("First round" to 1..30, "Second round" to 31..60)) {
         val list = picks.filter { it.pick in range }
@@ -723,13 +729,14 @@ private fun LazyListScope.budgetStep(lg: League) {
         GroupList(
             listOf(
                 Triple("Donor NIL pool", "Tracks prestige · ${prestigeLabel(t.prestige).lowercase()}", donor),
+                Triple("Fan support", "Fans are ${com.nh.hoopscoach.game.Fans.mood(t.fans).lowercase()}${if (t.homeGames > 0) " · ${fans(com.nh.hoopscoach.game.Fans.avgCrowd(t))} a night" else ""}", Finance.fanMoney(t)),
                 Triple("Conference revenue share", lg.conf(t.confId).name, rev),
                 Triple("Performance bonuses", "${t.bonuses.size} active, capped at ${money(Finance.bonusCap(lg, t))}", applied),
             ),
         ) { (a, b, v) ->
             ListRow {
                 Column(Modifier.weight(1f)) { Text(a, style = T.bodyB, color = P.ink); Text(b, style = T.small, color = P.sub) }
-                Text(money(v), style = T.numSm, color = P.good)
+                Text((if (v < 0) "−" else "") + money(kotlin.math.abs(v)), style = T.numSm, color = if (v < 0) P.bad else P.good)
             }
         }
         Spacer(Modifier.height(10.dp))

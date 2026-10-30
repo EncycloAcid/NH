@@ -86,6 +86,7 @@ class SimTest {
             )
             checkPostseason(lg)
             checkRivalries(lg)
+            checkFans(lg)
             val champ = lg.team(lg.history.last().champion)
             println("  Champion: ${champ.name} (${champ.record}, prestige ${champ.prestige}); user ${lg.user.name} ${lg.user.record} → ${lg.wrapUp?.result}")
             val top = lg.players.filter { it.teamId >= 0 }.sortedByDescending { it.stats.ppg }.take(3)
@@ -117,12 +118,47 @@ class SimTest {
                 assertTrue("walk-ons for ${t.school}", Tryouts.walkOns(lg, t) <= Tryouts.WALK_ON_SPOTS)
                 if (t.id != lg.userTeamId) assertEquals("AI roster for ${t.school}", Recruiting.MAX_ROSTER, t.roster.size)
             }
+            checkLegends(lg)
             val gems = lg.players.filter { it.tryout > 0 && it.teamId >= 0 }
             println("  former tryout walk-ons in the league: ${gems.size}, broke out ${gems.count { it.story >= 1 }}, stars ${gems.count { it.story >= 2 }}")
             assertTrue(lg.recruits.isNotEmpty())
             println("  new season ${lg.season}, games scheduled=${lg.games.size}, user exp wins=%.1f".format(lg.user.expWins))
             assertTrue(s >= 0)
         }
+    }
+
+    /** Winning fills the arena and the NIL pool; losing empties both. */
+    private fun checkFans(lg: League) {
+        val byWins = lg.teams.sortedByDescending { it.winPct }
+        val top = byWins.take(40)
+        val bottom = byWins.takeLast(40)
+        val fTop = top.map { it.fans }.average()
+        val fBot = bottom.map { it.fans }.average()
+        val fillTop = top.map { com.nh.hoopscoach.game.Fans.avgFill(it) }.average()
+        val fillBot = bottom.map { com.nh.hoopscoach.game.Fans.avgFill(it) }.average()
+        assertTrue("winners have happier fans", fTop > fBot + 15)
+        assertTrue("winners draw bigger crowds", fillTop > fillBot + 0.1)
+        val boosts = lg.teams.map { com.nh.hoopscoach.game.Finance.fanMoney(it) }
+        println("  fans: top-40 by win%% mood %.0f fill %.0f%%, bottom-40 mood %.0f fill %.0f%%; sellouts %d; fan NIL %d..%dK".format(
+            fTop, fillTop * 100, fBot, fillBot * 100, lg.teams.sumOf { it.sellouts }, boosts.min(), boosts.max()))
+        val u = lg.user
+        println("  user fans: ${"%.0f".format(u.fans)} ${com.nh.hoopscoach.game.Fans.mood(u.fans)}, avg crowd ${com.nh.hoopscoach.game.Fans.avgCrowd(u)}/${u.arena}, NIL ${com.nh.hoopscoach.game.Finance.fanMoney(u)}K")
+    }
+
+    /** Legends are honored when great players leave; retired numbers are never handed out again. */
+    private fun checkLegends(lg: League) {
+        val last = lg.season - 1
+        val fresh = lg.teams.flatMap { t -> t.legends.filter { it.inducted == last }.map { t to it } }
+        val retired = fresh.filter { it.second.retired }
+        for (t in lg.teams) {
+            val nums = com.nh.hoopscoach.game.Legacy.retiredNumbers(t)
+            val newcomers = lg.rosterOf(t).filter { it.year == 1 || it.ovrHistory.size <= 1 }
+            assertTrue("retired numbers stay retired at ${t.school}", newcomers.none { it.number in nums && t.legends.any { l -> l.retired && l.number == it.number && l.inducted < lg.season - 1 } })
+        }
+        val pipe = com.nh.hoopscoach.game.Pipeline.table(lg)
+        val best = lg.teams.sortedByDescending { pipe[it.id] }.take(3)
+        println("  legends this offseason: ${fresh.size} (retired ${retired.size}) e.g. ${fresh.maxByOrNull { it.second.score }?.let { (t, l) -> "${l.name} ${t.abbr} score ${l.score}${if (l.retired) " #${l.number} retired" else ""}: ${l.honors.take(2)}" }}")
+        println("  pro pipeline: ${best.map { "${it.abbr} ${pipe[it.id]}pts +${(com.nh.hoopscoach.game.Pipeline.bonus(pipe[it.id], true) * 100).toInt()}%" }}")
     }
 
     /** Walk-on tryouts: unrated candidates, closer looks, keeping two, then the new season. */

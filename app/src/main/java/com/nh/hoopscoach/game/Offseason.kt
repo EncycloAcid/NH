@@ -112,6 +112,7 @@ object Offseason {
         t.roster.remove(pid)
         lg.offseason?.let { it.released += p.name; it.freedOther += p.nil }
         toPortal(lg, p, t.id)
+        Gameplan.validate(lg, t)
     }
 
     private fun toPortal(lg: League, p: Player, fromId: Int) {
@@ -173,6 +174,7 @@ object Offseason {
                 if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
                 toPortal(lg, p, t.id)
             }
+            Gameplan.validate(lg, t)
         }
     }
 
@@ -202,12 +204,15 @@ object Offseason {
                 if (p.year >= 4 || pid in drafted) {
                     if (t.id == lg.userTeamId && pid !in drafted) os.freedGrad += p.nil
                     hallOfFameCheck(lg, p, t)
+                    Legacy.honorPlayer(lg, t, p)
                     t.roster.remove(pid)
                     lg.removePlayer(p)
                 }
             }
         }
         os.entrants.retainAll(drafted)
+        // Lineups can't point at players who just left.
+        for (t in lg.teams) Gameplan.validate(lg, t)
     }
 
     private fun hallOfFameCheck(lg: League, p: Player, t: Team) {
@@ -307,6 +312,7 @@ object Offseason {
     fun setupSeason(lg: League, carryElo: Boolean) {
         for (t in lg.teams) {
             t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0; t.rivalryDelta = 0
+            Fans.newSeason(t)
             t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
             if (t.id != lg.userTeamId) Morale.aiNilRefresh(lg, t)
             if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
@@ -431,6 +437,7 @@ object Coaching {
             val retire = c.age >= 72 || (c.age >= 66 && Rng.chance(0.3))
             val fired = !retire && t.w - t.expWins < -5 && Rng.chance(0.35)
             if (retire || fired) {
+                Legacy.honorCoach(lg, t, c)
                 if (retire && c.titles >= 2) lg.hallOfFame += HofEntry(lg.season, c.name, Pos.PG, t.school, "${c.w}-${c.l} · ${c.titles} titles", isCoach = true)
                 lg.coaches.remove(c)
                 val n = LeagueGen.makeCoach(lg, t.prestige, Rng.range(34, 55), withCareer = true)
@@ -462,6 +469,7 @@ object Coaching {
     fun acceptOffer(lg: League, teamId: Int) {
         val os = lg.offseason ?: return
         if (os.offers.none { it.teamId == teamId }) return
+        Legacy.honorCoach(lg, lg.user, lg.userCoach)
         val oldTeam = lg.user
         val newTeam = lg.team(teamId)
         val me = lg.userCoach

@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performScrollToIndex
@@ -118,6 +120,40 @@ class ScreenshotTest {
         vm.wrapPage = 3; scrollTo(0); shot("P19_wrap_program")
         scrollTo(1); shot("P20_wrap_signals")
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
+    }
+
+    /** Draft Night honors and pipeline, fan support in the NIL budget, the Program tab's fans and rafters. */
+    @Test
+    fun programLegacy() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        while (lg.phase != Phase.WRAP_UP) Season.playDay(lg)
+        Offseason.begin(lg)
+        val os = lg.offseason!!
+        // Two departing stars with the résumés of program legends.
+        val leaving = lg.rosterOf(lg.user).sortedByDescending { it.ovr }.take(2)
+        leaving.forEach { it.year = 4 }
+        leaving[0].awards += listOf("${lg.season} Nat MVP", "${lg.season} AA 1st")
+        leaving[1].awards += listOf("${lg.season} Conf POY", "${lg.season} AA 2nd")
+        Offseason.advance(lg)
+        vm.install(lg); vm.select(Tab.TODAY)
+        scrollTo(0); shot("U01_draft_honors")
+        scrollTo(1); shot("U02_draft_pipeline")
+        vm.select(Tab.TEAM); vm.teamTab = 3
+        scrollTo(0); shot("U03_program_fans")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Conference Player of the Year", substring = true))
+        rule.waitForIdle(); shot("U04_program_legends")
+        vm.select(Tab.TODAY)
+        while (os.step != com.nh.hoopscoach.game.OffStep.BUDGET) {
+            if (os.step == com.nh.hoopscoach.game.OffStep.CAREER && os.fired) com.nh.hoopscoach.game.Coaching.acceptOffer(lg, os.offers.first().teamId)
+            Offseason.advance(lg)
+        }
+        vm.install(lg); scrollTo(0); shot("U05_budget_fans")
+        Offseason.advance(lg)
+        vm.install(lg)
+        vm.push(Route.RecruitView(lg.recruits.first { it.p.stars >= 4 }.p.id)); shot("U06_recruit_pipeline"); vm.back()
     }
 
     /** Walk-on tryouts, a summer breakout, and a walk-on's player card. */

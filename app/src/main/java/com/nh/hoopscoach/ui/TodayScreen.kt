@@ -102,6 +102,14 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
             Spacer(Modifier.height(12.dp))
         }
         Text("$kind · $where".uppercase(), style = T.label, color = P.sub)
+        if (rivalry == null && !g.neutral) {
+            val home = lg.team(g.home)
+            val fill = com.nh.hoopscoach.game.Fans.expectedFill(lg, g)
+            Text(
+                "Expected crowd ${if (fill >= 0.99) "sellout" else "about ${fans((home.arena * fill).toInt() / 100 * 100)}"} · ${home.abbr} fans are ${com.nh.hoopscoach.game.Fans.mood(home.fans).lowercase()}",
+                style = T.small, color = P.sub,
+            )
+        }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Side(lg, u, seeds?.get(u.id), Modifier.weight(1f)) { vm.push(Route.TeamPage(u.id)) }

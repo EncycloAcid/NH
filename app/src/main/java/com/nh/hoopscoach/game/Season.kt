@@ -92,6 +92,7 @@ object Season {
 
     private fun dailyUpkeep(lg: League) {
         Rankings.refresh(lg)
+        Fans.drift(lg)
         Morale.tick(lg)
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
         // Practice: everyone improves a little, bench players included.
@@ -250,7 +251,7 @@ object Season {
         val field = pr.field.toSet()
         lg.nit = Bracketology.nitBracket(pr.order.filter { it !in field })
         lg.phase = Phase.NCAA
-        for (id in field) { val t = lg.team(id); t.tourneys++; lg.coachOf(t).tourneys++ }
+        for (id in field) { val t = lg.team(id); t.tourneys++; lg.coachOf(t).tourneys++; t.fans = (t.fans + 4).coerceAtMost(100.0) }
 
         val groups = lg.bubble!!.groups.associateBy { it.key }
         val lastIn = pr.atLarge.takeLast(4)
@@ -428,6 +429,7 @@ object Season {
                 if (natAwards > 0) "Award boost" else "None", natAwards > 0),
         ) + listOfNotNull(
             rivalrySignal(lg, t),
+            fanSignal(lg, t),
             nitReward?.let { Driver("NIT title", "+${it.prestige} prestige on top of the season's change, and ${it.xp} XP for ${it.players} returning players.", "+${it.prestige}", true) },
         )
         val drivers = mutableListOf(
@@ -443,6 +445,17 @@ object Season {
             Rankings.quadRecord(lg, t, 1), Rankings.quadRecord(lg, t, 2), Rankings.wab(lg, t), Rankings.sosRank(lg, t),
             mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
             event, rounds.take(path.size), nitReward,
+        )
+    }
+
+    private fun fanSignal(lg: League, t: Team): Driver? {
+        if (t.homeGames == 0) return null
+        val boost = Fans.nilBoost(t, Finance.donor(t.prestige))
+        val money = if (kotlin.math.abs(boost) >= 1000) "%.1fM".format(kotlin.math.abs(boost) / 1000.0) else "${kotlin.math.abs(boost)}K"
+        return Driver(
+            "Fan support",
+            "Average crowd of ${"%,d".format(Fans.avgCrowd(t))} (${(Fans.avgFill(t) * 100).roundToInt()}% full), ${t.sellouts} sellout${if (t.sellouts == 1) "" else "s"}. Fans are ${Fans.mood(t.fans).lowercase()}.",
+            "${if (boost >= 0) "+" else "−"}$$money NIL", boost >= 0,
         )
     }
 

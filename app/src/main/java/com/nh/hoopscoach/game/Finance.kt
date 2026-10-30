@@ -15,12 +15,15 @@ object Finance {
 
     fun appliedBonus(lg: League, t: Team) = min(bonusTotal(t), bonusCap(lg, t))
 
-    fun budget(lg: League, t: Team): Int = donor(t.prestige) + revShare(lg, t) + appliedBonus(lg, t)
+    /** Fans add to the donor pool when they're excited and pull money out when they're not. */
+    fun fanMoney(t: Team) = Fans.nilBoost(t, donor(t.prestige))
+
+    fun budget(lg: League, t: Team): Int = donor(t.prestige) + fanMoney(t) + revShare(lg, t) + appliedBonus(lg, t)
 
     /** Budget the program would have at a different prestige (for year-over-year comparisons). */
     fun budgetAt(lg: League, t: Team, prestige: Int): Int {
         val base = donor(prestige) + revShare(lg, t)
-        return base + min(bonusTotal(t), (base * 0.12).roundToInt())
+        return base + Fans.nilBoost(t, donor(prestige)) + min(bonusTotal(t), (base * 0.12).roundToInt())
     }
 
     /** Salaries owed to players who will be on next season's roster. */

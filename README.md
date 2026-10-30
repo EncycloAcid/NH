@@ -35,7 +35,15 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - **Prestige**: the winner takes 1 prestige point from the loser, or 2 for an upset. Winning also lifts your players' mood and your job security.
   - **Headlines**: every result gets a front page in *The Hoops Dispatch*, a newspaper-style banner with headline, score, crowd, prestige swing and series record. It appears on Today and in the box score.
   - **Rivals list**: rivals and the series record show on team pages and in your Program tab.
-- **Crowds**: every game has an attendance figure based on the home arena, the program and how the team is playing.
+- **Fans and crowds**: every program has a fan mood, from Apathetic to Electric.
+  - Wins raise it, especially at home, against ranked teams, in rivalries and in March. Losses lower it, and it slowly settles back toward what the program's stature supports.
+  - Fan mood sets attendance, so a hot team sells out and a losing one plays to empty seats.
+  - It also adds up to 20% to the donor NIL pool, or takes up to 20% away. That shows as "Fan support" in the NIL budget.
+- **Pro pipeline**: your best underclassmen can declare early for the NBA draft. Every player drafted from your program raises recruiting interest for the next four drafts: lottery picks count most, and 4- and 5-star recruits care most.
+- **Program legends**: when a player leaves, his whole career at the school is scored on awards, titles, Final Fours, scoring and draft position.
+  - The best enter the program's Hall of Fame, and the all-time greats have their jersey retired. Retired jerseys hang as banners in the rafters, and nobody on that team wears the number again.
+  - Coaches with titles, Final Fours or long runs are honored when they leave.
+  - Legends show on the Program tab and every team page, with a ceremony on Draft Night for your own.
 - **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
 - **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, a 68-team NCAA Tournament and a 32-team NIT.
   - **Selection**: 32 automatic bids and 36 at-large. The committee ranks resumes by NET and Wins Above Bubble equally, with credit for Quad 1 wins and a penalty for Quad 4 losses. Bubble Watch uses the same formula, so its projection matches the real selection.

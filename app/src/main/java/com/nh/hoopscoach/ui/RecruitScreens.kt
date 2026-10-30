@@ -185,6 +185,14 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                     SmallButton("Call · ${Recruiting.COST_CALL}", Modifier.weight(1f), enabled = !committed) { vm.act { if (!Recruiting.call(it, r)) vm.toast("Not enough points") } }
                     SmallButton("Visit · ${Recruiting.COST_VISIT}", Modifier.weight(1f), enabled = !committed && Recruiting.visitReady(lg, r)) { vm.act { if (!Recruiting.visit(it, r)) vm.toast("Not enough points") } }
                 }
+                val pipe = com.nh.hoopscoach.game.Pipeline.points(lg, u.id)
+                if (pipe > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Pro pipeline: +${(com.nh.hoopscoach.game.Pipeline.bonus(pipe, com.nh.hoopscoach.game.Pipeline.isTop(r)) * 100).toInt()}% interest from every pitch, thanks to your recent draft picks.",
+                        style = T.small, color = P.good,
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
                 if (u.id in r.offers) SecondaryButton("Withdraw scholarship offer", Modifier.fillMaxWidth(), enabled = !committed) { vm.act { Recruiting.withdraw(it, r) } }
                 else PrimaryButton("Offer scholarship", Modifier.fillMaxWidth(), enabled = !committed) { vm.act { if (!Recruiting.offer(it, r)) vm.toast("No scholarships left to offer") } }

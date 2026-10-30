@@ -513,6 +513,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         teams[1].opp.add(lastTotals(0))
         Rankings.updateElo(lg, game)
         Rivalries.afterGame(lg, game)
+        Fans.afterGame(lg, game)
     }
 
     private fun lastTotals(side: Int): StatLine {

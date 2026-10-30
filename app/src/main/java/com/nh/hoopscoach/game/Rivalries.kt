@@ -68,7 +68,7 @@ object Rivalries {
 
     /** Resolves the list to this league's teams and sizes every arena. Safe to call any time. */
     fun ensure(lg: League) {
-        for (t in lg.teams) if (t.arena <= 0) t.arena = arenaFor(t)
+        for (t in lg.teams) { if (t.arena <= 0) t.arena = arenaFor(t); Fans.ensure(t) }
         if (lg.rivalsReady) return
         val byName = lg.teams.associateBy { it.school }
         for (d in LIST) {
@@ -103,9 +103,9 @@ object Rivalries {
             return (venue * draw.coerceIn(0.35, 1.0)).roundToInt()
         }
         if (rival) return home.arena
-        val fill = 0.4 + home.prestige * 0.0045 + (home.winPct - 0.5) * 0.3 +
-            (if (away.ap > 0) 0.08 else 0.0) + (if (g.type == GameType.CONF) 0.04 else 0.0) + Rng.gauss() * 0.04
-        return (home.arena * fill.coerceIn(0.3, 0.97)).roundToInt()
+        // Fan mood fills the building; a packed house is a sellout.
+        val fill = Fans.expectedFill(lg, g) + Rng.gauss() * 0.03
+        return if (fill >= 0.99) home.arena else (home.arena * fill.coerceIn(0.25, 0.98)).roundToInt()
     }
 
     fun sellout(lg: League, g: Game) = g.att > 0 && lg.rivalry(g) != null

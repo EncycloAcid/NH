@@ -76,8 +76,10 @@ object Gameplan {
         var s = 0.0
         var w = 0.0
         for (slot in t.plan.slots) {
-            if (slot.starter >= 0) { val m = slot.starterMin.toDouble(); s += f(lg.player(slot.starter)) * m; w += m }
-            if (slot.reserve >= 0) { val m = (40 - slot.starterMin).toDouble(); s += f(lg.player(slot.reserve)) * m; w += m }
+            val st = if (slot.starter >= 0) lg.playerOrNull(slot.starter) else null
+            val rs = if (slot.reserve >= 0) lg.playerOrNull(slot.reserve) else null
+            if (st != null) { val m = slot.starterMin.toDouble(); s += f(st) * m; w += m }
+            if (rs != null) { val m = (40 - slot.starterMin).toDouble(); s += f(rs) * m; w += m }
         }
         if (w == 0.0) return lg.rosterOf(t).map(f).average().roundToInt()
         return (s / w).roundToInt()
