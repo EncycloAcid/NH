@@ -187,7 +187,7 @@ object Offseason {
         val picks = pool.take(60)
         picks.forEachIndexed { i, p ->
             val t = lg.team(p.teamId)
-            lg.draftHistory += DraftPick(lg.season, i + 1, p.name, p.pos, t.id, t.school, p.year, p.ovr, p.look, p.number)
+            lg.draftHistory += DraftPick(lg.season, i + 1, p.name, p.pos, t.id, t.school, p.year, p.ovr, p.look, p.number, p.id)
             lg.coachOf(t).drafted++
             p.awards += "${lg.season} Draft #${i + 1}"
             if (t.id == lg.userTeamId) {
@@ -207,6 +207,7 @@ object Offseason {
                     Legacy.honorPlayer(lg, t, p)
                     t.roster.remove(pid)
                     lg.removePlayer(p)
+                    Careers.keep(lg, p, t, if (pid in drafted) picks.indexOfFirst { it.id == pid } + 1 else 0)
                 }
             }
         }
@@ -271,8 +272,11 @@ object Offseason {
         os.signed += Recruiting.signingDay(lg)
         // Other programs fill their open scholarships; the user holds walk-on tryouts first.
         for (t in lg.teams) if (t.id != lg.userTeamId) { fillHoles(lg, t); Tryouts.aiTryout(lg, t) }
-        // Unsigned transfers leave the game.
-        lg.players.filter { it.teamId < 0 }.forEach { lg.removePlayer(it) }
+        // Unsigned transfers leave the game; the user's former players stay on record.
+        lg.players.filter { it.teamId < 0 }.forEach { p ->
+            lg.removePlayer(p)
+            if (p.transferFrom == lg.userTeamId) Careers.keep(lg, p, lg.user, 0, "Left ${lg.user.school} through the transfer portal in ${lg.season}")
+        }
         Tryouts.open(lg, os)
     }
 

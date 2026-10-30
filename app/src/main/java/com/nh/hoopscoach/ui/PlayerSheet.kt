@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Attr
+import com.nh.hoopscoach.game.Careers
 import com.nh.hoopscoach.game.Finance
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.League
@@ -88,19 +89,21 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     val team = if (p.teamId >= 0) lg.team(p.teamId) else null
     val mine = team?.id == lg.userTeamId
-    var tab by remember(p.id) { mutableIntStateOf(0) }
+    val former = if (team == null && p.lastTeam >= 0) lg.team(p.lastTeam) else null
+    var tab by remember(p.id) { mutableIntStateOf(if (former != null) 1 else 0) }
     var editNil by remember { mutableStateOf(false) }
     val board = remember(p.id, vm.rev) { Offseason.draftBoard(lg) }
     LazyColumn(modifier.fillMaxWidth()) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                PlayerJersey(p, team, 72.dp)
+                PlayerJersey(p, team ?: former, 72.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
+                    else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }
             }
             Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
@@ -114,7 +117,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag(p.style.label.uppercase(), P.accent)
-                Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub)
+                if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
                 if (team != null) {
                     val m = Morale.mood(p)
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
@@ -144,12 +147,12 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Segmented(listOf("Ratings", "Stats", "Growth", "Bio"), tab, { tab = it })
+            Segmented(listOf("Ratings", "Career", "Growth", "Bio"), tab, { tab = it })
         }
         item {
             when (tab) {
                 0 -> RatingsTab(p)
-                1 -> StatsTab(vm, lg, p)
+                1 -> CareerTab(vm, lg, p)
                 2 -> GrowthTab(p)
                 else -> BioTab(lg, p)
             }
@@ -206,15 +209,64 @@ private fun AttrBar(label: String, v: Int, gain: Int) {
     }
 }
 
+/** One row of the career table. */
+private class CareerRow(val year: String, val team: String, val cls: String, val s: StatLine, val current: Boolean = false, val total: Boolean = false)
+
 @Composable
-private fun StatsTab(vm: GameViewModel, lg: League, p: Player) {
+private fun CareerTab(vm: GameViewModel, lg: League, p: Player) {
     val s = p.stats
-    Section("This season")
-    Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
-        StatRow(listOf(Triple("PTS", f1(s.ppg), null), Triple("REB", f1(s.rpg), null), Triple("AST", f1(s.apg), null), Triple("STL", f1(s.spg), null), Triple("BLK", f1(s.bpg), null)), style = T.numSm)
-        Spacer(Modifier.height(10.dp))
-        StatRow(listOf(Triple("GP", "${s.gp}", null), Triple("MIN", f1(s.mpg), null), Triple("FG%", pct(s.fgPct), null), Triple("3P%", pct(s.tpPct), null), Triple("FT%", pct(s.ftPct), null)), style = T.numSm)
+    val inSchool = p.teamId >= 0
+    if (inSchool && s.gp > 0) {
+        Section("This season")
+        Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
+            StatRow(listOf(Triple("PTS", f1(s.ppg), null), Triple("REB", f1(s.rpg), null), Triple("AST", f1(s.apg), null), Triple("STL", f1(s.spg), null), Triple("BLK", f1(s.bpg), null)), style = T.numSm)
+            Spacer(Modifier.height(10.dp))
+            StatRow(listOf(Triple("GP", "${s.gp}", null), Triple("MIN", f1(s.mpg), null), Triple("FG%", pct(s.fgPct), null), Triple("3P%", pct(s.tpPct), null), Triple("FT%", pct(s.ftPct), null)), style = T.numSm)
+        }
     }
+
+    // Season by season, with the season in progress and a career line.
+    var totals by remember(p.id) { mutableStateOf(false) }
+    val rows = mutableListOf<CareerRow>()
+    p.career.forEach { rows += CareerRow("${it.season}", it.team, classLabel(it.cls), it.s) }
+    if (inSchool && s.gp > 0 && p.career.none { it.season == lg.season }) rows += CareerRow("${lg.season}", lg.team(p.teamId).abbr, p.cls, s, current = true)
+    Section("Season by season", action = if (rows.isEmpty()) null else if (totals) "Per game" else "Totals", onAction = { totals = !totals })
+    if (rows.isEmpty()) Panel { Text("No college stats yet.", style = T.body, color = P.sub) }
+    else {
+        if (rows.size > 1) rows += CareerRow("Career", "${rows.size} yrs", "", Careers.total(p), total = true)
+        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(rows, totals) }
+        if (rows.any { it.current }) Text("Highlighted: season in progress.", style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 6.dp))
+    }
+
+    // NCAA Tournament.
+    val march = p.career.filter { it.ncaa != null && it.ncaa.gp > 0 }.map { CareerRow("${it.season}", it.team, classLabel(it.cls), it.ncaa!!) }.toMutableList()
+    if (inSchool && p.tourney.gp > 0 && p.career.none { it.season == lg.season }) march += CareerRow("${lg.season}", lg.team(p.teamId).abbr, p.cls, p.tourney, current = true)
+    if (march.isNotEmpty()) {
+        if (march.size > 1) march += CareerRow("Career", "${march.sumOf { it.s.gp }} G", "", Careers.total(p, ncaa = true), total = true)
+        Section("NCAA Tournament")
+        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(march, totals) }
+    }
+
+    // Career highs.
+    if (p.highs.any { it > 0 }) {
+        Section("Career highs")
+        Panel(padding = PaddingValues(vertical = 12.dp, horizontal = 6.dp)) {
+            for (rowStart in listOf(0, 3)) {
+                Row(Modifier.fillMaxWidth()) {
+                    for (i in rowStart until rowStart + 3) {
+                        Column(Modifier.weight(1f).padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${p.highs.getOrElse(i) { 0 }}", style = T.num, color = P.ink)
+                            Text(Careers.HIGHS[i].uppercase(), style = T.label, color = P.sub)
+                            Text(p.highGames.getOrElse(i) { "" }, style = T.small.copy(fontSize = 11.sp), color = P.faint, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    HonorsTimeline(lg, p)
+
     if (p.log.isNotEmpty()) {
         Section("Game log")
         GroupList(p.log.reversed().take(8)) { e ->
@@ -228,24 +280,70 @@ private fun StatsTab(vm: GameViewModel, lg: League, p: Player) {
             }
         }
     }
-    val rows = p.career.toMutableList()
-    Section("Career")
-    if (rows.isEmpty() && s.gp == 0) Panel { Text("No college stats yet.", style = T.body, color = P.sub) }
-    else Panel(padding = PaddingValues(vertical = 10.dp)) {
-        Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
-            val heads = listOf("YEAR", "TEAM", "GP", "PTS", "REB", "AST", "FG%", "3P%")
-            val w = listOf(54, 54, 36, 46, 46, 46, 56, 56)
-            Row { heads.forEachIndexed { i, h -> Text(h, style = T.label, color = P.sub, modifier = Modifier.width(w[i].dp), textAlign = if (i < 2) TextAlign.Start else TextAlign.End) } }
-            rows.forEach { r ->
-                Row(Modifier.padding(vertical = 6.dp)) {
-                    listOf("${r.season}", r.team, "${r.s.gp}", f1(r.s.ppg), f1(r.s.rpg), f1(r.s.apg), pct(r.s.fgPct), pct(r.s.tpPct)).forEachIndexed { i, v ->
-                        Text(v, style = T.small, color = P.ink, modifier = Modifier.width(w[i].dp), textAlign = if (i < 2) TextAlign.Start else TextAlign.End)
-                    }
+}
+
+@Composable
+private fun StatTable(rows: List<CareerRow>, totals: Boolean) {
+    val heads = listOf("YEAR", "TEAM", "CL", "GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG%", "3P%", "FT%")
+    val w = listOf(52, 54, 30, 30, 44, 44, 42, 42, 38, 38, 36, 52, 52, 52)
+    fun values(r: CareerRow): List<String> {
+        val s = r.s
+        val per = if (totals) listOf("${s.sec / 60}", "${s.pts}", "${s.reb}", "${s.ast}", "${s.stl}", "${s.blk}", "${s.tov}")
+        else listOf(f1(s.mpg), f1(s.ppg), f1(s.rpg), f1(s.apg), f1(s.spg), f1(s.bpg), f1(s.per(s.tov)))
+        return listOf(r.year, r.team, r.cls, "${s.gp}") + per + listOf(pct(s.fgPct), pct(s.tpPct), pct(s.ftPct))
+    }
+    Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
+        Row { heads.forEachIndexed { i, h -> Text(h, style = T.label, color = P.sub, modifier = Modifier.width(w[i].dp), textAlign = if (i < 3) TextAlign.Start else TextAlign.End) } }
+        rows.forEach { r ->
+            if (r.total) Box(Modifier.width(w.sum().dp).padding(top = 4.dp).height(1.dp).background(P.line))
+            Row(Modifier.padding(vertical = 6.dp)) {
+                values(r).forEachIndexed { i, v ->
+                    Text(
+                        v, style = if (r.total) T.bodyB.copy(fontSize = 13.sp) else T.small,
+                        color = when { r.current -> P.accent; else -> P.ink }, maxLines = 1,
+                        modifier = Modifier.width(w[i].dp), textAlign = if (i < 3) TextAlign.Start else TextAlign.End,
+                    )
                 }
             }
-            if (s.gp > 0 && p.career.none { it.season == lg.season }) Row(Modifier.padding(vertical = 6.dp)) {
-                listOf("${lg.season}", if (p.teamId >= 0) lg.team(p.teamId).abbr else "", "${s.gp}", f1(s.ppg), f1(s.rpg), f1(s.apg), pct(s.fgPct), pct(s.tpPct)).forEachIndexed { i, v ->
-                    Text(v, style = T.small, color = P.accent, modifier = Modifier.width(w[i].dp), textAlign = if (i < 2) TextAlign.Start else TextAlign.End)
+        }
+    }
+}
+
+/** Every season with the team's record and result, and the honors he won. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HonorsTimeline(lg: League, p: Player) {
+    val seasons = Careers.honorsBySeason(p, lg.season)
+    if (seasons.isEmpty()) return
+    val legend = lg.teams.flatMap { t -> t.legends.filter { it.pid == p.id }.map { t to it } }.firstOrNull()
+    Section("Honors by season")
+    GroupList(seasons) { sh ->
+        val line = p.career.firstOrNull { it.season == sh.season }
+        val current = line == null && sh.season == lg.season && p.teamId >= 0
+        val team = line?.let { l -> lg.teams.getOrNull(l.teamId) ?: lg.teams.firstOrNull { it.abbr == l.team } } ?: if (current) lg.team(p.teamId) else null
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${sh.season}", style = T.numSm, color = P.accent, modifier = Modifier.width(56.dp))
+                if (team != null) { TeamBadge(team, 22.dp); Spacer(Modifier.width(8.dp)) }
+                Column(Modifier.weight(1f)) {
+                    Text(listOfNotNull(team?.school, line?.let { classLabel(it.cls) } ?: if (current) p.cls else null).joinToString(" · "), style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val res = when {
+                        line != null && line.w + line.l > 0 -> "${line.w}-${line.l} · ${line.result}"
+                        line != null -> line.result
+                        current && team != null -> "${team.record} · season in progress"
+                        else -> ""
+                    }
+                    if (res.isNotEmpty()) Text(res, style = T.small, color = P.sub, maxLines = 1)
+                }
+            }
+            val extra = mutableListOf<Pair<String, Int>>()
+            if (p.tryout == sh.season) extra += "Made the team at walk-on tryouts" to 1
+            if (legend != null && sh.season == seasons.first().season && p.teamId < 0) extra += (if (legend.second.retired) "No. ${legend.second.number} retired by ${legend.first.school}" else "${legend.first.school} Hall of Fame") to 5
+            val all = extra + sh.honors
+            if (all.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                FlowRow(Modifier.padding(start = 56.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    all.forEach { (text, rank) -> Tag(text.uppercase(), when { rank >= 4 -> P.gold; rank == 3 -> P.accent; rank == 2 -> P.good; else -> P.sub }) }
                 }
             }
         }

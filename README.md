@@ -50,6 +50,10 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - **Other moments**: multi-overtime classics, Cinderella runs (a 10 seed or lower reaching the Sweet 16, a 7 seed or lower reaching the Final Four) and the national title.
   - **Where they show**: each one gets a tagged headline, and during March, Today shows the latest upset alerts. Bracket winners that pulled an upset get an UPSET tag.
   - **Highlight reel**: every moment is saved to a reel under League → History, with a filter for your team, and the season review lists the year's top March moments. Your own buzzer-beaters count in any month.
+- **Player career pages**: open any player for his full Career tab.
+  - **Stats**: a season-by-season table (minutes, points, rebounds, assists, steals, blocks, turnovers and shooting) that switches between per-game and totals, with the season in progress highlighted and a career line. Plus his NCAA Tournament stats, and career highs with the game each one came in.
+  - **Honors by season**: each season shows his team, its record and result (Sweet 16, NIT Champion and so on), and every honor: All-American teams, national and conference awards, All-Tournament, draft position, walk-on tryouts and program Hall of Fame.
+  - **Former players**: when players leave, their career pages stay on record. That covers everyone who played for you, every draft pick and every All-American. Open them from the Former players list on team pages, the draft history, award winners and the Hall of Fame.
 - **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
 - **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, a 68-team NCAA Tournament and a 32-team NIT.
   - **Selection**: 32 automatic bids and 36 at-large. The committee ranks resumes by NET and Wins Above Bubble equally, with credit for Quad 1 wins and a penalty for Quad 4 losses. Bubble Watch uses the same formula, so its projection matches the real selection.

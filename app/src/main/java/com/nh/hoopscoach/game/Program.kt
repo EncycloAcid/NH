@@ -163,7 +163,7 @@ object Legacy {
         val legend = Legend(
             p.name, p.pos, p.number, seasons.min(), seasons.max(),
             "%.1f ppg · %s points · %.1f rpg · %.1f apg".format(tot.ppg, "%,d".format(tot.pts), tot.rpg, tot.apg),
-            honors.take(4), lg.season, retired, score = score,
+            honors.take(4), lg.season, retired, score = score, pid = p.id,
         )
         induct(lg, t, legend)
     }

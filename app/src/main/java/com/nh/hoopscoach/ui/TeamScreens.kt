@@ -390,7 +390,8 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
             }
         }
         PipelinePanel(vm, lg, t)
-        ProgramLegends(t)
+        ProgramLegends(t) { vm.openPlayer(it) }
+        FormerPlayers(vm, lg, t)
     }
 }
 
@@ -424,7 +425,8 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 GroupList(Schedule.teamGames(lg, t.id)) { g -> GameRow(vm, lg, g, t.id) }
             }
             else -> item {
-                ProgramLegends(t)
+                ProgramLegends(t) { vm.openPlayer(it) }
+                FormerPlayers(vm, lg, t)
                 RivalsList(vm, lg, t)
                 PipelinePanel(vm, lg, t)
                 Section("Seasons")

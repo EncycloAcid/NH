@@ -132,7 +132,7 @@ fun RetiredBanner(t: Team, l: Legend) {
 
 /** The program's legends: retired jerseys in the rafters, then the Hall of Fame. */
 @Composable
-fun ProgramLegends(t: Team) {
+fun ProgramLegends(t: Team, onOpen: ((Int) -> Unit)? = null) {
     val retired = t.legends.filter { it.retired }.sortedBy { it.inducted }
     if (retired.isNotEmpty()) {
         Section("In the rafters")
@@ -150,12 +150,12 @@ fun ProgramLegends(t: Team) {
         }
         return
     }
-    GroupList(t.legends.sortedWith(compareByDescending<Legend> { it.retired }.thenByDescending { it.score }), inset = 66.dp) { l -> LegendRow(t, l) }
+    GroupList(t.legends.sortedWith(compareByDescending<Legend> { it.retired }.thenByDescending { it.score }), inset = 66.dp) { l -> LegendRow(t, l, onOpen) }
 }
 
 @Composable
-fun LegendRow(t: Team, l: Legend) {
-    ListRow {
+fun LegendRow(t: Team, l: Legend, onOpen: ((Int) -> Unit)? = null) {
+    ListRow(onClick = if (onOpen != null && l.pid >= 0) ({ onOpen(l.pid) }) else null) {
         if (l.coach) CoachBadge(l.name.substringBefore(' '), l.name.substringAfterLast(' '), 42.dp)
         else Jersey(l.number, Color(t.primary), Color(t.secondary), 42.dp)
         Spacer(Modifier.width(12.dp))
@@ -170,6 +170,31 @@ fun LegendRow(t: Team, l: Legend) {
             }
             Text("${l.years}${l.pos?.let { " · $it" } ?: ""} · ${l.line}", style = T.small, color = P.sub, maxLines = 2)
             if (l.honors.isNotEmpty()) Text(l.honors.joinToString(" · "), style = T.small, color = P.accent, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Former players with their career on record, newest first. */
+@Composable
+fun FormerPlayers(vm: GameViewModel, lg: League, t: Team) {
+    val list = com.nh.hoopscoach.game.Careers.formerPlayers(lg, t.id)
+    if (list.isEmpty()) return
+    Section("Former players · ${list.size}")
+    GroupList(list.take(10), inset = 70.dp) { p ->
+        val tot = com.nh.hoopscoach.game.Careers.total(p)
+        val seasons = p.career.filter { it.teamId == t.id || it.team == t.abbr }.map { it.season }
+        val years = if (seasons.isEmpty()) "" else if (seasons.min() == seasons.max()) "${seasons.min()}" else "${seasons.min()}-${seasons.max() % 100}"
+        ListRow(onClick = { vm.openPlayer(p.id) }) {
+            Jersey(p.number, Color(t.primary), Color(t.secondary), 44.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOf(years, "${p.pos}", p.left).filter { it.isNotEmpty() }.joinToString(" · "), style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(f1(tot.ppg), style = T.numSm, color = P.ink)
+                Text("PPG", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+            }
         }
     }
 }

@@ -382,7 +382,7 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                 for (s in lg.history.reversed()) item {
                     Section("${s.season}")
                     GroupList(s.awards.filter { it.award in setOf("Nat MVP", "DPOY", "FOY", "MOP", "COTY") }) { a ->
-                        ListRow {
+                        ListRow(onClick = if (a.pid > 0 && lg.anyPlayer(a.pid) != null) ({ vm.openPlayer(a.pid) }) else null) {
                             Text(awardName(a.award), style = T.small, color = P.accent, modifier = Modifier.width(110.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(a.name, style = T.bodyB, color = P.ink)
@@ -397,7 +397,7 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                 for ((season, picks) in lg.draftHistory.groupBy { it.season }.toSortedMap(compareByDescending { it })) item {
                     Section("$season draft")
                     GroupList(picks.take(30)) { d ->
-                        ListRow {
+                        ListRow(onClick = if (d.pid >= 0 && lg.anyPlayer(d.pid) != null) ({ vm.openPlayer(d.pid) }) else null) {
                             Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(36.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(d.playerName, style = T.bodyB, color = if (d.teamId == lg.userTeamId) P.accent else P.ink)

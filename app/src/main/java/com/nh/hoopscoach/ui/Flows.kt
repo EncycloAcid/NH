@@ -506,7 +506,7 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League) {
             GroupList(list) { d ->
                 val t = lg.team(d.teamId)
                 val my = d.teamId == lg.userTeamId
-                ListRow(modifier = if (my) Modifier.background(P.accentSoft) else Modifier) {
+                ListRow(onClick = if (d.pid >= 0 && lg.anyPlayer(d.pid) != null) ({ vm.openPlayer(d.pid) }) else null, modifier = if (my) Modifier.background(P.accentSoft) else Modifier) {
                     Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
                     Jersey(d.number, Color(t.primary), Color(t.secondary), 40.dp)
                     Spacer(Modifier.width(10.dp))

@@ -104,6 +104,7 @@ class SimTest {
             assertEquals("NIT survives a save", lg.nit!!.champion, back.nit!!.champion)
             assertEquals("Selection Sunday survives a save", lg.bubble!!.groups.map { it.ids }, back.bubble!!.groups.map { it.ids })
             assertEquals(lg.wrapUp!!.pathRounds, back.wrapUp!!.pathRounds)
+            assertEquals("former players survive a save", lg.alumni.size, back.alumni.size)
             println("  save size: ${bytes.size / 1024} KB gz")
 
             Offseason.begin(lg)
@@ -120,6 +121,7 @@ class SimTest {
                 if (t.id != lg.userTeamId) assertEquals("AI roster for ${t.school}", Recruiting.MAX_ROSTER, t.roster.size)
             }
             checkLegends(lg)
+            checkCareers(lg)
             val gems = lg.players.filter { it.tryout > 0 && it.teamId >= 0 }
             println("  former tryout walk-ons in the league: ${gems.size}, broke out ${gems.count { it.story >= 1 }}, stars ${gems.count { it.story >= 2 }}")
             assertTrue(lg.recruits.isNotEmpty())
@@ -159,6 +161,22 @@ class SimTest {
             fTop, fillTop * 100, fBot, fillBot * 100, lg.teams.sumOf { it.sellouts }, boosts.min(), boosts.max()))
         val u = lg.user
         println("  user fans: ${"%.0f".format(u.fans)} ${com.nh.hoopscoach.game.Fans.mood(u.fans)}, avg crowd ${com.nh.hoopscoach.game.Fans.avgCrowd(u)}/${u.arena}, NIL ${com.nh.hoopscoach.game.Finance.fanMoney(u)}K")
+    }
+
+    /** Career pages: full season lines, highs, honors, and former players kept on record. */
+    private fun checkCareers(lg: League) {
+        val lastDraft = lg.draftHistory.filter { it.season == lg.season - 1 }
+        assertEquals(60, lastDraft.size)
+        assertTrue("every draft pick stays on record", lastDraft.all { d -> lg.alumni.any { it.id == d.pid } })
+        val vets = lg.players.filter { it.teamId >= 0 && it.career.size >= 1 }
+        assertTrue(vets.isNotEmpty())
+        val line = vets.first().career.last()
+        assertTrue("season lines carry the team record and result", line.w + line.l > 0 && line.result.isNotEmpty() && line.teamId >= 0)
+        assertTrue("career highs tracked", vets.count { it.highs[0] > 0 } > vets.size * 0.8)
+        val mine = com.nh.hoopscoach.game.Careers.formerPlayers(lg, lg.userTeamId)
+        val star = lg.alumni.maxByOrNull { com.nh.hoopscoach.game.Careers.total(it).pts }!!
+        val honors = com.nh.hoopscoach.game.Careers.honorsBySeason(star, lg.season).flatMap { it.honors.map { h -> h.first } }
+        println("  alumni ${lg.alumni.size} (yours ${mine.size}); top: ${star.name} ${com.nh.hoopscoach.game.Careers.total(star).pts} pts, ${star.left}; honors ${honors.take(3)}; highs ${star.highs.toList()}")
     }
 
     /** Legends are honored when great players leave; retired numbers are never handed out again. */

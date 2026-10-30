@@ -112,7 +112,7 @@ private fun Shell(vm: GameViewModel, lg: League) {
             NavBar(vm)
         } else Spacer(Modifier.navigationBarsPadding())
     }
-    vm.sheet?.let { pid -> lg.playerOrNull(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
+    vm.sheet?.let { pid -> lg.anyPlayer(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
 }
 
 @Composable

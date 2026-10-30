@@ -356,9 +356,16 @@ object Season {
             t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name)
             c.history += CoachSeason(lg.season, t.id, t.school, t.w, t.l, result, t.prestige)
         }
+        val results = HashMap<Int, String>()
         for (p in lg.players) {
             val t = if (p.teamId >= 0) lg.team(p.teamId) else null
-            if (t != null && p.stats.gp > 0) p.career += SeasonLine(lg.season, t.abbr, lg.conf(t.confId).abbr, p.year, p.ovr, p.stats.copy())
+            if (t != null && p.stats.gp > 0) {
+                val result = results.getOrPut(t.id) { Awards.resultFor(lg, t.id) }
+                p.career += SeasonLine(
+                    lg.season, t.abbr, lg.conf(t.confId).abbr, p.year, p.ovr, p.stats.copy(),
+                    p.tourney.takeIf { it.gp > 0 }?.copy(), t.w, t.l, result, t.id,
+                )
+            }
             p.ovrHistory += p.ovr
         }
         Finance.decayBonuses(lg)

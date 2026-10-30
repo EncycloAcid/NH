@@ -91,7 +91,14 @@ class StatLine(
 }
 
 @Serializable
-class SeasonLine(val season: Int, val team: String, val conf: String, val cls: Int, val ovr: Int, val s: StatLine)
+class SeasonLine(
+    val season: Int, val team: String, val conf: String, val cls: Int, val ovr: Int, val s: StatLine,
+    /** NCAA Tournament games that season, if any. */
+    val ncaa: StatLine? = null,
+    /** The team's record and how its season ended. */
+    val w: Int = 0, val l: Int = 0, val result: String = "",
+    val teamId: Int = -1,
+)
 
 @Serializable
 class GameLogEntry(
@@ -145,6 +152,12 @@ class Player(
     var gem: Boolean = false,
     /** Walk-on story so far: 0 nothing yet, 1 broke out, 2 became a star. */
     var story: Int = 0,
+    /** Career highs: points, rebounds, assists, threes, steals, blocks; and the game for each. */
+    var highs: IntArray = IntArray(6),
+    var highGames: MutableList<String> = mutableListOf(),
+    /** For former players: the last school and how he left. */
+    var lastTeam: Int = -1,
+    var left: String = "",
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"
@@ -234,6 +247,7 @@ class Legend(
     val retired: Boolean = false,
     val coach: Boolean = false,
     val score: Int = 0,
+    val pid: Int = -1,
 ) {
     val years get() = if (from == to) "$from" else "$from-${to % 100}"
 }
@@ -404,7 +418,7 @@ class Rivalry(
 }
 
 @Serializable
-class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0)
+class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1)
 
 @Serializable
 class HofEntry(val season: Int, val name: String, val pos: Pos, val school: String, val summary: String, val isCoach: Boolean = false)
@@ -574,6 +588,8 @@ class League(
     var rivalsReady: Boolean = false,
     /** The highlight reel: upsets, buzzer-beaters and other big moments, every season. */
     val moments: MutableList<Moment> = mutableListOf(),
+    /** Former players whose careers stay on record: the user's, every draft pick and All-Americans. */
+    val alumni: MutableList<Player> = mutableListOf(),
     var events: MutableList<InSeasonEvent> = mutableListOf(),
     var recruits: MutableList<Recruit> = mutableListOf(),
     var userTeamId: Int,
@@ -611,6 +627,8 @@ class League(
 
     fun player(id: Int): Player = playerIndex[id] ?: players.first { it.id == id }.also { playerIndex[id] = it }
     fun playerOrNull(id: Int): Player? = playerIndex[id] ?: players.firstOrNull { it.id == id }?.also { playerIndex[id] = it }
+    /** A current player or, failing that, a former one. */
+    fun anyPlayer(id: Int): Player? = playerOrNull(id) ?: alumni.firstOrNull { it.id == id }
     fun addPlayer(p: Player) { players.add(p); playerIndex[p.id] = p }
     fun removePlayer(p: Player) { players.remove(p); playerIndex.remove(p.id) }
 

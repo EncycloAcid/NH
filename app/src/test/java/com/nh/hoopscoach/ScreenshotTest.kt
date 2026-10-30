@@ -8,6 +8,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
@@ -120,6 +124,40 @@ class ScreenshotTest {
         vm.wrapPage = 3; scrollTo(0); shot("P19_wrap_program")
         scrollTo(1); shot("P20_wrap_signals")
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
+    }
+
+    /** Career pages: a veteran's season-by-season table and honors, a former player's page, and former players. */
+    @Test
+    fun careerPages() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        var pid by mutableIntStateOf(-1)
+        rule.setContent {
+            if (pid < 0) App(vm)
+            else HoopsTheme(androidx.compose.ui.graphics.Color(lg.user.primary), androidx.compose.ui.graphics.Color(lg.user.secondary)) { PlayerCard(vm, lg, lg.anyPlayer(pid)!!) }
+        }
+        while (lg.phase != Phase.WRAP_UP) Season.playDay(lg)
+        Offseason.autoComplete(lg)
+        repeat(20) { Season.playDay(lg) }
+        vm.install(lg)
+        val vet = lg.rosterOf(lg.user).filter { it.career.isNotEmpty() }.maxBy { it.stats.pts + it.awards.size * 200 }
+        pid = vet.id
+        rule.waitForIdle()
+        rule.onNodeWithText("Career").performClick()
+        rule.waitForIdle(); shot("C01_career_table")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("HONORS BY SEASON"))
+        rule.waitForIdle(); shot("C02_career_highs")
+        val former = lg.alumni.filter { it.lastTeam == lg.userTeamId }.maxByOrNull { com.nh.hoopscoach.game.Careers.total(it).pts } ?: lg.alumni.first()
+        pid = former.id
+        rule.waitForIdle(); shot("C03_former_player")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("HONORS BY SEASON"))
+        rule.waitForIdle(); shot("C04_former_honors")
+        pid = -1
+        vm.select(Tab.TEAM); vm.teamTab = 3
+        rule.waitForIdle()
+        repeat(6) { rule.onAllNodes(hasScrollToIndexAction()).onFirst().performTouchInput { swipeUp() }; rule.waitForIdle() }
+        shot("C05_former_list")
     }
 
     /** Upset alerts, bracket upset tags, the highlight reel and March moments in the season review. */
