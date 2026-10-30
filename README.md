@@ -50,12 +50,25 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - **Other moments**: multi-overtime classics, Cinderella runs (a 10 seed or lower reaching the Sweet 16, a 7 seed or lower reaching the Final Four) and the national title.
   - **Where they show**: each one gets a tagged headline, and during March, Today shows the latest upset alerts. Bracket winners that pulled an upset get an UPSET tag.
   - **Highlight reel**: every moment is saved to a reel under League → History, with a filter for your team, and the season review lists the year's top March moments. Your own buzzer-beaters count in any month.
-- **Season preview magazine**: every preseason a new issue comes out, announced in the news and on Today. Open it from Today or League → Polls, and swipe through five pages.
-  - **Cover**: the preseason No. 1, with headlines on what's inside.
-  - **Top 25**: ranked by team strength, with projected records and a short write-up on each team's last season, headliner and top newcomer.
-  - **Conferences**: predicted finishes and projected records for all 32 conferences, plus each one's Preseason Player of the Year. Once conference play starts, a NOW column shows who's ahead of or behind the prediction.
-  - **Players to watch**: the Preseason All-America teams, top freshmen, transfers to watch and breakout candidates.
-  - **Picks**: Final Four and champion picks, a sleeper, and your team's outlook, with its key players and newcomers.
+- **Hoops Dynasty Preview**: a 15-page preseason yearbook. Each new issue opens itself before your first game of the season, and you swipe through it page by page (or tap the page ticks to jump). Reopen it any time from Today or League → Polls.
+  1. **Cover**: the preseason No. 1 and what's inside.
+  2. **Contents and editor's letter**: the big storylines of the year.
+  3. **Top 5**: a feature on each, with projected record, star, newcomer and a scouting report of strengths and worries.
+  4. **Nos. 6–25**: the rest of the poll, each with a short write-up.
+  5. **Preseason All-America**: three five-man teams.
+  6. **Freshman class**: the top recruiting classes and the top 10 freshmen.
+  7. **New faces, last calls**: impact transfers, portal winners and the best seniors.
+  8. **Breakouts and sleepers**: breakout candidates, plus stars at mid-major schools.
+  9. **Your conference in depth**: predicted finish and a line on every team.
+  10. **Power conferences**: contenders and Player of the Year picks for the big leagues.
+  11. **Mid-major roundup**: the pick and player to watch in every other league.
+  12. **Team report**: your own team's outlook, starting five, bench and scouting report.
+  13. **Coaches**: the top 10 coaches and the hot seat.
+  14. **Games to watch**: early-season tournaments and the 10 regular-season games to circle.
+  15. **Predictions**: Final Four, champion, Cinderella, sleeper, award picks and bold predictions.
+  Once conference play starts, the conference pages show who's ahead of or behind the prediction.
+- **Player archetypes**: 20 play styles, from Floor General and Sharpshooter to 3-and-D Wing, Shot Creator, Table Setter, Ball Hawk, Glue Guy, Rim Runner, Point Center, Stretch Five and Enforcer. Each one raises three ratings when used as a training focus. Existing players keep their style; the new ones show up in new recruits and in the Develop tab.
+- **Player customization**: tap Edit on any of your own players to change his name, jersey number, position, height, weight, archetype, hometown and high school. A number already worn by a teammate or retired by the program can't be picked. Changing position shows his overall at the new spot, and the lineup updates itself.
 - **Player career pages**: open any player for his full Career tab.
   - **Stats**: a season-by-season table (minutes, points, rebounds, assists, steals, blocks, turnovers and shooting) that switches between per-game and totals, with the season in progress highlighted and a career line. Plus his NCAA Tournament stats, and career highs with the game each one came in.
   - **Honors by season**: each season shows his team, its record and result (Sweet 16, NIT Champion and so on), and every honor: All-American teams, national and conference awards, All-Tournament, draft position, walk-on tryouts and program Hall of Fame.

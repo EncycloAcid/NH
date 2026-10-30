@@ -31,7 +31,16 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     STRETCH("Stretch", "STR", listOf(Attr.MID, Attr.OUT, Attr.REB), "Forward who spaces the floor and pulls bigs away from the rim"),
     POST_SCORER("Post Scorer", "PST", listOf(Attr.INS, Attr.MID, Attr.REB), "Back-to-the-basket scorer with soft touch around the rim"),
     REBOUNDER("Rebounder", "REB", listOf(Attr.REB, Attr.IDF, Attr.BLK), "Relentless on the glass and finishes second chances"),
-    RIM_PROTECTOR("Rim Protector", "RIM", listOf(Attr.IDF, Attr.BLK, Attr.REB), "Anchors the defense and erases mistakes at the rim");
+    RIM_PROTECTOR("Rim Protector", "RIM", listOf(Attr.IDF, Attr.BLK, Attr.REB), "Anchors the defense and erases mistakes at the rim"),
+    THREE_AND_D("3-and-D Wing", "3&D", listOf(Attr.OUT, Attr.PER, Attr.STL), "Knocks down open threes and guards the other team's best scorer"),
+    SHOT_CREATOR("Shot Creator", "SCR", listOf(Attr.INS, Attr.MID, Attr.HND), "Breaks down defenders and gets his shot whenever he wants"),
+    TABLE_SETTER("Table Setter", "TBL", listOf(Attr.HND, Attr.PAS, Attr.STL), "Pass-first point guard who pushes the pace and pressures the ball"),
+    BALL_HAWK("Ball Hawk", "HWK", listOf(Attr.HND, Attr.PER, Attr.STL), "Lives in the passing lanes and turns steals into layups"),
+    GLUE_GUY("Glue Guy", "GLU", listOf(Attr.PAS, Attr.REB, Attr.PER), "Makes the extra pass, grabs the tough rebound, takes the charge"),
+    RIM_RUNNER("Rim Runner", "RUN", listOf(Attr.INS, Attr.REB, Attr.BLK), "Sprints the floor and finishes lobs and putbacks above the rim"),
+    POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
+    STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
+    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends");
 }
 
 enum class Trait(val label: String, val good: Boolean) {

@@ -50,6 +50,7 @@ sealed interface Route {
     data object CoachDev : Route
     data object WrapUp : Route
     data object Preview : Route
+    data class EditPlayer(val playerId: Int) : Route
 }
 
 /** A game being watched possession by possession. */

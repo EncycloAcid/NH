@@ -136,12 +136,23 @@ class ScreenshotTest {
         rule.setContent { App(vm) }
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Read the issue", substring = true))
         rule.waitForIdle(); shot("V01_today_card")
-        vm.push(Route.Preview); rule.waitForIdle(); shot("V02_cover")
-        for ((tab, name) in listOf("Top 25" to "V03_top25", "Conferences" to "V04_conferences", "Players" to "V05_players", "Picks" to "V06_picks")) {
-            rule.onAllNodesWithText(tab).onFirst().performClick()
+        vm.push(Route.Preview); rule.waitForIdle(); shot("V01_page01")
+        for (page in 2..15) {
+            rule.onNodeWithText("Next ›").performClick()
             rule.mainClock.advanceTimeBy(1500)
-            rule.waitForIdle(); shot(name)
+            rule.waitForIdle(); shot("V01_page" + "%02d".format(page))
         }
+        vm.back()
+        // Player customization and the expanded archetypes.
+        val star = lg.rosterOf(lg.user).maxBy { it.ovr }
+        vm.push(Route.EditPlayer(star.id)); rule.waitForIdle(); shot("E01_edit_player")
+        scrollTo(0)
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performTouchInput { swipeUp() }
+        rule.waitForIdle(); shot("E02_edit_player_more")
+        vm.back()
+        vm.push(Route.Focus(star.id)); rule.waitForIdle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(14)
+        rule.waitForIdle(); shot("E03_archetypes")
     }
 
     /** Career pages: a veteran's season-by-season table and honors, a former player's page, and former players. */
