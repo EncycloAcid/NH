@@ -307,7 +307,11 @@ private fun BracketLine(lg: League, b: Bracket, id: Int, g: Game?, tbd: String? 
         Text("${b.seeds[id] ?: ""}", style = T.small, color = P.faint, modifier = Modifier.width(26.dp))
         TeamBadge(t, 20.dp)
         Spacer(Modifier.width(8.dp))
-        Text(t.school, style = T.bodyB.copy(fontSize = 14.sp), color = when { id == lg.userTeamId -> P.accent; lost -> P.faint; else -> P.ink }, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(t.school, style = T.bodyB.copy(fontSize = 14.sp), color = when { id == lg.userTeamId -> P.accent; lost -> P.faint; else -> P.ink }, modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val upset = won && b.confId == -1 && g != null && (b.seeds[id] ?: 0) - (b.seeds[g.opp(id)] ?: 0) >= 5
+            if (upset) { Spacer(Modifier.width(6.dp)); Tag("UPSET", P.bad) }
+        }
         if (g != null && g.played) Text("${g.scoreFor(id)}", style = T.numSm.copy(fontSize = 16.sp), color = if (won) P.ink else P.faint)
     }
 }
@@ -315,6 +319,11 @@ private fun BracketLine(lg: League, b: Bracket, id: Int, g: Game?, tbd: String? 
 // ---------- history ----------
 
 private fun LazyListScope.history(vm: GameViewModel, lg: League) {
+    val latest = lg.moments.maxOfOrNull { it.season }
+    if (latest != null) item {
+        Section("Highlight reel · $latest", action = "See all", onAction = { vm.push(Route.History(HistoryKind.MOMENTS)) })
+        com.nh.hoopscoach.game.Moments.reel(lg, latest, 3).forEach { m -> MomentCard(vm, lg, m); Spacer(Modifier.height(8.dp)) }
+    }
     item {
         Section("Champions")
         if (lg.history.isEmpty()) Panel { Text("Finish a season to start the record book.", style = T.body, color = P.sub) }
@@ -411,6 +420,12 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                         Text("${h.season}", style = T.numSm, color = P.sub)
                     }
                 }
+            }
+            HistoryKind.MOMENTS -> item {
+                var mine by remember { mutableIntStateOf(0) }
+                Spacer(Modifier.height(6.dp))
+                Segmented(listOf("All", lg.user.school), mine, { mine = it })
+                HighlightReel(vm, lg, mine == 1)
             }
             HistoryKind.RECORDS -> item {
                 Spacer(Modifier.height(8.dp))

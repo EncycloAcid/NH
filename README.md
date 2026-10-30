@@ -44,6 +44,12 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - The best enter the program's Hall of Fame, and the all-time greats have their jersey retired. Retired jerseys hang as banners in the rafters, and nobody on that team wears the number again.
   - Coaches with titles, Final Fours or long runs are honored when they leave.
   - Legends show on the Program tab and every team page, with a ceremony on Draft Night for your own.
+- **Upset alerts and buzzer-beaters**: the engine records each game's deciding basket, and tied teams hold for the last shot.
+  - **Buzzer-beaters**: a winning shot with two seconds or less left counts, and so does a shot at the horn that forces overtime.
+  - **Upsets**: an NCAA upset of five or more seed lines is an upset alert.
+  - **Other moments**: multi-overtime classics, Cinderella runs (a 10 seed or lower reaching the Sweet 16, a 7 seed or lower reaching the Final Four) and the national title.
+  - **Where they show**: each one gets a tagged headline, and during March, Today shows the latest upset alerts. Bracket winners that pulled an upset get an UPSET tag.
+  - **Highlight reel**: every moment is saved to a reel under League → History, with a filter for your team, and the season review lists the year's top March moments. Your own buzzer-beaters count in any month.
 - **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
 - **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, a 68-team NCAA Tournament and a 32-team NIT.
   - **Selection**: 32 automatic bids and 36 at-large. The committee ranks resumes by NET and Wins Above Bubble equally, with credit for Quad 1 wins and a penalty for Quad 4 losses. Bubble Watch uses the same formula, so its projection matches the real selection.

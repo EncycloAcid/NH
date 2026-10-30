@@ -122,6 +122,37 @@ class ScreenshotTest {
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
     }
 
+    /** Upset alerts, bracket upset tags, the highlight reel and March moments in the season review. */
+    @Test
+    fun marchMoments() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        val me = lg.userTeamId
+        val coach = lg.userCoachId
+        fun viewAs(id: Int) { lg.userTeamId = id; lg.userCoachId = lg.team(id).coachId; vm.install(lg) }
+        while (lg.phase != Phase.NCAA) Season.playDay(lg)
+        // First Four, then the Round of 64.
+        Season.playDay(lg)
+        Season.playDay(lg)
+        vm.install(lg); vm.select(Tab.TODAY)
+        scrollTo(3); shot("M01_upset_alerts")
+        scrollTo(6); shot("M02_headlines")
+        val upset = lg.moments.lastOrNull { it.kind == com.nh.hoopscoach.game.MomentKind.UPSET && it.season == lg.season }
+        if (upset != null) {
+            viewAs(upset.winner)
+            vm.push(Route.BracketView(-1)); shot("M03_bracket_upsets"); vm.back()
+            lg.userTeamId = me; lg.userCoachId = coach; vm.install(lg)
+        }
+        while (lg.phase == Phase.NCAA) Season.playDay(lg)
+        vm.install(lg); vm.wrapPage = 0
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("cuts down the nets", substring = true))
+        rule.waitForIdle(); shot("M04_wrap_moments")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 5; scrollTo(0); shot("M05_history_preview")
+        vm.push(Route.History(HistoryKind.MOMENTS)); scrollTo(0); shot("M06_highlight_reel")
+    }
+
     /** Draft Night honors and pipeline, fan support in the NIL budget, the Program tab's fans and rafters. */
     @Test
     fun programLegacy() {
@@ -136,14 +167,14 @@ class ScreenshotTest {
         val leaving = lg.rosterOf(lg.user).sortedByDescending { it.ovr }.take(2)
         leaving.forEach { it.year = 4 }
         leaving[0].awards += listOf("${lg.season} Nat MVP", "${lg.season} AA 1st")
-        leaving[1].awards += listOf("${lg.season} Conf POY", "${lg.season} AA 2nd")
+        leaving[1].awards += listOf("${lg.season} Conf POY", "${lg.season} AA 2nd", "${lg.season} DPOY")
         Offseason.advance(lg)
         vm.install(lg); vm.select(Tab.TODAY)
         scrollTo(0); shot("U01_draft_honors")
         scrollTo(1); shot("U02_draft_pipeline")
         vm.select(Tab.TEAM); vm.teamTab = 3
         scrollTo(0); shot("U03_program_fans")
-        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Conference Player of the Year", substring = true))
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("HALL OF FAME", substring = true))
         rule.waitForIdle(); shot("U04_program_legends")
         vm.select(Tab.TODAY)
         while (os.step != com.nh.hoopscoach.game.OffStep.BUDGET) {

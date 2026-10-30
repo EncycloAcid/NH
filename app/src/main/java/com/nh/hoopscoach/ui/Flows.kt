@@ -190,6 +190,11 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
         }
         Section("Leading scorers")
         GroupList(lg.rosterOf(t).sortedByDescending { it.stats.pts }.take(5), inset = 70.dp) { p -> PlayerLine(vm, lg, t, p, statLine(p)) }
+        val reel = com.nh.hoopscoach.game.Moments.season(lg, lg.season).sortedWith(compareByDescending<com.nh.hoopscoach.game.Moment> { it.mine }.thenByDescending { it.weight }).take(4)
+        if (reel.isNotEmpty()) {
+            Section("March moments", action = "Highlight reel", onAction = { vm.push(Route.History(HistoryKind.MOMENTS)) })
+            reel.forEach { m -> MomentCard(vm, lg, m); Spacer(Modifier.height(8.dp)) }
+        }
     }
 }
 

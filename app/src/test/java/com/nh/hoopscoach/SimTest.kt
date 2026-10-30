@@ -87,6 +87,7 @@ class SimTest {
             checkPostseason(lg)
             checkRivalries(lg)
             checkFans(lg)
+            checkMoments(lg)
             val champ = lg.team(lg.history.last().champion)
             println("  Champion: ${champ.name} (${champ.record}, prestige ${champ.prestige}); user ${lg.user.name} ${lg.user.record} → ${lg.wrapUp?.result}")
             val top = lg.players.filter { it.teamId >= 0 }.sortedByDescending { it.stats.ppg }.take(3)
@@ -125,6 +126,21 @@ class SimTest {
             println("  new season ${lg.season}, games scheduled=${lg.games.size}, user exp wins=%.1f".format(lg.user.expWins))
             assertTrue(s >= 0)
         }
+    }
+
+    /** March moments: upsets, buzzer-beaters, Cinderellas and the champion make the highlight reel. */
+    private fun checkMoments(lg: League) {
+        val ms = com.nh.hoopscoach.game.Moments.season(lg, lg.season)
+        val byKind = ms.groupingBy { it.kind }.eachCount()
+        val st = com.nh.hoopscoach.game.Moments.stats
+        assertEquals("one title moment", 1, byKind[com.nh.hoopscoach.game.MomentKind.TITLE])
+        val ncaa = lg.ncaa!!
+        val upsetGames = lg.games.filter { it.played && it.type == GameType.NCAA }.count { g ->
+            val ws = ncaa.seeds[g.winner()] ?: 0; val ls = ncaa.seeds[g.loser()] ?: 0; ws - ls >= 5 && !g.label.endsWith("First Four")
+        }
+        println("  moments: $byKind; NCAA upsets(5+ lines)=$upsetGames; all-time buzzer-beaters ${st[1]}/${st[0]} games (%.2f%%), forced OT ${st[2]}".format(st[1] * 100.0 / st[0]))
+        ms.sortedByDescending { it.weight }.take(3).forEach { println("    [${it.kind}] ${it.headline} — ${it.detail}") }
+        assertTrue(ms.all { it.season == lg.season })
     }
 
     /** Winning fills the arena and the NIL pool; losing empties both. */

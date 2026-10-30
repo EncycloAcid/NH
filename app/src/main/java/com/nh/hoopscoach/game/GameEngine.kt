@@ -39,6 +39,22 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     var finished = false
         private set
     val events = ArrayList<PlayEvent>()
+
+    /** A made basket late in a period, kept to spot buzzer-beaters. [margin] is the shooting team's margin before the shot. */
+    class Clutch(val side: Int, val name: String, val shot: String, val period: Int, val clock: Double, val margin: Int, val pts: Int)
+    private var lastBasket: Clutch? = null
+    private var tyingShot: Clutch? = null
+    /** The first shot that tied the game in the last two seconds and sent it to overtime. */
+    var forcedOt: Clutch? = null
+        private set
+    /** The winning basket, if it went in with two seconds or less left in the game. */
+    val buzzerBeater: Clutch?
+        get() {
+            val b = lastBasket ?: return null
+            if (!finished || b.period != period || b.clock > 2.0 || b.margin > 0 || b.margin + b.pts <= 0) return null
+            val winner = if (score[0] > score[1]) 0 else 1
+            return b.takeIf { it.side == winner }
+        }
     /** 1.0 is a normal home crowd; rivalry crowds scale it up to match their extra Elo. */
     private val homeEdge = Rankings.homeElo(lg, game) / Rankings.HOME_ELO
 
@@ -188,9 +204,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val trail = score[o] - score[d]
 
         var len = possLength(o)
-        // Milk the clock with a late lead; hurry when behind.
+        // Milk the clock with a late lead; hurry when behind; hold for the last shot when tied.
         if (period >= 2 && clock < 60) {
             if (trail > 0) len = min(clock, 30.0) else if (trail < 0) len = min(len, 8.0 + Rng.d() * 6)
+            else if (clock <= 30) len = (clock - Rng.d() * 3).coerceAtLeast(min(clock, 0.5))
         }
         // Intentional foul when the defense trails late.
         if (period >= 2 && clock < 40 && trail in 1..9) {
@@ -284,6 +301,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && period >= 2 && clock < 120 && abs(trail) <= 5) pMake += 0.03
+            // Shots at the horn are rushed and contested.
+            if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
             val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 }
@@ -298,6 +317,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (made) {
                 sl.fgm++; sl.pts += pts
                 if (type == 2) sl.tpm++
+                val before = score[o] - score[d]
+                val c = Clutch(o, shooter.name, what, period, clock, before, pts)
+                lastBasket = c
+                if (period >= 2 && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
                 score[o] += pts
                 var astText = ""
                 val astP = when (type) { 0 -> if (putback != null) 0.0 else 0.42; 1 -> 0.38; else -> 0.74 }
@@ -310,7 +333,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     }
                 }
                 val verb = when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
-                log(o, "${shooter.short} $verb$astText", pts)
+                log(o, "${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
                 if (fouled) {
                     val fouler = Rng.weighted(defense) { posFoul(it.pos) }
                     line(d, fouler).pf++; teamFouls[d]++
@@ -441,6 +464,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             return
         }
         if (score[0] == score[1]) {
+            if (forcedOt == null && tyingShot?.period == period) forcedOt = tyingShot
             period++; clock = 300.0
             log(-1, "Tied at ${score[0]}. Overtime!", 0)
             periodScores += IntArray(2)
@@ -514,6 +538,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         Rankings.updateElo(lg, game)
         Rivalries.afterGame(lg, game)
         Fans.afterGame(lg, game)
+        Moments.afterGame(lg, game, buzzerBeater, forcedOt)
     }
 
     private fun lastTotals(side: Int): StatLine {

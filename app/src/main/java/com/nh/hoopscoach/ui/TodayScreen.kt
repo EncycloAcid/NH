@@ -71,6 +71,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
             }
         }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
+        item { LatestMyMoment(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
         item { Form(vm, lg, u) }
         if (u.gp >= 8) item { Outlook(vm, lg) }
@@ -232,11 +233,11 @@ private fun Headlines(vm: GameViewModel, lg: League) {
     if (items.isEmpty()) return
     Section("Around the league")
     GroupList(items, inset = 34.dp) { n ->
-        ListRow(onClick = if (n.rivalry) ({ vm.push(Route.Box(n.gameId)) }) else null) {
+        ListRow(onClick = if (n.gameId >= 0 && lg.games.any { it.id == n.gameId }) ({ vm.push(Route.Box(n.gameId)) }) else null) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (n.mine) P.accent else P.line))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                if (n.rivalry) { Tag("RIVALRY", P.bad); Spacer(Modifier.height(3.dp)) }
+                NewsTag(n)
                 Text(n.text, style = T.body, color = if (n.mine) P.ink else P.sub)
             }
         }
@@ -294,6 +295,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
         }
         if (!post) item { Outlook(vm, lg) }
+        item { UpsetAlerts(vm, lg) }
         item {
             val r = if (b.done) b.gameIds.lastIndex else b.current
             val games = if (ffDay) b.playIns.mapNotNull { pi -> pi.gameId.takeIf { it >= 0 }?.let { lg.game(it) } }

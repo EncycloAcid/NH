@@ -231,10 +231,12 @@ object Season {
             } else if (b.confId == NIT_ID) {
                 lg.news += News(lg.season, lg.day, "${t.school} wins the NIT", t.id == lg.userTeamId)
             }
+            Moments.afterRound(lg, b)
             return
         }
         b.rounds += next
         b.current++
+        Moments.afterRound(lg, b)
     }
 
     // ---------- NCAA tournament ----------

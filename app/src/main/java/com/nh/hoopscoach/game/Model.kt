@@ -354,10 +354,37 @@ class Recruit(
 )
 
 @Serializable
-class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1) {
+class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "") {
     /** Rivalry results carry their game so the headline can link to the box score. */
-    val rivalry get() = gameId >= 0
+    val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
 }
+
+enum class MomentKind(val tag: String) {
+    BUZZER("Buzzer-beater"), FORCED_OT("Forces overtime"), UPSET("Upset alert"), CLASSIC("Instant classic"),
+    CINDERELLA("Cinderella"), TITLE("Champions"),
+}
+
+/** A big moment for the highlight reel. Self-contained: it outlives the season's games and box scores. */
+@Serializable
+class Moment(
+    val season: Int,
+    val day: Int,
+    val kind: MomentKind,
+    /** Where it happened, e.g. "NCAA South · First Round". */
+    val stage: String,
+    val headline: String,
+    val detail: String,
+    val winner: Int,
+    val loser: Int,
+    val wSeed: Int = 0,
+    val lSeed: Int = 0,
+    val wScore: Int = 0,
+    val lScore: Int = 0,
+    val ot: Int = 0,
+    val mine: Boolean = false,
+    val weight: Int = 0,
+    val gameId: Int = -1,
+)
 
 /** A traditional rivalry between two programs, with the series record since the dynasty began. */
 @Serializable
@@ -545,6 +572,8 @@ class League(
     var bubble: Bubble? = null,
     val rivals: MutableList<Rivalry> = mutableListOf(),
     var rivalsReady: Boolean = false,
+    /** The highlight reel: upsets, buzzer-beaters and other big moments, every season. */
+    val moments: MutableList<Moment> = mutableListOf(),
     var events: MutableList<InSeasonEvent> = mutableListOf(),
     var recruits: MutableList<Recruit> = mutableListOf(),
     var userTeamId: Int,

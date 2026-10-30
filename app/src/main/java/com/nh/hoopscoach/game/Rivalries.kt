@@ -132,7 +132,7 @@ object Rivalries {
         val user = lg.userTeamId
         val mine = g.involves(user)
         if (mine) lg.userCoach.security = (lg.userCoach.security + if (w.id == user) 2 else -2).coerceIn(0, 100)
-        if (mine || w.ap > 0 || l.ap > 0) lg.news += News(lg.season, lg.day, "${r.title}: ${headline(lg, g)}", mine, g.id)
+        if (mine || w.ap > 0 || l.ap > 0) lg.news += News(lg.season, lg.day, "${r.title}: ${headline(lg, g)}", mine, g.id, "rivalry")
     }
 
     /** Newspaper headline for a finished rivalry game. */
