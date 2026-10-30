@@ -1,0 +1,363 @@
+package com.nh.hoopscoach.game
+
+import kotlin.math.roundToInt
+
+object Season {
+
+    private val SLOT_ORDER = intArrayOf(1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15)
+    val NCAA_ROUNDS = listOf("R64", "R32", "S16", "E8", "F4", "CHAMP")
+    private val CT_ROUNDS = listOf("R1", "QF", "SF", "Final")
+    val REGIONS = listOf("East", "West", "South", "Midwest")
+
+    fun gamesOn(lg: League, day: Int) = lg.games.filter { it.day == day }
+
+    fun userGameToday(lg: League): Game? = lg.games.firstOrNull { it.day == lg.day && it.involves(lg.userTeamId) && !it.played }
+
+    fun nextUserGame(lg: League): Game? = lg.games.filter { it.involves(lg.userTeamId) && !it.played }.minByOrNull { it.day }
+
+    fun seasonOver(lg: League) = lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON
+
+    /** Creates games for today that depend on earlier results (events, brackets). */
+    fun prepareDay(lg: League) {
+        when (lg.phase) {
+            Phase.REGULAR -> if (lg.day in Schedule.EVENT_DAY + 1..Schedule.EVENT_DAY + 2) for (ev in lg.events) eventRound(lg, ev, lg.day - Schedule.EVENT_DAY)
+            Phase.CONF_TOURNEY -> for (b in lg.confBrackets) scheduleBracketRound(lg, b, GameType.CONF_TOURNEY)
+            Phase.NCAA -> lg.ncaa?.let { scheduleBracketRound(lg, it, GameType.NCAA) }
+            else -> {}
+        }
+    }
+
+    /** Plays every remaining game today and moves the calendar forward one day. */
+    fun playDay(lg: League) {
+        if (seasonOver(lg)) return
+        prepareDay(lg)
+        for (g in gamesOn(lg, lg.day)) if (!g.played) GameEngine(lg, g, false).commit()
+        endOfDay(lg)
+    }
+
+    private fun endOfDay(lg: League) {
+        when (lg.phase) {
+            Phase.REGULAR -> {
+                dailyUpkeep(lg)
+                if (lg.day == Schedule.EVENT_DAY + 2) for (ev in lg.events) finishEvent(lg, ev)
+                if (lg.day >= Schedule.REG_DAYS) {
+                    endRegularSeason(lg)
+                    lg.day = Schedule.CT_START
+                    prepareDay(lg)
+                    return
+                }
+            }
+            Phase.CONF_TOURNEY -> {
+                dailyUpkeep(lg)
+                for (b in lg.confBrackets) advanceBracket(lg, b)
+                if (lg.confBrackets.all { it.done }) {
+                    selection(lg)
+                    lg.day = Schedule.NCAA_START
+                    prepareDay(lg)
+                    return
+                }
+            }
+            Phase.NCAA -> {
+                val b = lg.ncaa!!
+                advanceBracket(lg, b)
+                if (b.done) { endSeason(lg); return }
+            }
+            else -> return
+        }
+        lg.day++
+        prepareDay(lg)
+    }
+
+    private fun dailyUpkeep(lg: League) {
+        Rankings.refresh(lg)
+        Morale.tick(lg)
+        if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
+        // Practice: everyone improves a little, bench players included.
+        for (t in lg.teams) {
+            val dev = Coaching.devOf(lg.coachOf(t))
+            for (pid in t.roster) {
+                val p = lg.player(pid)
+                Ratings.addXp(p, (7 * Ratings.devRate(p, dev)).roundToInt())
+            }
+        }
+        // AI coaches re-tune their rotations as players develop.
+        if (lg.day % 7 == 0) for (t in lg.teams) if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t)
+    }
+
+    // ---------- in-season events ----------
+
+    private fun eventRound(lg: League, ev: InSeasonEvent, round: Int) {
+        if (ev.gameIds.size >= 4 * (round + 1)) return
+        val day = Schedule.EVENT_DAY + round
+        val label = if (round == 1) "${ev.name} · R2" else "${ev.name} · Final"
+        val prev = ev.gameIds.takeLast(4).map { lg.game(it) }
+        val pairs: List<Pair<Int, Int>> = if (round == 1) {
+            listOf(prev[0].winner() to prev[1].winner(), prev[2].winner() to prev[3].winner(), prev[0].loser() to prev[1].loser(), prev[2].loser() to prev[3].loser())
+        } else {
+            listOf(prev[0].winner() to prev[1].winner(), prev[0].loser() to prev[1].loser(), prev[2].winner() to prev[3].winner(), prev[2].loser() to prev[3].loser())
+        }
+        pairs.forEachIndexed { i, (a, b) ->
+            val lab = if (round == 2) when (i) { 0 -> "${ev.name} · Final"; 1 -> "${ev.name} · 3rd Place"; 2 -> "${ev.name} · 5th Place"; else -> "${ev.name} · 7th Place" }
+            else if (i < 2) label else "${ev.name} · Consolation"
+            val g = Game(lg.nextGameId++, day, a, b, true, GameType.EVENT, lab)
+            lg.addGame(g)
+            ev.gameIds += g.id
+        }
+    }
+
+    private fun finishEvent(lg: League, ev: InSeasonEvent) {
+        if (ev.gameIds.size < 12) return
+        val last = ev.gameIds.takeLast(4).map { lg.game(it) }
+        ev.placement = mutableListOf(
+            last[0].winner(), last[0].loser(), last[1].winner(), last[1].loser(),
+            last[2].winner(), last[2].loser(), last[3].winner(), last[3].loser(),
+        )
+        val champ = lg.team(ev.placement[0])
+        lg.news += News(lg.season, lg.day, "${champ.school} wins the ${ev.name}", champ.id == lg.userTeamId)
+    }
+
+    // ---------- conference standings & tournaments ----------
+
+    fun standings(lg: League, confId: Int): List<Team> =
+        lg.conf(confId).teamIds.map { lg.team(it) }.sortedWith(
+            compareByDescending<Team> { if (it.cw + it.cl == 0) 0.0 else it.cw.toDouble() / (it.cw + it.cl) }
+                .thenByDescending { it.cw }
+                .thenByDescending { it.winPct }
+                .thenByDescending { it.elo },
+        )
+
+    private fun endRegularSeason(lg: League) {
+        Rankings.refresh(lg)
+        Awards.conference(lg)
+        lg.confBrackets = mutableListOf()
+        for (c in lg.confs) {
+            val st = standings(lg, c.id)
+            val seeds = HashMap<Int, Int>()
+            st.forEachIndexed { i, t -> seeds[t.id] = i + 1 }
+            val slots = SLOT_ORDER.map { s -> st.getOrNull(s - 1)?.id ?: -1 }.toMutableList()
+            lg.confBrackets += Bracket("${c.abbr} Tournament", c.abbr, c.id, Schedule.CT_START, CT_ROUNDS, seeds, mutableListOf(slots))
+            st.first().let { champ ->
+                lg.news += News(lg.season, lg.day, "${champ.school} wins the ${c.name} regular season title", champ.id == lg.userTeamId)
+            }
+        }
+        lg.phase = Phase.CONF_TOURNEY
+        val u = lg.user
+        val seed = lg.confBrackets.first { it.confId == u.confId }.seeds[u.id]
+        lg.news += News(lg.season, lg.day, "${u.school} enters the ${lg.conf(u.confId).abbr} Tournament as the No. $seed seed", true)
+    }
+
+    private fun scheduleBracketRound(lg: League, b: Bracket, type: GameType) {
+        if (b.done) return
+        val r = b.current
+        if (b.gameIds.size > r) return
+        val slots = b.rounds[r]
+        val ids = mutableListOf<Int>()
+        val day = b.startDay + r
+        for (i in 0 until slots.size / 2) {
+            val a = slots[2 * i]
+            val c = slots[2 * i + 1]
+            if (a < 0 || c < 0) { ids += -1; continue }
+            val sa = b.seeds[a] ?: 99
+            val sc = b.seeds[c] ?: 99
+            val neutral = type == GameType.NCAA || r > 0
+            val (h, aw) = if (sa <= sc) a to c else c to a
+            val label = if (type == GameType.NCAA) ncaaLabel(r, i, slots.size) else "${b.name} · ${b.roundNames.getOrElse(r) { "R${r + 1}" }}"
+            val g = Game(lg.nextGameId++, day, h, aw, neutral, type, label)
+            lg.addGame(g)
+            ids += g.id
+        }
+        b.gameIds += ids
+    }
+
+    private fun ncaaLabel(round: Int, index: Int, slots: Int): String {
+        val name = when (round) { 0 -> "First Round"; 1 -> "Second Round"; 2 -> "Sweet 16"; 3 -> "Elite Eight"; 4 -> "Final Four"; else -> "National Championship" }
+        if (round >= 4) return "NCAA · $name"
+        val perRegion = slots / 2 / 4
+        val region = REGIONS[(index / perRegion).coerceAtMost(3)]
+        return "NCAA $region · $name"
+    }
+
+    private fun advanceBracket(lg: League, b: Bracket) {
+        if (b.done) return
+        val r = b.current
+        if (b.gameIds.size <= r) return
+        val slots = b.rounds[r]
+        val next = mutableListOf<Int>()
+        for (i in 0 until slots.size / 2) {
+            val a = slots[2 * i]
+            val c = slots[2 * i + 1]
+            val gid = b.gameIds[r][i]
+            next += when {
+                gid >= 0 -> lg.game(gid).let { g -> if (g.played) g.winner() else -2 }
+                a >= 0 -> a
+                else -> c
+            }
+        }
+        if (next.size == 1) {
+            b.champion = next[0]
+            b.rounds += next.toMutableList()
+            b.current++
+            val t = lg.team(b.champion)
+            if (b.confId >= 0) {
+                lg.news += News(lg.season, lg.day, "${t.school} wins the ${b.name} and an automatic bid", t.id == lg.userTeamId)
+            }
+            return
+        }
+        b.rounds += next
+        b.current++
+    }
+
+    // ---------- NCAA tournament ----------
+
+    private fun selection(lg: League) {
+        Rankings.refresh(lg)
+        val auto = lg.confBrackets.map { it.champion }.toSet()
+        val atLarge = lg.teams.filter { it.id !in auto }.sortedBy { it.net }.take(64 - auto.size).map { it.id }
+        val field = (auto + atLarge).map { lg.team(it) }.sortedBy { it.net }
+        val regions = List(4) { arrayOfNulls<Team>(16) }
+        val seeds = HashMap<Int, Int>()
+        field.forEachIndexed { i, t ->
+            val line = i / 4
+            val k = i % 4
+            val region = if (line % 2 == 0) k else 3 - k
+            regions[region][line] = t
+            seeds[t.id] = line + 1
+        }
+        val slots = mutableListOf<Int>()
+        for (rg in regions) for (s in SLOT_ORDER) slots += rg[s - 1]!!.id
+        lg.ncaa = Bracket("NCAA Tournament", "NCAA", -1, Schedule.NCAA_START, NCAA_ROUNDS, seeds, mutableListOf(slots))
+        lg.phase = Phase.NCAA
+        for (t in field) t.tourneys++
+        for (t in field) lg.coachOf(t).tourneys++
+        val u = lg.user
+        val us = seeds[u.id]
+        lg.news += News(
+            lg.season, lg.day,
+            if (us != null) "${u.school} earns a No. $us seed in the NCAA Tournament" else "${u.school} is left out of the NCAA Tournament",
+            true,
+        )
+    }
+
+    fun regionOf(lg: League, teamId: Int): String? {
+        val b = lg.ncaa ?: return null
+        val idx = b.rounds[0].indexOf(teamId)
+        return if (idx < 0) null else REGIONS[idx / 16]
+    }
+
+    // ---------- end of season ----------
+
+    private fun endSeason(lg: League) {
+        Rankings.refresh(lg)
+        Awards.national(lg)
+        val ncaa = lg.ncaa!!
+        val champ = lg.team(ncaa.champion)
+        champ.titles++
+        lg.coachOf(champ).titles++
+        val f4 = ncaa.rounds[4].filter { it >= 0 }
+        for (id in f4) { lg.team(id).finalFours++; lg.coachOf(lg.team(id)).finalFours++ }
+        val runnerUp = ncaa.rounds[5].first { it != ncaa.champion }
+        lg.news += News(lg.season, lg.day, "${champ.school} are national champions!", champ.id == lg.userTeamId)
+
+        val confChamps = HashMap<Int, Int>()
+        for (b in lg.confBrackets) {
+            confChamps[b.confId] = b.champion
+            lg.team(b.champion).confTitles++
+            lg.coachOf(lg.team(b.champion)).confTitles++
+        }
+        val coty = lg.coaches.firstOrNull { it.id == lg.cotyCoachId }
+        lg.history += SeasonSummary(
+            lg.season, champ.id, runnerUp, f4, lg.seasonAwards.toList(),
+            coty?.name ?: "", coty?.teamId ?: -1, confChamps,
+        )
+
+        // Prestige, team & coach history.
+        val beforeUser = lg.user.prestige
+        for (t in lg.teams) {
+            val round = Awards.tourneyRound(lg, t.id)
+            val bonus = when (round) { 7 -> 48; 6 -> 40; 5 -> 34; 4 -> 27; 3 -> 20; 2 -> 12; 1 -> 6; else -> 0 }
+            val target = 25 + t.winPct * 50 + bonus + if (confChamps[t.confId] == t.id) 3 else 0
+            t.prevPrestige = t.prestige
+            t.prestige = (t.prestige * 0.85 + target * 0.15).roundToInt().coerceIn(5, 99)
+            val c = lg.coachOf(t)
+            val result = Awards.resultLabel(round)
+            t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name)
+            c.history += CoachSeason(lg.season, t.id, t.school, t.w, t.l, result, t.prestige)
+        }
+        for (p in lg.players) {
+            val t = if (p.teamId >= 0) lg.team(p.teamId) else null
+            if (t != null && p.stats.gp > 0) p.career += SeasonLine(lg.season, t.abbr, lg.conf(t.confId).abbr, p.year, p.ovr, p.stats.copy())
+            p.ovrHistory += p.ovr
+        }
+        Finance.decayBonuses(lg)
+        Finance.awardBonuses(lg)
+        Coaching.evaluateUser(lg)
+        val points = Coaching.pointsEarned(lg)
+        lg.userCoach.points += points
+        lg.wrapUp = buildWrapUp(lg, beforeUser, points)
+        lg.phase = Phase.WRAP_UP
+    }
+
+    private fun buildWrapUp(lg: League, prestigeBefore: Int, points: Int): WrapUp {
+        val t = lg.user
+        val round = Awards.tourneyRound(lg, t.id)
+        val b = lg.ncaa!!
+        val path = mutableListOf<Int>()
+        val won = mutableListOf<Boolean>()
+        for (g in lg.games.filter { it.type == GameType.NCAA && it.involves(t.id) && it.played }.sortedBy { it.day }) {
+            path += g.opp(t.id); won += g.winner() == t.id
+        }
+        val regular = lg.games.filter { it.involves(t.id) && it.played && (it.type == GameType.CONF || it.type == GameType.NONCONF || it.type == GameType.EVENT) }
+        val regW = regular.count { it.winner() == t.id }
+        val st = standings(lg, t.confId)
+        val mine = (lg.seasonAwards + lg.confAwards).filter { it.teamId == t.id && it.pid > 0 }
+        val coach = lg.userCoach
+        val coachAwards = mutableListOf<String>()
+        if (lg.cotyCoachId == coach.id) coachAwards += "Coach of the Year"
+        if (lg.confAwards.any { it.pid == -coach.id }) coachAwards += "${lg.conf(t.confId).abbr} Coach of the Year"
+        val ct = lg.confBrackets.firstOrNull { it.confId == t.confId }
+        val ctResult = when {
+            ct == null -> ""
+            ct.champion == t.id -> "Champions"
+            else -> {
+                val reached = ct.rounds.indexOfLast { t.id in it }
+                "Lost in ${ct.roundNames.getOrElse(reached) { "R1" }}"
+            }
+        }
+        val confFinish = st.indexOf(t) + 1
+        val diff = t.w - t.expWins
+        val q1w = Rankings.quadRecord(lg, t, 1).substringBefore('-').toInt()
+        val natAwards = lg.seasonAwards.count { it.teamId == t.id }
+        val signals = listOf(
+            Driver("Season performance", "${t.w} wins finished %+.0f against a %.0f-win target.".format(diff, t.expWins),
+                when { diff >= 5 -> "Big lift"; diff >= 1.5 -> "Small lift"; diff > -1.5 -> "Steady"; diff > -5 -> "Small drop"; else -> "Big drop" }, diff > -1.5),
+            Driver("Conference result", "Finished $confFinish of ${st.size} in conference play" + if (ctResult == "Champions") " and won the conference tournament." else ".",
+                when { confFinish == 1 || ctResult == "Champions" -> "Champions"; confFinish <= 4 -> "Contender"; confFinish <= st.size / 2 -> "Middle"; else -> "Struggled" }, confFinish <= st.size / 2),
+            Driver("NCAA tournament", if (round == 0) "Missed the field." else "Reached the ${Awards.resultLabel(round).replace("Round of", "round of")}.",
+                when { round >= 5 -> "Deep run"; round >= 3 -> "Solid run"; round >= 1 -> "Made it"; else -> "Missed" }, round >= 1),
+            Driver("Quality wins", "$q1w Quadrant 1 win${if (q1w == 1) "" else "s"} on the resume.", when { q1w >= 8 -> "Strong"; q1w >= 3 -> "Some quality"; else -> "Thin" }, q1w >= 3),
+            Driver("National awards", if (natAwards > 0) "$natAwards national honor${if (natAwards == 1) "" else "s"} for the program." else "No national honors this year.",
+                if (natAwards > 0) "Award boost" else "None", natAwards > 0),
+        )
+        val drivers = mutableListOf(
+            Driver("Season vs Expectation", "${t.w} wins against a %.0f-win target.".format(t.expWins), "%+d".format(diff.roundToInt().coerceIn(-6, 6)), diff >= 0),
+            Driver("National Tournament", if (round == 0) "Missed the field." else "${Awards.resultLabel(round)}.", "%+d".format((round - 1).coerceIn(-1, 6)), round >= 1),
+        )
+        if (coachAwards.isNotEmpty()) drivers += Driver("Awards", coachAwards.joinToString(" + "), "+${coachAwards.size * 2}", true)
+        return WrapUp(
+            lg.season, t.id, Awards.resultLabel(round), b.seeds[t.id] ?: 0, path, won,
+            t.w, t.l, regW, regular.size - regW, t.cw, t.cl, t.expWins, t.net, t.ap, st.indexOf(t) + 1,
+            t.prestige, t.prestige - prestigeBefore,
+            Rankings.quadRecord(lg, t, 1), Rankings.quadRecord(lg, t, 2), Rankings.wab(lg, t), Rankings.sosRank(lg, t),
+            mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
+        )
+    }
+
+    /** Short label for where a team's season stands. */
+    fun statusLine(lg: League): String = when (lg.phase) {
+        Phase.REGULAR -> "Game ${(lg.user.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}"
+        Phase.CONF_TOURNEY -> "Conference Tournament"
+        Phase.NCAA -> "NCAA Tournament"
+        Phase.WRAP_UP -> "Season Complete"
+        Phase.OFFSEASON -> "Offseason"
+    }
+}

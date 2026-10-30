@@ -1,0 +1,121 @@
+package com.nh.hoopscoach.game
+
+import kotlin.math.roundToInt
+
+object Awards {
+
+    fun score(p: Player, t: Team): Double {
+        val s = p.stats
+        if (s.gp == 0) return 0.0
+        val eff = s.ppg + 1.15 * s.rpg + 1.5 * s.apg + 2.0 * s.spg + 2.0 * s.bpg - 1.2 * s.per(s.tov) +
+            (s.fgPct - 0.45) * 20 * (s.fga.toDouble() / s.gp / 10)
+        return eff + t.winPct * 6 + p.ovr * 0.08
+    }
+
+    fun defScore(p: Player): Double {
+        val s = p.stats
+        if (s.gp == 0) return 0.0
+        return 3 * s.spg + 3 * s.bpg + 0.6 * s.per(s.drb) + (p[Attr.PER] + p[Attr.IDF] + p[Attr.STL] + p[Attr.BLK]) / 40.0
+    }
+
+    fun line(p: Player): String = "%.1f ppg · %.1f rpg · %.1f apg".format(p.stats.ppg, p.stats.rpg, p.stats.apg)
+
+    private fun eligible(lg: League, ids: Collection<Int>? = null): List<Pair<Player, Team>> {
+        val out = mutableListOf<Pair<Player, Team>>()
+        for (t in lg.teams) for (pid in t.roster) {
+            if (ids != null && pid !in ids) continue
+            val p = lg.player(pid)
+            if (t.gp > 0 && p.stats.gp >= t.gp * 0.6) out += p to t
+        }
+        return out
+    }
+
+    private fun give(lg: League, list: MutableList<AwardWinner>, award: String, p: Player, t: Team) {
+        list += AwardWinner(award, p.id, p.name, t.id, line(p))
+        p.awards += "${lg.season} $award"
+    }
+
+    /** End of the regular season: conference honors. */
+    fun conference(lg: League) {
+        val out = mutableListOf<AwardWinner>()
+        for (c in lg.confs) {
+            val pool = eligible(lg).filter { it.second.confId == c.id }
+            if (pool.isEmpty()) continue
+            val ranked = pool.sortedByDescending { score(it.first, it.second) }
+            give(lg, out, "Conf POY", ranked[0].first, ranked[0].second)
+            ranked.take(5).forEach { give(lg, out, "All-Conf 1st", it.first, it.second) }
+            pool.maxByOrNull { defScore(it.first) }?.let { give(lg, out, "Conf DPOY", it.first, it.second) }
+            pool.filter { it.first.year == 1 }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "Conf FOY", it.first, it.second) }
+            val coty = c.teamIds.map { lg.team(it) }.maxByOrNull { it.w - it.expWins + it.cw * 0.2 }
+            if (coty != null) {
+                val coach = lg.coachOf(coty)
+                coach.confCoty++
+                out += AwardWinner("Conf COTY", -coach.id, coach.name, coty.id, "${coty.record} (${coty.confRecord} conf)")
+            }
+        }
+        lg.confAwards = out
+    }
+
+    /** After the title game: national honors and tournament awards. */
+    fun national(lg: League) {
+        val out = mutableListOf<AwardWinner>()
+        val pool = eligible(lg)
+        val ranked = pool.sortedByDescending { score(it.first, it.second) }
+        if (ranked.isNotEmpty()) give(lg, out, "Nat MVP", ranked[0].first, ranked[0].second)
+        ranked.take(5).forEach { give(lg, out, "AA 1st", it.first, it.second) }
+        ranked.drop(5).take(5).forEach { give(lg, out, "AA 2nd", it.first, it.second) }
+        ranked.drop(10).take(5).forEach { give(lg, out, "AA 3rd", it.first, it.second) }
+        pool.maxByOrNull { defScore(it.first) }?.let { give(lg, out, "DPOY", it.first, it.second) }
+        pool.filter { it.first.year == 1 }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "FOY", it.first, it.second) }
+        for (pos in Pos.entries) pool.filter { it.first.pos == pos }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "Pos OY", it.first, it.second) }
+
+        // Tournament awards from NCAA stats.
+        val ncaa = lg.ncaa
+        if (ncaa != null && ncaa.champion >= 0) {
+            val f4 = ncaa.rounds.getOrNull(4)?.filter { it >= 0 } ?: emptyList()
+            val tp = f4.flatMap { tid -> lg.team(tid).roster.map { lg.player(it) to lg.team(tid) } }
+                .filter { it.first.tourney.gp > 0 }
+                .sortedByDescending { (p, t) -> tScore(p) + if (t.id == ncaa.champion) 4 else 0 }
+            tp.firstOrNull()?.let { (p, t) ->
+                out += AwardWinner("MOP", p.id, p.name, t.id, tLine(p)); p.awards += "${lg.season} MOP"
+            }
+            tp.take(5).forEach { (p, t) -> out += AwardWinner("All-Tourn", p.id, p.name, t.id, tLine(p)); p.awards += "${lg.season} All-Tourn" }
+        }
+
+        // Coach of the year: biggest over-performance, with a bump for March.
+        val best = lg.teams.maxByOrNull { (it.w - it.expWins) + tourneyRound(lg, it.id) * 1.2 }
+        if (best != null) {
+            val c = lg.coachOf(best)
+            c.natCoty++
+            lg.cotyCoachId = c.id
+            out += AwardWinner("COTY", -c.id, c.name, best.id, best.record)
+        }
+        lg.seasonAwards = out
+    }
+
+    private fun tScore(p: Player): Double {
+        val s = p.tourney
+        return s.ppg + 1.1 * s.rpg + 1.4 * s.apg + 1.5 * (s.spg + s.bpg) + s.gp * 1.5
+    }
+
+    private fun tLine(p: Player) = "%.1f ppg · %.1f rpg in March".format(p.tourney.ppg, p.tourney.rpg)
+
+    /** 0 = missed, 1 = R64 ... 6 = runner-up, 7 = champion. */
+    fun tourneyRound(lg: League, teamId: Int): Int {
+        val b = lg.ncaa ?: return 0
+        if (b.champion == teamId) return 7
+        var reached = 0
+        for ((i, r) in b.rounds.withIndex()) if (teamId in r) reached = i + 1
+        return reached
+    }
+
+    fun resultLabel(round: Int): String = when (round) {
+        7 -> "National Champion"; 6 -> "Runner-Up"; 5 -> "Final Four"; 4 -> "Elite Eight"; 3 -> "Sweet 16"
+        2 -> "Round of 32"; 1 -> "Round of 64"; else -> "Missed Tournament"
+    }
+
+    fun badge(award: String): String = award.substringAfter(' ').let { if (it.firstOrNull()?.isDigit() == true) award else it }
+
+    @Suppress("unused")
+    fun pct(v: Double) = (v * 100).roundToInt()
+}

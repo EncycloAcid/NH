@@ -1,0 +1,468 @@
+package com.nh.hoopscoach.game
+
+import kotlin.math.roundToInt
+
+/**
+ * The offseason runs as a series of steps the user walks through:
+ * Roster & NIL → Draft Night → Career Decision → Player Development → NIL Budget → Recruiting rounds.
+ */
+object Offseason {
+    const val ROUNDS = 5
+
+    // ---------- entering the offseason ----------
+
+    fun begin(lg: League) {
+        if (lg.phase != Phase.WRAP_UP) return
+        val os = OffseasonState()
+        val board = draftBoard(lg)
+        for (p in lg.rosterOf(lg.user).filter { it.year >= 4 }) {
+            os.graduates += GradEntry(p.id, p.name, p.pos, p.ovr, p.nil, Awards.line(p), gradNote(board[p.id]))
+        }
+        os.entrants += declarations(lg, board)
+        lg.offseason = os
+        Coaching.carousel(lg, os)
+        lg.phase = Phase.OFFSEASON
+    }
+
+    fun gradNote(rank: Int?): String = when {
+        rank == null || rank > 90 -> "Moving on after a four-year career."
+        rank <= 30 -> "Projected first-round pick heading to draft night."
+        rank <= 60 -> "Projected second-round pick, hoping to hear his name on draft night."
+        else -> "Draft hopeful, hoping to hear his name on draft night."
+    }
+
+    private fun draftValue(p: Player) = p.ovr + (p.pot - p.ovr) * 0.5 - (p.year - 1) * 1.2
+
+    /** Ranks every player by draft stock, 1 = best. Used for projections. */
+    fun draftBoard(lg: League): Map<Int, Int> {
+        val ranked = lg.players.filter { it.teamId >= 0 && it.year >= 1 }.sortedByDescending { draftValue(it) }
+        return ranked.withIndex().associate { (i, p) -> p.id to i + 1 }
+    }
+
+    fun projection(rank: Int?, year: Int): String = when {
+        rank == null -> "—"
+        rank <= 14 -> "Lottery"
+        rank <= 30 -> "1st Round"
+        rank <= 60 -> "2nd Round"
+        year <= 1 -> "TBD"
+        else -> "Undrafted"
+    }
+
+    private fun declarations(lg: League, board: Map<Int, Int>): List<Int> {
+        val out = mutableListOf<Int>()
+        for (p in lg.players) {
+            if (p.teamId < 0 || p.year !in 1..3) continue
+            val rank = board[p.id] ?: continue
+            if (rank > 45 || p.ovr < 76) continue
+            var c = when { rank <= 14 -> 0.9; rank <= 30 -> 0.7; else -> 0.4 }
+            c *= when (p.year) { 1 -> 0.85; 2 -> 0.95; else -> 1.0 }
+            if (p.has(Trait.LOYAL)) c *= 0.6
+            if (Rng.chance(c)) out += p.id
+        }
+        return out
+    }
+
+    // ---------- step 1: roster & NIL ----------
+
+    fun userEntrants(lg: League): List<Player> {
+        val os = lg.offseason ?: return emptyList()
+        return os.entrants.mapNotNull { lg.playerOrNull(it) }.filter { it.teamId == lg.userTeamId }
+    }
+
+    /** Try to talk a draft entrant into another year. */
+    fun pitchReturn(lg: League, pid: Int): Boolean {
+        val os = lg.offseason ?: return false
+        if (pid !in os.entrants || pid in os.pitched) return false
+        os.pitched += pid
+        val p = lg.player(pid)
+        val rank = draftBoard(lg)[pid] ?: 99
+        var c = when { rank <= 14 -> 0.08; rank <= 30 -> 0.3; else -> 0.6 } + (p.happiness - 60) / 200.0
+        if (p.has(Trait.LOYAL)) c += 0.15
+        if (lg.userCoach.has(CoachSkill.CULTURE)) c += 0.1
+        if (!Rng.chance(c.coerceIn(0.03, 0.9))) return false
+        os.entrants.remove(pid)
+        p.happiness = (p.happiness + 5).coerceAtMost(100)
+        lg.news += News(lg.season, lg.day, "${p.name} withdraws from the draft and returns to ${lg.user.school}", true)
+        return true
+    }
+
+    /** Players on next year's roster being paid under their market value. */
+    fun belowMarket(lg: League): List<Player> {
+        val os = lg.offseason
+        return lg.rosterOf(lg.user).filter { it.year < 4 && (os == null || it.id !in os.entrants) && Ratings.expectedNil(it) - it.nil >= 25 }
+            .sortedByDescending { Ratings.expectedNil(it) - it.nil }
+    }
+
+    fun raiseNil(lg: League, pid: Int): Boolean {
+        val p = lg.player(pid)
+        val ask = Ratings.expectedNil(p)
+        if (ask <= p.nil) return true
+        if (Finance.available(lg, lg.user, includeSeniors = false) < ask - p.nil) return false
+        p.nil = ask
+        p.happiness = (p.happiness + 15).coerceAtMost(100)
+        return true
+    }
+
+    /** Cut a player loose: he enters the transfer portal. */
+    fun release(lg: League, pid: Int) {
+        val t = lg.user
+        if (pid !in t.roster) return
+        val p = lg.player(pid)
+        t.roster.remove(pid)
+        lg.offseason?.let { it.released += p.name; it.freedOther += p.nil }
+        toPortal(lg, p, t.id)
+    }
+
+    private fun toPortal(lg: League, p: Player, fromId: Int) {
+        p.teamId = -1
+        p.transferFrom = fromId
+        val r = Recruit(p, transfer = true)
+        r.nilAsk = Ratings.expectedNil(p)
+        r.scouted = true
+        r.estOvr = p.ovr
+        r.estPot = p.pot
+        val target = (p.ovr * 1.35 - 28).coerceIn(10.0, 99.0)
+        val k = Rng.range(3, 5)
+        repeat(k * 3) {
+            if (r.interest.size >= k) return@repeat
+            val t = Rng.weighted(lg.teams) { tm ->
+                if (tm.id == fromId || tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((tm.prestige - target) / 15.0).let { it * it })
+            }
+            r.interest[t.id] = Rng.range(15, 45)
+        }
+        lg.recruits += r
+    }
+
+    private fun transferChance(lg: League, p: Player): Double {
+        if (p.year >= 4) return 0.0
+        var c = when (Morale.mood(p)) { Mood.TRANSFER -> 0.55; Mood.UNHAPPY -> 0.14; Mood.CONTENT -> 0.03; Mood.HAPPY -> 0.01 }
+        if (p.has(Trait.DISLOYAL)) c *= 1.5
+        if (p.has(Trait.LOYAL)) c *= 0.35
+        val t = if (p.teamId >= 0) lg.team(p.teamId) else null
+        if (t != null && lg.coachOf(t).has(CoachSkill.CULTURE)) c *= 0.7
+        return c.coerceAtMost(0.85)
+    }
+
+    // ---------- moving between steps ----------
+
+    fun advance(lg: League) {
+        val os = lg.offseason ?: return
+        when (os.step) {
+            OffStep.ROSTER -> { runTransfers(lg, os); runDraft(lg, os); os.step = OffStep.DRAFT }
+            OffStep.DRAFT -> os.step = OffStep.CAREER
+            OffStep.CAREER -> { if (os.fired) return; runDevelopment(lg, os); os.step = OffStep.DEVELOPMENT }
+            OffStep.DEVELOPMENT -> os.step = OffStep.BUDGET
+            OffStep.BUDGET -> { os.round = 1; lg.recruitPoints = roundPoints(lg); os.step = OffStep.RECRUITING }
+            OffStep.RECRUITING -> lockRound(lg)
+        }
+    }
+
+    private fun runTransfers(lg: League, os: OffseasonState) {
+        val entrants = os.entrants.toSet()
+        for (t in lg.teams) {
+            for (pid in t.roster.toList()) {
+                val p = lg.player(pid)
+                if (pid in entrants || !Rng.chance(transferChance(lg, p))) continue
+                t.roster.remove(pid)
+                if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
+                toPortal(lg, p, t.id)
+            }
+        }
+    }
+
+    private fun runDraft(lg: League, os: OffseasonState) {
+        val entrants = os.entrants.toSet()
+        val pool = lg.players.filter { it.teamId >= 0 && (it.year >= 4 || it.id in entrants) }
+            .map { it to draftValue(it) + Rng.gauss() * 2 }
+            .sortedByDescending { it.second }
+            .map { it.first }
+        val picks = pool.take(60)
+        picks.forEachIndexed { i, p ->
+            val t = lg.team(p.teamId)
+            lg.draftHistory += DraftPick(lg.season, i + 1, p.name, p.pos, t.id, t.school, p.year, p.ovr, p.look, p.number)
+            lg.coachOf(t).drafted++
+            p.awards += "${lg.season} Draft #${i + 1}"
+            if (t.id == lg.userTeamId) {
+                os.draftedCount++
+                os.freedDraft += p.nil
+                lg.news += News(lg.season, lg.day, "${p.name} goes No. ${i + 1} overall in the draft", true)
+            }
+        }
+        val drafted = picks.map { it.id }.toSet()
+        // Seniors graduate, draftees leave, undrafted underclassmen return.
+        for (t in lg.teams) {
+            for (pid in t.roster.toList()) {
+                val p = lg.player(pid)
+                if (p.year >= 4 || pid in drafted) {
+                    if (t.id == lg.userTeamId && pid !in drafted) os.freedGrad += p.nil
+                    hallOfFameCheck(lg, p, t)
+                    t.roster.remove(pid)
+                    lg.removePlayer(p)
+                }
+            }
+        }
+        os.entrants.retainAll(drafted)
+    }
+
+    private fun hallOfFameCheck(lg: League, p: Player, t: Team) {
+        val aa = p.awards.count { it.endsWith("AA 1st") }
+        val mvp = p.awards.count { it.endsWith("Nat MVP") }
+        val mop = p.awards.count { it.endsWith("MOP") }
+        if (mvp >= 1 || aa >= 2 || (aa >= 1 && mop >= 1)) {
+            val tot = StatLine()
+            p.career.forEach { tot.add(it.s) }
+            lg.hallOfFame += HofEntry(lg.season, p.name, p.pos, t.school, "%.1f ppg career · %d× All-American%s".format(tot.ppg, aa, if (mvp > 0) " · MVP" else ""))
+            if (t.id == lg.userTeamId) lg.userCoach.hof++
+        }
+    }
+
+    private fun runDevelopment(lg: League, os: OffseasonState) {
+        for (t in lg.teams) {
+            val dev = Coaching.devOf(lg.coachOf(t))
+            for (pid in t.roster) {
+                val p = lg.player(pid)
+                val before = p.ovr
+                val attrs = p.attrs.copyOf()
+                Ratings.offseasonGrowth(p, dev)
+                val gains = IntArray(10) { p.attrs[it] - attrs[it] }
+                val lbs = if (p.year <= 2) Rng.range(0, 8) else Rng.range(-2, 4)
+                p.weight += lbs
+                p.year++
+                if (t.id == lg.userTeamId) os.growth += Growth(pid, before, p.ovr, gains, lbs)
+            }
+        }
+        os.growth.sortByDescending { it.after - it.before }
+    }
+
+    // ---------- recruiting rounds ----------
+
+    fun roundPoints(lg: League) = 70 + lg.userCoach.rec / 2 + if (lg.userCoach.has(CoachSkill.RECRUITER)) 10 else 0
+
+    private fun lockRound(lg: League) {
+        val os = lg.offseason ?: return
+        repeat(3) {
+            lg.day++
+            Recruiting.tick(lg)
+        }
+        os.round++
+        lg.recruitPoints = roundPoints(lg)
+        if (os.round > ROUNDS) finish(lg)
+    }
+
+    private fun finish(lg: League) {
+        val os = lg.offseason ?: return
+        os.signed += Recruiting.signingDay(lg)
+        // Walk-ons fill any remaining holes.
+        for (t in lg.teams) {
+            while (t.roster.size < Recruiting.MAX_ROSTER) {
+                val w = LeagueGen.walkOn(lg, t, LeagueGen.nearestPositionNeed(lg, t))
+                w.year = 1
+                w.number = Recruiting.freeNumber(lg, t)
+                lg.addPlayer(w)
+                t.roster += w.id
+            }
+        }
+        // Unsigned transfers leave the game.
+        lg.players.filter { it.teamId < 0 }.forEach { lg.removePlayer(it) }
+        startNewSeason(lg)
+    }
+
+    // ---------- new season ----------
+
+    private fun startNewSeason(lg: League) {
+        for (t in lg.teams) {
+            for (pid in t.roster) {
+                val p = lg.player(pid)
+                p.stats = StatLine(); p.tourney = StatLine(); p.log = mutableListOf()
+                p.seasonGains = IntArray(10); p.seasonLevels = 0
+                p.happiness = ((p.happiness + 72) / 2.0).roundToInt()
+                p.transferFrom = -1
+            }
+        }
+        for (c in lg.coaches) {
+            c.age++
+            if (!c.isUser) Coaching.aiGrowth(c)
+        }
+        lg.season++
+        setupSeason(lg, carryElo = true)
+        lg.news += News(lg.season, 0, "Welcome to the ${lg.season} season", true)
+        if (lg.news.size > 250) lg.news.subList(0, lg.news.size - 250).clear()
+    }
+
+    /** Shared by a brand-new league and every new season. */
+    fun setupSeason(lg: League, carryElo: Boolean) {
+        for (t in lg.teams) {
+            t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0
+            t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
+            if (t.id != lg.userTeamId) Morale.aiNilRefresh(lg, t)
+            if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
+        }
+        lg.phase = Phase.REGULAR
+        lg.day = 1
+        lg.wrapUp = null
+        lg.offseason = null
+        lg.seasonAwards = mutableListOf()
+        lg.confAwards = mutableListOf()
+        lg.cotyCoachId = -1
+        Records.ensure(lg)
+        Schedule.build(lg)
+        Rankings.seedElo(lg, carryElo)
+        Rankings.computeExpectedWins(lg)
+        Rankings.refresh(lg)
+        lg.norms = GameEngine.computeNorms(lg)
+        lg.recruits = LeagueGen.recruitClass(lg)
+        lg.recruitPoints = Recruiting.dailyPoints(lg)
+        val u = lg.user
+        lg.news += News(lg.season, 0, if (u.ap > 0) "${u.school} opens the season ranked No. ${u.ap}" else "${u.school} opens the season unranked", true)
+        Season.prepareDay(lg)
+    }
+
+    fun newGame(teamId: Int, coachFirst: String, coachLast: String, startYear: Int = 2026): League =
+        claimTeam(LeagueGen.newLeague(startYear), teamId, coachFirst, coachLast)
+
+    /** Puts the user in charge of [teamId] in a freshly generated league and starts the season. */
+    fun claimTeam(lg: League, teamId: Int, coachFirst: String, coachLast: String): League {
+        val t = lg.team(teamId)
+        val old = lg.coachOf(t)
+        lg.coaches.remove(old)
+        val c = Coach(lg.nextCoachId++, coachFirst, coachLast, 38, teamId, 68, 66, 70, 68, Rng.int(0, 1_000_000), isUser = true)
+        lg.coaches += c
+        t.coachId = c.id
+        lg.userTeamId = teamId
+        lg.userCoachId = c.id
+        lg.reindex()
+        setupSeason(lg, carryElo = false)
+        return lg
+    }
+
+    /** Runs every offseason step with default choices. Used by tests and "sim offseason". */
+    fun autoComplete(lg: League) {
+        if (lg.phase == Phase.WRAP_UP) begin(lg)
+        var guard = 0
+        while (lg.phase == Phase.OFFSEASON && guard++ < 20) {
+            val os = lg.offseason ?: break
+            if (os.step == OffStep.CAREER && os.fired) Coaching.acceptOffer(lg, os.offers.first().teamId)
+            advance(lg)
+        }
+    }
+}
+
+object Coaching {
+
+    private fun expectedRound(prestige: Int) = when {
+        prestige >= 85 -> 3
+        prestige >= 72 -> 2
+        prestige >= 58 -> 1
+        else -> 0
+    }
+
+    fun devOf(c: Coach) = c.dev + if (c.has(CoachSkill.DEVELOPER)) 8 else 0
+
+    fun evaluateUser(lg: League) {
+        val t = lg.user
+        val c = lg.userCoach
+        val round = Awards.tourneyRound(lg, t.id)
+        val delta = (t.w - t.expWins) * 3 + (round - expectedRound(t.prevPrestige)) * 5
+        c.security = (c.security + delta).roundToInt().coerceIn(0, 100)
+    }
+
+    /** Coaching points earned this season. */
+    fun pointsEarned(lg: League): Int {
+        val t = lg.user
+        val c = lg.userCoach
+        val round = Awards.tourneyRound(lg, t.id)
+        var pts = 3 + ((t.w - t.expWins) / 2).roundToInt().coerceIn(0, 6) + (round - 1).coerceAtLeast(0)
+        if (lg.cotyCoachId == c.id) pts += 2
+        if (lg.confAwards.any { it.pid == -c.id }) pts += 1
+        if (lg.confBrackets.any { it.confId == t.confId && it.champion == t.id }) pts += 1
+        return pts
+    }
+
+    fun cost(which: Int) = if (which == 0) 3 else 2
+
+    /** Spend points on a rating: 0 offense, 1 defense, 2 recruiting, 3 development. */
+    fun buyRating(c: Coach, which: Int): Boolean {
+        val cost = cost(which)
+        if (c.points < cost) return false
+        val cur = when (which) { 0 -> c.off; 1 -> c.def; 2 -> c.rec; else -> c.dev }
+        if (cur >= 99) return false
+        c.points -= cost
+        when (which) { 0 -> c.off++; 1 -> c.def++; 2 -> c.rec++; else -> c.dev++ }
+        return true
+    }
+
+    const val SKILL_COST = 10
+
+    fun buySkill(c: Coach, s: CoachSkill): Boolean {
+        if (c.has(s) || c.points < SKILL_COST) return false
+        c.points -= SKILL_COST
+        c.skills += s
+        return true
+    }
+
+    fun aiGrowth(c: Coach) {
+        repeat(2) {
+            val d = if (c.age > 66) -1 else if (c.age < 58 && Rng.chance(0.5)) 1 else 0
+            when (Rng.int(0, 4)) { 0 -> c.off += d; 1 -> c.def += d; 2 -> c.rec += d; else -> c.dev += d }
+        }
+        c.off = c.off.coerceIn(30, 99); c.def = c.def.coerceIn(30, 99); c.rec = c.rec.coerceIn(30, 99); c.dev = c.dev.coerceIn(30, 99)
+    }
+
+    fun carousel(lg: League, os: OffseasonState) {
+        for (t in lg.teams) {
+            if (t.id == lg.userTeamId) continue
+            val c = lg.coachOf(t)
+            val retire = c.age >= 72 || (c.age >= 66 && Rng.chance(0.3))
+            val fired = !retire && t.w - t.expWins < -5 && Rng.chance(0.35)
+            if (retire || fired) {
+                if (retire && c.titles >= 2) lg.hallOfFame += HofEntry(lg.season, c.name, Pos.PG, t.school, "${c.w}-${c.l} · ${c.titles} titles", isCoach = true)
+                lg.coaches.remove(c)
+                val n = LeagueGen.makeCoach(lg, t.prestige, Rng.range(34, 55), withCareer = true)
+                n.teamId = t.id
+                t.coachId = n.id
+                if (t.prestige >= 80) lg.news += News(lg.season, lg.day, "${t.school} hires ${n.name} as head coach", false)
+            }
+        }
+        val u = lg.user
+        val c = lg.userCoach
+        val round = Awards.tourneyRound(lg, u.id)
+        if (c.security < 15) {
+            os.fired = true
+            val pool = lg.teams.filter { it.id != u.id && it.prestige in (u.prestige - 40)..(u.prestige - 8) }.shuffled(Rng.r)
+            val picks = (if (pool.size >= 2) pool else lg.teams.filter { it.id != u.id }.sortedBy { it.prestige }.take(20).shuffled(Rng.r)).take(3)
+            picks.forEach { os.offers += JobOffer(it.id, "Offers you a fresh start") }
+            lg.news += News(lg.season, lg.day, "${u.school} has fired ${c.name}", true)
+        } else {
+            val strong = c.security >= 75 || round >= 4 || u.w - u.expWins >= 5
+            val n = if (strong) Rng.range(2, 5) else if (c.security >= 55) Rng.range(0, 2) else 0
+            lg.teams.filter { it.id != u.id && it.prestige in (u.prestige - 12)..(u.prestige + 35) }
+                .sortedByDescending { it.prestige }.take(12).shuffled(Rng.r).take(n)
+                .sortedByDescending { it.prestige }
+                .forEach { os.offers += JobOffer(it.id, if (it.prestige > u.prestige) "Wants you to lead a bigger program" else "Interested in your rebuild skills") }
+        }
+    }
+
+    /** User accepts a job: swaps benches with that school's coach. */
+    fun acceptOffer(lg: League, teamId: Int) {
+        val os = lg.offseason ?: return
+        if (os.offers.none { it.teamId == teamId }) return
+        val oldTeam = lg.user
+        val newTeam = lg.team(teamId)
+        val me = lg.userCoach
+        val other = lg.coachOf(newTeam)
+        other.teamId = oldTeam.id
+        oldTeam.coachId = other.id
+        me.teamId = newTeam.id
+        newTeam.coachId = me.id
+        lg.userTeamId = newTeam.id
+        me.security = 70
+        newTeam.plan.auto = true
+        os.offers.clear()
+        os.fired = false
+        os.graduates.clear()
+        os.signed.clear()
+        // Commitments made to the old school stay there.
+        for (r in lg.recruits) r.onBoard = false
+        lg.news += News(lg.season, lg.day, "${me.name} is the new head coach at ${newTeam.school}", true)
+    }
+}
