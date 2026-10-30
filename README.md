@@ -4,7 +4,9 @@ A native Android college basketball coaching game, written in Kotlin with Jetpac
 
 Pick a school, set your rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, develop players, and chase national titles season after season.
 
-All 228 schools, conferences, players and coaches are fictional. You can rename any school, its mascot, colors and logo shape in **Settings → Edit Any School**.
+You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Team marks are drawn monograms in school colors, not official logos. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
+
+The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
 
 ## Install on your phone
 
@@ -16,15 +18,17 @@ All 228 schools, conferences, players and coaches are fictional. You can rename 
 
 ## What's in the game
 
-- **Home**: next game with Play (watch it possession by possession, change tactics mid-game) or Sim, recent results, team stats, your leaders and headlines. A Sim menu jumps ahead a game, a week, or to any point in the season.
-- **Program**
-  - *Summary*: prestige, budget, NIL spend, player happiness, and players who need attention.
-  - *Players*: starters, rotation and bench, with roles, stats and personality traits.
-  - *Gameplan*: offense and defense styles, starters and backups at each position, minutes split and usage sliders, or Auto-Allocate.
-  - *Training*: XP and level-ups, with a training focus (archetype) for each player.
-  - *Recruiting*: daily points to scout, call, visit and offer scholarships and NIL money.
-- **League**: national AP Top 25 and NET rankings, conference standings, stat leaders, coach power rankings, and history (season review, awards, draft, Hall of Fame, record book).
-- **Dynasty**: your coach's career record, titles, awards, job security, coaching history and skills.
+- **Continue bar**: one bar above the tabs always shows what's next. Play the game live, sim it, or use the ⋮ menu to jump a week, to the conference tournament, to Selection Sunday, or to the end of the season.
+- **Today**: next opponent with win odds and a head-to-head comparison, recent form, conference standings, top performers and headlines. During tournaments it shows your road to the title and the current round.
+- **Team**
+  - *Roster*: starting five, rotation and bench with jersey numbers, rating rings and personality traits.
+  - *Lineup*: offense and defense styles, starter and backup at each position, a minutes slider, and optional usage tuning.
+  - *Develop*: XP progress and a training focus (archetype) for each player.
+  - *Program*: prestige, NIL budget, locker-room mood and coaching staff.
+- **Recruit**: targets, high-school prospects, transfers and commits, with interest races against rival schools.
+- **League**: AP Top 25 and NET, standings for all 32 conferences, stat leaders, bracketology and brackets, and history.
+- **Career**: your coach's record, honors, job security, coaching skills and history.
+- **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
 - **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, and a 64-team NCAA bracket.
 - **Season wrap-up**: results, awards (Player of the Year, All-Americans, All-Tournament), graduations, program prestige changes, and coach development points.
 - **Offseason**, step by step:
@@ -75,4 +79,4 @@ keytool -genkeypair -keystore hoops.keystore -alias hoops -keyalg RSA -keysize 2
 base64 -w0 hoops.keystore   # paste the output into the KEYSTORE_BASE64 secret
 ```
 
-Font: [Lexend](https://github.com/googlefonts/lexend) (SIL Open Font License, see `licenses/`).
+Fonts: [Big Shoulders Display](https://github.com/xotypeco/big_shoulders) and [Manrope](https://github.com/sharanda/manrope), both SIL Open Font License (see `licenses/`).

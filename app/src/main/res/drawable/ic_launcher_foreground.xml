@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Basketball on a dark tile. The safe zone is the middle 66dp of 108dp. -->
+<!-- Ball on a dark tile with an arena-orange seam pattern. Safe zone is the middle 66dp. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#F26B21"
-        android:pathData="M54,26a28,28 0,1 1,0 56a28,28 0,1 1,0 -56z" />
+        android:fillColor="#F2F3F5"
+        android:pathData="M54,28a26,26 0,1 1,0 52a26,26 0,1 1,0 -52z" />
     <path
-        android:strokeColor="#16171B"
-        android:strokeWidth="2.6"
+        android:strokeColor="#11141B"
+        android:strokeWidth="2.8"
         android:fillColor="#00000000"
-        android:pathData="M26,54h56 M54,26v56 M34.2,34.2c8,6 12,13 12,19.8s-4,13.8 -12,19.8 M73.8,34.2c-8,6 -12,13 -12,19.8s4,13.8 12,19.8" />
+        android:pathData="M28,54h52 M54,28v52 M35.6,35.6c7.4,5.6 11.2,12 11.2,18.4s-3.8,12.8 -11.2,18.4 M72.4,35.6c-7.4,5.6 -11.2,12 -11.2,18.4s3.8,12.8 11.2,18.4" />
 </vector>

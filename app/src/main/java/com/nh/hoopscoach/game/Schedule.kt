@@ -61,7 +61,8 @@ object Schedule {
 
         // Conference play: circle method, then a partial second pass to reach 18 games.
         for (c in lg.confs) {
-            val ids = c.teamIds.shuffled(Rng.r)
+            // Odd-sized conferences get a bye slot (-1); games against it are skipped.
+            val ids = c.teamIds.shuffled(Rng.r).toMutableList<Int>().also { if (it.size % 2 == 1) it += -1 }
             val n = ids.size
             val rounds = mutableListOf<List<Pair<Int, Int>>>()
             val rot = ids.toMutableList()
@@ -86,15 +87,17 @@ object Schedule {
             val order = all.shuffled(Rng.r)
             order.forEachIndexed { idx, pairs ->
                 val day = NC_DAYS + 1 + idx
-                for ((h, a) in pairs) lg.addGame(Game(lg.nextGameId++, day, h, a, false, GameType.CONF))
+                for ((h, a) in pairs) if (h >= 0 && a >= 0) lg.addGame(Game(lg.nextGameId++, day, h, a, false, GameType.CONF))
             }
         }
         lg.games.sortBy { it.day }
         lg.reindex()
     }
 
-    private fun pairUp(teams: List<Team>, played: Set<Long>): List<Pair<Team, Team>> {
+    private fun pairUp(all: List<Team>, played: Set<Long>): List<Pair<Team, Team>> {
         fun key(a: Int, b: Int) = if (a < b) a.toLong() * 10000 + b else b.toLong() * 10000 + a
+        // With an odd number of teams, one random team sits out the day.
+        val teams = if (all.size % 2 == 1) all.shuffled(Rng.r).drop(1) else all
         repeat(300) { attempt ->
             val list = teams.shuffled(Rng.r)
             val used = BooleanArray(list.size)

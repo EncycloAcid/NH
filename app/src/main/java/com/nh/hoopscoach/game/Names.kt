@@ -1,6 +1,6 @@
 package com.nh.hoopscoach.game
 
-/** Name pools. All schools and people are fictional. */
+/** Name pools for fictional players and coaches. */
 object Names {
     val first = listOf(
         "Aaron", "Adrian", "Ahmad", "Aidan", "Alex", "Amari", "Andre", "Anthony", "Antonio", "Armando", "Asa", "Austin",
@@ -93,52 +93,6 @@ object Names {
         "Lakeview", "Cedar Ridge", "Pine Valley", "Northwood", "Southridge", "Mount Zion", "Grace", "Liberty",
     )
 
-    /** Places used to build fictional school names. */
-    val places = listOf(
-        "Ashford", "Bayport", "Bellmont", "Blue Ridge", "Briarwood", "Brookhaven", "Calder", "Cambria", "Carver",
-        "Cedar Falls", "Cedarcrest", "Centralia", "Chesapeake", "Clearwater", "Coldwater", "Columbia Valley", "Copper Canyon",
-        "Crestview", "Cumberland", "Dalton", "Deer Park", "Delmar", "Eastbrook", "Easton", "Elk River", "Emerald Coast",
-        "Fairhaven", "Falcon Ridge", "Fox Valley", "Franklin", "Galveston", "Glen Echo", "Grand Prairie", "Granite Falls",
-        "Great Plains", "Greenfield", "Hartwell", "Harbor City", "Hawthorne", "Highland", "Hollister", "Hudson Valley",
-        "Iron Range", "Jasper", "Juniper", "Kearney", "Keystone", "Kingsport", "Lake Shore", "Lakewood", "Laredo",
-        "Lewisburg", "Lincoln Park", "Long Bay", "Magnolia", "Maple Grove", "Marion", "Meadowbrook", "Merrimack",
-        "Mesa Verde", "Midland", "Millbrook", "Mohave", "Montclair", "Mount Pleasant", "New Albion", "Northgate",
-        "Oak Harbor", "Oakmont", "Ocean Bluff", "Olympia", "Orchard Park", "Palisades", "Palmetto", "Pine Bluff",
-        "Pinecrest", "Port Royal", "Prairie View", "Quarry Hill", "Redwood", "Ridgemont", "Riverbend", "Rockport",
-        "Rolling Hills", "Saddleback", "Salem", "Sandpoint", "Sawtooth", "Seabrook", "Shelby", "Silver Lake",
-        "Southport", "Springdale", "Stonebridge", "Summit", "Sun Valley", "Sycamore", "Tahoma", "Tidewater",
-        "Timberline", "Trinity", "Twin Rivers", "Union City", "Valley Forge", "Vista", "Wabash Valley", "Walnut Creek",
-        "Waverly", "West Haven", "Westfield", "Whitewater", "Wildwood", "Willow Bend", "Windham", "Woodland",
-        "Yellowstone", "Yorktown", "Appalachia", "Bayou", "Big Sky", "Black Hills", "Blackstone", "Bluegrass",
-        "Bridgeport", "Canyon", "Capital City", "Carolina Coast", "Cascade", "Central Plains", "Coastal", "Delta",
-        "Desert", "Driftwood", "Eagle Pass", "Flint Hills", "Foothills", "Frontier", "Gateway", "Gulf Coast", "Heartland",
-        "High Desert", "Hill Country", "Inland", "Lakeland", "Lone Pine", "Lowcountry", "Mid-Atlantic", "Midway",
-        "Mountain", "North Coast", "Northern", "Ozark", "Pacific", "Panhandle", "Piedmont", "Prairie", "Red River",
-        "Rio Grande", "River City", "Sierra", "Southern", "Southwest", "Sunbelt", "Tri-State", "Upstate", "Western",
-        "Albion", "Arden", "Avalon", "Beaumont", "Belmont Park", "Brighton", "Carlisle", "Chandler", "Clayton",
-        "Concord", "Dover", "Elmhurst", "Fairfield", "Glenwood", "Hamilton", "Harrisburg", "Kent Falls", "Lancaster",
-        "Lexington Hills", "Madison Park", "Marlow", "Newport", "Norwood", "Oxford Hills", "Pembroke", "Preston",
-        "Quincy", "Richland", "Rutherford", "Sheffield", "Somerset", "Stamford", "Sterling", "Thornton", "Trenton Falls",
-        "Vernon", "Wakefield", "Wellington", "Weston", "Whitfield", "Wilmington Bay", "Winchester", "Wyndham",
-        "Aurora", "Bellevue", "Bristol", "Clifton", "Dearborn", "Edgewood", "Fulton", "Garland", "Hampton",
-        "Irving", "Jackson Hole", "Kingston", "Lafayette", "Mansfield", "Monroe", "Nashua", "Ogden", "Peyton",
-        "Raleigh Hills", "Saratoga", "Tyler", "Urbana", "Valdosta", "Waco Falls", "Xenia", "Yuma", "Zephyr",
-    )
-    val saints = listOf("Bonaventure", "Agnes", "Ambrose", "Cyril", "Dominic", "Edmund", "Florian", "Gregory", "Jerome", "Lucian", "Martin", "Rafael", "Sebastian", "Thaddeus")
-    val mascots = listOf(
-        "Gators", "Cougars", "Wolves", "Hawks", "Eagles", "Bears", "Tigers", "Lions", "Panthers", "Falcons", "Knights",
-        "Pioneers", "Rams", "Bulldogs", "Mustangs", "Broncos", "Wildcats", "Hornets", "Owls", "Ravens", "Comets",
-        "Rockets", "Storm", "Thunder", "Lightning", "Cyclones", "Hurricanes", "Blazers", "Flames", "Spartans",
-        "Titans", "Trojans", "Vikings", "Raiders", "Pirates", "Mariners", "Seahawks", "Ospreys", "Pelicans", "Herons",
-        "Badgers", "Wolverines", "Bobcats", "Lynx", "Jaguars", "Cardinals", "Blue Jays", "Orioles", "Jayhawks",
-        "Bison", "Buffaloes", "Longhorns", "Stallions", "Chargers", "Patriots", "Minutemen", "Colonials", "Rebels",
-        "Mountaineers", "Rangers", "Outlaws", "Sooners", "Huskies", "Retrievers", "Terriers", "Greyhounds", "Foxes",
-        "Coyotes", "Scorpions", "Rattlers", "Cobras", "Dragons", "Griffins", "Phoenix", "Thunderbirds", "Golden Eagles",
-        "Red Hawks", "Black Bears", "Grizzlies", "Kodiaks", "Timberwolves", "Lumberjacks", "Miners", "Railers",
-        "Engineers", "Monarchs", "Royals", "Crusaders", "Saints", "Friars", "Dukes", "Barons", "Generals", "Admirals",
-        "Captains", "Sharks", "Stingrays", "Marlins", "Dolphins", "Gulls", "Tide", "Waves", "Surge", "Rapids",
-        "Aggies", "Sentinels", "Highlanders", "Leopards", "Catamounts", "Mavericks", "Wranglers", "Roadrunners",
-    )
     val colors: List<Pair<Long, Long>> = listOf(
         0xFF0021A5 to 0xFFFA4616, 0xFF002E5D to 0xFFFFFFFF, 0xFF7B1113 to 0xFFFFC72C, 0xFF00274C to 0xFFFFCB05,
         0xFF4B2E83 to 0xFFB7A57A, 0xFF8C1D40 to 0xFFFFC627, 0xFF154734 to 0xFFFFC72C, 0xFFBA0C2F to 0xFF000000,
@@ -150,20 +104,6 @@ object Names {
         0xFF2D68C4 to 0xFFF2A900, 0xFF6F263D to 0xFFA2AAAD, 0xFF00B2A9 to 0xFF000000, 0xFF8A2432 to 0xFFF2C75C,
         0xFF003DA5 to 0xFF99D6EA, 0xFF2C2A29 to 0xFFCF4520, 0xFF0B3D91 to 0xFFF1B82D, 0xFF990000 to 0xFFE0E0E0,
     )
-
-    val confNames = listOf(
-        // tier 0 (power)
-        Triple("Atlantic Premier", "APC", 0), Triple("Southern Union", "SUN", 0), Triple("Great Lakes", "GLC", 0),
-        Triple("Pacific Coast", "PCC", 0), Triple("Heartland", "HRT", 0),
-        // tier 1 (mid-major)
-        Triple("Mountain Range", "MRC", 1), Triple("Gulf Coast", "GCC", 1), Triple("River Valley", "RVC", 1),
-        Triple("Keystone", "KEY", 1), Triple("Frontier", "FRO", 1), Triple("Cascade", "CAS", 1),
-        // tier 2 (low-major)
-        Triple("Piedmont", "PIE", 2), Triple("Bayou", "BAY", 2), Triple("Redwood", "RED", 2), Triple("Granite", "GRN", 2),
-        Triple("Ozark", "OZK", 2), Triple("Lakeshore", "LKS", 2), Triple("Mesa", "MSA", 2), Triple("Tidewater", "TDW", 2),
-        Triple("Northwoods", "NWD", 2),
-    )
-    val confSizes = listOf(16, 16, 14, 14, 12, 12, 12, 12, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10)
 
     val events = listOf("Paradise Invitational", "Empire Classic", "Lone Star Showcase", "Bluegrass Shootout")
 }

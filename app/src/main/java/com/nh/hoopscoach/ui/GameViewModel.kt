@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class Tab(val label: String) { HOME("Home"), PROGRAM("Program"), LEAGUE("League"), DYNASTY("Dynasty") }
+enum class Tab(val label: String) { TODAY("Today"), TEAM("Team"), RECRUIT("Recruit"), LEAGUE("League"), CAREER("Career") }
 
 enum class HistoryKind(val title: String, val sub: String) {
     SEASONS("Season Review", "Champions, awards and Final Fours by year"),
@@ -47,6 +47,7 @@ sealed interface Route {
     data class RecruitView(val playerId: Int) : Route
     data object Leaders : Route
     data object CoachDev : Route
+    data object WrapUp : Route
 }
 
 /** A game being watched possession by possession. */
@@ -71,7 +72,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var busy by mutableStateOf<String?>(null)
         private set
-    var tab by mutableStateOf(Tab.HOME)
+    var tab by mutableStateOf(Tab.TODAY)
     val stack = mutableStateListOf<Route>()
     var sheet by mutableStateOf<Int?>(null)
     var live by mutableStateOf<LiveGame?>(null)
@@ -79,10 +80,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var message by mutableStateOf<String?>(null)
 
     // Sub-tab memory so switching tabs doesn't reset what you were looking at.
-    var programTab by mutableIntStateOf(0)
-    var leagueScope by mutableIntStateOf(0)
+    var teamTab by mutableIntStateOf(0)
     var leagueConf by mutableIntStateOf(-1)
     var leagueTab by mutableIntStateOf(0)
+    var awardsScope by mutableIntStateOf(0)
     var wrapPage by mutableIntStateOf(0)
     var recruitView by mutableIntStateOf(1)
     var recruitFilter by mutableIntStateOf(0)
@@ -192,7 +193,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.Default) { Offseason.claimTeam(d, teamId, first, last) }
             draft = null
             league = d
-            tab = Tab.HOME
+            tab = Tab.TODAY
             stack.clear()
             busy = null
             bump()
@@ -229,7 +230,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 stack.clear()
                 sheet = null
                 live = null
-                tab = Tab.HOME
+                tab = Tab.TODAY
             }
             bump()
             toast("Save restored: ${lg.user.school}, ${lg.season}")
@@ -255,7 +256,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun simDay() {
         val lg = league ?: return
         if (Season.seasonOver(lg)) return
-        act { Season.playDay(it) }
+        heavy("Simulating") { Season.playDay(it) }
     }
 
     fun simUntil(label: String, stop: (League) -> Boolean) = heavy(label) { lg ->
@@ -287,14 +288,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
         heavy(label) {
             Offseason.advance(it)
-            if (it.phase == Phase.REGULAR) { wrapPage = 0; tab = Tab.HOME }
+            if (it.phase == Phase.REGULAR) { wrapPage = 0; tab = Tab.TODAY }
         }
     }
 
     fun simOffseason() = heavy("Simulating the offseason") {
         Offseason.autoComplete(it)
         wrapPage = 0
-        tab = Tab.HOME
+        tab = Tab.TODAY
     }
 
     // ---------- live games ----------

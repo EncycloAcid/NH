@@ -19,6 +19,8 @@ class SimTest {
     fun simulatesSeveralSeasons() {
         Rng.r = Random(7)
         val lg = Offseason.newGame(5, "Test", "Coach")
+        assertEquals("abbreviations must be unique", lg.teams.size, lg.teams.map { it.abbr }.toSet().size)
+        println("Teams: ${lg.teams.size} in ${lg.confs.size} conferences")
         repeat(3) { s ->
             val t0 = System.currentTimeMillis()
             var guard = 0

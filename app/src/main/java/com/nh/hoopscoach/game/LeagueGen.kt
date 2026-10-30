@@ -7,23 +7,13 @@ import kotlin.math.roundToInt
 object LeagueGen {
 
     fun newLeague(startYear: Int = 2026): League {
-        val places = Names.places.shuffled(Rng.r).toMutableList()
-        val mascots = Names.mascots.shuffled(Rng.r).toMutableList()
-        val usedAbbr = HashSet<String>()
         val teams = mutableListOf<Team>()
         val confs = mutableListOf<Conference>()
-        Names.confNames.forEachIndexed { ci, (cname, cabbr, tier) ->
-            val size = Names.confSizes[ci]
-            val conf = Conference(ci, cname, cabbr, tier, mutableListOf())
-            repeat(size) { k ->
-                val place = places.removeAt(0)
-                val school = schoolName(place)
-                if (mascots.isEmpty()) mascots.addAll(Names.mascots.shuffled(Rng.r))
-                val mascot = mascots.removeAt(0)
-                val abbr = makeAbbr(school, usedAbbr)
-                val prestige = prestigeFor(tier, k, size)
-                val (c1, c2) = Rng.pick(Names.colors)
-                val t = Team(teams.size, school, mascot, abbr, ci, prestige, c1, c2, Rng.int(0, 4))
+        Schools.conferences.forEachIndexed { ci, c ->
+            val conf = Conference(ci, c.name, c.abbr, c.tier, mutableListOf())
+            for (s in Schools.parse(c)) {
+                val prestige = (s.prestige + Rng.range(-2, 2)).coerceIn(5, 99)
+                val t = Team(teams.size, s.name, s.nickname, s.abbr, ci, prestige, s.primary, s.secondary, 0)
                 t.prevPrestige = prestige
                 teams += t
                 conf.teamIds += t.id
@@ -48,48 +38,8 @@ object LeagueGen {
             t.coachId = c.id
             buildRoster(lg, t)
         }
+        lg.reindex()
         return lg
-    }
-
-    private fun schoolName(place: String): String {
-        val r = Rng.d()
-        return when {
-            r < 0.55 -> place
-            r < 0.75 -> "$place State"
-            r < 0.84 -> "$place Tech"
-            r < 0.89 -> "$place A&M"
-            r < 0.94 -> "Saint ${Rng.pick(Names.saints)}"
-            else -> "$place College"
-        }
-    }
-
-    private fun makeAbbr(school: String, used: MutableSet<String>): String {
-        val words = school.replace("&", "").split(" ").filter { it.isNotBlank() }
-        val candidates = mutableListOf<String>()
-        if (words.size == 1) {
-            candidates += words[0].take(4).uppercase()
-            candidates += words[0].take(3).uppercase()
-        } else {
-            val ini = words.joinToString("") { it.first().uppercase() }
-            if (words.last() == "State") candidates += words.dropLast(1).joinToString("") { it.take(1) }.uppercase() + "ST"
-            candidates += if (ini.length >= 3) ini else ini + words.last().drop(1).take(1).uppercase()
-            candidates += words[0].take(3).uppercase() + words.last().first().uppercase()
-            candidates += words[0].take(4).uppercase()
-        }
-        for (c in candidates) if (used.add(c)) return c
-        var n = 2
-        while (true) {
-            val c = candidates[0].take(3) + n
-            if (used.add(c)) return c
-            n++
-        }
-    }
-
-    private fun prestigeFor(tier: Int, index: Int, size: Int): Int {
-        val x = 1.0 - index.toDouble() / size // top of the conference first, then shuffled by noise
-        val (lo, hi) = when (tier) { 0 -> 58 to 97; 1 -> 34 to 72; else -> 8 to 48 }
-        val v = lo + (hi - lo) * x.pow(1.3) + Rng.gauss() * 5
-        return v.roundToInt().coerceIn(5, 99)
     }
 
     fun makeCoach(lg: League, prestige: Int, age: Int, withCareer: Boolean): Coach {

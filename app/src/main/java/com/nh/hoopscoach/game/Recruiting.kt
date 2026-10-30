@@ -149,11 +149,11 @@ object Recruiting {
 
     private fun checkCommit(lg: League, r: Recruit) {
         if (r.committed >= 0) return
-        val ranked = r.interest.entries.filter { it.key in r.offers }.sortedByDescending { it.value }
+        // Only programs that offered and still have a scholarship are in the running.
+        val ranked = r.interest.entries.filter { it.key in r.offers && openSpots(lg, lg.team(it.key)) > 0 }.sortedByDescending { it.value }
         val top = ranked.firstOrNull() ?: return
         val second = ranked.getOrNull(1)?.value ?: 0
         if (top.value >= 100 && (top.value - second >= 8 || top.value >= 118)) {
-            if (openSpots(lg, lg.team(top.key)) <= 0) return
             r.committed = top.key
             val t = lg.team(top.key)
             val mine = top.key == lg.userTeamId
