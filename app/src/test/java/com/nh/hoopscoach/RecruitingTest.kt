@@ -40,6 +40,35 @@ class RecruitingTest {
         assertTrue(lg.recruitBudget > 0)
         assertTrue("rivals moved before round 1", lg.recruits.any { r -> r.alloc.keys.any { it != u.id } })
 
+        // NIL adds interest on its own, more for a bigger offer, and offers can't exceed the NIL room.
+        run {
+            val c = Recruiting.Ctx(lg)
+            val r = lg.recruits.first { it.committed < 0 && u.id !in it.interest && u.id !in it.alloc && it.nilAsk > 0 }
+            assertEquals("no offer, no interest", null, Recruiting.project(lg, r, c)[u.id])
+            assertTrue(Recruiting.setNil(lg, r, r.nilAsk) || r.nilOffer > 0)
+            val atAsk = Recruiting.project(lg, r, c)[u.id] ?: 0
+            Recruiting.setNil(lg, r, r.nilAsk * 2)
+            val atDouble = Recruiting.project(lg, r, c)[u.id] ?: 0
+            println("NIL alone on ${r.p.name} (ask ${r.nilAsk}K, room ${Recruiting.nilRoom(lg, r)}K): ask -> $atAsk, double -> $atDouble")
+            assertTrue("NIL alone puts you in the race", atAsk > 4)
+            assertTrue("a bigger offer adds more", atDouble >= atAsk)
+            assertTrue("can't offer past the NIL room", !Recruiting.setNil(lg, r, Recruiting.nilRoom(lg, r) + 1000))
+            assertTrue(r.nilOffer <= Recruiting.nilRoom(lg, r))
+            Recruiting.setNil(lg, r, 0)
+            assertEquals(null, Recruiting.project(lg, r, c)[u.id])
+        }
+        run {
+            val c = Recruiting.Ctx(lg)
+            val r = lg.recruits.first { it.committed < 0 && it.nilAsk > 0 && it.p.stars >= 3 }
+            Recruiting.setPoints(lg, r, 50)
+            val pointsOnly = Recruiting.project(lg, r, c)[u.id] ?: 0
+            Recruiting.setNil(lg, r, r.nilAsk)
+            val withNil = Recruiting.project(lg, r, c)[u.id] ?: 0
+            println("50 points on ${r.p.name}: $pointsOnly, with NIL at ask: $withNil")
+            assertTrue("NIL adds to points", withNil > pointsOnly)
+            Recruiting.setPoints(lg, r, 0); Recruiting.setNil(lg, r, 0)
+        }
+
         // A simple user plan: about two targets per open spot that fit the program.
         val ctx = Recruiting.Ctx(lg)
         val targets = lg.recruits.filter { it.committed < 0 && Recruiting.wants(it) <= pull + 8 }

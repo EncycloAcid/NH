@@ -295,24 +295,46 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
             }
         }
         if (!committed) item {
-            Section("NIL offer")
+            val room = Recruiting.nilMax(lg, r)
+            val step = Recruiting.nilStep(r)
+            val gain = Recruiting.nilGain(r, r.nilOffer).roundToInt()
+            val pct = if (r.nilAsk <= 0) 100 else (r.nilOffer * 100.0 / r.nilAsk).roundToInt()
+            val set: (Int) -> Unit = { v -> vm.act { if (!Recruiting.setNil(it, r, v)) vm.toast("Not enough NIL room. Offer set to the most you can afford.") } }
+            Section("NIL offer · ${money((room - r.nilOffer).coerceAtLeast(0))} room left")
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(money(r.nilOffer), style = T.num, color = P.ink)
-                        Text("He asks for ${money(r.nilAsk)} a year", style = T.small, color = P.sub)
+                        Text(money(r.nilOffer), style = T.num, color = if (r.nilOffer > 0) P.ink else P.sub)
+                        Text(if (r.nilOffer > 0) "$pct% of his ${money(r.nilAsk)} ask" else "He asks for ${money(r.nilAsk)} a year", style = T.small, color = P.sub)
                     }
-                    SmallButton("−") { vm.act { Recruiting.setNil(it, r, r.nilOffer - 25) } }
-                    Spacer(Modifier.width(6.dp))
-                    SmallButton("+") { vm.act { Recruiting.setNil(it, r, r.nilOffer + 25) } }
-                    Spacer(Modifier.width(6.dp))
-                    SmallButton("Match ask") { vm.act { Recruiting.setNil(it, r, r.nilAsk) } }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(if (gain > 0) "+$gain" else "+0", style = T.num, color = if (gain > 0) P.good else P.faint)
+                        Text("INTEREST A ROUND", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallButton("−${money(step)}", Modifier.weight(1f), enabled = r.nilOffer > 0) { set((r.nilOffer - step).coerceAtLeast(0)) }
+                    SmallButton("+${money(step)}", Modifier.weight(1f), primary = true, enabled = room > r.nilOffer) { set(r.nilOffer + step) }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallButton("Clear", Modifier.weight(1f), enabled = r.nilOffer > 0) { set(0) }
+                    SmallButton("Match ask", Modifier.weight(1f), enabled = r.nilOffer != r.nilAsk) { set(r.nilAsk) }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    (if (Recruiting.inCycle(lg)) "" else "Counts once the recruiting rounds start. ") +
+                        "An NIL offer adds interest every round on its own, even with no points on him. Matching his ask adds about +8; double the ask about +13" +
+                        (if (r.pref == com.nh.hoopscoach.game.RecruitPref.NIL || r.p.has(com.nh.hoopscoach.game.Trait.BAG_CHASER)) ", and he cares about NIL, so more." else ".") +
+                        " Rival programs offer NIL too, the richest the most.",
+                    style = T.small, color = P.sub,
+                )
             }
         }
         item {
             val fs = Recruiting.factors(lg, u, r, ctx)
-            val fit = fs.fold(1.0) { a, f -> a * f.value }
+            val fit = fs.fold(1.0) { a, f -> if (f.multiplier) a * f.value else a }
             Section("Why he'd pick ${u.school}")
             GroupList(fs) { f ->
                 ListRow {

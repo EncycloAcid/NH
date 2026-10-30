@@ -391,7 +391,7 @@ enum class RecruitPref(val label: String, val blurb: String) {
     MINUTES("Early playing time", "Playing time counts double: he wants to start, not sit behind veterans."),
     WINNING("Winning now", "Wants a team that's winning right now."),
     BRAND("A big-name program", "Program strength counts extra: Recruiting Pull matters most."),
-    NIL("NIL money", "Your NIL offer counts almost double."),
+    NIL("NIL money", "NIL offers count 60% more with him."),
     PROS("A path to the pros", "Recent draft picks count three times as much."),
 }
 

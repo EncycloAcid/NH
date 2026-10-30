@@ -80,7 +80,42 @@ object Recruiting {
         if (r.committed < 0) r.alloc.remove(lg.userTeamId)
     }
 
-    fun setNil(lg: League, r: Recruit, amount: Int) { r.nilOffer = amount.coerceAtLeast(0); @Suppress("UNUSED_VARIABLE") val u = lg }
+    // ---------- NIL offers ----------
+
+    /** NIL already offered to other prospects who haven't committed yet. */
+    fun nilOffered(lg: League, except: Recruit? = null) =
+        lg.recruits.sumOf { if (it.committed < 0 && it !== except) it.nilOffer else 0 }
+
+    /** Next year's NIL room left for new offers, after returning players, commits and other open offers. */
+    fun nilRoom(lg: League, except: Recruit? = null) =
+        (Finance.available(lg, lg.user, includeSeniors = false) - nilOffered(lg, except)).coerceAtLeast(0)
+
+    /** Most the user can offer this prospect right now. */
+    fun nilMax(lg: League, r: Recruit) = nilRoom(lg, r)
+
+    /** Set the user's NIL offer, capped by the NIL room. Returns false if it had to be cut back. */
+    fun setNil(lg: League, r: Recruit, amount: Int): Boolean {
+        if (r.committed >= 0) return false
+        val want = (amount / 5 * 5).coerceAtLeast(0)
+        val cap = nilMax(lg, r) / 5 * 5
+        r.nilOffer = want.coerceAtMost(maxOf(cap, 0))
+        return want <= cap
+    }
+
+    /** A sensible +/- step for a prospect's NIL offer: a tenth of his ask, at least 25K. */
+    fun nilStep(r: Recruit) = ((r.nilAsk / 10) / 25 * 25).coerceAtLeast(25)
+
+    /** Interest an NIL offer adds each round on its own, before the taper near 100. */
+    fun nilGain(r: Recruit, offer: Int): Double {
+        if (offer <= 0) return 0.0
+        val ratio = if (r.nilAsk <= 0) 1.0 else offer.toDouble() / r.nilAsk
+        var g = 8.0 * ratio.coerceAtMost(2.0).pow(0.7)
+        if (r.pref == RecruitPref.NIL || r.p.has(Trait.BAG_CHASER)) g *= 1.6
+        return g
+    }
+
+    /** What a rival program offers: richer NIL budgets offer more of the ask (60% to 120%). */
+    fun aiNilOffer(r: Recruit, ctx: Ctx, teamId: Int) = (r.nilAsk * ctx.nilRatio[teamId]).roundToInt()
 
     // ---------- budget ----------
 
@@ -112,8 +147,11 @@ object Recruiting {
 
     // ---------- fit ----------
 
-    /** One reason a prospect likes (or doesn't like) a school. 1.0 is neutral. */
-    class Factor(val label: String, val value: Double, val note: String)
+    /**
+     * One reason a prospect likes (or doesn't like) a school. 1.0 is neutral. Multipliers scale the
+     * interest points earn; the NIL row isn't one, because an NIL offer adds interest on its own.
+     */
+    class Factor(val label: String, val value: Double, val note: String, val multiplier: Boolean = true)
 
     /** The Recruiting Pull a prospect is looking for. */
     fun wants(r: Recruit): Double =
@@ -124,6 +162,12 @@ object Recruiting {
     class Ctx(lg: League) {
         val pulls = Brand.pullTable(lg)
         val pipes = Pipeline.table(lg)
+        /** Share of a prospect's NIL ask each program offers, from its NIL budget rank (0.6 to 1.2). */
+        val nilRatio = DoubleArray(lg.teams.size).also { out ->
+            val order = lg.teams.sortedBy { Finance.budget(lg, it) }
+            val n = (order.size - 1).coerceAtLeast(1)
+            order.forEachIndexed { i, t -> out[t.id] = 0.6 + 0.6 * i / n }
+        }
         /** Overalls of next year's players at each team and position (key teamId * 5 + pos). */
         val depth = HashMap<Int, MutableList<Int>>()
         init {
@@ -178,34 +222,41 @@ object Recruiting {
             val pct = if (t.gp > 0) t.winPct else if (last != null && last.w + last.l > 0) last.w.toDouble() / (last.w + last.l) else 0.5
             out += Factor("Winning", 0.85 + pct * 0.4, "Won ${(pct * 100).roundToInt()}% of games")
         }
-        // NIL: AI programs meet the market; your offer is up to you.
+        // NIL: shown for your school; it adds interest each round on its own (see project()).
         if (t.id == lg.userTeamId) {
-            val ratio = if (r.nilAsk <= 0) 1.0 else r.nilOffer.toDouble() / r.nilAsk
-            var nil = when {
-                ratio <= 0.01 -> 0.88
-                ratio < 1.0 -> 0.88 + ratio * 0.12
-                else -> (1.0 + (ratio - 1) * 0.5).coerceAtMost(1.2)
-            }
-            if (pref == RecruitPref.NIL || r.p.has(Trait.BAG_CHASER)) nil = 1 + (nil - 1) * 1.8
-            out += Factor("NIL offer", nil, if (r.nilOffer <= 0) "No NIL offer yet" else "Offering ${r.nilOffer}K of his ${r.nilAsk}K ask")
+            val g = nilGain(r, r.nilOffer)
+            val pct = if (r.nilAsk <= 0) 100 else (r.nilOffer * 100.0 / r.nilAsk).roundToInt()
+            out += Factor(
+                "NIL offer", if (r.nilOffer <= 0) 0.96 else 1 + g / 60,
+                if (r.nilOffer <= 0) "No offer yet. Rivals are offering NIL." else "$pct% of his ask: +${g.roundToInt()} interest a round",
+                multiplier = false,
+            )
         }
         return out
     }
 
-    fun fit(lg: League, t: Team, r: Recruit, ctx: Ctx): Double = factors(lg, t, r, ctx).fold(1.0) { a, f -> a * f.value }
+    fun fit(lg: League, t: Team, r: Recruit, ctx: Ctx): Double = factors(lg, t, r, ctx).fold(1.0) { a, f -> if (f.multiplier) a * f.value else a }
 
     /** Interest a school gains in one round from [points] (diminishing returns). */
-    fun gain(points: Int, fit: Double) = if (points <= 0) 0.0 else 2.6 * sqrt(points.toDouble()) * fit
+    fun gain(points: Int, fit: Double) = if (points <= 0) 0.0 else 2.0 * sqrt(points.toDouble()) * fit
 
     /** Where every school in the race would stand after this round, with the points as they are now. */
     fun project(lg: League, r: Recruit, ctx: Ctx): Map<Int, Int> {
         val out = HashMap<Int, Int>()
-        val ids = r.interest.keys + r.alloc.keys
+        val u = lg.userTeamId
+        val ids = r.interest.keys + r.alloc.keys + (if (r.nilOffer > 0) setOf(u) else emptySet())
         for (tid in ids) {
             val now = r.interest[tid] ?: 4
             val pts = r.alloc[tid] ?: 0
+            // NIL adds interest on its own: your offer whenever you make one, a rival's while it's recruiting him.
+            val nil = when {
+                tid == u -> nilGain(r, r.nilOffer)
+                pts > 0 -> nilGain(r, aiNilOffer(r, ctx, tid))
+                else -> 0.0
+            }
+            val g = gain(pts, if (pts > 0) fit(lg, lg.team(tid), r, ctx) else 1.0) + nil
             // Gains taper as interest climbs, so the last stretch to 100 is the hardest.
-            out[tid] = if (pts > 0) (now + gain(pts, fit(lg, lg.team(tid), r, ctx)) * (1 - now / 115.0).coerceAtLeast(0.05)).roundToInt().coerceAtMost(100) else (now * 0.9).roundToInt()
+            out[tid] = if (g > 0) (now + g * (1 - now / 104.0).coerceAtLeast(0.04)).roundToInt().coerceAtMost(100) else (now * 0.9).roundToInt()
         }
         return out
     }
@@ -273,40 +324,71 @@ object Recruiting {
     }
 
     /**
-     * Spend the user's free points the way a sensible staff would: about two prospects per open
-     * scholarship, best value first, never more than one per position beyond what the roster needs.
-     * Points already placed stay where they are. Returns how many prospects got points.
+     * Spend the user's free points the way a sensible staff would: step out of races that are lost,
+     * keep about two prospects per open scholarship (at most three per position), match NIL asks
+     * while the room lasts, and put most of the points where the chances are best. Returns how many
+     * prospects the plan covers.
      */
     fun autoPlan(lg: League): Int {
         if (!inCycle(lg)) return 0
         val u = lg.user
         val room = openSpots(lg, u)
-        val free = available(lg)
-        if (room <= 0 || free < 10) return 0
+        if (room <= 0) return 0
         val ctx = Ctx(lg)
+        val round = round(lg)
+        // Step out of races that are lost: well behind the leader after the first round.
+        for (r in lg.recruits) {
+            if (r.committed >= 0 || (mine(lg, r) == 0 && r.nilOffer == 0)) continue
+            val proj = project(lg, r, ctx)
+            val me = proj[u.id] ?: 0
+            val best = proj.filterKeys { it != u.id }.values.maxOrNull() ?: 0
+            if (round >= 2 && Recruiting.place(proj, u.id) >= 3 && best - me > 15) {
+                r.alloc.remove(u.id)
+                r.nilOffer = 0
+            }
+        }
+        val free = available(lg)
         val already = lg.recruits.filter { it.committed < 0 && mine(lg, it) > 0 }
-        val want = (room * 2 + 1 - already.size).coerceAtLeast(0)
+        val want = (room * 2 - already.size).coerceAtLeast(0)
         val perPos = HashMap<Pos, Int>()
         for (r in already) perPos.merge(r.p.pos, 1, Int::plus)
+        fun standing(r: Recruit): Pair<Int, Int> {
+            val proj = project(lg, r, ctx)
+            return (proj[u.id] ?: (r.interest[u.id] ?: 0)) to (proj.filterKeys { it != u.id }.values.maxOrNull() ?: 0)
+        }
+        // Races you lead or are close in count extra; races already won need nothing more.
+        fun score(r: Recruit): Double {
+            val (me, best) = standing(r)
+            val boost = when { me >= best && me > 0 -> 1.5; best - me <= 8 -> 1.2; else -> 1.0 }
+            return value(lg, u, r, ctx) * boost
+        }
         val picks = lg.recruits.asSequence()
             .filter { it.committed < 0 && mine(lg, it) == 0 }
+            // Skip races already out of reach: rivals far ahead after the first round.
+            .filter { r -> round < 2 || (r.interest.filterKeys { it != u.id }.values.maxOrNull() ?: 0) - (r.interest[u.id] ?: 0) <= 30 }
             .map { it to value(lg, u, it, ctx) }
             .sortedByDescending { it.second }
             .filter { (r, _) -> (perPos[r.p.pos] ?: 0) < 3 && perPos.merge(r.p.pos, 1, Int::plus) != null }
             .take(want).toList()
-        val all = already.map { it to value(lg, u, it, ctx) } + picks
-        val total = all.sumOf { it.second.pow(1.5) }
-        if (total <= 0) return 0
-        var nilRoom = Finance.available(lg, u, includeSeniors = false)
+        val all = already.map { it to score(it) } + picks
+        if (all.isEmpty()) return 0
         for ((r, _) in all.sortedByDescending { it.second }) {
-            if (r.nilOffer < r.nilAsk && r.nilAsk - r.nilOffer <= nilRoom) { nilRoom -= r.nilAsk - r.nilOffer; r.nilOffer = r.nilAsk }
+            if (r.nilOffer < r.nilAsk && r.nilAsk <= nilMax(lg, r)) r.nilOffer = r.nilAsk
         }
+        if (free < 10) return all.size
+        // Concentrate on the best chances, at most 30% of the budget on one prospect, nothing more once he's nearly won.
+        val cap = lg.recruitBudget * 3 / 10
+        val open = all.filter { (r, _) -> standing(r).first < 97 && mine(lg, r) < cap }
+        val total = open.sumOf { it.second.pow(2.0) }
+        if (total <= 0) return all.size
         var left = free
-        for ((r, v) in all.sortedByDescending { it.second }) {
-            val add = ((free * v.pow(1.5) / total) / STEP).roundToInt() * STEP
-            val pts = add.coerceAtMost(left)
-            if (pts <= 0) continue
-            if (setPoints(lg, r, mine(lg, r) + pts)) left -= pts
+        for (pass in 0..1) {
+            for ((r, v) in open.sortedByDescending { it.second }) {
+                if (left < STEP) break
+                val share = if (pass == 0) ((free * v.pow(2.0) / total) / STEP).roundToInt() * STEP else left
+                val pts = share.coerceAtMost(left).coerceAtMost((cap - mine(lg, r)).coerceAtLeast(0))
+                if (pts > 0 && setPoints(lg, r, mine(lg, r) + pts)) left -= pts
+            }
         }
         return all.size
     }
@@ -329,9 +411,14 @@ object Recruiting {
             val ranked = proj.entries.filter { room[it.key] > 0 }.sortedByDescending { it.value }
             val top = ranked.firstOrNull() ?: continue
             val second = ranked.getOrNull(1)?.value ?: 0
+            // Ready to decide once interest is high; a close race makes him a little slower to choose.
             val ready = ((top.value - 40) / 40.0).coerceIn(0.0, 1.0)
-            val margin = (0.35 + (top.value - second) / 25.0).coerceIn(0.15, 1.0)
-            if (Rng.chance(commitBase[round - 1] * ready * margin)) commit(lg, r, top.key, round, room, rep)
+            val close = 0.6 + 0.4 * ((top.value - second) / 15.0).coerceIn(0.0, 1.0)
+            if (!Rng.chance(commitBase[round - 1] * ready * close)) continue
+            // He picks among the schools near the top: a tie is a coin flip, 5 back is about a third as likely.
+            val near = ranked.filter { it.value >= top.value - 15 }
+            val pick = Rng.weighted(near) { exp((it.value - top.value) / 5.0) }
+            commit(lg, r, pick.key, round, room, rep)
         }
         val targets = HashSet<Int>()
         for (r in lg.recruits) if (r.onBoard || u in r.alloc || u in r.interest) targets += r.p.id
