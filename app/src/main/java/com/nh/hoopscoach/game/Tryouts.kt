@@ -89,6 +89,8 @@ object Tryouts {
         p.number = Recruiting.freeNumber(lg, t)
         lg.addPlayer(p)
         t.roster += p.id
+        // The cut player is gone, so the lineup can't point at him.
+        Gameplan.validate(lg, t)
     }
 
     private fun level(v: Double) = ((v - 36) / 6.0).roundToInt().coerceIn(0, 3)

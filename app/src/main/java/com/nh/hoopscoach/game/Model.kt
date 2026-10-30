@@ -366,7 +366,8 @@ class InSeasonEvent(
 
 @Serializable
 class Recruit(
-    val p: Player,
+    /** For transfers this is the same player as in League.players; SaveIO.decode relinks it after a load. */
+    var p: Player,
     /** Interest in each school still in the race, 0-100. */
     var interest: MutableMap<Int, Int> = mutableMapOf(),
     var committed: Int = -1,

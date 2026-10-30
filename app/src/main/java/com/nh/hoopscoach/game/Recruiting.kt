@@ -502,7 +502,9 @@ object Recruiting {
         for (r in lg.recruits) {
             if (r.committed < 0) continue
             val t = lg.team(r.committed)
-            val p = r.p
+            // Always sign the league's own copy of the player (a transfer is already in League.players).
+            val p = lg.playerOrNull(r.p.id) ?: r.p
+            r.p = p
             p.teamId = t.id
             p.walkOn = false
             if (!r.transfer) {
@@ -514,7 +516,7 @@ object Recruiting {
             p.nil = if (t.id == u && r.nilOffer > 0) r.nilOffer else Ratings.expectedNil(p)
             p.happiness = 75
             if (lg.playerOrNull(p.id) == null) lg.addPlayer(p)
-            t.roster += p.id
+            if (p.id !in t.roster) t.roster += p.id
             if (t.id == u) signedUser += p.id
         }
         lg.recruits.clear()
