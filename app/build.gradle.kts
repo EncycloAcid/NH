@@ -13,11 +13,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.nh.hoopscoach"
+        applicationId = "com.nh.hoopscoach.road"
         minSdk = 26
         targetSdk = 35
         versionCode = 16
-        versionName = "3.4"
+        versionName = "3.4-road.1"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from

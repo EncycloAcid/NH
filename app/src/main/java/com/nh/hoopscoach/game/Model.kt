@@ -585,6 +585,39 @@ class GradEntry(val pid: Int, val name: String, val pos: Pos, val ovr: Int, val 
 @Serializable
 class Growth(val pid: Int, val before: Int, val after: Int, val gains: IntArray, val weight: Int)
 
+enum class GameMode { COACH, PLAYER }
+
+enum class NilDeal(val label: String, val blurb: String) {
+    NONE("No deal", ""),
+    STEADY("Hometown dealership", "Full value, guaranteed, no strings."),
+    PERFORMANCE("Performance deal", "60% guaranteed, plus a bonus for every point you average and for All-America honors."),
+    BRAND("National brand", "150% of your value, but appearances and shoots cost 15% of your development this season."),
+}
+
+/** A school's scholarship offer to the user's player: out of high school or out of the transfer portal. */
+@Serializable
+class SchoolOffer(val teamId: Int, val nil: Int, val role: String, val ahead: Int, val closeness: Int)
+
+/** Player-mode state: NIL deal, offseason decisions and how the career ended. */
+@Serializable
+class RoadState(
+    var startSeason: Int = 0,
+    var dealSeason: Int = 0,
+    var deal: NilDeal = NilDeal.NONE,
+    var dealBase: Int = 0,
+    /** NIL earned over the career, in thousands. */
+    var earned: Int = 0,
+    var declared: Boolean = false,
+    var portal: Boolean = false,
+    val offers: MutableList<SchoolOffer> = mutableListOf(),
+    val schools: MutableList<Int> = mutableListOf(),
+    var ended: Boolean = false,
+    var draftPick: Int = 0,
+    var ending: String = "",
+    /** One line per finished season for the career story. */
+    val story: MutableList<String> = mutableListOf(),
+)
+
 @Serializable
 class OffseasonState(
     var step: OffStep = OffStep.ROSTER,
@@ -660,6 +693,11 @@ class League(
     var cotyCoachId: Int = -1,
     var apHistory: MutableList<Int> = mutableListOf(),
     var norms: DoubleArray? = null,
+    /** Coach a program, or play one player's college career ("Road to the League"). */
+    var mode: GameMode = GameMode.COACH,
+    /** In player mode, the user's player. */
+    var heroId: Int = -1,
+    var road: RoadState? = null,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()
@@ -692,6 +730,15 @@ class League(
 
     val user get() = teams[userTeamId]
     val userCoach get() = coach(userCoachId)
+
+    val playerMode get() = mode == GameMode.PLAYER
+    /** True when the user runs this team's bench. In player mode every team is coached by the AI. */
+    fun humanCoach(t: Team) = mode == GameMode.COACH && t.id == userTeamId
+    fun humanCoach(teamId: Int) = mode == GameMode.COACH && teamId == userTeamId
+    /** The school the user recruits for, or -1 in player mode (every school recruits on its own). */
+    val recruiterId get() = if (mode == GameMode.COACH) userTeamId else -1
+    /** The user's player in player mode, on a roster or (once his college career is over) among the alumni. */
+    val hero: Player? get() = if (heroId < 0) null else anyPlayer(heroId)
 
     fun rosterOf(t: Team): List<Player> = t.roster.map { player(it) }
 

@@ -8,6 +8,22 @@ You can coach any of the 364 Division I schools, in their real 2026-27 conferenc
 
 The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
 
+## This branch: Road to the League (experiment)
+
+The `road-to-the-league` branch adds a second way to play: instead of coaching a program, you play one player's college career. It builds as a separate app, **Hoops Dynasty Road** (`com.nh.hoopscoach.road`), so it installs next to the main game and never touches its save. The main game keeps going on its own branch.
+
+- **Create your player**: name, position, height and weight, play style, hometown and state, jersey number, and prospect level (3-star sleeper, 4-star prospect or 5-star blue-chipper). Every level has a real ceiling: 96 to 99 potential.
+- **Scholarship offers**: eight schools offer, matched to your level, with a lean toward home. Each offer shows your projected role, how many players at your position are already as good as you, distance from home and the NIL money the school pays.
+- **Your team is coached by the AI**: the coach sets the rotation and tactics, recruits and pays the roster. You see the roster and the program; your row is marked YOU. Minutes come from being the best at your position.
+- **The Me tab**: draft stock and big-board rank, your role and planned minutes, the depth chart at your position, training focus and XP, your NIL deal and career earnings, and your story season by season. Today shows a "Your player" card with your last game.
+- **NIL deals**: each season pick one. A hometown dealership pays full value. A performance deal pays 60% plus 4% per point you average and a bonus for All-America honors. A national brand pays 150% but costs 15% of your development that season. Richer programs pay more.
+- **The offseason** in four steps:
+  1. **Decision**: return to school, declare for the draft (undrafted underclassmen go back to school), or enter the transfer portal.
+  2. **Draft Night**.
+  3. **Summer**: workouts, and transfer offers if you entered the portal.
+  4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
+- **The ending**: drafted (with your pick) or, after four seasons, undrafted and overseas. You get a career summary with totals, your story, NIL earned and every school you played for.
+
 ## Install on your phone
 
 1. Open the repository's **Releases** page on your Android phone and download `HoopsDynasty.apk` from the newest build. Every push builds a fresh one.

@@ -52,7 +52,7 @@ object Gameplan {
         val broken = slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
             slots.flatMap { listOf(it.starter, it.reserve) }.filter { it != -1 }.let { it.size != it.toSet().size } ||
             slots.any { it.starter == -1 && t.roster.size >= 5 }
-        if (broken || t.plan.auto && t.id != lg.userTeamId) autoAllocate(lg, t)
+        if (broken || t.plan.auto && !lg.humanCoach(t)) autoAllocate(lg, t)
     }
 
     fun plannedMinutes(t: Team, pid: Int): Int {

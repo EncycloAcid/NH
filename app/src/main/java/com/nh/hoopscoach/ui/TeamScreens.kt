@@ -63,14 +63,19 @@ fun TeamScreen(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
             ScreenHeader("${lg.conf(t.confId).name} · Coach ${lg.coachOf(t).last}", t.school, "${t.mascot}  ·  ${recordLine(lg, t)}") {
-                GuideButton { vm.openGuide(Guide.PROGRAM, when (vm.teamTab) { 0 -> 0; 1 -> 2; 2 -> 3; else -> 4 }) }
+                GuideButton { vm.openGuide(Guide.PROGRAM, if (lg.playerMode) (if (vm.teamTab == 0) 0 else 4) else when (vm.teamTab) { 0 -> 0; 1 -> 2; 2 -> 3; else -> 4 }) }
                 TeamBadge(t, 46.dp)
             }
             TeamRings(lg, t)
             Spacer(Modifier.height(14.dp))
-            Segmented(listOf("Roster", "Lineup", "Develop", "Program"), vm.teamTab, { vm.teamTab = it })
+            // In player mode the coach runs the team: you see the roster and the program, not the controls.
+            if (lg.playerMode) Segmented(listOf("Roster", "Program"), vm.teamTab.coerceIn(0, 1), { vm.teamTab = it })
+            else Segmented(listOf("Roster", "Lineup", "Develop", "Program"), vm.teamTab, { vm.teamTab = it })
         }
-        when (vm.teamTab) {
+        if (lg.playerMode) {
+            if (vm.teamTab == 0) rosterList(vm, lg, t, mine = false)
+            else item { ProgramNumbers(vm, lg, t); FanPanel(t); RivalsList(vm, lg, t); ProgramLegends(t) { vm.openPlayer(it) } }
+        } else when (vm.teamTab) {
             0 -> rosterList(vm, lg, t, mine = true)
             1 -> lineup(vm, lg, t)
             2 -> develop(vm, lg, t)
@@ -120,12 +125,14 @@ fun LazyListScope.rosterList(vm: GameViewModel, lg: League, t: Team, mine: Boole
 @Composable
 fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) {
     val mins = Gameplan.plannedMinutes(t, p.id)
-    ListRow(onClick = { vm.openPlayer(p.id) }) {
+    val you = p.id == lg.heroId
+    ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (you) Modifier.background(P.accentSoft) else Modifier) {
         PlayerJersey(p, t, 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (you) { Spacer(Modifier.width(6.dp)); Tag("YOU", P.accent, filled = true) }
                 if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }

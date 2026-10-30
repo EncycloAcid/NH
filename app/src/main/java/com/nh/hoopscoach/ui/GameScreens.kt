@@ -113,8 +113,11 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 SmallButton("Finish", primary = true) { vm.completeLive() }
             }
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val t = e.teams[if (userHome) 0 else 1]
+            val t = e.teams[if (userHome) 0 else 1]
+            if (lg.playerMode) {
+                Text("Coach ${lg.coachOf(t).last} calls it: ${t.plan.offense.label} offense, ${t.plan.defense.label} defense.", style = T.small, color = P.sub,
+                    modifier = Modifier.padding(horizontal = Gutter + 4.dp))
+            } else Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.offense = Offense.entries[i]; lv.tick++ }
                 Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.defense = Defense.entries[i]; lv.tick++ }
             }

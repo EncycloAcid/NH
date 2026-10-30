@@ -173,7 +173,7 @@ object LeagueGen {
             var guard = 0
             while (chosen.size < k && guard++ < 50) {
                 val t = Rng.weighted(lg.teams) { tm ->
-                    if (tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((pulls[tm.id] - target) / 14.0).pow(2)) + 1e-9
+                    if (tm.id == lg.recruiterId) 0.0 else kotlin.math.exp(-((pulls[tm.id] - target) / 14.0).pow(2)) + 1e-9
                 }
                 chosen += t.id
             }

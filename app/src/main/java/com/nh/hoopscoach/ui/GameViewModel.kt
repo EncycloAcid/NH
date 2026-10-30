@@ -195,6 +195,60 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- Road to the League ----------
+
+    /** The player being created on the new game screen, and the schools offering him. */
+    var roadHero by mutableStateOf<com.nh.hoopscoach.game.Player?>(null)
+    var roadOffers by mutableStateOf<List<com.nh.hoopscoach.game.SchoolOffer>>(emptyList())
+
+    fun roadFindOffers(spec: com.nh.hoopscoach.game.Road.Spec) {
+        val d = draft ?: return
+        busy = "Coaches are calling"
+        viewModelScope.launch {
+            val (h, o) = withContext(Dispatchers.Default) {
+                val h = com.nh.hoopscoach.game.Road.createHero(d, spec)
+                h to com.nh.hoopscoach.game.Road.offers(d, h)
+            }
+            roadHero = h
+            roadOffers = o
+            busy = null
+        }
+    }
+
+    fun roadBack() { roadHero = null; roadOffers = emptyList() }
+
+    fun startRoad(teamId: Int) {
+        val d = draft ?: return
+        val h = roadHero ?: return
+        busy = "Signing your scholarship"
+        viewModelScope.launch {
+            withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Road.start(d, h, teamId) }
+            draft = null
+            roadHero = null
+            roadOffers = emptyList()
+            league = d
+            tab = Tab.TODAY
+            stack.clear()
+            busy = null
+            bump()
+        }
+    }
+
+    /** One step of the player-mode offseason. */
+    fun roadNext() {
+        val os = league?.offseason ?: return
+        val label = when (os.step) {
+            com.nh.hoopscoach.game.OffStep.ROSTER -> "Running Draft Night"
+            com.nh.hoopscoach.game.OffStep.DRAFT -> "Summer workouts"
+            else -> "Getting ready for the new season"
+        }
+        heavy(label) {
+            com.nh.hoopscoach.game.Road.next(it)
+            wrapPage = 0
+            if (it.phase == com.nh.hoopscoach.game.Phase.REGULAR) tab = Tab.TODAY
+        }
+    }
+
     fun startCareer(teamId: Int, first: String, last: String) {
         val d = draft ?: return
         busy = "Setting up your first season"

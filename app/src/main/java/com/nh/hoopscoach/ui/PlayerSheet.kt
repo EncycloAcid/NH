@@ -128,9 +128,12 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             }
             Spacer(Modifier.height(12.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (mine) SmallButton("NIL ${money(p.nil)}") { editNil = true }
-                if (mine) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
-                if (mine) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
+                // In player mode you only manage yourself, and your NIL comes from your deal.
+                val coaching = mine && !lg.playerMode
+                val yourself = lg.playerMode && p.id == lg.heroId
+                if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
+                if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
+                if (coaching || yourself) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
             }
             if (mine && p.walkOn && team != null) {

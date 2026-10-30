@@ -105,7 +105,7 @@ object Season {
             }
         }
         // AI coaches re-tune their rotations as players develop.
-        if (lg.day % 7 == 0) for (t in lg.teams) if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t)
+        if (lg.day % 7 == 0) for (t in lg.teams) if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t)
     }
 
     // ---------- in-season events ----------
@@ -381,6 +381,7 @@ object Season {
         lg.userCoach.points += points
         val reward = if (nitChamp == lg.userTeamId) NitReward(nitBoost, NIT_POINTS, NIT_XP, nitPlayers) else null
         lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward)
+        if (lg.playerMode) Road.seasonEnd(lg)
         lg.phase = Phase.WRAP_UP
     }
 

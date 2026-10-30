@@ -526,7 +526,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     )
                 }
                 // Development: playing time and production earn XP.
-                val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side]))
+                val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side])) *
+                    (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0)
                 Ratings.addXp(p, xp.roundToInt())
                 Records.checkGame(lg, p, t, st)
                 Careers.track(lg, p, st, game, t.id)

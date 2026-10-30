@@ -32,7 +32,7 @@ object Finance {
 
     /** NIL promised to recruits who have committed but not yet enrolled. */
     fun promised(lg: League, t: Team): Int = lg.recruits.filter { it.committed == t.id }.sumOf { r ->
-        if (t.id == lg.userTeamId) r.nilOffer else Ratings.expectedNil(r.p)
+        if (lg.humanCoach(t)) r.nilOffer else Ratings.expectedNil(r.p)
     }
 
     fun available(lg: League, t: Team, includeSeniors: Boolean = true): Int =

@@ -108,9 +108,9 @@ private fun Shell(vm: GameViewModel, lg: League) {
                 when (vm.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> TeamScreen(vm, lg)
-                    Tab.RECRUIT -> RecruitScreen(vm, lg)
+                    Tab.RECRUIT -> if (lg.playerMode) HeroScreen(vm, lg) else RecruitScreen(vm, lg)
                     Tab.LEAGUE -> LeagueScreen(vm, lg)
-                    Tab.CAREER -> CareerScreen(vm, lg)
+                    Tab.CAREER -> if (lg.playerMode) HeroCareerScreen(vm, lg) else CareerScreen(vm, lg)
                 }
             } else RouteScreen(vm, lg, route)
         }
@@ -161,8 +161,9 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
         when (lg.phase) {
             Phase.WRAP_UP, Phase.OFFSEASON -> {
                 Column(Modifier.weight(1f)) {
-                    Text(if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
-                    Text(if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
+                    val done = lg.road?.ended == true
+                    Text(if (done) "CAREER COMPLETE" else if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
+                    Text(if (done) "See how it ended" else if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
                 }
                 SmallButton("Continue", primary = true) { vm.select(Tab.TODAY) }
             }
@@ -215,15 +216,16 @@ private fun NavBar(vm: GameViewModel) {
             for (t in Tab.entries) {
                 val icon = when (t) { Tab.TODAY -> NavIcons.Today; Tab.TEAM -> NavIcons.Team; Tab.RECRUIT -> NavIcons.Recruit; Tab.LEAGUE -> NavIcons.League; Tab.CAREER -> NavIcons.Career }
                 val sel = vm.tab == t
+                val label = if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { vm.select(t) }.padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(Modifier.clip(RoundedCornerShape(50)).background(if (sel) P.accentSoft else Color.Transparent).padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Icon(icon, t.label, tint = if (sel) P.accent else P.sub, modifier = Modifier.size(22.dp))
+                        Icon(icon, label, tint = if (sel) P.accent else P.sub, modifier = Modifier.size(22.dp))
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(t.label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
+                    Text(label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
                 }
             }
         }

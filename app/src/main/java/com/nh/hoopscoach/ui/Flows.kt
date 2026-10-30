@@ -57,20 +57,23 @@ import com.nh.hoopscoach.game.WrapUp
 // Season review
 // ======================================================================
 
-private val WRAP_PAGES = listOf("Season", "Awards", "Seniors", "Program", "Coach")
+private val COACH_PAGES = listOf("Season", "Awards", "Seniors", "Program", "Coach")
+private val PLAYER_PAGES = listOf("Season", "Awards", "You", "Program")
 
 @Composable
 fun WrapUpFlow(vm: GameViewModel, lg: League) {
     val w = lg.wrapUp ?: run { Empty("Season complete."); return }
+    val WRAP_PAGES = if (lg.playerMode) PLAYER_PAGES else COACH_PAGES
     val page = vm.wrapPage.coerceIn(0, WRAP_PAGES.lastIndex)
     Column(Modifier.fillMaxSize()) {
         StepHeader("Season review · ${lg.season}", WRAP_PAGES, page) { vm.wrapPage = it }
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            when (page) {
-                0 -> seasonPage(vm, lg, w)
-                1 -> awardsPage(vm, lg)
-                2 -> seniorsPage(vm, lg)
-                3 -> programPage(vm, lg, w)
+            when (WRAP_PAGES[page]) {
+                "Season" -> seasonPage(vm, lg, w)
+                "Awards" -> awardsPage(vm, lg)
+                "Seniors" -> seniorsPage(vm, lg)
+                "You" -> heroSeasonPage(vm, lg)
+                "Program" -> programPage(vm, lg, w)
                 else -> coachPage(vm, lg, w)
             }
             item { Spacer(Modifier.height(20.dp)) }

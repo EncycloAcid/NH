@@ -49,7 +49,7 @@ fun TodayScreen(vm: GameViewModel, lg: League) {
         Phase.REGULAR -> SeasonToday(vm, lg)
         Phase.CONF_TOURNEY, Phase.NCAA -> TourneyToday(vm, lg)
         Phase.WRAP_UP -> WrapUpFlow(vm, lg)
-        Phase.OFFSEASON -> OffseasonFlow(vm, lg)
+        Phase.OFFSEASON -> if (lg.playerMode) RoadOffseasonFlow(vm, lg) else OffseasonFlow(vm, lg)
     }
 }
 
@@ -70,6 +70,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
@@ -211,7 +212,7 @@ fun statLine(p: Player) = "${f1(p.stats.ppg)} pts · ${f1(p.stats.rpg)} reb · $
 @Composable
 fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, trailing: (@Composable () -> Unit)? = null) {
     val team = t ?: if (p.teamId >= 0) lg.team(p.teamId) else null
-    ListRow(onClick = { vm.openPlayer(p.id) }) {
+    ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (p.id == lg.heroId) Modifier.background(P.accentSoft) else Modifier) {
         PlayerJersey(p, team, 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -272,6 +273,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         when {

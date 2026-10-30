@@ -19,7 +19,8 @@ object Offseason {
         for (p in lg.rosterOf(lg.user).filter { it.year >= 4 }) {
             os.graduates += GradEntry(p.id, p.name, p.pos, p.ovr, p.nil, Awards.line(p), gradNote(board[p.id]))
         }
-        os.entrants += declarations(lg, board)
+        // In player mode the user decides for his own player.
+        os.entrants += declarations(lg, board).filter { it != lg.heroId }
         lg.offseason = os
         Coaching.carousel(lg, os)
         lg.phase = Phase.OFFSEASON
@@ -129,7 +130,7 @@ object Offseason {
         repeat(k * 3) {
             if (r.interest.size >= k) return@repeat
             val t = Rng.weighted(lg.teams) { tm ->
-                if (tm.id == fromId || tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((tm.prestige - target) / 15.0).let { it * it })
+                if (tm.id == fromId || tm.id == lg.recruiterId) 0.0 else kotlin.math.exp(-((tm.prestige - target) / 15.0).let { it * it })
             }
             r.interest[t.id] = Rng.range(15, 45)
         }
@@ -151,14 +152,18 @@ object Offseason {
     fun advance(lg: League) {
         val os = lg.offseason ?: return
         when (os.step) {
-            OffStep.ROSTER -> { runTransfers(lg, os); runDraft(lg, os); os.step = OffStep.DRAFT }
+            OffStep.ROSTER -> {
+                if (lg.playerMode) Road.beforeDraft(lg, os)
+                runTransfers(lg, os); runDraft(lg, os); os.step = OffStep.DRAFT
+                if (lg.playerMode) Road.afterDraft(lg)
+            }
             OffStep.DRAFT -> os.step = OffStep.CAREER
             OffStep.CAREER -> { if (os.fired) return; runDevelopment(lg, os); os.step = OffStep.DEVELOPMENT }
             OffStep.DEVELOPMENT -> os.step = OffStep.BUDGET
             OffStep.BUDGET -> { os.step = OffStep.RECRUITING; Recruiting.startCycle(lg) }
             OffStep.RECRUITING -> { Recruiting.lockRound(lg); if (os.round > ROUNDS) finish(lg) }
             OffStep.TRYOUTS -> {
-                Tryouts.finish(lg, os)
+                if (!lg.playerMode) Tryouts.finish(lg, os)
                 fillHoles(lg, lg.user)
                 startNewSeason(lg)
             }
@@ -170,7 +175,7 @@ object Offseason {
         for (t in lg.teams) {
             for (pid in t.roster.toList()) {
                 val p = lg.player(pid)
-                if (pid in entrants || !Rng.chance(transferChance(lg, p))) continue
+                if (pid in entrants || pid == lg.heroId || !Rng.chance(transferChance(lg, p))) continue
                 t.roster.remove(pid)
                 if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
                 toPortal(lg, p, t.id)
@@ -260,13 +265,13 @@ object Offseason {
         val os = lg.offseason ?: return
         os.signed += Recruiting.endCycle(lg)
         // Other programs fill their open scholarships; the user holds walk-on tryouts first.
-        for (t in lg.teams) if (t.id != lg.userTeamId) { fillHoles(lg, t); Tryouts.aiTryout(lg, t) }
+        for (t in lg.teams) if (!lg.humanCoach(t)) { fillHoles(lg, t); Tryouts.aiTryout(lg, t) }
         // Unsigned transfers leave the game; the user's former players stay on record.
         lg.players.filter { it.teamId < 0 }.forEach { p ->
             lg.removePlayer(p)
             if (p.transferFrom == lg.userTeamId) Careers.keep(lg, p, lg.user, 0, "Left ${lg.user.school} through the transfer portal in ${lg.season}")
         }
-        Tryouts.open(lg, os)
+        if (lg.playerMode) os.step = OffStep.TRYOUTS else Tryouts.open(lg, os)
     }
 
     /** Unrecruited players fill any scholarship left open. */
@@ -311,8 +316,8 @@ object Offseason {
             t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0; t.rivalryDelta = 0
             Fans.newSeason(t)
             t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
-            if (t.id != lg.userTeamId) Morale.aiNilRefresh(lg, t)
-            if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
+            if (!lg.humanCoach(t)) Morale.aiNilRefresh(lg, t)
+            if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
         }
         lg.phase = Phase.REGULAR
         lg.day = 1
@@ -434,7 +439,7 @@ object Coaching {
 
     fun carousel(lg: League, os: OffseasonState) {
         for (t in lg.teams) {
-            if (t.id == lg.userTeamId) continue
+            if (lg.humanCoach(t)) continue
             val c = lg.coachOf(t)
             val retire = c.age >= 72 || (c.age >= 66 && Rng.chance(0.3))
             val fired = !retire && t.w - t.expWins < -5 && Rng.chance(0.35)
@@ -448,6 +453,8 @@ object Coaching {
                 if (t.prestige >= 80) lg.news += News(lg.season, lg.day, "${t.school} hires ${n.name} as head coach", false)
             }
         }
+        // In player mode the user doesn't coach: just keep "your team" and its coach in step.
+        if (lg.playerMode) { Road.sync(lg); return }
         val u = lg.user
         val c = lg.userCoach
         val round = Awards.tourneyRound(lg, u.id)
