@@ -123,6 +123,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }
                     Mood.UNHAPPY -> { Spacer(Modifier.width(6.dp)); Tag("UNHAPPY", P.warn) }
@@ -149,7 +150,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
 @Composable
 fun traitColor(t: Trait): Color = when (t) {
     Trait.AMBITIOUS -> P.warn; Trait.BAG_CHASER -> P.gold; Trait.DISLOYAL -> P.bad
-    Trait.LOYAL, Trait.TEAM_PLAYER -> P.good; Trait.GYM_RAT, Trait.CLUTCH -> P.accent
+    Trait.LOYAL, Trait.TEAM_PLAYER -> P.good; Trait.GYM_RAT, Trait.CLUTCH -> P.accent; Trait.LATE_BLOOMER -> P.gold
 }
 
 // ---------- lineup ----------

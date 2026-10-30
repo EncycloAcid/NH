@@ -100,6 +100,7 @@ object Season {
             for (pid in t.roster) {
                 val p = lg.player(pid)
                 Ratings.addXp(p, (7 * Ratings.devRate(p, dev)).roundToInt())
+                Tryouts.checkStar(lg, t, p)
             }
         }
         // AI coaches re-tune their rotations as players develop.

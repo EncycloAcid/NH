@@ -286,6 +286,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             com.nh.hoopscoach.game.OffStep.ROSTER -> "Running Draft Night"
             com.nh.hoopscoach.game.OffStep.CAREER -> "Players are training this summer"
             com.nh.hoopscoach.game.OffStep.RECRUITING -> if (os.round >= Offseason.ROUNDS) "Signing day" else "Locking in round ${os.round}"
+            com.nh.hoopscoach.game.OffStep.TRYOUTS -> "Opening the season"
             else -> "Loading"
         }
         heavy(label) {

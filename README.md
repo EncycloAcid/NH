@@ -49,6 +49,10 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   4. **Player Development**: summer growth for every returning player.
   5. **NIL Budget**: donor pool, conference revenue share and performance bonuses.
   6. **Recruiting**: five rounds for the recruiting class and the transfer portal, then signing day.
+  7. **Walk-on tryouts**: five unrated students try out. Instead of ratings you see drill grades for shooting, athleticism and the scrimmage, plus your coach's gut feeling. You can take a closer look at two of them to see their overall and get sharper grades. Keep up to two walk-ons on top of your 13 scholarships, and any scholarship you leave open can go to a walk-on too. Walk-ons cost no NIL money.
+     - Once in a while a walk-on is a hidden gem. He breaks out over a summer, earns the Late Bloomer trait, develops faster and can become a star. The coach's gut is your best clue.
+     - Other programs find gems too, so watch the headlines for "from walk-on to star" stories.
+     - When a scholarship opens, award one to a walk-on from his player card.
 
 ## Build it yourself
 

@@ -48,6 +48,8 @@ import com.nh.hoopscoach.game.OffStep
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Ratings
+import com.nh.hoopscoach.game.Tryout
+import com.nh.hoopscoach.game.Tryouts
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.WrapUp
 
@@ -348,7 +350,7 @@ private fun LazyListScope.coachPage(vm: GameViewModel, lg: League, w: WrapUp) {
 @Composable
 fun OffseasonFlow(vm: GameViewModel, lg: League) {
     val os = lg.offseason ?: return
-    val steps = OffStep.entries.map { if (it == OffStep.RECRUITING) "Recruiting" else it.title }
+    val steps = OffStep.entries.map { it.title }
     val next = when (os.step) {
         OffStep.ROSTER -> "Go to Draft Night"
         OffStep.DRAFT -> "Next: Career decision"
@@ -356,6 +358,7 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
         OffStep.DEVELOPMENT -> "Next: NIL budget"
         OffStep.BUDGET -> "Start recruiting"
         OffStep.RECRUITING -> if (os.round >= Offseason.ROUNDS) "Finish signing day" else "Lock in round ${os.round} of ${Offseason.ROUNDS}"
+        OffStep.TRYOUTS -> "Start the ${lg.season + 1} season"
     }
     Column(Modifier.fillMaxSize()) {
         StepHeader("Offseason · ${lg.season}", steps, os.step.ordinal)
@@ -376,6 +379,7 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
                     }
                     recruitBoard(vm, lg)
                 }
+                OffStep.TRYOUTS -> tryoutsStep(vm, lg)
             }
             item {
                 Text("Skip ahead: sim the rest of the offseason", style = T.small, color = P.sub, textAlign = TextAlign.Center,
@@ -555,6 +559,21 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
         Panel(padding = PaddingValues(vertical = 14.dp)) {
             StatRow(listOf(Triple("Players", "${os.growth.size}", null), Triple("Avg gain", "%+.1f".format(avg), if (avg >= 0) P.good else P.bad), Triple("Biggest", "%+d".format(os.growth.maxOfOrNull { it.after - it.before } ?: 0), P.good)))
         }
+        val breakouts = os.breakouts.mapNotNull { lg.playerOrNull(it) }.filter { it.teamId == lg.userTeamId }
+        if (breakouts.isNotEmpty()) {
+            Section("Walk-on breakout")
+            for (p in breakouts) {
+                val gr = os.growth.firstOrNull { it.pid == p.id }
+                Panel(Modifier.padding(bottom = 8.dp), color = P.accent, onClick = { vm.openPlayer(p.id) }) {
+                    Text("LATE BLOOMER", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
+                    Text(p.name.uppercase(), style = T.title, color = P.onAccent)
+                    Text(
+                        "The former walk-on came back a different player: ${gr?.before ?: "?"} → ${p.ovr} overall, with a ceiling of ${p.pot}.",
+                        style = T.small, color = P.onAccent.copy(alpha = 0.9f),
+                    )
+                }
+            }
+        }
         Section("Summer growth")
         if (os.growth.isEmpty()) Panel { Text("No returning players to develop.", style = T.body, color = P.sub) }
         GroupList(os.growth, inset = 70.dp) { gr ->
@@ -580,6 +599,106 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
                     }
                 }
             }
+        }
+    }
+}
+
+// ---------- walk-on tryouts ----------
+
+private fun LazyListScope.tryoutsStep(vm: GameViewModel, lg: League) {
+    val os = lg.offseason!!
+    val t = lg.user
+    val cap = Tryouts.capacity(lg)
+    val kept = Tryouts.kept(os)
+    item {
+        Panel(color = P.accentSoft) {
+            Text("PRESEASON TRYOUTS", style = T.label, color = P.accent)
+            Text(
+                "${os.tryouts.size} students tried out. Nobody has rated them, so go on the drills and your gut. Most are practice bodies, but once in a while a walk-on turns into a star.",
+                style = T.small, color = P.ink,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 6.dp)) {
+            StatRow(
+                listOf(
+                    Triple("Open spots", "$cap", null),
+                    Triple("Keeping", "$kept of $cap", if (kept > 0) P.good else null),
+                    Triple("Closer looks", "${os.looks}", if (os.looks > 0) P.accent else P.faint),
+                ),
+                style = T.numSm,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    val current = lg.rosterOf(t).filter { it.walkOn }
+    if (current.isNotEmpty()) item {
+        Section("Your walk-ons")
+        GroupList(current, inset = 70.dp) { p ->
+            PlayerLine(vm, lg, t, p, "${p.pos} · ${p.cls} · ${if (p.tryout > 0) "made the team in ${p.tryout}" else "walk-on"}") {
+                SmallButton("Release", danger = true) { vm.act { Tryouts.release(it, p.id) } }
+            }
+        }
+        Text(
+            if (Tryouts.openWalkOnSpots(lg, t) == 0) "Both walk-on spots are taken. Release a walk-on to make room for someone new." else "Walk-ons keep their spot until they graduate or you release them.",
+            style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
+        )
+        Section("Trying out")
+    }
+    os.tryouts.forEachIndexed { i, tr ->
+        item { TryoutCard(vm, lg, i, tr, os.looks, canKeep = tr.kept || kept < cap) }
+    }
+    item {
+        Text(
+            "Walk-ons take two extra roster spots with no scholarship and no NIL deal. Any scholarship you leave open goes to a walk-on too. You can award a walk-on a scholarship later from his player card.",
+            style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun TryoutCard(vm: GameViewModel, lg: League, i: Int, tr: Tryout, looks: Int, canKeep: Boolean) {
+    val p = tr.p
+    Panel(Modifier.padding(bottom = 10.dp), color = if (tr.kept) P.accentSoft else P.surface) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PlayerJersey(p, lg.user, 44.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${p.pos} · ${com.nh.hoopscoach.game.classLabel(p.year)} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub, maxLines = 1)
+                Text(p.hometown, style = T.small.copy(fontSize = 12.sp), color = P.faint, maxLines = 1)
+            }
+            if (tr.looked) Ring(p.ovr, 46.dp, label = "OVR", textSize = 16.sp) else UnknownRating()
+        }
+        Spacer(Modifier.height(10.dp))
+        tr.notes.forEachIndexed { k, lvl -> DrillRow(Tryouts.DRILLS[k], Tryouts.GRADES[k][lvl], lvl, gut = k == 3) }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SmallButton(if (tr.looked) "Looked closer" else "Closer look", enabled = !tr.looked && looks > 0) { vm.act { Tryouts.look(it, i) } }
+            Spacer(Modifier.weight(1f))
+            SmallButton(if (tr.kept) "Keeping ✓" else "Keep him", primary = !tr.kept, enabled = canKeep) { vm.act { Tryouts.toggle(it, i) } }
+        }
+    }
+}
+
+@Composable
+private fun UnknownRating() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(46.dp).clip(CircleShape).border(3.dp, P.line, CircleShape), contentAlignment = Alignment.Center) {
+            Text("?", style = T.numSm.copy(fontSize = 20.sp), color = P.sub)
+        }
+        Text("OVR", style = T.label.copy(fontSize = 9.sp), color = P.faint)
+    }
+}
+
+@Composable
+private fun DrillRow(drill: String, grade: String, level: Int, gut: Boolean) {
+    val color = when (level) { 0 -> P.bad; 1 -> P.warn; 2 -> P.good; else -> if (gut) P.gold else P.good }
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(drill, style = T.small, color = P.sub, modifier = Modifier.width(92.dp))
+        Text(grade, style = T.bodyB.copy(fontSize = 14.sp), color = if (gut && level == 3) P.gold else P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            repeat(4) { k -> Box(Modifier.size(width = 12.dp, height = 6.dp).clip(RoundedCornerShape(3.dp)).background(if (k <= level) color else P.line)) }
         }
     }
 }

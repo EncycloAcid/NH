@@ -13,7 +13,8 @@ object Recruiting {
     /** Players who will be on next year's roster. In the offseason, seniors are already gone. */
     fun stays(lg: League, p: Player) = if (lg.phase == Phase.OFFSEASON) true else p.year in 1..3
 
-    fun returning(lg: League, t: Team) = t.roster.count { stays(lg, lg.player(it)) }
+    /** Scholarship players on next year's roster (walk-ons don't use a scholarship). */
+    fun returning(lg: League, t: Team) = t.roster.count { val p = lg.player(it); stays(lg, p) && !p.walkOn }
 
     fun committedTo(lg: League, teamId: Int) = lg.recruits.count { it.committed == teamId }
 
@@ -200,6 +201,7 @@ object Recruiting {
             val t = lg.team(r.committed)
             val p = r.p
             p.teamId = t.id
+            p.walkOn = false
             if (!r.transfer) {
                 p.year = 1
                 p.ovrHistory.clear()
@@ -217,7 +219,7 @@ object Recruiting {
     }
 
     /** Roster room right now (used in the off-season, after departures). */
-    fun openRoom(lg: League, t: Team) = MAX_ROSTER - t.roster.size - lg.recruits.count { it.committed == t.id }
+    fun openRoom(lg: League, t: Team) = MAX_ROSTER - Tryouts.scholarships(lg, t) - lg.recruits.count { it.committed == t.id }
 
     fun freeNumber(lg: League, t: Team): Int {
         val used = t.roster.map { lg.player(it).number }.toSet()

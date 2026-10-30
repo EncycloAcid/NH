@@ -4,7 +4,8 @@ import kotlin.math.roundToInt
 
 /**
  * The offseason runs as a series of steps the user walks through:
- * Roster & NIL → Draft Night → Career Decision → Player Development → NIL Budget → Recruiting rounds.
+ * Roster & NIL → Draft Night → Career Decision → Player Development → NIL Budget → Recruiting rounds
+ * → Walk-on Tryouts.
  */
 object Offseason {
     const val ROUNDS = 5
@@ -154,6 +155,11 @@ object Offseason {
             OffStep.DEVELOPMENT -> os.step = OffStep.BUDGET
             OffStep.BUDGET -> { os.round = 1; lg.recruitPoints = roundPoints(lg); os.step = OffStep.RECRUITING }
             OffStep.RECRUITING -> lockRound(lg)
+            OffStep.TRYOUTS -> {
+                Tryouts.finish(lg, os)
+                fillHoles(lg, lg.user)
+                startNewSeason(lg)
+            }
         }
     }
 
@@ -223,11 +229,17 @@ object Offseason {
                 val p = lg.player(pid)
                 val before = p.ovr
                 val attrs = p.attrs.copyOf()
+                val brokeOut = Tryouts.summer(p)
                 Ratings.offseasonGrowth(p, dev)
                 val gains = IntArray(10) { p.attrs[it] - attrs[it] }
                 val lbs = if (p.year <= 2) Rng.range(0, 8) else Rng.range(-2, 4)
                 p.weight += lbs
                 p.year++
+                if (brokeOut) {
+                    Tryouts.breakoutNews(lg, t, p, before)
+                    if (t.id == lg.userTeamId) os.breakouts += pid
+                }
+                Tryouts.checkStar(lg, t, p)
                 if (t.id == lg.userTeamId) os.growth += Growth(pid, before, p.ovr, gains, lbs)
             }
         }
@@ -252,19 +264,21 @@ object Offseason {
     private fun finish(lg: League) {
         val os = lg.offseason ?: return
         os.signed += Recruiting.signingDay(lg)
-        // Walk-ons fill any remaining holes.
-        for (t in lg.teams) {
-            while (t.roster.size < Recruiting.MAX_ROSTER) {
-                val w = LeagueGen.walkOn(lg, t, LeagueGen.nearestPositionNeed(lg, t))
-                w.year = 1
-                w.number = Recruiting.freeNumber(lg, t)
-                lg.addPlayer(w)
-                t.roster += w.id
-            }
-        }
+        // Other programs fill their open scholarships; the user holds walk-on tryouts first.
+        for (t in lg.teams) if (t.id != lg.userTeamId) { fillHoles(lg, t); Tryouts.aiTryout(lg, t) }
         // Unsigned transfers leave the game.
         lg.players.filter { it.teamId < 0 }.forEach { lg.removePlayer(it) }
-        startNewSeason(lg)
+        Tryouts.open(lg, os)
+    }
+
+    /** Unrecruited players fill any scholarship left open. */
+    private fun fillHoles(lg: League, t: Team) {
+        while (Tryouts.scholarships(lg, t) < Recruiting.MAX_ROSTER) {
+            val w = Tryouts.filler(lg, t)
+            w.number = Recruiting.freeNumber(lg, t)
+            lg.addPlayer(w)
+            t.roster += w.id
+        }
     }
 
     // ---------- new season ----------

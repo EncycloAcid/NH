@@ -9,6 +9,7 @@ import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Recruiting
 import com.nh.hoopscoach.game.Rivalries
+import com.nh.hoopscoach.game.Tryouts
 import com.nh.hoopscoach.game.Rng
 import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.Season
@@ -19,6 +20,33 @@ import org.junit.Test
 import kotlin.random.Random
 
 class SimTest {
+
+    /** A hidden gem who tries out as a freshman should usually be a star by his junior or senior year. */
+    @Test
+    fun gemsBecomeStars() {
+        Rng.r = Random(3)
+        val lg = com.nh.hoopscoach.game.LeagueGen.newLeague()
+        val finals = mutableListOf<Int>()
+        val plain = mutableListOf<Int>()
+        repeat(300) { k ->
+            val gem = k % 2 == 0
+            val p = Tryouts.unrated(lg, com.nh.hoopscoach.game.Pos.SG, 1, 46, gem)
+            repeat(3) {
+                // A season of practice and games, then a summer.
+                com.nh.hoopscoach.game.Ratings.addXp(p, (1300 * com.nh.hoopscoach.game.Ratings.devRate(p, 70)).toInt())
+                Tryouts.summer(p)
+                com.nh.hoopscoach.game.Ratings.offseasonGrowth(p, 70)
+                p.year++
+            }
+            com.nh.hoopscoach.game.Ratings.addXp(p, (1300 * com.nh.hoopscoach.game.Ratings.devRate(p, 70)).toInt())
+            (if (gem) finals else plain) += p.ovr
+        }
+        finals.sort(); plain.sort()
+        val stars = finals.count { it >= Tryouts.STAR }
+        println("Gems as seniors: median ${finals[finals.size / 2]}, stars ${stars}/${finals.size}, range ${finals.first()}-${finals.last()}; ordinary walk-ons: median ${plain[plain.size / 2]}, max ${plain.last()}")
+        assertTrue("most gems become stars", stars >= finals.size * 0.6)
+        assertTrue("ordinary walk-ons stay role players", plain.last() < Tryouts.STAR)
+    }
 
     @Test
     fun simulatesSeveralSeasons() {
@@ -81,14 +109,56 @@ class SimTest {
             val os = lg.offseason!!
             Offseason.advance(lg) // roster -> draft
             println("  offseason: grads=${os.graduates.size} entrants=${os.entrants.size} transfersOut=${os.transferredOut.size} portal=${lg.recruits.count { it.transfer }} offers=${os.offers.size} drafted=${os.draftedCount}")
-            Offseason.autoComplete(lg)
+            checkTryouts(lg, os)
             println("  signed=${os.signed.size} growth=${os.growth.take(3).map { "${it.before}->${it.after}" }}")
             assertEquals(Phase.REGULAR, lg.phase)
-            for (t in lg.teams) assertEquals("roster size for ${t.school}", Recruiting.MAX_ROSTER, t.roster.size)
+            for (t in lg.teams) {
+                assertEquals("scholarships for ${t.school}", Recruiting.MAX_ROSTER, Tryouts.scholarships(lg, t))
+                assertTrue("walk-ons for ${t.school}", Tryouts.walkOns(lg, t) <= Tryouts.WALK_ON_SPOTS)
+                if (t.id != lg.userTeamId) assertEquals("AI roster for ${t.school}", Recruiting.MAX_ROSTER, t.roster.size)
+            }
+            val gems = lg.players.filter { it.tryout > 0 && it.teamId >= 0 }
+            println("  former tryout walk-ons in the league: ${gems.size}, broke out ${gems.count { it.story >= 1 }}, stars ${gems.count { it.story >= 2 }}")
             assertTrue(lg.recruits.isNotEmpty())
             println("  new season ${lg.season}, games scheduled=${lg.games.size}, user exp wins=%.1f".format(lg.user.expWins))
             assertTrue(s >= 0)
         }
+    }
+
+    /** Walk-on tryouts: unrated candidates, closer looks, keeping two, then the new season. */
+    private fun checkTryouts(lg: League, os: com.nh.hoopscoach.game.OffseasonState) {
+        var guard = 0
+        while (os.step != com.nh.hoopscoach.game.OffStep.TRYOUTS && guard++ < 20) {
+            if (os.step == com.nh.hoopscoach.game.OffStep.CAREER && os.fired) com.nh.hoopscoach.game.Coaching.acceptOffer(lg, os.offers.first().teamId)
+            Offseason.advance(lg)
+        }
+        assertEquals(com.nh.hoopscoach.game.OffStep.TRYOUTS, os.step)
+        assertEquals(Tryouts.CANDIDATES, os.tryouts.size)
+        assertEquals(Tryouts.LOOKS, os.looks)
+        val u = lg.user
+        assertEquals("user roster not filled before tryouts", Tryouts.openScholarships(lg, u), Recruiting.MAX_ROSTER - Tryouts.scholarships(lg, u))
+        assertTrue(Tryouts.look(lg, 0))
+        assertTrue(os.tryouts[0].looked)
+        assertTrue(Tryouts.look(lg, 1))
+        assertTrue("only two looks", !Tryouts.look(lg, 2))
+        if (Tryouts.capacity(lg) == 0) {
+            val w = lg.rosterOf(u).first { it.walkOn }
+            assertTrue(Tryouts.release(lg, w.id))
+            assertTrue("release frees a spot", lg.playerOrNull(w.id) == null && Tryouts.capacity(lg) == 1)
+        }
+        val cap = Tryouts.capacity(lg)
+        assertTrue(cap >= Tryouts.WALK_ON_SPOTS - Tryouts.walkOns(lg, u))
+        val names = mutableListOf<String>()
+        for (i in os.tryouts.indices) if (Tryouts.kept(os) < 2 && Tryouts.toggle(lg, i)) names += os.tryouts[i].p.name
+        val walkOnsBefore = Tryouts.walkOns(lg, u)
+        val season = lg.season
+        Offseason.advance(lg)
+        assertEquals(Phase.REGULAR, lg.phase)
+        val made = lg.rosterOf(lg.user).filter { it.name in names && it.tryout == season + 1 }
+        assertEquals("kept walk-ons make the team", names.size, made.size)
+        assertTrue(made.all { it.nil == 0 })
+        assertTrue(Tryouts.walkOns(lg, lg.user) >= minOf(Tryouts.WALK_ON_SPOTS, walkOnsBefore + names.size))
+        println("  tryouts: kept ${made.map { "${it.name} ${it.pos} ${it.ovr}${if (it.walkOn) " walk-on" else " schol"}" }}, roster ${lg.user.roster.size}")
     }
 
     /** Rivalry games are scheduled, sell out, swing prestige and make headlines. */

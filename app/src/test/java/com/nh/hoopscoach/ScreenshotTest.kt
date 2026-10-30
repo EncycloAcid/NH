@@ -18,6 +18,7 @@ import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Rng
 import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Season
+import com.nh.hoopscoach.game.Tryouts
 import com.nh.hoopscoach.ui.App
 import com.nh.hoopscoach.ui.GameViewModel
 import com.nh.hoopscoach.ui.HistoryKind
@@ -117,6 +118,47 @@ class ScreenshotTest {
         vm.wrapPage = 3; scrollTo(0); shot("P19_wrap_program")
         scrollTo(1); shot("P20_wrap_signals")
         vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
+    }
+
+    /** Walk-on tryouts, a summer breakout, and a walk-on's player card. */
+    @Test
+    fun tryouts() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        var pid by mutableIntStateOf(-1)
+        rule.setContent {
+            if (pid < 0) App(vm)
+            else HoopsTheme(androidx.compose.ui.graphics.Color(lg.user.primary), androidx.compose.ui.graphics.Color(lg.user.secondary)) { PlayerCard(vm, lg, lg.player(pid)) }
+        }
+        while (lg.phase != Phase.WRAP_UP) Season.playDay(lg)
+        Offseason.begin(lg)
+        val os = lg.offseason!!
+        fun step() {
+            if (os.step == com.nh.hoopscoach.game.OffStep.CAREER && os.fired) com.nh.hoopscoach.game.Coaching.acceptOffer(lg, os.offers.first().teamId)
+            Offseason.advance(lg)
+        }
+        while (os.step != com.nh.hoopscoach.game.OffStep.CAREER) step()
+        // A walk-on from last year's tryouts who has a breakout in him.
+        val gem = lg.rosterOf(lg.user).filter { it.year <= 3 }.minBy { it.ovr }
+        gem.gem = true; gem.walkOn = true; gem.tryout = lg.season; gem.year = 3
+        step()
+        vm.install(lg); vm.select(Tab.TODAY)
+        scrollTo(0); shot("T01_breakout")
+        while (os.step != com.nh.hoopscoach.game.OffStep.TRYOUTS) step()
+        Tryouts.look(lg, 0)
+        Tryouts.toggle(lg, 0)
+        vm.install(lg)
+        scrollTo(0); shot("T02_tryouts_top")
+        scrollTo(2); shot("T03_tryouts_cards")
+        scrollTo(4); shot("T04_tryouts_more")
+        val kept = os.tryouts[0].p.id
+        step()
+        vm.install(lg)
+        pid = kept; shot("T05_walkon_card")
+        pid = gem.id; shot("T06_late_bloomer_card")
+        pid = -1
+        vm.select(Tab.TEAM); vm.teamTab = 0; scrollTo(5); shot("T07_roster_bench")
     }
 
     /** Duke-North Carolina: preview, live crowd, the newspaper banner and the box score. */

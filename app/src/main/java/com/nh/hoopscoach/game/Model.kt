@@ -42,6 +42,8 @@ enum class Trait(val label: String, val good: Boolean) {
     TEAM_PLAYER("Team Player", true),
     GYM_RAT("Gym Rat", true),
     CLUTCH("Clutch", true),
+    /** Earned, never rolled: a walk-on whose game suddenly took off. Develops faster. */
+    LATE_BLOOMER("Late Bloomer", true),
 }
 
 enum class Offense(val label: String, val blurb: String) {
@@ -135,6 +137,14 @@ class Player(
     var awards: MutableList<String> = mutableListOf(),
     var transferFrom: Int = -1,
     var favorite: Boolean = false,
+    /** On a walk-on spot: no scholarship. */
+    var walkOn: Boolean = false,
+    /** Season he made the team at walk-on tryouts (0 = he didn't). */
+    var tryout: Int = 0,
+    /** Hidden: this walk-on has a breakout in him. */
+    var gem: Boolean = false,
+    /** Walk-on story so far: 0 nothing yet, 1 broke out, 2 became a star. */
+    var story: Int = 0,
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"
@@ -455,8 +465,12 @@ class NilBonus(val label: String, val amount: Int, var seasonsLeft: Int, val con
 
 enum class OffStep(val title: String) {
     ROSTER("Roster & NIL"), DRAFT("Draft Night"), CAREER("Career Decision"), DEVELOPMENT("Player Development"),
-    BUDGET("NIL Budget"), RECRUITING("Recruiting"),
+    BUDGET("NIL Budget"), RECRUITING("Recruiting"), TRYOUTS("Walk-on Tryouts"),
 }
+
+/** A student trying out for a walk-on spot. Ratings stay hidden; [notes] are drill grades 0-3. */
+@Serializable
+class Tryout(val p: Player, var notes: IntArray, var looked: Boolean = false, var kept: Boolean = false)
 
 @Serializable
 class GradEntry(val pid: Int, val name: String, val pos: Pos, val ovr: Int, val nil: Int, val line: String, val note: String)
@@ -481,6 +495,11 @@ class OffseasonState(
     var freedDraft: Int = 0,
     var freedOther: Int = 0,
     var draftedCount: Int = 0,
+    val tryouts: MutableList<Tryout> = mutableListOf(),
+    /** The user's walk-ons who broke out this summer. */
+    val breakouts: MutableList<Int> = mutableListOf(),
+    /** Closer looks left at tryouts: each one reveals a candidate's overall. */
+    var looks: Int = 0,
 )
 
 @Serializable

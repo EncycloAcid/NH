@@ -58,6 +58,7 @@ import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Ratings
 import com.nh.hoopscoach.game.StatLine
 import com.nh.hoopscoach.game.Trait
+import com.nh.hoopscoach.game.Tryouts
 import com.nh.hoopscoach.game.classLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,6 +79,7 @@ private fun traitBlurb(t: Trait) = when (t) {
     Trait.TEAM_PLAYER -> "Accepts whatever role helps the team."
     Trait.GYM_RAT -> "Lives in the gym. Develops faster."
     Trait.CLUTCH -> "Shoots better with the game on the line."
+    Trait.LATE_BLOOMER -> "A walk-on whose game suddenly took off. Develops faster."
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -117,6 +119,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     val m = Morale.mood(p)
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
                 }
+                if (p.walkOn) Tag("WALK-ON", P.sub)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
             }
@@ -125,6 +128,20 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (mine) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (mine) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
+            }
+            if (mine && p.walkOn && team != null) {
+                val open = Tryouts.openScholarships(lg, team)
+                Spacer(Modifier.height(10.dp))
+                Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Walk-on", style = T.bodyB, color = P.ink)
+                            Text(if (open > 0) "A scholarship is open. Awarding it makes him happier and often loyal." else "All 13 scholarships are taken. One opens when a scholarship player leaves.", style = T.small, color = P.sub)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        SmallButton("Award scholarship", primary = true, enabled = open > 0) { vm.act { Tryouts.awardScholarship(it, p.id) } }
+                    }
+                }
             }
             Spacer(Modifier.height(14.dp))
             Segmented(listOf("Ratings", "Stats", "Growth", "Bio"), tab, { tab = it })
@@ -304,7 +321,12 @@ private fun BioTab(lg: League, p: Player) {
         listOfNotNull(
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
-            "Recruit rating" to if (p.recruitRank > 0) "${p.stars}★ · No. ${p.recruitRank} overall" else "Walk-on",
+            "Recruit rating" to when {
+                p.recruitRank > 0 -> "${p.stars}★ · No. ${p.recruitRank} overall"
+                p.tryout > 0 -> "Unrated · made the team at ${p.tryout} tryouts"
+                else -> "Unrated walk-on"
+            },
+            if (p.teamId >= 0) "Roster spot" to (if (p.walkOn) "Walk-on (no scholarship)" else "Scholarship") else null,
             "Position rank" to if (p.posRank > 0) "No. ${p.posRank} ${p.pos}" else "–",
             if (p.teamId >= 0) "NIL deal" to money(p.nil) else null,
         ),

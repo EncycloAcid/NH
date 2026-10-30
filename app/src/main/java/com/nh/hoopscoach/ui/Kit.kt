@@ -423,6 +423,7 @@ fun teamInk(t: Team): Color {
 fun f1(v: Double) = "%.1f".format(v)
 fun pct(v: Double) = "%.1f%%".format(v * 100)
 fun money(k: Int): String = when {
+    k == 0 -> "$0"
     k >= 1000 -> "$" + "%.2fM".format(k / 1000.0).replace(".00M", "M").replace(Regex("(\\.\\d)0M"), "$1M")
     else -> "$${k}K"
 }

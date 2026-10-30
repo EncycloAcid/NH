@@ -150,6 +150,7 @@ object Ratings {
         val potF = (gap / 10.0).coerceIn(0.12, 1.6)
         var r = (0.55 + coachDev / 100.0) * potF
         if (p.has(Trait.GYM_RAT)) r *= 1.25
+        if (p.has(Trait.LATE_BLOOMER)) r *= 1.2
         return r
     }
 
@@ -183,6 +184,7 @@ object Ratings {
         var gain = if (gap > 0) gap * (0.28 + Rng.d() * 0.22) + Rng.gauss() * 1.2 else Rng.gauss() * 1.0
         gain *= 0.85 + coachDev / 330.0
         if (p.has(Trait.GYM_RAT)) gain *= 1.15
+        if (p.has(Trait.LATE_BLOOMER)) gain *= 1.2
         // One attribute point moves the overall by roughly 0.14, so scale up.
         val steps = (gain * 7.3).roundToInt()
         val w = when (p.pos) {
