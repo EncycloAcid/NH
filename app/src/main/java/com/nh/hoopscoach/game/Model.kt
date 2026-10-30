@@ -61,7 +61,7 @@ enum class Defense(val label: String, val blurb: String) {
 
 enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON }
 
-enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA") }
+enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT") }
 
 @Serializable
 class StatLine(
@@ -272,9 +272,18 @@ class Bracket(
     val gameIds: MutableList<MutableList<Int>> = mutableListOf(),
     var champion: Int = -1,
     var current: Int = 0,
+    /** NCAA only: First Four games that fill an empty Round of 64 slot. */
+    val playIns: MutableList<PlayIn> = mutableListOf(),
 ) {
     val done get() = champion >= 0
+    fun playInOf(teamId: Int) = playIns.firstOrNull { it.a == teamId || it.b == teamId }
+    /** Every team in the bracket, First Four teams included. */
+    fun hasTeam(teamId: Int) = teamId in seeds
 }
+
+/** A First Four game: the winner takes Round of 64 [slot] as a No. [seed] seed. */
+@Serializable
+class PlayIn(val slot: Int, val a: Int, val b: Int, val seed: Int, var gameId: Int = -1)
 
 @Serializable
 class InSeasonEvent(
@@ -347,7 +356,57 @@ class WrapUp(
     val drivers: List<Driver> = emptyList(),
     val signals: List<Driver> = emptyList(),
     val confTourney: String = "",
+    /** "NCAA", "NIT" or "" for the postseason event the team played in. */
+    val event: String = "",
+    /** Short round names for each game in [path]. */
+    val pathRounds: List<String> = emptyList(),
+    val nitReward: NitReward? = null,
 )
+
+/** What an NIT title earned the program. */
+@Serializable
+class NitReward(val prestige: Int, val points: Int, val xp: Int, val players: Int)
+
+/** A team's selection resume. Quadrant records are stored as [q1w, q1l, q2w, q2l, q3w, q3l, q4w, q4l]. */
+@Serializable
+class Sheet(
+    val teamId: Int,
+    val net: Int,
+    val w: Int,
+    val l: Int,
+    val q: IntArray,
+    val sos: Int,
+    val ncSos: Int,
+    val wab: Double,
+    val wabRank: Int,
+    val score: Double,
+    var rank: Int = 0,
+) {
+    fun qw(n: Int) = q[(n - 1) * 2]
+    fun ql(n: Int) = q[(n - 1) * 2 + 1]
+    fun quad(n: Int) = "${qw(n)}-${ql(n)}"
+    val record get() = "$w-$l"
+}
+
+@Serializable
+class BubbleGroup(val key: String, val title: String, val note: String, val ids: List<Int>)
+
+/** Bubble Watch: a projection during the season, or the committee's final call on Selection Sunday. */
+@Serializable
+class Bubble(
+    val season: Int,
+    val final: Boolean,
+    val groups: List<BubbleGroup>,
+    val sheets: List<Sheet>,
+    val seeds: Map<Int, Int> = emptyMap(),
+    /** At-large order (1 = first at-large pick); auto-bid teams get the spot they would have held. */
+    val atLargeRank: Map<Int, Int> = emptyMap(),
+    val atLargeSpots: Int = 36,
+) {
+    @Transient private var index: Map<Int, Sheet>? = null
+    fun sheet(id: Int): Sheet? = (index ?: sheets.associateBy { it.teamId }.also { index = it })[id]
+    fun groupOf(id: Int): BubbleGroup? = groups.firstOrNull { id in it.ids }
+}
 
 @Serializable
 class Driver(val label: String, val detail: String, val value: String, val good: Boolean)
@@ -408,6 +467,8 @@ class League(
     var games: MutableList<Game> = mutableListOf(),
     var confBrackets: MutableList<Bracket> = mutableListOf(),
     var ncaa: Bracket? = null,
+    var nit: Bracket? = null,
+    var bubble: Bubble? = null,
     var events: MutableList<InSeasonEvent> = mutableListOf(),
     var recruits: MutableList<Recruit> = mutableListOf(),
     var userTeamId: Int,

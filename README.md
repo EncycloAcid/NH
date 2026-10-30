@@ -26,10 +26,14 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - *Develop*: XP progress and a training focus (archetype) for each player.
   - *Program*: prestige, NIL budget, locker-room mood and coaching staff.
 - **Recruit**: targets, high-school prospects, transfers and commits, with interest races against rival schools.
-- **League**: AP Top 25 and NET, standings for all 32 conferences, stat leaders, bracketology and brackets, and history.
+- **League**: AP Top 25 and NET, standings for all 32 conferences, stat leaders, Bubble Watch, bracketology and brackets, and history.
+- **Bubble Watch**: the projected field, sorted into Locks, Should be in, On the bubble (last four byes and last four in), First four out and Next four out, plus projected automatic bids. Tap any two teams to compare their resumes side by side: record, NET, Quad 1 and Quad 2 records, SOS, non-conference SOS and Wins Above Bubble. After Selection Sunday it shows the committee's final call. The Today screen shows your own outlook from mid-season on.
 - **Career**: your coach's record, honors, job security, coaching skills and history.
 - **Live games**: possession-by-possession play-by-play, a live win-probability chart, speed controls and in-game tactics.
-- **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, and a 64-team NCAA bracket.
+- **Season structure**: 31-game regular season with in-season tournaments, conference tournaments, a 68-team NCAA Tournament and a 32-team NIT.
+  - **Selection**: 32 automatic bids and 36 at-large. The committee ranks resumes by NET and Wins Above Bubble equally, with credit for Quad 1 wins and a penalty for Quad 4 losses. Bubble Watch uses the same formula, so its projection matches the real selection.
+  - **First Four**: the last four at-large teams play for two 11 seeds, and the four lowest automatic qualifiers play for two 16 seeds, before the Round of 64.
+  - **NIT**: the 32 best teams that missed the field, in four brackets of eight. Higher seeds host until the semifinals. The NIT champion gets +2 to +3 prestige, 3 extra coaching points and 350 XP for every returning player.
 - **Season wrap-up**: results, awards (Player of the Year, All-Americans, All-Tournament), graduations, program prestige changes, and coach development points.
 - **Offseason**, step by step:
   1. **Roster & NIL**: pitch draft entrants to return, raise below-market deals, release players.

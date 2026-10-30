@@ -362,7 +362,8 @@ object Coaching {
         val t = lg.user
         val c = lg.userCoach
         val round = Awards.tourneyRound(lg, t.id)
-        val delta = (t.w - t.expWins) * 3 + (round - expectedRound(t.prevPrestige)) * 5
+        var delta = (t.w - t.expWins) * 3 + (round - expectedRound(t.prevPrestige)) * 5
+        if (lg.nit?.champion == t.id) delta += 4
         c.security = (c.security + delta).roundToInt().coerceIn(0, 100)
     }
 
@@ -375,6 +376,7 @@ object Coaching {
         if (lg.cotyCoachId == c.id) pts += 2
         if (lg.confAwards.any { it.pid == -c.id }) pts += 1
         if (lg.confBrackets.any { it.confId == t.confId && it.champion == t.id }) pts += 1
+        if (lg.nit?.champion == t.id) pts += Season.NIT_POINTS
         return pts
     }
 

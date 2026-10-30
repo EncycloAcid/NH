@@ -116,7 +116,12 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
         Panel(color = P.accent) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (w.seed > 0) "NCAA TOURNAMENT · NO. ${w.seed} SEED" else "SEASON RESULT", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
+                    val label = when {
+                        w.event == "NIT" -> "NIT · NO. ${w.seed} SEED"
+                        w.seed > 0 -> "NCAA TOURNAMENT · NO. ${w.seed} SEED"
+                        else -> "SEASON RESULT"
+                    }
+                    Text(label, style = T.label, color = P.onAccent.copy(alpha = 0.8f))
                     Text(w.result.uppercase(), style = T.hero, color = P.onAccent)
                     Text("${t.school} · ${w.w}-${w.l}", style = T.bodyB, color = P.onAccent.copy(alpha = 0.85f))
                 }
@@ -124,14 +129,33 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
             }
             if (w.path.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val big = w.path.size <= 6
+                Row(horizontalArrangement = Arrangement.spacedBy(if (big) 8.dp else 6.dp)) {
                     w.path.forEachIndexed { i, opp ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(40.dp).clip(CircleShape).background(if (w.pathWon[i]) P.good else P.bad).padding(3.dp), contentAlignment = Alignment.Center) {
-                                TeamBadge(lg.team(opp), 34.dp)
+                            Box(Modifier.size(if (big) 40.dp else 36.dp).clip(CircleShape).background(if (w.pathWon[i]) P.good else P.bad).padding(3.dp), contentAlignment = Alignment.Center) {
+                                TeamBadge(lg.team(opp), if (big) 34.dp else 30.dp)
                             }
-                            Text(Season.NCAA_ROUNDS.getOrElse(i) { "" }, style = T.label.copy(fontSize = 9.sp), color = P.onAccent)
+                            Text(w.pathRounds.getOrNull(i) ?: Season.NCAA_ROUNDS.getOrElse(i) { "" }, style = T.label.copy(fontSize = 9.sp), color = P.onAccent)
                         }
+                    }
+                }
+            }
+        }
+        w.nitReward?.let { r ->
+            Section("NIT champions")
+            GroupList(
+                listOf(
+                    Triple("+${r.prestige}", "Program prestige", "On top of the season's normal change"),
+                    Triple("+${r.points}", "Coaching points", "Extra points to spend on your coach"),
+                    Triple("+${r.xp}", "Player XP", "For each of ${r.players} returning players"),
+                ),
+            ) { (v, title, sub) ->
+                ListRow {
+                    Text(v, style = T.numSm, color = P.good, modifier = Modifier.width(64.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = T.bodyB, color = P.ink)
+                        Text(sub, style = T.small, color = P.sub)
                     }
                 }
             }

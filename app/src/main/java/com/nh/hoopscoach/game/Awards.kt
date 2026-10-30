@@ -100,13 +100,29 @@ object Awards {
 
     private fun tLine(p: Player) = "%.1f ppg · %.1f rpg in March".format(p.tourney.ppg, p.tourney.rpg)
 
-    /** 0 = missed, 1 = R64 ... 6 = runner-up, 7 = champion. */
+    /** 0 = missed, 1 = made the field (First Four or Round of 64) ... 6 = runner-up, 7 = champion. */
     fun tourneyRound(lg: League, teamId: Int): Int {
         val b = lg.ncaa ?: return 0
         if (b.champion == teamId) return 7
-        var reached = 0
+        var reached = if (b.playInOf(teamId) != null) 1 else 0
         for ((i, r) in b.rounds.withIndex()) if (teamId in r) reached = i + 1
         return reached
+    }
+
+    /** How a team's season ended, NIT included. */
+    fun resultFor(lg: League, teamId: Int): String {
+        val round = tourneyRound(lg, teamId)
+        val b = lg.ncaa
+        if (round == 1 && b != null && teamId !in b.rounds[0]) return "First Four"
+        if (round > 0) return resultLabel(round)
+        val nit = lg.nit
+        if (nit != null && nit.hasTeam(teamId)) {
+            if (nit.champion == teamId) return "NIT Champion"
+            return when (nit.rounds.indexOfLast { teamId in it }) {
+                4 -> "NIT Runner-Up"; 3 -> "NIT Semifinals"; 2 -> "NIT Quarterfinals"; 1 -> "NIT Second Round"; else -> "NIT First Round"
+            }
+        }
+        return resultLabel(0)
     }
 
     fun resultLabel(round: Int): String = when (round) {

@@ -90,6 +90,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var offRecruitTab by mutableIntStateOf(0)
     var draftTab by mutableIntStateOf(0)
     var recruitPos by mutableStateOf<com.nh.hoopscoach.game.Pos?>(null)
+    /** Teams picked for the Bubble Watch resume comparison (up to two). */
+    val bubblePick = mutableStateListOf<Int>()
 
     companion object {
         /** Tests turn this off and install a league themselves. */

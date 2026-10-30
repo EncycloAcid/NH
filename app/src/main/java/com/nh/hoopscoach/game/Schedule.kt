@@ -6,14 +6,16 @@ object Schedule {
     const val REG_DAYS = NC_DAYS + CONF_GAMES // 31
     const val EVENT_DAY = 4                   // in-season events run days 4-6
     const val CT_START = REG_DAYS + 1         // 32..35
-    const val NCAA_START = CT_START + 4       // 36..41
-    const val LAST_DAY = NCAA_START + 5
+    const val NCAA_START = CT_START + 4       // 36 First Four and NIT first round, 37..42 Round of 64 to title game
+    const val LAST_DAY = NCAA_START + 6
 
     fun build(lg: League) {
         lg.games = mutableListOf()
         lg.events = mutableListOf()
         lg.confBrackets = mutableListOf()
         lg.ncaa = null
+        lg.nit = null
+        lg.bubble = null
         lg.nextGameId = 1
         lg.reindex()
         val played = HashSet<Long>()
@@ -131,6 +133,6 @@ object Schedule {
     fun dayLabel(day: Int): String = when {
         day <= REG_DAYS -> "Game $day"
         day < NCAA_START -> "Conf. Tournament"
-        else -> "NCAA Tournament"
+        else -> "Postseason"
     }
 }

@@ -55,6 +55,7 @@ object Finance {
         }
         for (ev in lg.events) ev.placement.firstOrNull()?.let { lg.team(it).bonuses += NilBonus("$yr MTE Champion bonus for ${lg.team(it).school}", 325, 1) }
         for (b in lg.confBrackets) if (b.champion >= 0) lg.team(b.champion).bonuses += NilBonus("$yr Conference Tournament bonus for ${lg.team(b.champion).school}", 200, 1)
+        lg.nit?.champion?.takeIf { it >= 0 }?.let { lg.team(it).bonuses += NilBonus("$yr NIT Champion bonus for ${lg.team(it).school}", 150, 1) }
         for (cid in f4Confs) {
             val c = lg.conf(cid)
             for (tid in c.teamIds) lg.team(tid).bonuses += NilBonus("$yr Final Four bonus for ${c.abbr}", 275, 3, conference = true)

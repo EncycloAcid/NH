@@ -7,7 +7,15 @@ object Season {
     private val SLOT_ORDER = intArrayOf(1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15)
     val NCAA_ROUNDS = listOf("R64", "R32", "S16", "E8", "F4", "CHAMP")
     private val CT_ROUNDS = listOf("R1", "QF", "SF", "Final")
+    val NIT_ROUNDS = listOf("R1", "R2", "QF", "SF", "Final")
+    private val NIT_TITLES = listOf("First Round", "Second Round", "Quarterfinals", "Semifinals", "Championship")
     val REGIONS = listOf("East", "West", "South", "Midwest")
+
+    /** Bracket id for the NIT (conference brackets use their conference id, the NCAA uses -1). */
+    const val NIT_ID = -2
+    /** NIT title rewards: coaching points for the user and XP for every returning player. */
+    const val NIT_POINTS = 3
+    const val NIT_XP = 350
 
     fun gamesOn(lg: League, day: Int) = lg.games.filter { it.day == day }
 
@@ -22,10 +30,22 @@ object Season {
         when (lg.phase) {
             Phase.REGULAR -> if (lg.day in Schedule.EVENT_DAY + 1..Schedule.EVENT_DAY + 2) for (ev in lg.events) eventRound(lg, ev, lg.day - Schedule.EVENT_DAY)
             Phase.CONF_TOURNEY -> for (b in lg.confBrackets) scheduleBracketRound(lg, b, GameType.CONF_TOURNEY)
-            Phase.NCAA -> lg.ncaa?.let { scheduleBracketRound(lg, it, GameType.NCAA) }
+            Phase.NCAA -> {
+                lg.ncaa?.let { if (lg.day < it.startDay) schedulePlayIns(lg, it) else scheduleBracketRound(lg, it, GameType.NCAA) }
+                lg.nit?.let { scheduleBracketRound(lg, it, GameType.NIT) }
+            }
             else -> {}
         }
     }
+
+    /** The bracket the user's team is (or was) playing in this phase. */
+    fun userBracket(lg: League): Bracket? = when (lg.phase) {
+        Phase.CONF_TOURNEY -> lg.confBrackets.firstOrNull { it.confId == lg.user.confId }
+        Phase.NCAA, Phase.WRAP_UP -> lg.nit?.takeIf { it.hasTeam(lg.userTeamId) } ?: lg.ncaa
+        else -> null
+    }
+
+    fun firstFourDay(lg: League) = lg.phase == Phase.NCAA && lg.ncaa?.let { it.playIns.isNotEmpty() && lg.day < it.startDay } == true
 
     /** Plays every remaining game today and moves the calendar forward one day. */
     fun playDay(lg: League) {
@@ -59,8 +79,10 @@ object Season {
             }
             Phase.NCAA -> {
                 val b = lg.ncaa!!
-                advanceBracket(lg, b)
-                if (b.done) { endSeason(lg); return }
+                if (lg.day < b.startDay) resolvePlayIns(lg, b) else advanceBracket(lg, b)
+                val nit = lg.nit
+                if (nit != null) advanceBracket(lg, nit)
+                if (b.done && (nit == null || nit.done)) { endSeason(lg); return }
             }
             else -> return
         }
@@ -159,9 +181,13 @@ object Season {
             if (a < 0 || c < 0) { ids += -1; continue }
             val sa = b.seeds[a] ?: 99
             val sc = b.seeds[c] ?: 99
-            val neutral = type == GameType.NCAA || r > 0
+            val neutral = when (type) { GameType.NCAA -> true; GameType.NIT -> r >= 3; else -> r > 0 }
             val (h, aw) = if (sa <= sc) a to c else c to a
-            val label = if (type == GameType.NCAA) ncaaLabel(r, i, slots.size) else "${b.name} · ${b.roundNames.getOrElse(r) { "R${r + 1}" }}"
+            val label = when (type) {
+                GameType.NCAA -> ncaaLabel(r, i, slots.size)
+                GameType.NIT -> "NIT · ${NIT_TITLES.getOrElse(r) { "Round ${r + 1}" }}"
+                else -> "${b.name} · ${b.roundNames.getOrElse(r) { "R${r + 1}" }}"
+            }
             val g = Game(lg.nextGameId++, day, h, aw, neutral, type, label)
             lg.addGame(g)
             ids += g.id
@@ -200,6 +226,8 @@ object Season {
             val t = lg.team(b.champion)
             if (b.confId >= 0) {
                 lg.news += News(lg.season, lg.day, "${t.school} wins the ${b.name} and an automatic bid", t.id == lg.userTeamId)
+            } else if (b.confId == NIT_ID) {
+                lg.news += News(lg.season, lg.day, "${t.school} wins the NIT", t.id == lg.userTeamId)
             }
             return
         }
@@ -209,39 +237,69 @@ object Season {
 
     // ---------- NCAA tournament ----------
 
+    /** Selection Sunday: 68 teams for the NCAA Tournament (First Four first), the next 32 for the NIT. */
     private fun selection(lg: League) {
         Rankings.refresh(lg)
-        val auto = lg.confBrackets.map { it.champion }.toSet()
-        val atLarge = lg.teams.filter { it.id !in auto }.sortedBy { it.net }.take(64 - auto.size).map { it.id }
-        val field = (auto + atLarge).map { lg.team(it) }.sortedBy { it.net }
-        val regions = List(4) { arrayOfNulls<Team>(16) }
-        val seeds = HashMap<Int, Int>()
-        field.forEachIndexed { i, t ->
-            val line = i / 4
-            val k = i % 4
-            val region = if (line % 2 == 0) k else 3 - k
-            regions[region][line] = t
-            seeds[t.id] = line + 1
-        }
-        val slots = mutableListOf<Int>()
-        for (rg in regions) for (s in SLOT_ORDER) slots += rg[s - 1]!!.id
-        lg.ncaa = Bracket("NCAA Tournament", "NCAA", -1, Schedule.NCAA_START, NCAA_ROUNDS, seeds, mutableListOf(slots))
+        val pr = Bracketology.project(lg)
+        lg.bubble = pr.snapshot(lg, final = true)
+        val s = pr.seeding
+        // With a First Four, the Round of 64 starts the day after the play-in games.
+        val start = if (s.playIns.isEmpty()) Schedule.NCAA_START else Schedule.NCAA_START + 1
+        lg.ncaa = Bracket("NCAA Tournament", "NCAA", -1, start, NCAA_ROUNDS, s.seeds, mutableListOf(s.slots), playIns = s.playIns)
+        val field = pr.field.toSet()
+        lg.nit = Bracketology.nitBracket(pr.order.filter { it !in field })
         lg.phase = Phase.NCAA
-        for (t in field) t.tourneys++
-        for (t in field) lg.coachOf(t).tourneys++
+        for (id in field) { val t = lg.team(id); t.tourneys++; lg.coachOf(t).tourneys++ }
+
+        val groups = lg.bubble!!.groups.associateBy { it.key }
+        val lastIn = pr.atLarge.takeLast(4)
+        if (s.playIns.isNotEmpty()) lg.news += News(lg.season, lg.day, "Last four in: " + lastIn.joinToString(", ") { lg.team(it).school })
+        groups["ffo"]?.ids?.takeIf { it.isNotEmpty() }?.let { ids -> lg.news += News(lg.season, lg.day, "First four out: " + ids.joinToString(", ") { lg.team(it).school }) }
+
         val u = lg.user
-        val us = seeds[u.id]
+        val seed = s.seeds[u.id]
+        val pi = lg.ncaa!!.playInOf(u.id)
+        val nitSeed = lg.nit?.seeds?.get(u.id)
         lg.news += News(
             lg.season, lg.day,
-            if (us != null) "${u.school} earns a No. $us seed in the NCAA Tournament" else "${u.school} is left out of the NCAA Tournament",
+            when {
+                pi != null -> "${u.school} heads to the First Four, playing for a No. ${pi.seed} seed in the ${REGIONS[pi.slot / 16]}"
+                seed != null -> "${u.school} earns a No. $seed seed in the ${regionOf(lg, u.id)} Region"
+                nitSeed != null -> "${u.school} misses the NCAA field and takes a No. $nitSeed seed in the NIT"
+                else -> "${u.school} is left out of the postseason"
+            },
             true,
         )
     }
 
+    private fun schedulePlayIns(lg: League, b: Bracket) {
+        for (pi in b.playIns) {
+            if (pi.gameId >= 0) continue
+            val (h, a) = if ((b.seeds[pi.a] ?: 99) <= (b.seeds[pi.b] ?: 99)) pi.a to pi.b else pi.b to pi.a
+            val g = Game(lg.nextGameId++, lg.day, h, a, true, GameType.NCAA, "NCAA ${REGIONS[pi.slot / 16]} · First Four")
+            lg.addGame(g)
+            pi.gameId = g.id
+        }
+    }
+
+    /** First Four winners move into their Round of 64 slot. */
+    private fun resolvePlayIns(lg: League, b: Bracket) {
+        for (pi in b.playIns) {
+            if (pi.gameId < 0) continue
+            val g = lg.game(pi.gameId)
+            if (!g.played || b.rounds[0][pi.slot] >= 0) continue
+            val w = g.winner()
+            b.rounds[0][pi.slot] = w
+            if (g.involves(lg.userTeamId)) {
+                lg.news += News(lg.season, lg.day, if (w == lg.userTeamId) "${lg.user.school} wins in the First Four and moves on as a No. ${pi.seed} seed" else "${lg.user.school} falls in the First Four", true)
+            }
+        }
+    }
+
     fun regionOf(lg: League, teamId: Int): String? {
         val b = lg.ncaa ?: return null
-        val idx = b.rounds[0].indexOf(teamId)
-        return if (idx < 0) null else REGIONS[idx / 16]
+        val idx = b.rounds[0].indexOf(teamId).takeIf { it >= 0 } ?: b.playInOf(teamId)?.slot ?: return null
+        return REGIONS[idx / 16]
     }
 
     // ---------- end of season ----------
@@ -270,6 +328,15 @@ object Season {
             coty?.name ?: "", coty?.teamId ?: -1, confChamps,
         )
 
+        // NIT champion: a prestige boost and extra development for everyone coming back.
+        val nitChamp = lg.nit?.champion ?: -1
+        val nitBoost = if (nitChamp >= 0) Rng.range(2, 3) else 0
+        var nitPlayers = 0
+        if (nitChamp >= 0) {
+            val t = lg.team(nitChamp)
+            for (p in lg.rosterOf(t)) if (p.year < 4) { Ratings.addXp(p, NIT_XP); nitPlayers++ }
+        }
+
         // Prestige, team & coach history.
         val beforeUser = lg.user.prestige
         for (t in lg.teams) {
@@ -278,8 +345,9 @@ object Season {
             val target = 25 + t.winPct * 50 + bonus + if (confChamps[t.confId] == t.id) 3 else 0
             t.prevPrestige = t.prestige
             t.prestige = (t.prestige * 0.85 + target * 0.15).roundToInt().coerceIn(5, 99)
+            if (t.id == nitChamp) t.prestige = (t.prestige + nitBoost).coerceAtMost(99)
             val c = lg.coachOf(t)
-            val result = Awards.resultLabel(round)
+            val result = Awards.resultFor(lg, t.id)
             t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name)
             c.history += CoachSeason(lg.season, t.id, t.school, t.w, t.l, result, t.prestige)
         }
@@ -293,18 +361,36 @@ object Season {
         Coaching.evaluateUser(lg)
         val points = Coaching.pointsEarned(lg)
         lg.userCoach.points += points
-        lg.wrapUp = buildWrapUp(lg, beforeUser, points)
+        val reward = if (nitChamp == lg.userTeamId) NitReward(nitBoost, NIT_POINTS, NIT_XP, nitPlayers) else null
+        lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward)
         lg.phase = Phase.WRAP_UP
     }
 
-    private fun buildWrapUp(lg: League, prestigeBefore: Int, points: Int): WrapUp {
+    private fun buildWrapUp(lg: League, prestigeBefore: Int, points: Int, nitReward: NitReward?): WrapUp {
         val t = lg.user
         val round = Awards.tourneyRound(lg, t.id)
         val b = lg.ncaa!!
+        val nit = lg.nit
+        val event = when { b.hasTeam(t.id) -> "NCAA"; nit != null && nit.hasTeam(t.id) -> "NIT"; else -> "" }
+        val result = Awards.resultFor(lg, t.id)
         val path = mutableListOf<Int>()
         val won = mutableListOf<Boolean>()
-        for (g in lg.games.filter { it.type == GameType.NCAA && it.involves(t.id) && it.played }.sortedBy { it.day }) {
+        val type = if (event == "NIT") GameType.NIT else GameType.NCAA
+        for (g in lg.games.filter { it.type == type && it.involves(t.id) && it.played }.sortedBy { it.day }) {
             path += g.opp(t.id); won += g.winner() == t.id
+        }
+        val rounds = when (event) {
+            "NIT" -> NIT_ROUNDS.map { it.uppercase() }
+            else -> (if (b.playInOf(t.id) != null) listOf("FF") else emptyList()) + NCAA_ROUNDS
+        }
+        val seed = when (event) { "NCAA" -> b.seeds[t.id] ?: 0; "NIT" -> nit?.seeds?.get(t.id) ?: 0; else -> 0 }
+        val tourneyText = when {
+            result == "First Four" -> "Made the field and lost in the First Four."
+            round == 7 -> "Won the national title."
+            round >= 1 -> "Reached the ${Awards.resultLabel(round).replace("Round of", "round of")}."
+            result == "NIT Champion" -> "Missed the field, then won the NIT."
+            event == "NIT" -> "Missed the field and played in the NIT (${result.removePrefix("NIT ").lowercase()})."
+            else -> "Missed the field."
         }
         val regular = lg.games.filter { it.involves(t.id) && it.played && (it.type == GameType.CONF || it.type == GameType.NONCONF || it.type == GameType.EVENT) }
         val regW = regular.count { it.winner() == t.id }
@@ -332,23 +418,28 @@ object Season {
                 when { diff >= 5 -> "Big lift"; diff >= 1.5 -> "Small lift"; diff > -1.5 -> "Steady"; diff > -5 -> "Small drop"; else -> "Big drop" }, diff > -1.5),
             Driver("Conference result", "Finished $confFinish of ${st.size} in conference play" + if (ctResult == "Champions") " and won the conference tournament." else ".",
                 when { confFinish == 1 || ctResult == "Champions" -> "Champions"; confFinish <= 4 -> "Contender"; confFinish <= st.size / 2 -> "Middle"; else -> "Struggled" }, confFinish <= st.size / 2),
-            Driver("NCAA tournament", if (round == 0) "Missed the field." else "Reached the ${Awards.resultLabel(round).replace("Round of", "round of")}.",
-                when { round >= 5 -> "Deep run"; round >= 3 -> "Solid run"; round >= 1 -> "Made it"; else -> "Missed" }, round >= 1),
+            Driver("Postseason", tourneyText,
+                when { round >= 5 -> "Deep run"; round >= 3 -> "Solid run"; round >= 1 -> "Made it"; result == "NIT Champion" -> "NIT title"; event == "NIT" -> "NIT"; else -> "Missed" },
+                round >= 1 || result == "NIT Champion"),
             Driver("Quality wins", "$q1w Quadrant 1 win${if (q1w == 1) "" else "s"} on the resume.", when { q1w >= 8 -> "Strong"; q1w >= 3 -> "Some quality"; else -> "Thin" }, q1w >= 3),
             Driver("National awards", if (natAwards > 0) "$natAwards national honor${if (natAwards == 1) "" else "s"} for the program." else "No national honors this year.",
                 if (natAwards > 0) "Award boost" else "None", natAwards > 0),
+        ) + listOfNotNull(
+            nitReward?.let { Driver("NIT title", "+${it.prestige} prestige on top of the season's change, and ${it.xp} XP for ${it.players} returning players.", "+${it.prestige}", true) },
         )
         val drivers = mutableListOf(
             Driver("Season vs Expectation", "${t.w} wins against a %.0f-win target.".format(t.expWins), "%+d".format(diff.roundToInt().coerceIn(-6, 6)), diff >= 0),
-            Driver("National Tournament", if (round == 0) "Missed the field." else "${Awards.resultLabel(round)}.", "%+d".format((round - 1).coerceIn(-1, 6)), round >= 1),
+            Driver("National Tournament", if (round == 0) "Missed the field." else "$result.", "%+d".format((round - 1).coerceIn(-1, 6)), round >= 1),
         )
+        if (nitReward != null) drivers += Driver("NIT title", "Earned ${nitReward.points} extra coaching points.", "+${nitReward.points}", true)
         if (coachAwards.isNotEmpty()) drivers += Driver("Awards", coachAwards.joinToString(" + "), "+${coachAwards.size * 2}", true)
         return WrapUp(
-            lg.season, t.id, Awards.resultLabel(round), b.seeds[t.id] ?: 0, path, won,
+            lg.season, t.id, result, seed, path, won,
             t.w, t.l, regW, regular.size - regW, t.cw, t.cl, t.expWins, t.net, t.ap, st.indexOf(t) + 1,
             t.prestige, t.prestige - prestigeBefore,
             Rankings.quadRecord(lg, t, 1), Rankings.quadRecord(lg, t, 2), Rankings.wab(lg, t), Rankings.sosRank(lg, t),
             mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
+            event, rounds.take(path.size), nitReward,
         )
     }
 
@@ -356,7 +447,11 @@ object Season {
     fun statusLine(lg: League): String = when (lg.phase) {
         Phase.REGULAR -> "Game ${(lg.user.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}"
         Phase.CONF_TOURNEY -> "Conference Tournament"
-        Phase.NCAA -> "NCAA Tournament"
+        Phase.NCAA -> when {
+            firstFourDay(lg) -> "First Four"
+            lg.nit?.hasTeam(lg.userTeamId) == true -> "NIT"
+            else -> "NCAA Tournament"
+        }
         Phase.WRAP_UP -> "Season Complete"
         Phase.OFFSEASON -> "Offseason"
     }

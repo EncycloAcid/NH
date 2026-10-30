@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Bracket
+import com.nh.hoopscoach.game.Bracketology
 import com.nh.hoopscoach.game.Game
 import com.nh.hoopscoach.game.GameType
 import com.nh.hoopscoach.game.Gameplan
@@ -69,6 +71,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         }
         if (today != null) item { NextUp(vm, lg, today) }
         item { Form(vm, lg, u) }
+        if (u.gp >= 8) item { Outlook(vm, lg) }
         item { ConfSnapshot(vm, lg, u) }
         item { TopPlayers(vm, lg, u) }
         item { Headlines(lg) }
@@ -88,7 +91,7 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         GameType.NONCONF -> "Non-conference"
         else -> g.label.substringBefore(" ·")
     }
-    val seeds = (if (lg.phase == Phase.NCAA) lg.ncaa else lg.confBrackets.firstOrNull { it.confId == u.confId && lg.phase == Phase.CONF_TOURNEY })?.seeds
+    val seeds = Season.userBracket(lg)?.seeds
     Section(title ?: "Next up", action = "Scout", onAction = { vm.push(Route.TeamPage(opp.id)) })
     Panel {
         Text("$kind · $where".uppercase(), style = T.label, color = P.sub)
@@ -227,63 +230,175 @@ private fun Headlines(lg: League) {
 @Composable
 private fun TourneyToday(vm: GameViewModel, lg: League) {
     val u = lg.user
-    val ncaa = lg.phase == Phase.NCAA
-    val b: Bracket = (if (ncaa) lg.ncaa else lg.confBrackets.firstOrNull { it.confId == u.confId }) ?: return
+    val post = lg.phase == Phase.NCAA
+    val b: Bracket = Season.userBracket(lg) ?: return
+    val isNcaa = b.confId == -1
+    val isNit = b.confId == Season.NIT_ID
+    val ffDay = isNcaa && Season.firstFourDay(lg)
+    val myPlayIn = if (isNcaa) b.playInOf(u.id) else null
+    val inEvent = b.hasTeam(u.id)
     val today = Season.userGameToday(lg)
-    val roundName = roundTitle(b, b.current, ncaa)
-    val alive = b.current < b.rounds.size && u.id in b.rounds[b.current]
+    val roundName = when { b.done -> "Champions"; ffDay -> "First Four"; else -> roundTitle(b, b.current, isNcaa) }
+    val alive = !b.done && ((b.current < b.rounds.size && u.id in b.rounds[b.current]) || (ffDay && myPlayIn != null))
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            val sub = if (ncaa) Season.regionOf(lg, u.id)?.let { "$it Region · No. ${b.seeds[u.id]} seed" } ?: "${u.school} missed the field"
-            else "No. ${b.seeds[u.id] ?: "–"} seed · ${recordLine(lg, u)}"
-            ScreenHeader(if (ncaa) "NCAA Tournament" else "${lg.conf(u.confId).abbr} Tournament", roundName, sub) { TeamBadge(u, 46.dp) }
+            val eyebrow = when { isNcaa -> "NCAA Tournament"; isNit -> "NIT"; else -> "${lg.conf(u.confId).abbr} Tournament" }
+            val sub = when {
+                isNcaa -> Season.regionOf(lg, u.id)?.let { "$it Region · No. ${b.seeds[u.id]} seed" } ?: "${u.school} missed the field"
+                else -> "No. ${b.seeds[u.id] ?: "–"} seed · ${recordLine(lg, u)}"
+            }
+            ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
-        item { PathStepper(b, u.id, ncaa) }
+        if (inEvent) item { PathStepper(b, u.id) }
         when {
-            today != null -> item { NextUp(vm, lg, today, "Your game") }
+            today != null -> item { NextUp(vm, lg, today, if (ffDay) "Your First Four game" else "Your game") }
+            b.done && b.champion == u.id -> item {
+                Section("Your season")
+                Panel(color = P.accent) {
+                    Text("${b.name.uppercase()} CHAMPIONS", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
+                    Text(u.school.uppercase(), style = T.title, color = P.onAccent)
+                    if (isNit) Text("Prestige, coaching points and extra player development arrive in the season review.", style = T.small, color = P.onAccent.copy(alpha = 0.85f))
+                }
+            }
             alive -> item { Section("Your game"); Panel { Text("You have a bye this round. Sim it to see who you'll face.", style = T.body, color = P.sub) } }
             else -> item {
                 Section("Your season")
-                Panel { Text(if (ncaa && u.id !in b.rounds[0]) "${u.school} wasn't selected. Follow the bracket from here." else "${u.school} has been eliminated. Sim ahead to finish the season.", style = T.body, color = P.sub) }
+                Panel {
+                    Text(
+                        when {
+                            post && !inEvent -> "${u.school} missed the NCAA Tournament and the NIT. Follow the brackets from here."
+                            else -> "${u.school} has been eliminated. Sim ahead to finish the season."
+                        },
+                        style = T.body, color = P.sub,
+                    )
+                }
             }
         }
+        if (!post) item { Outlook(vm, lg) }
         item {
-            val games = (b.gameIds.getOrNull(b.current) ?: emptyList()).filter { it >= 0 }.map { lg.game(it) }
-            val region = Season.regionOf(lg, u.id)
-            val shown = if (ncaa && b.current < 4 && region != null) games.filter { it.label.contains(region) } else games
-            Section("$roundName games", action = "Bracket", onAction = { vm.push(Route.BracketView(if (ncaa) -1 else u.confId)) })
+            val r = if (b.done) b.gameIds.lastIndex else b.current
+            val games = if (ffDay) b.playIns.mapNotNull { pi -> pi.gameId.takeIf { it >= 0 }?.let { lg.game(it) } }
+            else (b.gameIds.getOrNull(r) ?: emptyList()).filter { it >= 0 }.map { lg.game(it) }
+            val region = if (isNcaa) Season.regionOf(lg, u.id) else null
+            val shown = if (isNcaa && !ffDay && b.current < 4 && region != null) games.filter { it.label.contains(region) } else games
+            Section(if (b.done) "Championship" else "$roundName games", action = "Bracket", onAction = { vm.push(Route.BracketView(b.confId)) })
             if (shown.isEmpty()) Panel { Text("No games left this round.", style = T.body, color = P.sub) }
             GroupList(shown.take(8)) { g -> MatchRow(vm, lg, b, g) }
         }
+        if (post) item { OtherEvents(vm, lg, b) }
         item { Headlines(lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }
 }
 
-fun roundTitle(b: Bracket, r: Int, ncaa: Boolean): String = if (ncaa) when (r) {
-    0 -> "First Round"; 1 -> "Second Round"; 2 -> "Sweet 16"; 3 -> "Elite Eight"; 4 -> "Final Four"; 5 -> "Championship"; else -> "Champions"
-} else when (b.roundNames.getOrNull(r)) { "R1" -> "First Round"; "QF" -> "Quarterfinals"; "SF" -> "Semifinals"; "Final" -> "Championship"; else -> "Champions" }
+/** Short status line for a postseason bracket. */
+fun eventStatus(lg: League, b: Bracket): String = when {
+    b.done -> "Champion: ${lg.team(b.champion).school}"
+    b.confId == -1 && Season.firstFourDay(lg) -> "Now: First Four"
+    else -> "Now: ${roundTitle(b, b.current, b.confId == -1)}"
+}
 
 @Composable
-fun PathStepper(b: Bracket, teamId: Int, ncaa: Boolean) {
+private fun OtherEvents(vm: GameViewModel, lg: League, mine: Bracket) {
+    val others = listOfNotNull(lg.ncaa, lg.nit).filter { it !== mine }
+    if (others.isEmpty()) return
+    Section("Around the postseason")
+    GroupList(others) { ob ->
+        ListRow(onClick = { vm.push(Route.BracketView(ob.confId)) }) {
+            Text(ob.short, style = T.numSm, color = P.accent, modifier = Modifier.width(64.dp))
+            Column(Modifier.weight(1f)) {
+                Text(eventStatus(lg, ob).removePrefix("Now: "), style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (ob.confId == -1) "${ob.seeds.size} teams" else "32 teams", style = T.small, color = P.sub)
+            }
+            Chevron()
+        }
+    }
+}
+
+/** Where the user's team stands for Selection Sunday, from the Bubble Watch projection. */
+@Composable
+fun Outlook(vm: GameViewModel, lg: League) {
+    val b = remember(lg, lg.day, lg.phase) { Bracketology.board(lg) } ?: return
+    val u = lg.user
+    val s = b.sheet(u.id) ?: return
+    val key = b.groupOf(u.id)?.key
+    val status = Bracketology.status(b, u.id)
+    val seed = b.seeds[u.id]
+    val conf = lg.conf(u.confId).abbr
+    val open = { vm.leagueTab = TAB_BUBBLE; vm.select(Tab.LEAGUE) }
+    val text = when (key) {
+        "lock" -> "Safely in the field."
+        "safe" -> "Should be in. One more good result seals it."
+        "bubble" -> if (status == "Last four in") "One of the last four in. Right now that means the First Four." else "On the bubble, just above the First Four."
+        "ffo" -> "Just outside the field. A quality win could flip it."
+        "nfo" -> "Outside the field. It will take a big run."
+        "auto" -> "In as the projected $conf champion. Winning the conference tournament makes it official."
+        else -> "Outside the bubble. Winning the $conf tournament is the way in."
+    }
+    Section(if (lg.phase == Phase.CONF_TOURNEY) "Selection Sunday outlook" else "NCAA outlook", action = "Bubble Watch", onAction = open)
+    Panel(onClick = open) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Tag(status.uppercase(), groupColor(key))
+                Spacer(Modifier.height(6.dp))
+                Text(text, style = T.body, color = P.ink)
+            }
+            if (seed != null) {
+                Spacer(Modifier.width(12.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$seed", style = T.num, color = P.ink)
+                    Text("PROJ. SEED", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        StatRow(
+            listOf(
+                Triple("NET", "${s.net}", null), Triple("Quad 1", s.quad(1), null), Triple("SOS", ordinal(s.sos), null),
+                Triple("WAB", "%+.1f".format(s.wab), if (s.wab >= 0) P.good else P.bad),
+            ),
+            style = T.numSm,
+        )
+    }
+}
+
+fun roundTitle(b: Bracket, r: Int, ncaa: Boolean): String = if (ncaa) when (r) {
+    0 -> "First Round"; 1 -> "Second Round"; 2 -> "Sweet 16"; 3 -> "Elite Eight"; 4 -> "Final Four"; 5 -> "Championship"; else -> "Champions"
+} else when (b.roundNames.getOrNull(r)) {
+    "R1" -> "First Round"; "R2" -> "Second Round"; "QF" -> "Quarterfinals"; "SF" -> "Semifinals"; "Final" -> "Championship"; else -> "Champions"
+}
+
+/** Steps to the title, with the First Four in front for play-in teams. */
+@Composable
+fun PathStepper(b: Bracket, teamId: Int) {
+    // 0 upcoming, 1 now, 2 won, 3 lost
+    val steps = mutableListOf<Pair<String, Int>>()
+    b.playInOf(teamId)?.let { pi ->
+        val won = teamId in b.rounds[0]
+        val lost = !won && b.rounds[0][pi.slot] >= 0
+        steps += "FF" to when { won -> 2; lost -> 3; else -> 1 }
+    }
+    b.roundNames.forEachIndexed { i, name ->
+        val reached = b.rounds.getOrNull(i)?.contains(teamId) == true
+        val advanced = b.rounds.getOrNull(i + 1)?.contains(teamId) == true || (i == b.roundNames.lastIndex && b.champion == teamId)
+        val current = i == b.current && reached
+        val lost = reached && !advanced && i < b.current
+        steps += name to when { advanced -> 2; lost -> 3; current -> 1; else -> 0 }
+    }
     Section("Road to the title")
     Panel(padding = PaddingValues(horizontal = 10.dp, vertical = 14.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            b.roundNames.forEachIndexed { i, name ->
-                val reached = b.rounds.getOrNull(i)?.contains(teamId) == true
-                val advanced = b.rounds.getOrNull(i + 1)?.contains(teamId) == true || (i == b.roundNames.lastIndex && b.champion == teamId)
-                val current = i == b.current && reached
-                val lost = reached && !advanced && i < b.current
-                val color = when { advanced -> P.good; lost -> P.bad; current -> P.accent; else -> P.line }
+            steps.forEachIndexed { i, (name, state) ->
+                val color = when (state) { 2 -> P.good; 3 -> P.bad; 1 -> P.accent; else -> P.line }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
-                        Modifier.size(26.dp).clip(CircleShape).background(if (advanced || current) color.copy(alpha = 0.15f) else Color.Transparent).border(2.dp, color, CircleShape),
+                        Modifier.size(26.dp).clip(CircleShape).background(if (state == 1 || state == 2) color.copy(alpha = 0.15f) else Color.Transparent).border(2.dp, color, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(if (advanced) "✓" else if (lost) "×" else "${i + 1}", style = T.label, color = color)
+                        Text(when (state) { 2 -> "✓"; 3 -> "×"; else -> "${i + 1}" }, style = T.label, color = color)
                     }
                     Spacer(Modifier.height(5.dp))
-                    Text(if (ncaa) name else name, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.4.sp), color = if (current) P.accent else P.sub, maxLines = 1)
+                    Text(name.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.4.sp), color = if (state == 1) P.accent else P.sub, maxLines = 1)
                 }
             }
         }

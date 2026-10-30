@@ -6,13 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.LeagueGen
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Rng
+import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.ui.App
 import com.nh.hoopscoach.ui.GameViewModel
@@ -67,6 +71,54 @@ class ScreenshotTest {
         run("Duke", "D", full = false)
     }
 
+    private fun scrollTo(index: Int) {
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(index)
+        rule.waitForIdle()
+    }
+
+    /** First Four, NIT and Bubble Watch, seen from the teams that play in them. */
+    @Test
+    fun postseason() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        fun viewAs(id: Int) { lg.userTeamId = id; lg.userCoachId = lg.team(id).coachId; vm.install(lg) }
+
+        while (lg.phase == Phase.REGULAR && lg.day < Schedule.REG_DAYS - 2) Season.playDay(lg)
+        vm.install(lg)
+        scrollTo(3); shot("P01_today_outlook")
+        while (lg.phase == Phase.REGULAR) Season.playDay(lg)
+        Season.playDay(lg)
+        vm.install(lg); shot("P02_ct_today")
+        scrollTo(3); shot("P03_ct_outlook")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 3
+        scrollTo(0); shot("P04_bubble_top")
+        scrollTo(2); shot("P05_bubble_locks")
+        scrollTo(4); shot("P06_bubble_cut")
+        scrollTo(6); shot("P07_bubble_out")
+        vm.leagueTab = 4; scrollTo(0); shot("P08_bracketology")
+
+        while (lg.phase == Phase.CONF_TOURNEY) Season.playDay(lg)
+        vm.install(lg); vm.leagueTab = 3; scrollTo(0); shot("P09_selection_sunday")
+        scrollTo(4); shot("P10_selection_cut")
+        vm.leagueTab = 4; scrollTo(0); shot("P11_postseason")
+        val pi = lg.ncaa!!.playIns.first()
+        viewAs(pi.a); vm.select(Tab.TODAY); shot("P12_first_four_today")
+        vm.push(Route.BracketView(-1)); shot("P13_region_first_four"); vm.back()
+        val nitTeam = lg.nit!!.rounds[0][0]
+        viewAs(nitTeam); vm.select(Tab.TODAY); shot("P14_nit_today")
+        vm.push(Route.BracketView(Season.NIT_ID)); shot("P15_nit_bracket"); vm.back()
+        while (lg.nit?.done == false) Season.playDay(lg)
+        viewAs(lg.nit!!.champion); vm.select(Tab.TODAY); shot("P16_nit_champions")
+        while (lg.phase == Phase.NCAA) Season.playDay(lg)
+        vm.install(lg); vm.wrapPage = 0; shot("P17_wrap_nit")
+        scrollTo(1); shot("P18_wrap_nit_rewards")
+        vm.wrapPage = 3; scrollTo(0); shot("P19_wrap_program")
+        scrollTo(1); shot("P20_wrap_signals")
+        vm.wrapPage = 4; scrollTo(0); shot("P21_wrap_coach")
+    }
+
     private fun run(team: String, tag: String, full: Boolean = true) {
         val lg = league(team)
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
@@ -86,7 +138,7 @@ class ScreenshotTest {
         for (i in 0..3) { vm.teamTab = i; shot("${tag}02_team_$i") }
         vm.select(Tab.RECRUIT); shot("${tag}03_recruit")
         vm.select(Tab.LEAGUE)
-        for (i in 0..4) { vm.leagueTab = i; shot("${tag}04_league_$i") }
+        for (i in 0..5) { vm.leagueTab = i; shot("${tag}04_league_$i") }
         vm.select(Tab.CAREER); shot("${tag}05_career")
         vm.select(Tab.TODAY)
         vm.startLive()
