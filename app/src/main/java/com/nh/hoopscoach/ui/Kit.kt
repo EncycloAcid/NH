@@ -287,6 +287,28 @@ fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = 
 /** Circular badge in school colors with a monogram. Real logos are not used. */
 @Composable
 fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val logo = remember(t.abbr) { Logos.get(ctx, t.abbr) }
+    if (logo != null) {
+        // Logos are drawn for light backgrounds, so they sit on a light plate in both themes.
+        val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White
+        val ringColor = P.line
+        Canvas(modifier.size(size)) {
+            val r = this.size.minDimension / 2
+            drawCircle(plate, r)
+            drawCircle(ringColor, r - 0.5f, style = Stroke(width = 1f))
+            val inset = this.size.width * 0.15f
+            val side = this.size.width - inset * 2
+            drawImage(
+                logo, srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                srcSize = androidx.compose.ui.unit.IntSize(logo.width, logo.height),
+                dstOffset = androidx.compose.ui.unit.IntOffset(inset.toInt(), inset.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()),
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            )
+        }
+        return
+    }
     val primary = Color(t.primary)
     val secondary = Color(t.secondary)
     val ring = if (contrast(primary, secondary) > 1.6f) secondary else onColor(primary)

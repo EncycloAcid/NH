@@ -4,7 +4,7 @@ A native Android college basketball coaching game, written in Kotlin with Jetpac
 
 Pick a school, set your rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, develop players, and chase national titles season after season.
 
-You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Team marks are drawn monograms in school colors, not official logos. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
+You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Every school shows its own logo (the logo files you supplied, in `app/src/main/assets/logos`, one per team named by its abbreviation). A school without a logo file falls back to a drawn monogram in its colors. The logos are the schools' trademarks, so keep this build for personal use and don't publish it to an app store. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
 
 The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
 
