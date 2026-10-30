@@ -28,7 +28,7 @@ object Moments {
 
     private fun clockText(c: GameEngine.Clutch) = if (c.clock <= 0.05) "at the horn" else "with %.1f seconds left".format(c.clock)
 
-    private fun ncaaRound(lg: League, g: Game): Int {
+    fun ncaaRound(lg: League, g: Game): Int {
         val b = lg.ncaa ?: return 0
         if (g.label.endsWith("First Four")) return 0
         val r = b.gameIds.indexOfFirst { g.id in it }

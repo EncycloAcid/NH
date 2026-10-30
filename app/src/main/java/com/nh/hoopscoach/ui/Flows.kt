@@ -362,7 +362,7 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
         OffStep.CAREER -> if (os.fired) "Accept a job to continue" else "Stay at ${lg.user.school}"
         OffStep.DEVELOPMENT -> "Next: NIL budget"
         OffStep.BUDGET -> "Start recruiting"
-        OffStep.RECRUITING -> if (os.round >= Offseason.ROUNDS) "Finish signing day" else "Lock in round ${os.round} of ${Offseason.ROUNDS}"
+        OffStep.RECRUITING -> if (os.round >= Offseason.ROUNDS) "Lock in the final round" else "Lock in round ${os.round} of ${Offseason.ROUNDS}"
         OffStep.TRYOUTS -> "Start the ${lg.season + 1} season"
     }
     Column(Modifier.fillMaxSize()) {
@@ -377,8 +377,18 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
                 OffStep.RECRUITING -> {
                     item {
                         Panel(color = P.accentSoft) {
-                            Text("ROUND ${os.round} OF ${Offseason.ROUNDS}", style = T.label, color = P.accent)
-                            Text("Spend this round's points, then lock it in. Rivals recruit between rounds.", style = T.small, color = P.ink)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("ROUND ${os.round} OF ${Offseason.ROUNDS}", style = T.label, color = P.accent)
+                                    Text("Rivals have made their moves. Set your points, preview your position, then lock in.", style = T.small, color = P.ink)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                GuideButton { vm.openGuide(Guide.RECRUITING) }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            SmallButton("Auto-assign my free points", Modifier.fillMaxWidth(), enabled = com.nh.hoopscoach.game.Recruiting.available(lg) >= 10) {
+                                vm.act { val n = com.nh.hoopscoach.game.Recruiting.autoPlan(it); vm.toast(if (n > 0) "Points spread over $n prospects" else "No open scholarships to recruit for") }
+                            }
                         }
                         Spacer(Modifier.height(10.dp))
                     }

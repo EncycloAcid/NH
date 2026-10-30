@@ -539,6 +539,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         Rankings.updateElo(lg, game)
         Rivalries.afterGame(lg, game)
         Fans.afterGame(lg, game)
+        Brand.afterGame(lg, game)
         Moments.afterGame(lg, game, buzzerBeater, forcedOt)
     }
 

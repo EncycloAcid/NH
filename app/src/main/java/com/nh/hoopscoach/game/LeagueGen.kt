@@ -140,7 +140,7 @@ object LeagueGen {
 
     /** A new high-school class. Ranked best to worst. */
     fun recruitClass(lg: League): MutableList<Recruit> {
-        val n = (lg.teams.size * 3.4).roundToInt()
+        val n = Recruiting.CLASS_SIZE
         val out = mutableListOf<Recruit>()
         val posCount = HashMap<Pos, Int>()
         for (rank in 1..n) {
@@ -160,18 +160,20 @@ object LeagueGen {
             r.nilAsk = (Ratings.expectedNil(p) * (1.0 + (p.stars - 2) * 0.35)).roundToInt() / 5 * 5
             r.estOvr = (ovr + Rng.range(-6, 6)).coerceIn(30, 99)
             r.estPot = (p.pot + Rng.range(-7, 7)).coerceIn(r.estOvr, 99)
+            r.pref = Recruiting.pickPref(p.stars)
             out += r
         }
-        // Each recruit starts with a handful of interested programs.
-        val byPrestige = lg.teams.sortedByDescending { it.prestige }
+        // Each recruit starts with a handful of interested programs, near the Recruiting Pull he's after.
+        Brand.ensure(lg)
+        val pulls = Brand.pullTable(lg)
         for (r in out) {
-            val target = when (r.p.stars) { 5 -> 88.0; 4 -> 68.0; 3 -> 42.0; else -> 18.0 }
+            val target = Recruiting.wants(r)
             val k = Rng.range(3, 5)
             val chosen = HashSet<Int>()
             var guard = 0
             while (chosen.size < k && guard++ < 50) {
-                val t = Rng.weighted(byPrestige) { tm ->
-                    if (tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((tm.prestige - target) / 14.0).pow(2))
+                val t = Rng.weighted(lg.teams) { tm ->
+                    if (tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((pulls[tm.id] - target) / 14.0).pow(2)) + 1e-9
                 }
                 chosen += t.id
             }

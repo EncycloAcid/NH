@@ -24,6 +24,8 @@ object SaveIO {
         val lg = json.decodeFromString(League.serializer(), text)
         lg.reindex()
         Rivalries.ensure(lg)
+        Brand.ensure(lg)
+        Recruiting.ensure(lg)
         return lg
     }
 }

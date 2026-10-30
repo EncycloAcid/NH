@@ -51,6 +51,7 @@ sealed interface Route {
     data object WrapUp : Route
     data object Preview : Route
     data class EditPlayer(val playerId: Int) : Route
+    data object RecruitPreview : Route
 }
 
 /** A game being watched possession by possession. */
@@ -78,6 +79,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var tab by mutableStateOf(Tab.TODAY)
     val stack = mutableStateListOf<Route>()
     var sheet by mutableStateOf<Int?>(null)
+    /** The open in-app guide, if any, and its tab. */
+    var guide by mutableStateOf<Guide?>(null)
+    var guideTab by mutableIntStateOf(0)
     var live by mutableStateOf<LiveGame?>(null)
         private set
     var message by mutableStateOf<String?>(null)
@@ -342,7 +346,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openPlayer(id: Int) { sheet = id }
 
+    fun openGuide(g: Guide, tab: Int = guideTab) { guideTab = tab; guide = g }
+
     fun back(): Boolean {
+        if (guide != null) { guide = null; return true }
         if (sheet != null) { sheet = null; return true }
         val top = stack.lastOrNull() ?: return false
         if (top is Route.Live) { closeLive(); return true }

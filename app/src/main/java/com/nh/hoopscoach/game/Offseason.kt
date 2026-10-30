@@ -8,7 +8,7 @@ import kotlin.math.roundToInt
  * → Walk-on Tryouts.
  */
 object Offseason {
-    const val ROUNDS = 5
+    const val ROUNDS = Recruiting.ROUNDS
 
     // ---------- entering the offseason ----------
 
@@ -123,6 +123,7 @@ object Offseason {
         r.scouted = true
         r.estOvr = p.ovr
         r.estPot = p.pot
+        r.pref = Recruiting.pickPref(if (p.ovr >= 75) 4 else 3)
         val target = (p.ovr * 1.35 - 28).coerceIn(10.0, 99.0)
         val k = Rng.range(3, 5)
         repeat(k * 3) {
@@ -154,8 +155,8 @@ object Offseason {
             OffStep.DRAFT -> os.step = OffStep.CAREER
             OffStep.CAREER -> { if (os.fired) return; runDevelopment(lg, os); os.step = OffStep.DEVELOPMENT }
             OffStep.DEVELOPMENT -> os.step = OffStep.BUDGET
-            OffStep.BUDGET -> { os.round = 1; lg.recruitPoints = roundPoints(lg); os.step = OffStep.RECRUITING }
-            OffStep.RECRUITING -> lockRound(lg)
+            OffStep.BUDGET -> { os.step = OffStep.RECRUITING; Recruiting.startCycle(lg) }
+            OffStep.RECRUITING -> { Recruiting.lockRound(lg); if (os.round > ROUNDS) finish(lg) }
             OffStep.TRYOUTS -> {
                 Tryouts.finish(lg, os)
                 fillHoles(lg, lg.user)
@@ -254,22 +255,10 @@ object Offseason {
 
     // ---------- recruiting rounds ----------
 
-    fun roundPoints(lg: League) = 70 + lg.userCoach.rec / 2 + if (lg.userCoach.has(CoachSkill.RECRUITER)) 10 else 0
-
-    private fun lockRound(lg: League) {
-        val os = lg.offseason ?: return
-        repeat(3) {
-            lg.day++
-            Recruiting.tick(lg)
-        }
-        os.round++
-        lg.recruitPoints = roundPoints(lg)
-        if (os.round > ROUNDS) finish(lg)
-    }
 
     private fun finish(lg: League) {
         val os = lg.offseason ?: return
-        os.signed += Recruiting.signingDay(lg)
+        os.signed += Recruiting.endCycle(lg)
         // Other programs fill their open scholarships; the user holds walk-on tryouts first.
         for (t in lg.teams) if (t.id != lg.userTeamId) { fillHoles(lg, t); Tryouts.aiTryout(lg, t) }
         // Unsigned transfers leave the game; the user's former players stay on record.
@@ -316,7 +305,9 @@ object Offseason {
 
     /** Shared by a brand-new league and every new season. */
     fun setupSeason(lg: League, carryElo: Boolean) {
+        Brand.ensure(lg)
         for (t in lg.teams) {
+            if (carryElo) Brand.newSeason(t)
             t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0; t.rivalryDelta = 0
             Fans.newSeason(t)
             t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
@@ -337,7 +328,7 @@ object Offseason {
         Rankings.refresh(lg)
         lg.norms = GameEngine.computeNorms(lg)
         lg.recruits = LeagueGen.recruitClass(lg)
-        lg.recruitPoints = Recruiting.dailyPoints(lg)
+        lg.recruitPoints = Recruiting.SCOUT_CAP / 2
         val u = lg.user
         lg.news += News(lg.season, 0, if (u.ap > 0) "${u.school} opens the season ranked No. ${u.ap}" else "${u.school} opens the season unranked", true)
         val preview = Previews.build(lg)
@@ -372,6 +363,7 @@ object Offseason {
         while (lg.phase == Phase.OFFSEASON && guard++ < 20) {
             val os = lg.offseason ?: break
             if (os.step == OffStep.CAREER && os.fired) Coaching.acceptOffer(lg, os.offers.first().teamId)
+            if (os.step == OffStep.RECRUITING) Recruiting.autoPlan(lg)
             advance(lg)
         }
     }
@@ -496,7 +488,7 @@ object Coaching {
         os.graduates.clear()
         os.signed.clear()
         // Commitments made to the old school stay there.
-        for (r in lg.recruits) r.onBoard = false
+        for (r in lg.recruits) { r.onBoard = false; r.alloc.clear() }
         lg.news += News(lg.season, lg.day, "${me.name} is the new head coach at ${newTeam.school}", true)
     }
 }

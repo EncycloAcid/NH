@@ -226,3 +226,47 @@ fun HonorsCard(t: Team, honors: List<Legend>) {
     val inducted = honors.filter { !it.retired }
     if (inducted.isNotEmpty()) GroupList(inducted, inset = 66.dp) { l -> LegendRow(t, l) }
 }
+
+/** Prestige and the numbers around it: Legacy, Buzz, Program Pull, Conference Exposure, Expected Wins and the resume ceiling. */
+@Composable
+fun ProgramNumbers(vm: GameViewModel, lg: League, t: Team) {
+    val pull = com.nh.hoopscoach.game.Brand.pull(lg, t)
+    val exposure = com.nh.hoopscoach.game.Brand.exposure(lg, t.confId)
+    val ceiling = com.nh.hoopscoach.game.Brand.ceiling(t)
+    Section("Program", action = "Guide", onAction = { vm.openGuide(Guide.PROGRAM, 4) })
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("PRESTIGE", style = T.label, color = P.sub)
+                Text(prestigeLabel(t.prestige), style = T.head, color = P.accent)
+                val d = t.prestige - t.prevPrestige
+                Text(
+                    if (t.history.isEmpty()) "Moves once a season, at the end of it." else "${if (d >= 0) "+" else "−"}${abs(d)} last season. Moves once a season.",
+                    style = T.small, color = P.sub,
+                )
+            }
+            Ring(t.prestige, 58.dp, textSize = 22.sp)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Stat("Legacy", "${t.legacy.roundToInt()}", Modifier.weight(1f), style = T.numSm)
+            Stat("Buzz", "${t.buzz.roundToInt()}", Modifier.weight(1f), if (t.buzz >= 40) P.good else P.ink, T.numSm)
+            Stat("Pull", "$pull", Modifier.weight(1f), P.accent, T.numSm)
+            Stat("Exposure", "$exposure", Modifier.weight(1f), style = T.numSm)
+        }
+        Spacer(Modifier.height(12.dp))
+        BrandLine("Buzz", "${com.nh.hoopscoach.game.Brand.buzzLabel(t.buzz)}: short-term heat from big wins and March. It cools fast.")
+        BrandLine("Program Pull", "What recruits, coaches and players see. Recruits call it Recruiting Pull.")
+        BrandLine("Conference", "${com.nh.hoopscoach.game.Brand.exposureLabel(exposure)} exposure in the ${lg.conf(t.confId).abbr}.")
+        BrandLine("Resume ceiling", "${ceiling.roundToInt()} · ${com.nh.hoopscoach.game.Brand.ceilingLabel(ceiling)}. Above 70, Prestige won't stick far past this without more March wins.")
+        if (t.expWins > 0) BrandLine("Expected wins", "${t.expWins.roundToInt()}, the preseason target from this schedule. ${if (t.gp > 0) "${t.w} so far." else ""}")
+    }
+}
+
+@Composable
+private fun BrandLine(label: String, text: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(label, style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.ink, modifier = Modifier.width(112.dp))
+        Text(text, style = T.small, color = P.sub, modifier = Modifier.weight(1f))
+    }
+}

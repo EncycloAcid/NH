@@ -344,13 +344,19 @@ object Season {
         // Prestige, team & coach history.
         // Season-start prestige: rivalry swings during the year count toward the season's change.
         val beforeUser = lg.user.prestige - lg.user.rivalryDelta
+        Brand.ensure(lg)
+        val places = HashMap<Int, Int>()
+        for (c in lg.confs) standings(lg, c.id).forEachIndexed { i, tm -> places[tm.id] = i + 1 }
+        val earned = lg.teams.associate { t ->
+            val round = Awards.tourneyRound(lg, t.id)
+            t.id to Brand.target(lg, t, round, places[t.id] ?: 99, confChamps[t.confId] == t.id).total
+        }
         for (t in lg.teams) {
             val round = Awards.tourneyRound(lg, t.id)
-            val bonus = when (round) { 7 -> 48; 6 -> 40; 5 -> 34; 4 -> 27; 3 -> 20; 2 -> 12; 1 -> 6; else -> 0 }
-            val target = 25 + t.winPct * 50 + bonus + if (confChamps[t.confId] == t.id) 3 else 0
             t.prevPrestige = t.prestige - t.rivalryDelta
-            t.prestige = (t.prestige * 0.85 + target * 0.15).roundToInt().coerceIn(5, 99)
+            t.prestige = Brand.newPrestige(t, earned.getValue(t.id), round).roundToInt().coerceIn(5, 99)
             if (t.id == nitChamp) t.prestige = (t.prestige + nitBoost).coerceAtMost(99)
+            Brand.updateLegacy(t, round)
             val c = lg.coachOf(t)
             val result = Awards.resultFor(lg, t.id)
             t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name)
@@ -436,6 +442,9 @@ object Season {
             Driver("Quality wins", "$q1w Quadrant 1 win${if (q1w == 1) "" else "s"} on the resume.", when { q1w >= 8 -> "Strong"; q1w >= 3 -> "Some quality"; else -> "Thin" }, q1w >= 3),
             Driver("National awards", if (natAwards > 0) "$natAwards national honor${if (natAwards == 1) "" else "s"} for the program." else "No national honors this year.",
                 if (natAwards > 0) "Award boost" else "None", natAwards > 0),
+            draftSignal(lg, t),
+            ceilingSignal(t),
+            legacySignal(t),
         ) + listOfNotNull(
             rivalrySignal(lg, t),
             fanSignal(lg, t),
@@ -455,6 +464,39 @@ object Season {
             mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
             event, rounds.take(path.size), nitReward,
         )
+    }
+
+    private fun draftSignal(lg: League, t: Team): Driver {
+        val picks = lg.draftHistory.filter { it.season == lg.season - 1 && it.teamId == t.id }
+        return Driver(
+            "Draft picks",
+            if (picks.isEmpty()) "Nobody from the program was drafted last summer." else "${picks.size} drafted last summer: " + picks.joinToString { "${it.playerName} (No. ${it.pick})" } + ".",
+            if (picks.isEmpty()) "None" else "Pro boost", picks.isNotEmpty(),
+        )
+    }
+
+    private fun ceilingSignal(t: Team): Driver {
+        val c = Brand.ceiling(t).roundToInt()
+        return when {
+            t.prestige <= 70 -> Driver("Resume ceiling", "Below 70, records and conference titles drive the climb. The ceiling ($c) starts to matter above 70.", "Not yet", true)
+            t.prestige > c + 1 -> Driver(
+                "Resume ceiling",
+                "Prestige is above what your last 10 tournaments support ($c, ${Brand.ceilingLabel(c.toDouble()).lowercase()}). Climbing stays slow" +
+                    (if (t.prestige > 80) ", and you'll drift down," else "") + " until you win in March.",
+                "Above ceiling", false,
+            )
+            t.prestige >= c - 1 -> Driver("Resume ceiling", "Prestige is at your ceiling of $c (${Brand.ceilingLabel(c.toDouble()).lowercase()}). Deeper March runs raise it.", "At ceiling", false)
+            else -> Driver("Resume ceiling", "Your last 10 tournaments support up to $c (${Brand.ceilingLabel(c.toDouble()).lowercase()}).", "Room to grow", true)
+        }
+    }
+
+    private fun legacySignal(t: Team): Driver {
+        val l = t.legacy.roundToInt()
+        return when {
+            l > t.prestige + 3 -> Driver("Legacy", "Legacy $l is above your Prestige, so it pulls you back up faster after good seasons.", "Pulls up", true)
+            l < t.prestige - 3 -> Driver("Legacy", "Legacy $l hasn't caught up with your Prestige yet. It slows a quick rise until the results last.", "Holds back", false)
+            else -> Driver("Legacy", "Legacy $l is in line with your Prestige.", "Steady", true)
+        }
     }
 
     private fun fanSignal(lg: League, t: Team): Driver? {

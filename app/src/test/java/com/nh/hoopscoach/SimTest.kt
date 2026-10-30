@@ -242,9 +242,11 @@ class SimTest {
         var guard = 0
         while (os.step != com.nh.hoopscoach.game.OffStep.TRYOUTS && guard++ < 20) {
             if (os.step == com.nh.hoopscoach.game.OffStep.CAREER && os.fired) com.nh.hoopscoach.game.Coaching.acceptOffer(lg, os.offers.first().teamId)
+            if (os.step == com.nh.hoopscoach.game.OffStep.RECRUITING) Recruiting.autoPlan(lg)
             Offseason.advance(lg)
         }
         assertEquals(com.nh.hoopscoach.game.OffStep.TRYOUTS, os.step)
+        assertTrue("auto-recruiting signs players", os.signed.isNotEmpty())
         assertEquals(Tryouts.CANDIDATES, os.tryouts.size)
         assertEquals(Tryouts.LOOKS, os.looks)
         val u = lg.user

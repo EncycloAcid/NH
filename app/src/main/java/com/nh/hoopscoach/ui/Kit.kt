@@ -160,7 +160,7 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
                 .clickable { onSelect(i) }.padding(horizontal = if (scroll) 14.dp else 4.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, style = T.bodyB.copy(fontSize = 14.sp), color = if (sel) P.ink else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = T.bodyB.copy(fontSize = if (!scroll && options.size >= 5) 13.sp else 14.sp), color = if (sel) P.ink else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
     if (scroll) {
@@ -169,7 +169,8 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         }
     } else {
         Row(modifier.padding(horizontal = Gutter).fillMaxWidth().then(track)) {
-            options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(1f)) }
+            // Five or more tabs share the width by label length so none gets cut off.
+            options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(if (options.size >= 5) l.length + 4f else 1f)) }
         }
     }
 }

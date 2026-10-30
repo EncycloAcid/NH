@@ -16,6 +16,9 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.League
@@ -333,6 +336,51 @@ class ScreenshotTest {
         scrollTo(6); shot("${tag}05_headlines")
         vm.select(Tab.TEAM); vm.teamTab = 3; scrollTo(1); shot("${tag}06_program_rivals")
         vm.push(Route.Schedule(duke)); scrollTo(2); shot("${tag}07_schedule"); vm.back()
+    }
+
+    /** Program numbers, the guides, and a recruiting cycle from scouting to a locked round. */
+    @Test
+    fun programAndRecruiting() {
+        val lg = league("Kentucky")
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        var guide by mutableIntStateOf(-1)
+        rule.setContent {
+            if (guide < 0) App(vm)
+            else HoopsTheme(androidx.compose.ui.graphics.Color(lg.user.primary), androidx.compose.ui.graphics.Color(lg.user.secondary)) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(com.nh.hoopscoach.ui.P.bg)) {
+                    com.nh.hoopscoach.ui.GuideContent(vm, if (guide == 9) com.nh.hoopscoach.ui.Guide.RECRUITING else com.nh.hoopscoach.ui.Guide.PROGRAM)
+                }
+            }
+        }
+        fun swipe() { rule.onAllNodes(hasScrollToIndexAction()).onLast().performTouchInput { swipeUp() }; rule.waitForIdle() }
+        vm.select(Tab.TEAM); vm.teamTab = 3; shot("G01_program_numbers")
+        for (i in 0..4) { vm.guideTab = i; guide = i; shot("G02_guide_$i") }
+        vm.guideTab = 4; guide = 4; swipe(); shot("G03_guide_program_more"); swipe(); swipe(); shot("G04_guide_program_end")
+        guide = 9; shot("G05_recruit_guide"); swipe(); shot("G06_recruit_guide_more"); swipe(); swipe(); shot("G07_recruit_guide_end")
+        guide = -1
+        vm.select(Tab.RECRUIT); shot("G08_recruit_season")
+        val five = lg.recruits.first { it.p.stars == 5 }
+        vm.push(Route.RecruitView(five.p.id)); shot("G09_prospect_season"); vm.back()
+
+        while (lg.phase != Phase.WRAP_UP) Season.playDay(lg)
+        Offseason.begin(lg)
+        val os = lg.offseason!!
+        while (os.step != com.nh.hoopscoach.game.OffStep.RECRUITING) {
+            if (os.step == com.nh.hoopscoach.game.OffStep.CAREER && os.fired) com.nh.hoopscoach.game.Coaching.acceptOffer(lg, os.offers.first().teamId)
+            Offseason.advance(lg)
+        }
+        vm.install(lg); vm.select(Tab.TODAY); shot("G10_round1_flow")
+        vm.select(Tab.RECRUIT); vm.recruitView = 1; shot("G11_board_round1")
+        com.nh.hoopscoach.game.Recruiting.autoPlan(lg)
+        vm.install(lg); vm.select(Tab.RECRUIT); vm.recruitView = 0; scrollTo(2); shot("G12_board_planned")
+        val target = lg.recruits.filter { com.nh.hoopscoach.game.Recruiting.mine(lg, it) > 0 }.maxBy { it.p.ovr }
+        vm.push(Route.RecruitView(target.p.id)); shot("G13_prospect_points")
+        scrollTo(3); shot("G14_prospect_why"); scrollTo(4); shot("G15_prospect_race"); vm.back()
+        vm.push(Route.RecruitPreview); shot("G16_preview"); vm.back()
+        Offseason.advance(lg)
+        vm.install(lg); vm.select(Tab.RECRUIT); vm.recruitView = 0; shot("G17_board_round2")
+        vm.select(Tab.TODAY); shot("G18_round2_flow")
     }
 
     private fun run(team: String, tag: String, full: Boolean = true) {

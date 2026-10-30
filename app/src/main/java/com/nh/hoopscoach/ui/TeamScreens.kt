@@ -62,7 +62,10 @@ fun TeamScreen(vm: GameViewModel, lg: League) {
     val t = lg.user
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            ScreenHeader("${lg.conf(t.confId).name} · Coach ${lg.coachOf(t).last}", t.school, "${t.mascot}  ·  ${recordLine(lg, t)}") { TeamBadge(t, 46.dp) }
+            ScreenHeader("${lg.conf(t.confId).name} · Coach ${lg.coachOf(t).last}", t.school, "${t.mascot}  ·  ${recordLine(lg, t)}") {
+                GuideButton { vm.openGuide(Guide.PROGRAM, when (vm.teamTab) { 0 -> 0; 1 -> 2; 2 -> 3; else -> 4 }) }
+                TeamBadge(t, 46.dp)
+            }
             TeamRings(lg, t)
             Spacer(Modifier.height(14.dp))
             Segmented(listOf("Roster", "Lineup", "Develop", "Program"), vm.teamTab, { vm.teamTab = it })
@@ -334,17 +337,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
     val moods = players.groupingBy { Morale.mood(it) }.eachCount()
     val risk = (moods[Mood.TRANSFER] ?: 0) + (moods[Mood.UNHAPPY] ?: 0)
     item {
-        Section("Program")
-        Panel {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("PRESTIGE", style = T.label, color = P.sub)
-                    Text(prestigeLabel(t.prestige), style = T.head, color = P.accent)
-                    Text("Shapes recruiting pull, donor money and job offers.", style = T.small, color = P.sub)
-                }
-                Ring(t.prestige, 58.dp, textSize = 22.sp)
-            }
-        }
+        ProgramNumbers(vm, lg, t)
         FanPanel(t)
         RivalsList(vm, lg, t)
         Section("NIL")
@@ -416,13 +409,18 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             }
             TeamRings(lg, t)
             Spacer(Modifier.height(12.dp))
-            Segmented(listOf("Roster", "Schedule", "History"), tab, { tab = it })
+            Segmented(listOf("Roster", "Schedule", "History", "Program"), tab, { tab = it })
         }
         when (tab) {
             0 -> rosterList(vm, lg, t, mine = t.id == lg.userTeamId)
             1 -> item {
                 Spacer(Modifier.height(10.dp))
                 GroupList(Schedule.teamGames(lg, t.id)) { g -> GameRow(vm, lg, g, t.id) }
+            }
+            3 -> item {
+                ProgramNumbers(vm, lg, t)
+                FanPanel(t)
+                ProgramLegends(t) { vm.openPlayer(it) }
             }
             else -> item {
                 ProgramLegends(t) { vm.openPlayer(it) }

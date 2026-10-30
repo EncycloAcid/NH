@@ -234,6 +234,10 @@ class Team(
     var sellouts: Int = 0,
     /** Program Hall of Fame; retired jerseys hang in the rafters. */
     val legends: MutableList<Legend> = mutableListOf(),
+    /** Long-run standing, 5-99. Moves a few points a decade. -1 until first computed. */
+    var legacy: Double = -1.0,
+    /** Short-term national heat, 0-100. Big wins and March runs raise it; it fades. -1 until first computed. */
+    var buzz: Double = -1.0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -363,17 +367,44 @@ class InSeasonEvent(
 @Serializable
 class Recruit(
     val p: Player,
+    /** Interest in each school still in the race, 0-100. */
     var interest: MutableMap<Int, Int> = mutableMapOf(),
-    var offers: MutableList<Int> = mutableListOf(),
     var committed: Int = -1,
     var scouted: Boolean = false,
     var onBoard: Boolean = false,
-    var lastVisit: Int = -99,
     var nilAsk: Int = 0,
     var nilOffer: Int = 0,
     var estOvr: Int = 0,
     var estPot: Int = 0,
     var transfer: Boolean = false,
+    /** Recruiting points each school has on him this round. The user's stay put between rounds. */
+    var alloc: MutableMap<Int, Int> = mutableMapOf(),
+    /** What matters most to him. */
+    var pref: RecruitPref = RecruitPref.NONE,
+    /** Round he committed in (6 = after the last round). */
+    var round: Int = 0,
+)
+
+enum class RecruitPref(val label: String, val blurb: String) {
+    NONE("No strong lean", "Weighs everything about evenly."),
+    HOME("Close to home", "Location counts double: in-state schools get a big edge, faraway ones a penalty."),
+    MINUTES("Early playing time", "Playing time counts double: he wants to start, not sit behind veterans."),
+    WINNING("Winning now", "Wants a team that's winning right now."),
+    BRAND("A big-name program", "Program strength counts extra: Recruiting Pull matters most."),
+    NIL("NIL money", "Your NIL offer counts almost double."),
+    PROS("A path to the pros", "Recent draft picks count three times as much."),
+}
+
+/** What happened when a recruiting round locked, from the user's side. */
+@Serializable
+class RoundReport(
+    val round: Int,
+    val mine: MutableList<Int> = mutableListOf(),
+    val lost: MutableList<Int> = mutableListOf(),
+    var dropped: Int = 0,
+    var entered: Int = 0,
+    var commits: Int = 0,
+    var open: Int = 0,
 )
 
 @Serializable
@@ -577,6 +608,10 @@ class OffseasonState(
     val honors: MutableList<Legend> = mutableListOf(),
     /** Closer looks left at tryouts: each one reveals a candidate's overall. */
     var looks: Int = 0,
+    /** The last recruiting round's results. */
+    var report: RoundReport? = null,
+    /** Prospects nobody signed when the cycle ended. */
+    var unsigned: Int = 0,
 )
 
 @Serializable
@@ -615,7 +650,10 @@ class League(
     val records: MutableList<RecordEntry> = mutableListOf(),
     var wrapUp: WrapUp? = null,
     var offseason: OffseasonState? = null,
+    /** Scouting points: refill every game day in season and every round in the offseason. */
     var recruitPoints: Int = 0,
+    /** The user's recruiting points for the whole offseason cycle. */
+    var recruitBudget: Int = 0,
     var seasonAwards: MutableList<AwardWinner> = mutableListOf(),
     var confAwards: MutableList<AwardWinner> = mutableListOf(),
     var cotyCoachId: Int = -1,

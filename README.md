@@ -24,8 +24,26 @@ The design is clean and neutral, with light and dark modes, and takes its accent
   - *Roster*: starting five, rotation and bench with jersey numbers, rating rings and personality traits.
   - *Lineup*: offense and defense styles, starter and backup at each position, a minutes slider, and optional usage tuning.
   - *Develop*: XP progress and a training focus (archetype) for each player.
-  - *Program*: prestige, NIL budget, locker-room mood and coaching staff.
-- **Recruit**: targets, high-school prospects, transfers and commits, with interest races against rival schools.
+  - *Program*: Prestige, Legacy, Buzz, Program Pull, Conference Exposure, Expected Wins and the resume ceiling, plus NIL budget, locker-room mood and coaching staff.
+  - The **i** button opens the **Program Guide**, with tabs for Players, NIL, Gameplan, Training and Program.
+- **Recruit**: a class of 1,600 high-school prospects plus the transfer portal. In season you scout and build your targets; after the season, recruiting runs in five rounds (details below). The **i** button opens the **Recruiting Guide**.
+- **Program numbers**: Prestige (0-100) is the durable brand and moves once a season.
+  - **How it moves**: about 15% of the way toward what the season earned (12% on the way down). A season earns credit for record, conference finish and tournament title, NCAA run, Quadrant 1 wins, last summer's draft picks and national awards. Rivalry games and an NIT title add on top.
+  - **Conference resistance**: records in a low-exposure league count for less, and a high-exposure league adds a little. Below 70 records and titles drive the climb; above 70 it takes March.
+  - **Resume ceiling**: above 70, the last 10 NCAA Tournaments set a soft ceiling (Round of 32 most years supports the low 80s, Sweet 16 most years the high 80s, one Elite Eight the high 80s on its own, a Final Four or title 90 and up). Past it, climbing slows to a quarter, and above 80 Prestige drifts back toward it. Years before the save began count at the level Legacy implies.
+  - **Legacy**: the long-run baseline. It moves a few points a decade and starts higher for programs with big pasts (UCLA, Indiana, Georgetown and others). It cushions a fallen power, lets it recover faster, and slows a one-year spike.
+  - **Buzz**: short-term heat from ranked wins, upsets, rivalry wins, conference tournament titles and March wins (Cinderella runs count 50% more). It cools every game and halves over the summer.
+  - **Conference Exposure**: a league's national visibility, from its level and its members' prestige.
+  - **Program Pull**: 45% Prestige, 15% Legacy and 10% each of Conference Exposure, coach recruiting, recent NCAA results and Buzz. Recruits see it as Recruiting Pull.
+  - **Expected Wins**: the preseason target from your schedule and team strength.
+  - The season review lists everything that moved your Prestige, including draft picks, Legacy and the resume ceiling.
+- **Recruiting cycle**: five rounds in the offseason, after the NIL budget step.
+  - **Budget**: one point budget for the whole cycle, from your Recruiting Pull and your coach's recruiting rating (plus 10% for an Ace Recruiter).
+  - **Rounds**: before each round, rival schools set their points. You put points on prospects (they stay there until you move them), preview where you'd stand, and lock in. Points have diminishing returns, and gains taper as interest nears 100.
+  - **Interest**: how much your points count depends on program strength (your Pull against what he's after), coach recruiting, location (in-state and same region), pro pipeline, playing time, roster crowding at his position, your NIL offer, and his own preference: close to home, early playing time, winning now, a big-name program, NIL money or a path to the pros. Each prospect page rates every factor for your school.
+  - **Locking in**: interest moves exactly as the preview showed. Then some prospects commit (leaders with high interest and a clear margin, more often in later rounds), points on them come back, schools that fall far behind or run out of scholarships drop out, and new schools enter. A round report shows what happened on your board.
+  - **End of cycle**: prospects with a clear favorite sign late, programs with room pick up some of the rest, and the others go unsigned. Your open spots go to walk-on tryouts.
+  - **Auto-assign**: one tap spreads your free points over about two prospects per open scholarship and matches their NIL asks when the money is there. Simming the offseason does this for you.
 - **League**: AP Top 25 and NET, standings for all 32 conferences, stat leaders, Bubble Watch, bracketology and brackets, and history.
 - **Bubble Watch**: the projected field, sorted into Locks, Should be in, On the bubble (last four byes and last four in), First four out and Next four out, plus projected automatic bids. Tap any two teams to compare their resumes side by side: record, NET, Quad 1 and Quad 2 records, SOS, non-conference SOS and Wins Above Bubble. After Selection Sunday it shows the committee's final call. The Today screen shows your own outlook from mid-season on.
 - **Career**: your coach's record, honors, job security, coaching skills and history.

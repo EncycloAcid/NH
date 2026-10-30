@@ -92,7 +92,7 @@ fun App(vm: GameViewModel) {
 @Composable
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
-    BackHandler(enabled = vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
+    BackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
     // The preseason magazine opens by itself once, before the first game of every season.
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview
@@ -121,6 +121,7 @@ private fun Shell(vm: GameViewModel, lg: League) {
         } else Spacer(Modifier.navigationBarsPadding())
     }
     vm.sheet?.let { pid -> lg.anyPlayer(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
+    vm.guide?.let { GuideSheet(vm, it) }
 }
 
 @Composable
@@ -141,6 +142,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.WrapUp -> WrapUpFlow(vm, lg)
         is Route.Preview -> PreviewScreen(vm, lg)
         is Route.EditPlayer -> EditPlayerScreen(vm, lg, r.playerId)
+        is Route.RecruitPreview -> RecruitPreviewScreen(vm, lg)
     }
 }
 
