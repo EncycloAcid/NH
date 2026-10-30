@@ -45,6 +45,9 @@ data class Palette(
     val bad: Color,
     val warn: Color,
     val gold: Color,
+    /** Big feature cards: the accent in light mode, a deep school color with white text in dark mode. */
+    val hero: Color,
+    val onHero: Color,
 )
 
 private val LightBase = Palette(
@@ -53,6 +56,7 @@ private val LightBase = Palette(
     ink = Color(0xFF11141B), sub = Color(0xFF5E6573), faint = Color(0xFF9BA1AD), line = Color(0xFFE4E7EC),
     accent = Color(0xFF2456E5), onAccent = Color.White, accentSoft = Color(0xFFE6ECFC),
     good = Color(0xFF15803D), bad = Color(0xFFD12C2C), warn = Color(0xFFB45309), gold = Color(0xFFB7791F),
+    hero = Color(0xFF2456E5), onHero = Color.White,
 )
 
 private val DarkBase = Palette(
@@ -61,6 +65,7 @@ private val DarkBase = Palette(
     ink = Color(0xFFEEF0F4), sub = Color(0xFF9CA3B0), faint = Color(0xFF5F6674), line = Color(0xFF272C36),
     accent = Color(0xFF6E95FF), onAccent = Color(0xFF0C0E12), accentSoft = Color(0xFF1C2540),
     good = Color(0xFF4ADE80), bad = Color(0xFFF87171), warn = Color(0xFFFBBF24), gold = Color(0xFFFACC15),
+    hero = Color(0xFF2A4BB8), onHero = Color.White,
 )
 
 val LocalPalette = staticCompositionLocalOf { LightBase }
@@ -107,6 +112,19 @@ fun accentFrom(primary: Color, secondary: Color, dark: Boolean): Color {
     return out
 }
 
+/** A school color deep enough to carry white text, for feature cards in dark mode. */
+fun heroFrom(primary: Color, secondary: Color): Color {
+    var c = if (saturation(primary) < 0.18f && saturation(secondary) >= 0.3f) secondary else primary
+    if (saturation(c) < 0.12f) c = Color(0xFF2A4BB8)
+    var out = c
+    var t = 0f
+    while (contrast(out, Color.White) < 4.5f && t < 0.9f) {
+        t += 0.06f
+        out = mix(c, Color.Black, t)
+    }
+    return out
+}
+
 fun palette(dark: Boolean, primary: Color?, secondary: Color?): Palette {
     val base = if (dark) DarkBase else LightBase
     if (primary == null) return base
@@ -115,6 +133,8 @@ fun palette(dark: Boolean, primary: Color?, secondary: Color?): Palette {
         accent = accent,
         onAccent = onColor(accent),
         accentSoft = mix(base.surface, accent, if (dark) 0.2f else 0.12f),
+        hero = if (dark) heroFrom(primary, secondary ?: primary) else accent,
+        onHero = if (dark) Color.White else onColor(accent),
     )
 }
 

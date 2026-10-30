@@ -144,8 +144,10 @@ private fun Side(lg: League, t: Team, seed: Int?, modifier: Modifier, onClick: (
     Column(modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         TeamBadge(t, 58.dp)
         Spacer(Modifier.height(8.dp))
-        Text((seed?.let { "($it) " } ?: if (t.ap > 0) "#${t.ap} " else "") + t.school, style = T.head, color = if (t.id == lg.userTeamId) P.accent else P.ink,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        val label = (seed?.let { "($it) " } ?: if (t.ap > 0) "#${t.ap} " else "") + t.school
+        // Long names step down a size and may wrap instead of being cut off.
+        Text(label, style = if (label.length > 15) T.head.copy(fontSize = 16.sp, lineHeight = 19.sp) else T.head, color = if (t.id == lg.userTeamId) P.accent else P.ink,
+            maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         Text("${t.mascot} · ${t.record}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -214,7 +216,8 @@ fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, 
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // A line break in the subtitle means two lines were meant to show.
+            Text(sub, style = T.small, color = P.sub, maxLines = if ('\n' in sub) 2 else 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
         if (trailing != null) trailing() else Ring(p.ovr, 42.dp)
@@ -275,10 +278,10 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             today != null -> item { NextUp(vm, lg, today, if (ffDay) "Your First Four game" else "Your game") }
             b.done && b.champion == u.id -> item {
                 Section("Your season")
-                Panel(color = P.accent) {
-                    Text("${b.name.uppercase()} CHAMPIONS", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
-                    Text(u.school.uppercase(), style = T.title, color = P.onAccent)
-                    if (isNit) Text("Prestige, coaching points and extra player development arrive in the season review.", style = T.small, color = P.onAccent.copy(alpha = 0.85f))
+                Panel(color = P.hero) {
+                    Text("${b.name.uppercase()} CHAMPIONS", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                    Text(u.school.uppercase(), style = T.title, color = P.onHero)
+                    if (isNit) Text("Prestige, coaching points and extra player development arrive in the season review.", style = T.small, color = P.onHero.copy(alpha = 0.85f))
                 }
             }
             alive -> item { Section("Your game"); Panel { Text("You have a bye this round. Sim it to see who you'll face.", style = T.body, color = P.sub) } }
@@ -288,7 +291,8 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
                     Text(
                         when {
                             post && !inEvent -> "${u.school} missed the NCAA Tournament and the NIT. Follow the brackets from here."
-                            else -> "${u.school} has been eliminated. Sim ahead to finish the season."
+                            !post -> "Out of the ${lg.conf(u.confId).abbr} Tournament. The resume is set: sim ahead to Selection Sunday and see where the committee puts you."
+                            else -> "${u.school}'s season is over. Sim ahead to follow the rest of March."
                         },
                         style = T.body, color = P.sub,
                     )

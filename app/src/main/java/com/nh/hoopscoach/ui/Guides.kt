@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.filled.Info
 
 enum class Guide(val title: String) { PROGRAM("Program Guide"), RECRUITING("Recruiting Guide") }
 
@@ -37,7 +39,7 @@ fun GuideButton(onClick: () -> Unit) {
     Box(
         Modifier.size(34.dp).clip(CircleShape).background(P.surface2).clickable(onClick = onClick).semantics { contentDescription = "Guide" },
         contentAlignment = Alignment.Center,
-    ) { Text("i", style = T.head.copy(fontSize = 18.sp, fontStyle = FontStyle.Italic), color = P.sub) }
+    ) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Info, null, tint = P.sub, modifier = Modifier.size(20.dp)) }
 }
 
 private class GSection(val title: String, val lines: List<String>)
@@ -285,9 +287,7 @@ fun GuideSheet(vm: GameViewModel, guide: Guide) {
 fun GuideContent(vm: GameViewModel, guide: Guide, modifier: Modifier = Modifier) {
         Column(modifier) {
             Row(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 6.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(26.dp).clip(CircleShape).background(P.sub), contentAlignment = Alignment.Center) {
-                    Text("i", style = T.bodyB.copy(fontStyle = FontStyle.Italic), color = P.bg)
-                }
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Info, null, tint = P.sub, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Text(guide.title, style = T.title.copy(fontSize = 28.sp), color = P.ink)
             }

@@ -179,22 +179,23 @@ private fun WinChart(points: List<Pair<Float, Float>>, oppColor: Color, myColor:
 @Composable
 fun Scoreboard(away: Team, home: Team, as_: Int, hs: Int, center: String, sub: String, user: Int) {
     Row(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(P.surface)) {
-        ScoreHalf(away, as_, as_ > hs && center == "FINAL", Modifier.weight(1f), user)
+        ScoreHalf(away, as_, as_ > hs, center == "FINAL", Modifier.weight(1f), user)
         Column(Modifier.width(84.dp).padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(center, style = T.h2, color = if (center == "FINAL") P.accent else P.ink)
             if (sub.isNotEmpty()) Text(sub.uppercase(), style = T.label, color = P.sub)
         }
-        ScoreHalf(home, hs, hs > as_ && center == "FINAL", Modifier.weight(1f), user)
+        ScoreHalf(home, hs, hs > as_, center == "FINAL", Modifier.weight(1f), user)
     }
 }
 
 @Composable
-private fun ScoreHalf(t: Team, score: Int, winner: Boolean, modifier: Modifier, user: Int) {
+private fun ScoreHalf(t: Team, score: Int, ahead: Boolean, final: Boolean, modifier: Modifier, user: Int) {
     Column(modifier.padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        TeamBadge(t, 42.dp)
-        Spacer(Modifier.height(4.dp))
+        TeamBadge(t, 52.dp)
+        Spacer(Modifier.height(6.dp))
         Text(t.abbr, style = T.label, color = if (t.id == user) P.accent else P.sub)
-        Text("$score", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (winner || score == 0) P.ink else P.ink)
+        // Once it's final, the losing score steps back.
+        Text("$score", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (final && !ahead) P.sub else P.ink)
     }
 }
 

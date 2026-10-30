@@ -115,7 +115,7 @@ fun FlowFooter(back: (() -> Unit)?, label: String, enabled: Boolean = true, onNe
 private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
     val t = lg.team(w.teamId)
     item {
-        Panel(color = P.accent) {
+        Panel(color = P.hero) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     val label = when {
@@ -123,9 +123,9 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
                         w.seed > 0 -> "NCAA TOURNAMENT · NO. ${w.seed} SEED"
                         else -> "SEASON RESULT"
                     }
-                    Text(label, style = T.label, color = P.onAccent.copy(alpha = 0.8f))
-                    Text(w.result.uppercase(), style = T.hero, color = P.onAccent)
-                    Text("${t.school} · ${w.w}-${w.l}", style = T.bodyB, color = P.onAccent.copy(alpha = 0.85f))
+                    Text(label, style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                    Text(w.result.uppercase(), style = T.hero, color = P.onHero)
+                    Text("${t.school} · ${w.w}-${w.l}", style = T.bodyB, color = P.onHero.copy(alpha = 0.85f))
                 }
                 TeamBadge(t, 60.dp)
             }
@@ -138,7 +138,7 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
                             Box(Modifier.size(if (big) 40.dp else 36.dp).clip(CircleShape).background(if (w.pathWon[i]) P.good else P.bad).padding(3.dp), contentAlignment = Alignment.Center) {
                                 TeamBadge(lg.team(opp), if (big) 34.dp else 30.dp)
                             }
-                            Text(w.pathRounds.getOrNull(i) ?: Season.NCAA_ROUNDS.getOrElse(i) { "" }, style = T.label.copy(fontSize = 9.sp), color = P.onAccent)
+                            Text(w.pathRounds.getOrNull(i) ?: Season.NCAA_ROUNDS.getOrElse(i) { "" }, style = T.label.copy(fontSize = 9.sp), color = P.onHero)
                         }
                     }
                 }
@@ -585,12 +585,12 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
             Section("Walk-on breakout")
             for (p in breakouts) {
                 val gr = os.growth.firstOrNull { it.pid == p.id }
-                Panel(Modifier.padding(bottom = 8.dp), color = P.accent, onClick = { vm.openPlayer(p.id) }) {
-                    Text("LATE BLOOMER", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
-                    Text(p.name.uppercase(), style = T.title, color = P.onAccent)
+                Panel(Modifier.padding(bottom = 8.dp), color = P.hero, onClick = { vm.openPlayer(p.id) }) {
+                    Text("LATE BLOOMER", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                    Text(p.name.uppercase(), style = T.title, color = P.onHero)
                     Text(
                         "The former walk-on came back a different player: ${gr?.before ?: "?"} → ${p.ovr} overall, with a ceiling of ${p.pot}.",
-                        style = T.small, color = P.onAccent.copy(alpha = 0.9f),
+                        style = T.small, color = P.onHero.copy(alpha = 0.9f),
                     )
                 }
             }
@@ -735,7 +735,7 @@ private fun LazyListScope.budgetStep(lg: League) {
     val avail = total - returning - Finance.promised(lg, t)
     item {
         Panel {
-            Text("AVAILABLE FOR RECRUITING", style = T.label, color = P.sub)
+            Text("NIL ROOM FOR NEW PLAYERS", style = T.label, color = P.sub)
             Text(money(avail), style = T.hero.copy(fontSize = 52.sp, lineHeight = 52.sp), color = P.ink)
             val d = total - Finance.budgetAt(lg, t, t.prevPrestige)
             Text(if (d == 0) "Total budget unchanged from last year" else "${if (d > 0) "▲" else "▼"} ${money(kotlin.math.abs(d))} total budget vs last year", style = T.small, color = if (d > 0) P.good else if (d < 0) P.bad else P.sub)

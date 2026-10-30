@@ -265,7 +265,9 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
             Panel {
                 SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { confirm = true }
                 Spacer(Modifier.height(10.dp))
-                Text("Hoops Dynasty 2.0 · Schools and conferences are real; all players and coaches are fictional. Team marks are drawn monograms, not official logos.", style = T.small, color = P.faint)
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
+                Text("Hoops Dynasty $version · Schools and conferences are real; all players and coaches are fictional. School logos belong to their schools.", style = T.small, color = P.faint)
             }
             Spacer(Modifier.height(24.dp))
         }

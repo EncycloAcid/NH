@@ -285,7 +285,7 @@ fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = 
 
 // ---------- sports graphics ----------
 
-/** Circular badge in school colors with a monogram. Real logos are not used. */
+/** The school's logo on a light plate, or a monogram in school colors when there's no logo file. */
 @Composable
 fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
     val ctx = androidx.compose.ui.platform.LocalContext.current

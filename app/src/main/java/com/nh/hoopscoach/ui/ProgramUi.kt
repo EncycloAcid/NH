@@ -206,16 +206,16 @@ fun HonorsCard(t: Team, honors: List<Legend>) {
     Section("Honoring legends")
     val retired = honors.filter { it.retired }
     if (retired.isNotEmpty()) {
-        Panel(color = P.accent) {
-            Text("JERSEY RETIREMENT", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
+        Panel(color = P.hero) {
+            Text("JERSEY RETIREMENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     for (l in retired) {
-                        Text("NO. ${l.number} · ${l.name.uppercase()}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onAccent)
-                        Text("${l.years} · ${l.honors.firstOrNull() ?: l.line}", style = T.small, color = P.onAccent.copy(alpha = 0.9f))
+                        Text("NO. ${l.number} · ${l.name.uppercase()}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onHero)
+                        Text("${l.years} · ${l.honors.firstOrNull() ?: l.line}", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                         Spacer(Modifier.height(4.dp))
                     }
-                    Text("No one at ${t.school} will wear ${if (retired.size == 1) "it" else "them"} again.", style = T.small, color = P.onAccent.copy(alpha = 0.85f))
+                    Text("No one at ${t.school} will wear ${if (retired.size == 1) "it" else "them"} again.", style = T.small, color = P.onHero.copy(alpha = 0.85f))
                 }
                 Spacer(Modifier.width(10.dp))
                 RetiredBanner(t, retired.first())
@@ -241,7 +241,11 @@ fun ProgramNumbers(vm: GameViewModel, lg: League, t: Team) {
                 Text(prestigeLabel(t.prestige), style = T.head, color = P.accent)
                 val d = t.prestige - t.prevPrestige
                 Text(
-                    if (t.history.isEmpty()) "Moves once a season, at the end of it." else "${if (d >= 0) "+" else "−"}${abs(d)} last season. Moves once a season.",
+                    when {
+                        t.history.isEmpty() -> "Moves once a season, at the end of it."
+                        d == 0 -> "No change last season. Moves once a season."
+                        else -> "${if (d > 0) "+" else "−"}${abs(d)} last season. Moves once a season."
+                    },
                     style = T.small, color = P.sub,
                 )
             }

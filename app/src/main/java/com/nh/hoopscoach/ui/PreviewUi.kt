@@ -743,13 +743,13 @@ fun PreviewCard(vm: GameViewModel, lg: League) {
     val pr = pv.proj[u.id] ?: return
     val top = topTeam(lg, pv)
     Section("Season preview")
-    Panel(color = P.accent, onClick = { vm.push(Route.Preview) }) {
-        Text("THE ${pv.season} PRESEASON ISSUE · 15 PAGES", style = T.label, color = P.onAccent.copy(alpha = 0.8f))
-        Text("${u.school.uppercase()} PICKED ${Previews.ordinal(pr.confRank).uppercase()} IN THE ${lg.conf(u.confId).abbr}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onAccent)
+    Panel(color = P.hero, onClick = { vm.push(Route.Preview) }) {
+        Text("THE ${pv.season} PRESEASON ISSUE · 15 PAGES", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+        Text("${u.school.uppercase()} PICKED ${Previews.ordinal(pr.confRank).uppercase()} IN THE ${lg.conf(u.confId).abbr}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onHero)
         Spacer(Modifier.height(4.dp))
-        Text("No. ${pr.nat} nationally, projected ${pr.w}-${pr.l}. ${top.school} is the preseason No. 1. Plus every conference, the freshman class, the portal and our Final Four.", style = T.small, color = P.onAccent.copy(alpha = 0.9f))
+        Text("No. ${pr.nat} nationally, projected ${pr.w}-${pr.l}. ${top.school} is the preseason No. 1. Plus every conference, the freshman class, the portal and our Final Four.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
         Spacer(Modifier.height(8.dp))
-        Text("Read the issue →", style = T.bodyB, color = P.onAccent)
+        Text("Read the issue →", style = T.bodyB, color = P.onHero)
     }
     @Suppress("UNUSED_VARIABLE") val unused = GameType.NCAA to Ratings
 }

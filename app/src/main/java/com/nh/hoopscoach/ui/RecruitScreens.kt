@@ -85,7 +85,7 @@ fun LazyListScope.recruitBoard(vm: GameViewModel, lg: League) {
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                if (cycle) "Recruiting Pull $pull · class rank ${Recruiting.classRank(lg, u.id).let { if (it > 0) "#$it" else "–" }}. Points stay on a prospect until you move them or he commits somewhere."
+                if (cycle) "Recruiting Pull $pull" + Recruiting.classRank(lg, u.id).let { if (it > 0) " · class ranked No. $it" else "" } + ". Points stay on a prospect until you move them or he commits somewhere."
                 else "Scouting a prospect costs ${Recruiting.COST_SCOUT} points and shows his real ratings. Add the ones you like to your targets.",
                 style = T.small, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             )
