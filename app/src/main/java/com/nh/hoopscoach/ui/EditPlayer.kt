@@ -105,7 +105,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
             Text("SECOND POSITION", style = T.label, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 12.dp, bottom = 6.dp))
             Segmented(seconds.map { it?.name ?: "None" }, seconds.indexOf(pos2).coerceAtLeast(0), { pos2 = seconds[it] })
             Text(
-                if (pos == p.pos) "His overall is rated for the position he plays." else "At $pos his overall would be $ovr (now ${p.ovr} at ${p.pos}). Ratings don't change, only how they're weighed.",
+                if (pos == p.pos) "His overall is rated for the position he plays." else "At $pos his overall would be ${shown(ovr)} (now ${shown(p.ovr)} at ${p.pos}). Ratings don't change, only how they're weighed.",
                 style = T.small, color = if (pos == p.pos) P.sub else P.warn, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
             )
 

@@ -80,7 +80,8 @@ fun App(vm: GameViewModel) {
                 vm.loading -> BusyScreen("Loading")
                 busy != null -> BusyScreen(busy)
                 lg == null -> NewGameScreen(vm)
-                else -> Shell(vm, lg)
+                // A pro league shows ratings on a 2K-style scale.
+                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v })) { Shell(vm, lg) }
             }
             Toast(vm)
         }

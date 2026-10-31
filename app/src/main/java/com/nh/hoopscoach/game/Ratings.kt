@@ -215,6 +215,12 @@ object Ratings {
     }
 
     /** Off-season growth toward potential. Returns OVR change. */
+    /**
+     * A pro rating as the screens show it, on a 2K-style scale: 90 and up is about the league's top
+     * 20, a typical starter about 77, a rookie about 70. The game works on its own internal scale.
+     */
+    fun shownPro(v: Int): Int = (if (v >= 85) 77 + (v - 85) * 1.5 else 77 - (85 - v) * 1.2).roundToInt().coerceIn(40, 99)
+
     fun offseasonGrowth(p: Player, coachDev: Int, share: Double? = null): Int {
         val before = p.ovr
         val gap = p.pot - before

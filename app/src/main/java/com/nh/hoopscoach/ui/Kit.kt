@@ -470,7 +470,8 @@ fun Jersey(number: Int, primary: Color, secondary: Color, size: Dp, modifier: Mo
 
 /** Rating ring: the arc fills toward 99 and takes the tier color. */
 @Composable
-fun Ring(value: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: String? = null, textSize: TextUnit = 17.sp) {
+fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: String? = null, textSize: TextUnit = 17.sp) {
+    val value = shown(rating)
     val c = tier(value)
     val track = P.surface2
     Box(modifier.size(size), contentAlignment = Alignment.Center) {

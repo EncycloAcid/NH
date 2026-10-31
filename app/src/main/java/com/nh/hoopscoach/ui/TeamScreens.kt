@@ -249,7 +249,7 @@ private fun SlotPick(label: String, p: Player?, modifier: Modifier, onClick: () 
             Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.sub)
             Text(p?.short ?: "Choose", style = T.bodyB.copy(fontSize = 14.sp), color = if (p == null) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (p != null) Text("${p.ovr}", style = T.numSm.copy(fontSize = 17.sp), color = tier(p.ovr))
+        if (p != null) Text("${shown(p.ovr)}", style = T.numSm.copy(fontSize = 17.sp), color = tier(shown(p.ovr)))
     }
 }
 
@@ -289,8 +289,8 @@ private fun LazyListScope.develop(vm: GameViewModel, lg: League, t: Team) {
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${p.ovr}", style = T.numSm, color = tier(p.ovr))
-                    Text("POT ${p.pot}", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                    Text("${shown(p.ovr)}", style = T.numSm, color = tier(shown(p.ovr)))
+                    Text("POT ${shown(p.pot)}", style = T.label.copy(fontSize = 9.sp), color = P.sub)
                 }
             }
         }

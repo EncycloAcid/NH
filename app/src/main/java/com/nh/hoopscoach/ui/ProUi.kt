@@ -918,7 +918,7 @@ internal fun ContenderPanel(vm: GameViewModel, lg: League) {
                 PlayerJersey(p, t, 40.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("${p.name} · ${p.ovr}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${p.name} · ${shown(p.ovr)}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${p.posLabel} · age ${p.age} · ${t.name}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("With him: %.0f%% title odds".format(after * 100) + if (pitch) " · %.0f%% he says yes".format(sr.chance(lg, p) * 100) else "", style = T.small, color = P.good)
                 }
@@ -1053,7 +1053,8 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
                     Column(Modifier.weight(1f)) {
                         Text(st.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${st.w}-${st.l} · ${s.role} there", style = T.small, color = P.sub, maxLines = 1)
-                        Text("They'd send ${back.joinToString(", ") { "${it.name} (${it.ovr})" }}", style = T.small, color = P.ink, maxLines = 2)
+                        val sc = LocalRatingScale.current
+                        Text("They'd send ${back.joinToString(", ") { "${it.name} (${sc(it.ovr)})" }}", style = T.small, color = P.ink, maxLines = 2)
                     }
                     Spacer(Modifier.width(8.dp))
                     SmallButton("Go", primary = true) { vm.act { trades.accept(it, i) }; vm.toast("You're headed to the ${st.name}") }
@@ -1293,7 +1294,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                 val r0 = lg.road
                 if (r0 != null && r0.collegeOvr > 0) {
                     Spacer(Modifier.height(8.dp))
-                    Text("The league is a step up: ${r0.collegeOvr} in college, ${h.ovr} here. Your ceiling is still ${h.pot}. Grow into it.", style = T.bodyB, color = P.onHero)
+                    Text("The league is a step up: ${r0.collegeOvr} in college, ${shown(h.ovr)} here (pro ratings run on their own scale). Your ceiling is ${shown(h.pot)}. Grow into it.", style = T.bodyB, color = P.onHero)
                 }
             }
             Section("Your new team")
@@ -1422,9 +1423,9 @@ private fun LazyListScope.proSummerStep(vm: GameViewModel, lg: League, h: Player
         val before = ps.before[h.id]
         Panel {
             Text("SUMMER", style = T.label, color = P.accent)
-            if (before != null && before != h.ovr) Text("$before → ${h.ovr} overall", style = T.title.copy(fontSize = 30.sp), color = P.ink)
-            else Text("${h.ovr} overall at age ${h.age}", style = T.head, color = P.ink)
-            Text(if (h.age >= 30) "Thirty-plus: the summer takes a little off the top." else if (h.ovr >= h.pot) "You're at your ceiling. Now it's about winning." else "Still climbing toward ${h.pot}.", style = T.small, color = P.sub)
+            if (before != null && before != h.ovr) Text("${shown(before)} → ${shown(h.ovr)} overall", style = T.title.copy(fontSize = 30.sp), color = P.ink)
+            else Text("${shown(h.ovr)} overall at age ${h.age}", style = T.head, color = P.ink)
+            Text(if (h.age >= 30) "Thirty-plus: the summer takes a little off the top." else if (h.ovr >= h.pot) "You're at your ceiling. Now it's about winning." else "Still climbing toward ${shown(h.pot)}.", style = T.small, color = P.sub)
             if (r.growthNote.isNotEmpty() && h.age <= 31) Text(r.growthNote, style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
         }
     }
@@ -1539,7 +1540,7 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 Panel(color = P.hero) {
                     Text(if (pick != null) "NO. ${pick.pick} OVERALL" else "UNDRAFTED FREE AGENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
                     Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
-                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr)} and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.Ratings.shownPro(com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr))} on the pro scale and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }
             if (careerEra != null) item {

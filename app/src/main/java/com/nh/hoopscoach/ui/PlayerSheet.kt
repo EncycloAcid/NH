@@ -358,8 +358,9 @@ private fun HonorsTimeline(lg: League, p: Player) {
 private fun GrowthTab(p: Player) {
     Section("Overall by year")
     Panel {
-        val pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5)
-        Sparkline(pts, p.pot, Modifier.fillMaxWidth().height(120.dp))
+        val sc = LocalRatingScale.current
+        val pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5).map(sc)
+        Sparkline(pts, sc(p.pot), Modifier.fillMaxWidth().height(120.dp))
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
             pts.indices.forEach { i -> Text(classLabel(i), style = T.label, color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }

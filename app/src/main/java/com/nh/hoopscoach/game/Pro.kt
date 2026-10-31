@@ -1280,7 +1280,7 @@ object ProCareer {
         Gameplan.autoAllocate(lg, t)
         lg.reindex()
         lg.news += News(lg.season, 0, "${lg.hero?.name} takes less to chase a ring; the ${t.name} use the room to sign ${add.name}", true)
-        return "You took ${Road.dollars(saved)} less a season. The ${t.name} spent it on ${add.name} (${add.ovr})."
+        return "You took ${Road.dollars(saved)} less a season. The ${t.name} spent it on ${add.name} (${Ratings.shownPro(add.ovr)})."
     }
 
     /** The player option on his last year: keep the year, or walk into free agency now. */
@@ -1348,7 +1348,7 @@ object ProCareer {
         ProLeague.trim(lg, t)
         Gameplan.autoAllocate(lg, t)
         lg.reindex()
-        lg.news += News(lg.season, 0, "Building around ${h.name}: the ${t.name} sign ${add.name}, a ${add.ovr}-rated ${add.pos}", true)
+        lg.news += News(lg.season, 0, "Building around ${h.name}: the ${t.name} sign ${add.name}, a ${Ratings.shownPro(add.ovr)}-rated ${add.pos}", true)
     }
 
     /** Everyone grows or ages over the summer. Young players climb toward their ceiling; from 31 on, they slowly slip. */

@@ -237,7 +237,8 @@ object Summer {
         val capped = lg.pro && ProLeague.rookieCap(lg, h, (ev.boosts.map { it.ordinal }).toSet())
         if (capped) note += " Rookies top out at ${ProLeague.ROOKIE_MAX} until their first summer."
         r.summer = lg.season
-        r.summerNote = note + if (h.ovr > before) " Overall $before → ${h.ovr}." else ""
+        val sh = { v: Int -> if (lg.pro) Ratings.shownPro(v) else v }
+        r.summerNote = note + if (h.ovr > before) " Overall ${sh(before)} → ${sh(h.ovr)}." else ""
         val tag = when (ev) { SummerEvent.U19 -> "U19 Team USA"; SummerEvent.NATIONAL_TEAM -> "Team USA, ${proTournament(lg.season)}"; else -> ev.label }
         val story = if (lg.pro) r.proStory else r.story
         if (story.isNotEmpty()) story[story.size - 1] = story.last() + " · Summer: " + tag
