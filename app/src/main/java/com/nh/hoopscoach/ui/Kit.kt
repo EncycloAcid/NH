@@ -20,20 +20,27 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +48,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -254,27 +268,113 @@ fun HoopsSlider(value: Float, onValueChange: (Float) -> Unit, range: ClosedFloat
     )
 }
 
-/** A field-like button that opens a menu of options with descriptions. */
+// ---------- menus ----------
+
+/** Small line icons for menu rows, drawn like the tab bar's. */
+object MenuIcons {
+    private fun line(name: String, d: String): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
+        addPath(addPathNodes(d), fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
+    }.build()
+
+    val Week = line("week", "M4 6.5l7 5.5-7 5.5z M13 6.5l7 5.5-7 5.5z")
+    val Calendar = line("calendar", "M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z M4 10h16 M8 3v4 M16 3v4")
+    val Star = line("star", "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z")
+    val Trophy = line("trophy", "M8 4h8v5a4 4 0 0 1-8 0z M8 5.5H5.5a3 3 0 0 0 2.8 4 M16 5.5h2.5a3 3 0 0 1-2.8 4 M12 13v3.5 M8.5 20h7 M10 16.5h4V20h-4z")
+    val Bracket = line("bracket", "M4 5h5v5H4 M4 14h5v5H4 M9 7.5h4v9H9 M13 12h7")
+    val Swap = line("swap", "M5 8h13l-3.5-3.5 M19 16H6l3.5 3.5")
+    val Flag = line("flag", "M6 21V4 M6 4.5h11l-2.5 4 2.5 4H6")
+}
+
+/**
+ * The app's drop-down menu: a rounded card on the surface color with a hairline border and a soft
+ * shadow, an optional small heading, at least [minWidth] wide, and scrolling past [maxHeight].
+ */
+@Composable
+fun AppMenu(
+    expanded: Boolean, onDismiss: () -> Unit, title: String? = null, minWidth: Dp = 232.dp, maxWidth: Dp = 340.dp,
+    maxHeight: Dp = 440.dp, scrollState: ScrollState = rememberScrollState(), content: @Composable ColumnScope.() -> Unit,
+) {
+    DropdownMenu(
+        expanded, onDismiss,
+        modifier = Modifier.widthIn(min = minWidth, max = maxOf(minWidth, maxWidth)).heightIn(max = maxHeight),
+        offset = DpOffset(0.dp, 6.dp),
+        scrollState = scrollState,
+        shape = RoundedCornerShape(18.dp),
+        containerColor = P.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 14.dp,
+        border = BorderStroke(1.dp, P.line),
+    ) {
+        if (title != null) Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 6.dp))
+        content()
+    }
+}
+
+/** One menu row: an optional icon tile, a title and a short line under it, and a check on the current choice. */
+@Composable
+fun AppMenuItem(title: String, subtitle: String? = null, icon: ImageVector? = null, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 1.dp).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) P.accentSoft else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (selected) P.accent else P.accentSoft), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = if (selected) P.onAccent else if (enabled) P.accent else P.faint, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = T.bodyB, color = if (enabled) P.ink else P.faint, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrEmpty()) Text(subtitle, style = T.small, color = if (enabled) P.sub else P.faint)
+        }
+        if (selected) {
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Default.Check, "Selected", tint = P.accent, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** A thin rule between groups of menu rows. */
+@Composable
+fun AppMenuDivider() = Box(Modifier.padding(horizontal = 18.dp, vertical = 5.dp).fillMaxWidth().height(1.dp).background(P.line))
+
+/**
+ * A field-like button that opens a menu of options with descriptions. The menu is at least as wide
+ * as the field, checks the current choice, and opens scrolled to it in a long list.
+ */
 @Composable
 fun Picker(label: String, current: String, options: List<Pair<String, String>>, modifier: Modifier = Modifier, onPick: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    var fieldWidth by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    val scroll = rememberScrollState()
+    val sel = options.indexOfFirst { it.first == current }
+    LaunchedEffect(open) {
+        // Rows with a one-line description are about 60dp; once the menu is laid out, land the current one near the top.
+        if (open && sel > 3) {
+            withTimeoutOrNull(600) { snapshotFlow { scroll.maxValue }.first { it in 1 until Int.MAX_VALUE } }
+            with(density) { scroll.scrollTo(((sel - 1) * 60.dp.toPx()).toInt()) }
+        }
+    }
     Box(modifier) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(P.surface).border(1.dp, P.line, RoundedCornerShape(14.dp))
+            Modifier.fillMaxWidth().onGloballyPositioned { fieldWidth = with(density) { it.size.width.toDp() } }
+                .clip(RoundedCornerShape(14.dp)).background(if (open) P.accentSoft else P.surface)
+                .border(if (open) 1.5.dp else 1.dp, if (open) P.accent else P.line, RoundedCornerShape(14.dp))
                 .clickable { open = true }.padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub)
+            Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = if (open) P.accent else P.sub)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(current, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Icon(Icons.Default.KeyboardArrowDown, null, tint = P.sub, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = if (open) P.accent else P.sub, modifier = Modifier.size(20.dp).rotate(if (open) 180f else 0f))
             }
         }
-        DropdownMenu(open, { open = false }, Modifier.background(P.surface)) {
+        AppMenu(open, { open = false }, title = label, minWidth = maxOf(fieldWidth, 260.dp), scrollState = scroll) {
             options.forEachIndexed { i, (l, b) ->
-                DropdownMenuItem(
-                    text = { Column { Text(l, style = T.bodyB, color = P.ink); Text(b, style = T.small, color = P.sub) } },
-                    onClick = { open = false; onPick(i) },
-                )
+                AppMenuItem(l, b.ifEmpty { null }, selected = i == sel) { open = false; onPick(i) }
             }
         }
     }

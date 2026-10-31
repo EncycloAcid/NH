@@ -27,8 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -189,18 +187,25 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
                     }
                 }
                 Box {
-                    Box(Modifier.size(40.dp).clip(CircleShape).clickable { menu = true }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.MoreVert, "More sim options", tint = P.sub)
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(if (menu) P.accentSoft else Color.Transparent).clickable { menu = true }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.MoreVert, "More sim options", tint = if (menu) P.accent else P.sub)
                     }
-                    DropdownMenu(menu, { menu = false }, Modifier.background(P.surface)) {
-                        @Composable
-                        fun item(label: String, a: () -> Unit) = DropdownMenuItem(text = { Text(label, style = T.body, color = P.ink) }, onClick = { menu = false; a() })
+                    AppMenu(menu, { menu = false }, title = "Sim ahead") {
+                        fun pick(a: () -> Unit) { menu = false; a() }
+                        val left = lg.games.count { it.involves(u.id) && !it.played && it.day <= Schedule.REG_DAYS }
                         if (lg.phase == Phase.REGULAR) {
-                            item("Sim one week") { vm.simDays(7) }
-                            item("Sim to conference tournament") { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season") }
+                            AppMenuItem("Sim one week", "The next 7 days", MenuIcons.Week) { pick { vm.simDays(7) } }
+                            AppMenuItem("Sim to the conference tournament", "$left regular-season ${if (left == 1) "game" else "games"} left", MenuIcons.Calendar) {
+                                pick { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season") }
+                            }
                         }
-                        if (lg.phase != Phase.NCAA) item("Sim to Selection Sunday") { vm.simToPhase(Phase.NCAA, "Simulating to Selection Sunday") }
-                        item("Sim to end of season") { vm.simToPhase(Phase.WRAP_UP, "Simulating the rest of the season") }
+                        if (lg.phase != Phase.NCAA) AppMenuItem("Sim to Selection Sunday", "Conference tournaments, then the bracket", MenuIcons.Bracket) {
+                            pick { vm.simToPhase(Phase.NCAA, "Simulating to Selection Sunday") }
+                        }
+                        AppMenuDivider()
+                        AppMenuItem("Sim to the end of the season", "Through the national championship", MenuIcons.Trophy) {
+                            pick { vm.simToPhase(Phase.WRAP_UP, "Simulating the rest of the season") }
+                        }
                     }
                 }
                 Spacer(Modifier.width(4.dp))

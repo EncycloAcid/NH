@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -327,18 +325,31 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
             }
         }
         Box {
-            Box(Modifier.size(40.dp).clip(CircleShape).clickable { menu = true }, contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.MoreVert, "More sim options", tint = P.sub)
+            Box(Modifier.size(40.dp).clip(CircleShape).background(if (menu) P.accentSoft else androidx.compose.ui.graphics.Color.Transparent).clickable { menu = true }, contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.MoreVert, "More sim options", tint = if (menu) P.accent else P.sub)
             }
-            DropdownMenu(menu, { menu = false }, Modifier.background(P.surface)) {
-                @Composable
-                fun item(label: String, a: () -> Unit) = DropdownMenuItem(text = { Text(label, style = T.body, color = P.ink) }, onClick = { menu = false; a() })
+            AppMenu(menu, { menu = false }, title = "Sim ahead") {
+                fun pick(a: () -> Unit) { menu = false; a() }
+                fun gamesBefore(day: Int) = lg.games.count { it.involves(u.id) && !it.played && it.day < day && it.type != GameType.CUP }
+                fun games(n: Int) = "$n ${if (n == 1) "game" else "games"}"
                 if (lg.phase == Phase.REGULAR) {
-                    item("Sim one week") { vm.simDays(7) }
-                    if (lg.day < ProLeague.allStarDay(lg)) item("Sim to the All-Star break") { vm.simUntil("Simulating to the All-Star break") { it.day >= ProLeague.allStarDay(it) } }
-                    item("Sim to the playoffs") { vm.simToPhase(Phase.PLAYOFFS, "Simulating the regular season") }
+                    AppMenuItem("Sim one week", "The next 7 days", MenuIcons.Week) { pick { vm.simDays(7) } }
+                    val deadline = com.nh.hoopscoach.game.Trades.deadlineDay(lg)
+                    // Stop the day before, so there's still time to ask for a trade.
+                    if (lg.day < deadline - 1) AppMenuItem("Sim to the trade deadline", "${games(gamesBefore(deadline - 1))} away · stops in time to make a move", MenuIcons.Swap) {
+                        pick { vm.simUntil("Simulating to the trade deadline") { it.day >= deadline - 1 || it.phase != Phase.REGULAR } }
+                    }
+                    if (lg.day < ProLeague.allStarDay(lg)) AppMenuItem("Sim to the All-Star break", "${games(gamesBefore(ProLeague.allStarDay(lg)))} away", MenuIcons.Star) {
+                        pick { vm.simUntil("Simulating to the All-Star break") { it.day >= ProLeague.allStarDay(it) } }
+                    }
+                    AppMenuItem("Sim to the playoffs", "${games(gamesBefore(ProLeague.lastDay(lg) + 1))} left, then the play-in", MenuIcons.Bracket) {
+                        pick { vm.simToPhase(Phase.PLAYOFFS, "Simulating the regular season") }
+                    }
+                    AppMenuDivider()
                 }
-                item("Sim to the end of the season") { vm.simUntil("Simulating the rest of the season") { it.phase == Phase.OFFSEASON } }
+                AppMenuItem("Sim to the end of the season", "Through the Finals", MenuIcons.Trophy) {
+                    pick { vm.simUntil("Simulating the rest of the season") { it.phase == Phase.OFFSEASON } }
+                }
             }
         }
         Spacer(Modifier.width(4.dp))

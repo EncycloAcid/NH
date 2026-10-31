@@ -1,0 +1,128 @@
+package com.nh.hoopscoach
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.nh.hoopscoach.game.League
+import com.nh.hoopscoach.game.LeagueGen
+import com.nh.hoopscoach.game.Offseason
+import com.nh.hoopscoach.game.Phase
+import com.nh.hoopscoach.game.ProCareer
+import com.nh.hoopscoach.game.ProLeague
+import com.nh.hoopscoach.game.Rng
+import com.nh.hoopscoach.game.Season
+import com.nh.hoopscoach.game.Sim
+import com.nh.hoopscoach.ui.App
+import com.nh.hoopscoach.ui.GameViewModel
+import com.nh.hoopscoach.ui.Tab
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.random.Random
+
+/** The drop-down menus, open: the sim menus on Today and the pickers. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w400dp-h880dp-xhdpi")
+class MenuShotsTest {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val out = File(System.getProperty("screenshots.dir") ?: "build/screenshots").apply { mkdirs() }
+    private fun idle() = rule.waitForIdle()
+
+    /** The screen with any open menu drawn on top where it sits. */
+    private fun shot(name: String) {
+        idle()
+        val view = rule.activity.window.decorView.rootView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        view.draw(canvas)
+        val loc = IntArray(2).also { view.getLocationOnScreen(it) }
+        // Popups are their own windows: draw each one where the window manager put it.
+        val wmg = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+        @Suppress("UNCHECKED_CAST")
+        val views = wmg.javaClass.getDeclaredField("mViews").apply { isAccessible = true }.get(wmg) as List<android.view.View>
+        for (v in views) {
+            if (v === view || v.width == 0) continue
+            val lp = v.layoutParams as? android.view.WindowManager.LayoutParams ?: continue
+            canvas.save()
+            canvas.translate((lp.x - loc[0]).toFloat(), (lp.y - loc[1]).toFloat())
+            v.draw(canvas)
+            canvas.restore()
+        }
+        FileOutputStream(File(out, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    private fun openSimMenu() { rule.onAllNodes(hasContentDescription("More sim options")).onFirst().performClick(); idle() }
+    /** Back closes an open menu: send it to each popup window. */
+    private fun close(@Suppress("UNUSED_PARAMETER") vm: GameViewModel) {
+        val root = rule.activity.window.decorView.rootView
+        val wmg = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+        @Suppress("UNCHECKED_CAST")
+        val views = (wmg.javaClass.getDeclaredField("mViews").apply { isAccessible = true }.get(wmg) as List<android.view.View>).toList()
+        rule.runOnUiThread {
+            for (v in views) if (v !== root) {
+                v.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK))
+                v.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK))
+            }
+        }
+        idle()
+    }
+
+    @Test
+    fun statePicker() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(9)
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.installDraft(LeagueGen.newLeague())
+        rule.setContent { App(vm) }
+        rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
+        // The home state field: a long list that opens scrolled to the current state.
+        rule.onAllNodes(hasText("STATE")).onFirst().performClick(); idle()
+        assertTrue("state picker open", rule.onAllNodes(androidx.compose.ui.test.isPopup()).fetchSemanticsNodes().isNotEmpty())
+        shot("Z04_state_picker")
+    }
+
+    @Test
+    fun menus() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(11)
+        val base = LeagueGen.newLeague()
+        val college = Offseason.claimTeam(base, base.teams.first { it.school == "Kentucky" }.id, "Jordan", "Reed")
+        repeat(4) { Season.playDay(college) }
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(college)
+        rule.setContent { App(vm) }
+        vm.select(Tab.TODAY); idle()
+        openSimMenu()
+        assertTrue("college sim menu", rule.onAllNodes(hasText("Sim to Selection Sunday")).fetchSemanticsNodes().isNotEmpty())
+        shot("Z01_college_sim_menu")
+        close(vm)
+        vm.select(Tab.TEAM); vm.teamTab = 1; idle()
+        // The ratings row also says "OFFENSE"; the picker is the field showing the current plan.
+        rule.onAllNodes(hasText(college.user.plan.offense.label)).onFirst().performClick(); idle()
+        assertTrue("picker open", rule.onAllNodes(androidx.compose.ui.test.isPopup()).fetchSemanticsNodes().isNotEmpty())
+        shot("Z02_offense_picker")
+        close(vm)
+
+        val pro = ProLeague.create(ProTest().toDraft(21))
+        while (pro.phase == Phase.OFFSEASON) ProCareer.next(pro)
+        repeat(3) { Sim.playDay(pro) }
+        vm.install(pro); vm.select(Tab.TODAY); idle()
+        openSimMenu()
+        assertTrue("pro sim menu has the deadline", rule.onAllNodes(hasText("Sim to the trade deadline")).fetchSemanticsNodes().isNotEmpty())
+        shot("Z03_pro_sim_menu")
+        close(vm)
+    }
+}
