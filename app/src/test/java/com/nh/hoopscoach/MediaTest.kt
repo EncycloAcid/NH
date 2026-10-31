@@ -12,6 +12,11 @@ class MediaTest {
         Rng.r = Random(6)
         val lg = ProLeague.create(ProTest().toDraft(21))
         while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        // A second-year starter, so he has the big nights the media writes about whatever the draw.
+        val h = lg.hero!!
+        h.proYears = 1
+        repeat(40) { if (h.ovr < 88) for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99) }
+        com.nh.hoopscoach.game.Gameplan.autoAllocate(lg, lg.team(h.teamId))
         val r = lg.road!!
         val topics = mutableSetOf<String>()
         var reporters = 0
