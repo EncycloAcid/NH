@@ -460,7 +460,11 @@ class RoundReport(
 )
 
 @Serializable
-class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "") {
+class News(
+    val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "",
+    /** A short article behind the headline, and the outlet that ran it. */
+    val body: String = "", val source: String = "",
+) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
 }
@@ -677,6 +681,9 @@ class RoadState(
     /** The open postgame press question, if any. */
     var press: PressQuestion? = null,
     val pressLog: MutableList<String> = mutableListOf(),
+    /** His social feed (newest last), and when the last award-race column ran (season * 1000 + day). */
+    val feed: MutableList<Post> = mutableListOf(),
+    var lastColumn: Int = 0,
     /** This week's practice plan, and how worn down he is (0 fresh, 100 exhausted). */
     var practice: Practice = Practice.TEAM,
     var fatigue: Int = 0,
@@ -932,7 +939,14 @@ class PressAnswer(
 )
 
 @Serializable
-class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>)
+class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "")
+
+/** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
+@Serializable
+class Post(
+    val season: Int, val day: Int, val name: String, val handle: String, val kind: String, val text: String,
+    val likes: Int, val verified: Boolean = false, val gameId: Int = -1,
+)
 
 @Serializable
 class OffseasonState(

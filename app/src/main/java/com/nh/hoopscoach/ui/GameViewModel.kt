@@ -52,6 +52,8 @@ sealed interface Route {
     data object Preview : Route
     data class EditPlayer(val playerId: Int) : Route
     data object RecruitPreview : Route
+    data object Social : Route
+    data class Article(val newsIndex: Int) : Route
 }
 
 /** A game being watched possession by possession. */

@@ -436,6 +436,8 @@ object Road {
         payMilestones(lg)
         r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner, duel)
         if (lg.pro) BigNights.afterGame(lg, g, line, won, winner, stakes)
+        Media.afterGame(lg, g, line, won, winner, stakes, duel)
+        Media.raceColumn(lg)
     }
 
     fun payMilestonesNow(lg: League) = payMilestones(lg)
@@ -458,60 +460,144 @@ object Road {
         lg: League, g: Game, h: Player, line: GameLogEntry, t: Team, opp: Team,
         won: Boolean, rivalry: Boolean, score: Double, winner: Boolean, duel: Duel? = null,
     ): PressQuestion? {
-        fun q(topic: String, prompt: String, vararg a: PressAnswer) = PressQuestion(lg.season, g.id, topic, prompt, a.toList())
+        val reporter = Media.reporter(lg)
+        fun q(topic: String, prompt: String, vararg a: PressAnswer) = PressQuestion(lg.season, g.id, topic, prompt, a.toList(), reporter)
+        // Three ways to answer: humble, brash, or even.
+        fun humble(text: String, fans: Int = 1, mates: Int = 3) = PressAnswer(text, 0.012, fans = fans, teammates = mates, persona = -1)
+        fun brash(text: String, mates: Int = -2, fans: Int = 0) = PressAnswer(text, 0.04, fans = fans, teammates = mates, persona = 2)
+        fun even(text: String) = PressAnswer(text, 0.006)
         val tourney = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.NIT || g.type == GameType.PLAYOFF
         val rank = if (h.stats.gp >= 15 && !lg.pro) Offseason.draftBoard(lg)[h.id] else null
+        val league = if (lg.pro) "league" else "conference"
+        val ppg = h.stats.ppg
+        val recent = h.log.dropLast(1).takeLast(3)
+        val slump = h.stats.gp >= 8 && ppg >= 10 && recent.size == 3 && recent.map { it.pts }.average() < ppg * 0.6 && line.pts < ppg * 0.7
+        val careerHigh = line.pts >= 15 && h.log.size >= 5 && h.log.dropLast(1).all { it.pts < line.pts }
+        val tripleDouble = listOf(line.pts, line.reb, line.ast).count { it >= 10 } >= 3
+        val race = if (lg.day > 25) raceRank(lg) else 0
+        val deadline = lg.pro && lg.phase == Phase.REGULAR && lg.day in (Trades.deadlineDay(lg) - 12) until Trades.deadlineDay(lg)
+        val contractYear = lg.pro && (lg.road?.contract?.years ?: 0) == 1
+        val rookie = lg.pro && h.proYears == 0 && h.stats.gp in 3..15
+        val lowMinutes = line.min in 1..14 && h.stats.mpg >= 20
+        val tired = (lg.road?.fatigue ?: 0) >= 70
+        val blowout = !won && g.scoreAgainst(t.id) - g.scoreFor(t.id) >= 20
         return when {
             winner -> q(
-                "Game-winner", "That shot is everywhere already. Walk us through it.",
+                "Game-winner", Rng.pick(listOf("That shot is everywhere already. Walk us through it.", "Clock winding down, ball in your hands. What were you thinking?", "Did you know it was going in when it left your hand?")),
                 PressAnswer("Coach drew it up and my guys trusted me.", 0.015, fans = 2, teammates = 4, persona = -1),
-                PressAnswer("I want the ball in that moment. Every time.", 0.05, teammates = -2, persona = 2),
-                PressAnswer("Just a good look. It went in.", 0.012),
+                brash("I want the ball in that moment. Every time."),
+                even("Just a good look. It went in."),
             )
             duel != null && Rng.chance(0.85) -> {
                 val rv = Rival.player(lg)?.last ?: "your rival"
                 if (duel.won) q(
-                    "Rival", "You got the better of $rv tonight, ${duel.me} to ${duel.him}. Is he the best player in your class?",
-                    PressAnswer("He's great. He makes me better every time we play.", 0.012, fans = 1, teammates = 2, persona = -1),
-                    PressAnswer("There's one best player in this class. It isn't him.", 0.05, teammates = -1, persona = 2),
-                    PressAnswer("It's not about him. We got the win.", 0.008, teammates = 1),
+                    "Rival", Rng.pick(listOf("You got the better of $rv tonight, ${duel.me} to ${duel.him}. Is he the best player in your class?", "Another round to you against $rv. Does that rivalry still motivate you?")),
+                    humble("He's great. He makes me better every time we play.", mates = 2),
+                    brash("There's one best player in this class. It isn't him.", mates = -1),
+                    even("It's not about him. We got the win."),
                 ) else q(
-                    "Rival", "$rv had the last word tonight. What happened out there?",
-                    PressAnswer("He made plays. Credit to him.", 0.008, fans = 1, persona = -1),
-                    PressAnswer("Enjoy it. It won't happen again.", 0.035, teammates = -1, persona = 2),
-                    PressAnswer("We'll see them again. I'll be ready.", 0.006),
+                    "Rival", Rng.pick(listOf("$rv had the last word tonight. What happened out there?", "$rv outscored you ${duel.him} to ${duel.me}. Does that sting?")),
+                    humble("He made plays. Credit to him.", mates = 0),
+                    brash("Enjoy it. It won't happen again.", mates = -1),
+                    even("We'll see them again. I'll be ready."),
                 )
             }
             tourney && won && Rng.chance(0.6) -> q(
                 "Moving on", if (g.type == GameType.PLAYOFF) ProSeason.winQuestion(lg, g, t.id)
                     else "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
-                PressAnswer("Whoever's next. We'll be ready.", 0.012),
-                PressAnswer(if (lg.pro) "Give us the best team in the league." else "Give us the best team in the country.", 0.04, persona = 2),
-                PressAnswer("All credit to our staff. They had us ready.", 0.012, fans = 1, teammates = 3, persona = -1),
+                even("Whoever's next. We'll be ready."),
+                brash(if (lg.pro) "Give us the best team in the league." else "Give us the best team in the country.", mates = 0),
+                humble("All credit to our staff. They had us ready."),
+            )
+            tripleDouble -> q(
+                "Triple-double", Rng.pick(listOf("A triple-double tonight. Is that the version of you we'll see more of?", "Points, rebounds, assists, all in double figures. Where does that come from?")),
+                humble("When the ball moves, everybody eats. I just made the simple play.", mates = 4),
+                brash("I can do everything on a basketball court. People are starting to notice."),
+                even("The numbers come when you play the right way."),
+            )
+            careerHigh -> q(
+                "Career high", Rng.pick(listOf("Career-high ${line.pts} tonight. When did you know you had it going?", "${line.pts} points, a new career high. What clicked?")),
+                humble("My teammates kept finding me. I just had to finish."),
+                brash("Honestly? I expected it. This is who I am.", mates = -1),
+                even("Felt good from warmups. I just kept shooting."),
+            )
+            race in 1..3 && won && Rng.chance(0.35) -> q(
+                "Award race", if (lg.pro) "The crowd was chanting MVP tonight. Is it yours?" else "You're in the Player of the Year conversation. Do you pay attention to that?",
+                humble("Individual stuff takes care of itself if we win.", fans = 2),
+                brash("Look at the numbers. Who else is it going to be?", mates = -2, fans = 1),
+                even("I hear it. I just try to stay locked in."),
             )
             rivalry && won && Rng.chance(0.8) -> q(
-                "Rivalry", "You beat ${opp.school}. What does this one mean?",
-                PressAnswer("This one's for our fans. They've waited all year.", 0.015, fans = 3, persona = -1),
-                PressAnswer("They're not on our level. Not even close.", 0.04, fans = 1, teammates = -2, persona = 2),
-                PressAnswer("It's one game. On to the next.", 0.006),
+                "Rivalry", Rng.pick(listOf("You beat ${opp.school}. What does this one mean?", "That place was loud tonight. How do you rate a rivalry win?")),
+                humble("This one's for our fans. They've waited all year.", fans = 3, mates = 0),
+                brash("They're not on our level. Not even close.", fans = 1),
+                even("It's one game. On to the next."),
             )
             line.min > 0 && score >= 20 && Rng.chance(0.6) -> q(
-                "Big night", "${line.pts} points tonight. What was working?",
-                PressAnswer("My teammates found me in great spots.", 0.012, teammates = 4, persona = -1),
-                PressAnswer(if (lg.pro) "Nobody in this league can guard me." else "Nobody in this conference can guard me.", 0.04, teammates = -5, persona = 2),
-                PressAnswer("Just taking what the defense gives me.", 0.006),
+                "Big night", Rng.pick(listOf("${line.pts} points tonight. What was working?", "You took over in the second half. What changed?", "${line.pts}, ${line.reb} and ${line.ast}. Best you've felt all season?")),
+                humble("My teammates found me in great spots.", mates = 4),
+                brash("Nobody in this $league can guard me.", mates = -5),
+                even("Just taking what the defense gives me."),
+            )
+            t.streak >= 5 && Rng.chance(0.5) -> q(
+                "Win streak", "That's ${t.streak} straight. What's clicking?",
+                humble("Everybody's bought in. Nobody cares who gets the credit.", mates = 3),
+                brash("We're the best team in the $league right now. It's not close.", mates = 0, fans = 2),
+                even("We're just stacking days. Can't get comfortable."),
+            )
+            t.streak <= -4 && Rng.chance(0.6) -> q(
+                "Losing streak", "That's ${-t.streak} losses in a row. How do you stop the slide?",
+                humble("It starts with me. I have to be better for this group.", fans = 2),
+                brash("Some guys need to look in the mirror. I'm doing my part.", mates = -5),
+                even("One game at a time. Win the next one."),
+            )
+            slump && Rng.chance(0.6) -> q(
+                "Slump", Rng.pick(listOf("You've been quiet the last few games. What's off?", "The shot hasn't been falling lately. Is something bothering you?")),
+                humble("I've got to be better. I'll be in the gym early tomorrow.", fans = 2, mates = 1),
+                brash("Slump? Look at my numbers over a season. I'm fine.", mates = 0),
+                even("Shooters shoot. It'll come back."),
+            )
+            deadline && Rng.chance(0.35) -> q(
+                "Trade talk", "Your name keeps coming up before the deadline. Do you want to stay?",
+                humble("I love it here. I want to win here.", fans = 4, mates = 2),
+                brash("I want to win. If that's not here, everybody knows it.", mates = -3, fans = -3),
+                even("That's business. I control what I can control."),
+            )
+            contractYear && Rng.chance(0.12) -> q(
+                "Contract year", "It's a contract year. Does that change anything for you?",
+                humble("Not at all. Win games and the rest takes care of itself."),
+                brash("I'm betting on myself. Everybody's going to have to pay up.", mates = -1),
+                even("I don't think about it. My agent does."),
+            )
+            rookie && Rng.chance(0.3) -> q(
+                "Rookie year", Rng.pick(listOf("What's been the biggest adjustment to the league?", "Welcome to the league. What's surprised you most?")),
+                humble("Everybody's good. The vets have taught me a lot.", mates = 4),
+                brash("Honestly? It's easier than I thought.", mates = -3),
+                even("The speed. Every possession matters."),
+            )
+            lowMinutes && Rng.chance(0.4) -> q(
+                "Minutes", "Only ${line.min} minutes tonight. Are you happy with your role?",
+                humble("Whatever coach needs. I'll be ready when my number's called.", mates = 2),
+                brash("I should be on the floor. I think everyone knows that.", mates = -3),
+                even("Some nights it goes like that."),
+            )
+            tired && Rng.chance(0.3) -> q(
+                "The grind", "You looked worn down out there. Is the schedule catching up with you?",
+                humble("No excuses. I have to take better care of my body.", fans = 1, mates = 1),
+                brash("I carry a lot for this team. It adds up.", mates = -3),
+                even("Long season. Rest up and go again."),
             )
             rank != null && rank <= 30 && Rng.chance(0.15) -> q(
                 "Draft", "There were scouts here tonight. Are you thinking about the draft?",
-                PressAnswer("Not until the season's over.", 0.006),
-                PressAnswer("I'm ready for the league. Everybody knows it.", 0.035, teammates = -4, persona = 2),
+                even("Not until the season's over."),
+                brash("I'm ready for the league. Everybody knows it.", mates = -4),
                 PressAnswer("I love it here at ${t.school}.", 0.012, fans = 2, persona = -1),
             )
-            !won && line.min >= 12 && (rivalry || opp.ap > 0 || tourney || Rng.chance(0.2)) -> q(
-                "Tough loss", "Tough one against ${opp.school}. What went wrong?",
-                PressAnswer("That's on me. I'll be better.", 0.01, fans = 1, teammates = 2, persona = -1),
+            !won && line.min >= 12 && (rivalry || opp.ap > 0 || tourney || blowout || Rng.chance(0.2)) -> q(
+                "Tough loss", if (blowout) "That got away from you early. What happened?" else Rng.pick(listOf("Tough one against ${opp.school}. What went wrong?", "Close game, wrong side of it. What decided it?")),
+                humble("That's on me. I'll be better.", mates = 2),
                 PressAnswer("Ask the refs. They decided that one.", 0.02, fans = -1, persona = 2),
-                PressAnswer("We'll watch the film and learn from it.", 0.003),
+                even("We'll watch the film and learn from it."),
             )
             else -> null
         }
@@ -532,6 +618,7 @@ object Road {
             if (a.teammates != 0) for (p in lg.rosterOf(t)) if (p.id != h.id) p.happiness = (p.happiness + a.teammates).coerceIn(0, 100)
         }
         r.pressLog += "${q.topic}: \u201c${a.text}\u201d (${if (delta >= 0) "+" else ""}${count(delta)} followers)"
+        Media.afterPress(lg, q, a)
         if (r.pressLog.size > 12) r.pressLog.removeAt(0)
         r.press = null
         payMilestones(lg)

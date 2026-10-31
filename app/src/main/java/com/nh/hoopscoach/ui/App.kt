@@ -147,6 +147,8 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Preview -> PreviewScreen(vm, lg)
         is Route.EditPlayer -> EditPlayerScreen(vm, lg, r.playerId)
         is Route.RecruitPreview -> RecruitPreviewScreen(vm, lg)
+        is Route.Social -> SocialScreen(vm, lg)
+        is Route.Article -> ArticleScreen(vm, lg, r.newsIndex)
     }
 }
 

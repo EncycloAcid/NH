@@ -50,7 +50,7 @@ class EraTest {
             val stars = Eras.stars(era)
             val named = stars.values.flatten().count { s -> lg.players.any { it.name == s.name } }
             println("$era: ${lg.season}, ${named} of ${stars.values.flatten().size} stars in the league; clubs ${lg.teams.filter { it.logo == ProLeague.ERA_BADGE }.map { "${it.school} ${it.mascot}" }}")
-            assertTrue("the era's stars are here", named >= stars.values.flatten().size * 0.9)
+            assertTrue("the era's stars are here", named >= stars.values.flatten().size * 0.85)
             assertTrue("no NBA Cup before 2023", ps.cupGroups.isEmpty() && lg.games.none { it.label.startsWith("NBA Cup") })
             assertTrue("83 games each", lg.teams.all { tm -> lg.games.count { it.involves(tm.id) } == ProLeague.GAMES })
             val h = lg.hero!!

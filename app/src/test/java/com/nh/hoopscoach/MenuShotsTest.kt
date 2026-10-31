@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.LeagueGen
@@ -78,6 +79,30 @@ class MenuShotsTest {
             }
         }
         idle()
+    }
+
+    /** The social feed and a game story. */
+    @Test
+    fun media() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(6)
+        val lg = ProLeague.create(ProTest().toDraft(21))
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        var days = 0
+        while ((days < 30 || lg.news.none { it.kind == "article" }) && days++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { com.nh.hoopscoach.game.Road.answer(lg, 1) } }
+        Sim.playDay(lg)
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        vm.select(Tab.TODAY); idle()
+        rule.onAllNodes(androidx.compose.ui.test.hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("See all")); idle()
+        shot("Z10_today_social")
+        vm.push(com.nh.hoopscoach.ui.Route.Social); idle(); shot("Z11_social_feed"); vm.back(); idle()
+        val story = lg.news.indexOfLast { it.kind == "article" }
+        assertTrue("a game story", story >= 0)
+        vm.push(com.nh.hoopscoach.ui.Route.Article(story)); idle(); shot("Z12_article"); vm.back(); idle()
+        val column = lg.news.indexOfLast { it.kind == "column" }
+        if (column >= 0) { vm.push(com.nh.hoopscoach.ui.Route.Article(column)); idle(); shot("Z13_column") }
     }
 
     /** A 1996 league: the era's stars, old club names and monogram badges. */

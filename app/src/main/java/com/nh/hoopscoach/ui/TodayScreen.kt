@@ -71,7 +71,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg); SocialStrip(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
@@ -252,16 +252,7 @@ private fun Headlines(vm: GameViewModel, lg: League) {
     val items = lg.news.filter { it.season == lg.season }.takeLast(6).reversed()
     if (items.isEmpty()) return
     Section("Around the league")
-    GroupList(items, inset = 34.dp) { n ->
-        ListRow(onClick = if (n.gameId >= 0 && lg.games.any { it.id == n.gameId }) ({ vm.push(Route.Box(n.gameId)) }) else null) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (n.mine) P.accent else P.line))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                NewsTag(n)
-                Text(n.text, style = T.body, color = if (n.mine) P.ink else P.sub)
-            }
-        }
-    }
+    GroupList(items, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
 }
 
 // ---------- tournaments ----------
@@ -288,7 +279,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg); SocialStrip(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         when {

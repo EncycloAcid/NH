@@ -185,6 +185,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (r.press != null) item { PressCard(vm, lg) }
+        if (r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
         if (r.suitors.isNotEmpty()) item {
             Section("Trade request")
             Panel(onClick = { vm.select(Tab.RECRUIT) }) {
@@ -253,7 +254,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         val news = lg.news.filter { it.season >= lg.season - 1 }.takeLast(6).reversed()
         if (news.isNotEmpty()) item {
             Section("Around the league")
-            GroupList(news) { n -> Text(n.text, style = if (n.mine) T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
+            GroupList(news, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
         }
         item { Spacer(Modifier.height(16.dp)) }
     }

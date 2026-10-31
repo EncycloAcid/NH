@@ -23,7 +23,8 @@ class RoadMomentsTest {
         Rng.r = Random(12)
         var lg = LeagueGen.newLeague()
         val hero = Road.createHero(lg, Road.Spec("Dre", "Collins", Pos.SG, 77, 200, "Memphis", "TN", Arch.SHARPSHOOTER, 5, 0))
-        val offer = Road.offers(lg, hero).minBy { it.ahead }
+        // A program where he starts: nobody ahead of him, and the weakest such school, so he's on the floor late in close games.
+        val offer = Road.offers(lg, hero).minWith(compareBy({ it.ahead }, { lg.team(it.teamId).prestige }))
         lg = Road.start(lg, hero, offer.teamId)
         Road.chooseDeal(lg, NilDeal.STEADY)
         val r = lg.road!!
@@ -32,6 +33,7 @@ class RoadMomentsTest {
         Road.setPractice(lg, Practice.SHOOTING)
 
         var offered = 0
+        val margins = mutableListOf<Int>()
         var games = 0
         var maxFatigue = 0
         val picks = GameEngine.MomentChoice.entries
@@ -57,6 +59,7 @@ class RoadMomentsTest {
                 } else e.step()
             }
             e.commit()
+            margins += kotlin.math.abs(g.hs - g.aws)
             val side = if (g.home == lg.userTeamId) 0 else 1
             val box = g.box!!
             val pts = (if (side == 0) box.home else box.away).sumOf { it.s.pts }
@@ -65,10 +68,11 @@ class RoadMomentsTest {
             games++
             maxFatigue = maxOf(maxFatigue, r.fatigue)
         }
+        println("final margins $margins; role ${com.nh.hoopscoach.game.Gameplan.role(lg.user, h.id)}, ${"%.1f".format(h.stats.mpg)} mpg")
         println("games $games, big moments offered $offered, recorded ${r.moments}, came through ${r.momentsWon}")
         println("fatigue peak $maxFatigue, now ${r.fatigue} (${Road.fatigueLabel(r.fatigue)}); 3PT ${startOut} -> ${h.attrs[com.nh.hoopscoach.game.Attr.OUT.ordinal]}, ovr ${h.ovr}")
         println("POY race: No. ${r.raceRank} (last week ${r.lastRaceRank}), live ${Road.raceRank(lg)} · ${Road.allAmericaPace(Road.raceRank(lg))}")
-        assertTrue("close games bring big moments", offered >= 2)
+        assertTrue("close games bring big moments", offered >= 3)
         assertEquals(offered, r.moments)
         assertTrue(r.momentsWon in 0..r.moments)
         assertTrue("shooting reps build the three", h.attrs[com.nh.hoopscoach.game.Attr.OUT.ordinal] > startOut)

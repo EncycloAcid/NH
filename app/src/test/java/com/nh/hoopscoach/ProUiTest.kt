@@ -98,7 +98,7 @@ class ProUiTest {
         vm.install(lg); vm.select(Tab.TODAY)
         shot("P05_today")
         scrollTo(3); shot("P05b_today_more")
-        vm.select(Tab.RECRUIT); shot("P06_me"); scrollTo(2); shot("P06b_me_races"); scrollToText("YOUR RIVAL"); shot("P06c_me_rival")
+        vm.select(Tab.RECRUIT); shot("P06_me"); scrollTo(2); shot("P06b_me_races"); if (com.nh.hoopscoach.game.Rival.player(lg) != null) { scrollToText("YOUR RIVAL"); shot("P06c_me_rival") }
         vm.select(Tab.TEAM); vm.teamTab = 0; shot("P07_roster"); vm.teamTab = 1; shot("P07b_schedule")
         vm.select(Tab.LEAGUE); vm.leagueTab = 0; shot("P08_standings"); vm.leagueTab = 3; shot("P08b_leaders"); vm.leagueTab = 0
         // Trades: how he feels, asking out, the teams that call, and the move.

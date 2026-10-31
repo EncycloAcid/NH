@@ -394,6 +394,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
     val q = r.press ?: return
     Section("Postgame press · ${q.topic}")
     Panel {
+        if (q.reporter.isNotEmpty()) Text(q.reporter.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(bottom = 6.dp))
         Row(verticalAlignment = Alignment.Top) {
             Box(Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(P.accentSoft), contentAlignment = Alignment.Center) {
                 Text("?", style = T.head, color = P.accent)
