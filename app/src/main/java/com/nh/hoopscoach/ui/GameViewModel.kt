@@ -96,6 +96,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var proRound by mutableIntStateOf(-1)
     var leagueConf by mutableIntStateOf(-1)
     var leagueTab by mutableIntStateOf(0)
+    /** The pro Me tab's page (You, Team, Growth, Media) and how free-agent offers are sorted. */
+    var meTab by mutableIntStateOf(0)
+    var faSort by mutableIntStateOf(0)
     /** The season the Awards page shows (0 for the current one). */
     var awardsSeason by mutableIntStateOf(0)
     var awardsScope by mutableIntStateOf(0)

@@ -784,13 +784,15 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                 ), style = T.numSm)
             }
         }
+        // Four pages instead of one long scroll.
+        item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
         if (r.press != null) item { PressCard(vm, lg) }
-        item { SituationPanel(vm, lg) }
-        item { ContenderPanel(vm, lg) }
-        item { RacePanel(vm, lg) }
-        item { AllTimePanel(vm, lg) }
-        item { RivalPanel(vm, lg) }
-        item {
+        if (vm.meTab == 0) item { SituationPanel(vm, lg) }
+        if (vm.meTab == 0) item { RacePanel(vm, lg) }
+        if (vm.meTab == 0) item { AllTimePanel(vm, lg) }
+        if (vm.meTab == 0) item { RivalPanel(vm, lg) }
+        if (vm.meTab == 1) item { ContenderPanel(vm, lg) }
+        if (vm.meTab == 1) item {
             val mins = com.nh.hoopscoach.game.Gameplan.plannedMinutes(t, h.id)
             Section("Your role")
             Panel {
@@ -818,11 +820,12 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        item { StaffPanel(vm, lg) }
-        item { ImpactPanel(vm, lg) }
-        item { PracticePanel(vm, lg) }
-        item { MediaPanel(lg) }
-        item {
+        if (vm.meTab == 1) item { ImpactPanel(vm, lg) }
+        if (vm.meTab == 2) item { PracticePanel(vm, lg) }
+        if (vm.meTab == 2) item { StaffPanel(vm, lg) }
+        if (vm.meTab == 3) item { MediaPanel(lg) }
+        if (vm.meTab == 3 && r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
+        if (vm.meTab == 2) item {
             Section("Development")
             Panel {
                 Text("Training focus: ${h.focus.label}", style = T.bodyB, color = P.ink)
@@ -1347,7 +1350,17 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
         Section("Offers")
         Text("Tap an offer to negotiate: counter, set the length, add a player option, or take less to join a contender.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
     }
-    for (i in r.proOffers.indices) item(key = "offer-${r.proOffers[i].teamId}") {
+    if (r.proOffers.size > 3) item {
+        Spacer(Modifier.height(6.dp))
+        Segmented(listOf("Most money", "Biggest role", "Contenders"), vm.faSort, { vm.faSort = it }, scroll = true)
+        Text("${r.proOffers.size} teams made offers.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
+    }
+    val order = r.proOffers.indices.sortedWith(when (vm.faSort) {
+        1 -> compareBy<Int> { r.proOffers[it].ahead }.thenByDescending { r.proOffers[it].salary }
+        2 -> compareByDescending<Int> { r.proOffers[it].winPct }.thenByDescending { r.proOffers[it].salary }
+        else -> compareByDescending { r.proOffers[it].salary }
+    })
+    for (i in order) item(key = "offer-${r.proOffers[i].teamId}") {
         Spacer(Modifier.height(8.dp))
         OfferCard(vm, lg, i, r.proOffers[i], current = r.proOffers[i].teamId == t.id)
     }

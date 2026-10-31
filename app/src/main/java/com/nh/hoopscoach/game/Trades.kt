@@ -63,6 +63,7 @@ object Trades {
         ps.moved += (fromA + fromB).map { it.id }
         val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, fromA.map { it.name }, fromB.map { it.name }, hero)
         ps.trades += trade
+        Rumors.breaking(lg, trade)
         if (ps.trades.size > 200) ps.trades.removeAt(0)
         lg.reindex()
         return trade

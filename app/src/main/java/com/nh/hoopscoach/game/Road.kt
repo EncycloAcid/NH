@@ -100,16 +100,18 @@ object Road {
      * Schools that offer the user's player a scholarship: programs whose Recruiting Pull matches his level,
      * with room at his position, and a lean toward home. [transfer] offers are judged on his current overall.
      */
-    fun offers(lg: League, p: Player, count: Int = 8, transfer: Boolean = false, exclude: Int = -1): List<SchoolOffer> {
+    fun offers(lg: League, p: Player, count: Int = 1000, transfer: Boolean = false, exclude: Int = -1): List<SchoolOffer> {
         Brand.ensure(lg)
         val pulls = Brand.pullTable(lg)
         val want = if (transfer) (p.ovr * 1.35 - 28).coerceIn(20.0, 92.0) else when (p.stars) { 5 -> 80.0; 4 -> 62.0; else -> 44.0 }
-        val scored = lg.teams.filter { it.id != exclude }.map { t ->
+        // Every school at or below his level wants him (a five-star can go anywhere); a few reach programs too.
+        val open = lg.teams.filter { it.id != exclude && pulls[it.id] <= want + 18 }
+        val scored = (open.ifEmpty { lg.teams.filter { it.id != exclude } }).map { t ->
             val band = exp(-((pulls[t.id] - want) / 13.0).pow(2))
             val need = when (ahead(lg, t, p)) { 0 -> 1.3; 1 -> 1.1; 2 -> 0.85; else -> 0.6 }
             val loc = 1.0 + Geo.closeness(t, p) * 0.15
             t to band * need * loc * (0.75 + Rng.d() * 0.5)
-        }.sortedByDescending { it.second }.take(count)
+        }.sortedByDescending { it.second }.take(maxOf(count, 8))
         return scored.map { (t, _) ->
             val a = ahead(lg, t, p)
             SchoolOffer(t.id, nilFor(lg, t, p), roleFor(a), a, Geo.closeness(t, p))
@@ -332,7 +334,7 @@ object Road {
         r.declared = false
         if (r.portal) {
             r.offers.clear()
-            r.offers += offers(lg, h, 6, transfer = true, exclude = h.teamId)
+            r.offers += offers(lg, h, transfer = true, exclude = h.teamId)
         }
     }
 

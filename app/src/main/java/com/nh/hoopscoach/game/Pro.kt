@@ -596,6 +596,7 @@ object ProSeason {
                 upkeep(lg)
                 NbaCup.endOfDay(lg)
                 NbaAwards.endOfDay(lg)
+                Rumors.daily(lg)
                 if (lg.day == ProLeague.allStarDay(lg) - 1) allStar(lg)
                 if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
@@ -1082,6 +1083,7 @@ object ProCareer {
                     r.proOffers.clear()
                     r.proOffers += offers(lg)
                     if (r.proOffers.isEmpty()) { retire(lg, "Nobody called. "); return }
+                    Rumors.freeAgency(lg)
                 }
                 ps.step = ProStep.FREE_AGENCY
             }
@@ -1192,14 +1194,16 @@ object ProCareer {
     fun offers(lg: League): List<ProOffer> {
         val h = lg.playerOrNull(lg.heroId) ?: return emptyList()
         val value = marketValue(lg, h)
-        val count = when { h.ovr >= 90 -> 6; h.ovr >= 86 -> 4; h.ovr >= 80 -> 3; h.ovr >= 77 -> 1; else -> 0 }
-        if (count == 0) return emptyList()
+        // Every team is in the market for a real player; below that, nobody calls.
+        if (h.ovr < 77) return emptyList()
         val years = when { h.age <= 27 -> Rng.range(4, 5); h.age <= 30 -> 3; h.age <= 33 -> Rng.range(2, 3); h.age <= 36 -> 2; else -> 1 }
-        val pool = (listOf(lg.user) + lg.teams.filter { it.id != h.teamId }.shuffled(Rng.r)).take(count)
+        val pool = listOf(lg.user) + lg.teams.filter { it.id != h.teamId }
         return pool.map { t ->
             val ahead = lg.rosterOf(t).count { it.id != h.id && it.pos == h.pos && it.ovr >= h.ovr }
             val top = maxFor(lg, t.id)
-            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
+            // Teams that need him at his position pay more; teams set there offer less.
+            val need = when (ahead) { 0 -> 1.0; 1 -> 0.9; else -> 0.78 }
+            val pay = ((value * (if (t.id == h.teamId) 1.05 else (0.78 + Rng.d() * 0.22) * need)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
             // How far each team will stretch: a little more for his own team, never past the max.
             val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, top)
             ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max)

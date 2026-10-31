@@ -43,11 +43,12 @@ private fun kindColor(kind: String) = when (kind) {
     "rival" -> P.warn
     "teammate" -> P.gold
     "hater" -> P.faint
+    "insider" -> P.accent
     else -> P.sub
 }
 
 private fun kindLabel(kind: String) = when (kind) {
-    "team" -> "Team"; "media" -> "Highlights"; "analyst" -> "Analyst"; "rival" -> "Your rival"; "teammate" -> "Teammate"; "hater" -> "Doubter"; else -> "Fan"
+    "team" -> "Team"; "media" -> "Highlights"; "analyst" -> "Analyst"; "rival" -> "Your rival"; "teammate" -> "Teammate"; "hater" -> "Doubter"; "insider" -> "Insider"; else -> "Fan"
 }
 
 /** One post: avatar, name with a check if verified, handle and day, the text, and the likes. */

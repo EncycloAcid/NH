@@ -190,7 +190,7 @@ private fun RoadOffers(vm: GameViewModel, lg: League, hero: Player, header: @Com
                 Text("Pick where you'll play. A school with fewer good players at your position means minutes sooner; richer programs pay more NIL.",
                     style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
                 Spacer(Modifier.height(6.dp))
-                GroupList(vm.roadOffers, inset = 64.dp) { o -> OfferRow(lg, o, hero, pick == o.teamId) { pick = o.teamId } }
+                OfferBrowser(lg, vm.roadOffers, hero, pick) { pick = it.teamId }
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -200,6 +200,32 @@ private fun RoadOffers(vm: GameViewModel, lg: League, hero: Player, header: @Com
             Text("Change your player", style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().clickable { vm.roadBack() }.padding(top = 10.dp))
         }
+    }
+}
+
+/** A long list of schools: sort it, search it, and see it a page at a time. */
+@Composable
+private fun OfferBrowser(lg: League, offers: List<SchoolOffer>, hero: Player, selected: Int, onPick: (SchoolOffer) -> Unit) {
+    var sort by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    var shown by remember { mutableStateOf(20) }
+    Segmented(listOf("Top programs", "Playing time", "Most NIL", "Near home"), sort, { sort = it; shown = 20 }, scroll = true)
+    OutlinedTextField(query, { query = it; shown = 20 }, placeholder = { Text("Search a school or conference", color = P.faint) }, singleLine = true,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 8.dp), colors = fieldColors())
+    val q = query.trim().lowercase()
+    val list = offers.filter { o ->
+        val t = lg.team(o.teamId)
+        q.isEmpty() || t.school.lowercase().contains(q) || t.mascot.lowercase().contains(q) || lg.conf(t.confId).name.lowercase().contains(q) || lg.conf(t.confId).abbr.lowercase() == q
+    }.sortedWith(when (sort) {
+        1 -> compareBy<SchoolOffer> { it.ahead }.thenByDescending { lg.team(it.teamId).prestige }
+        2 -> compareByDescending { it.nil }
+        3 -> compareByDescending<SchoolOffer> { it.closeness }.thenByDescending { lg.team(it.teamId).prestige }
+        else -> compareByDescending { lg.team(it.teamId).prestige }
+    })
+    if (list.isEmpty()) Panel { Text("No school matches \"$query\".", style = T.body, color = P.sub) }
+    GroupList(list.take(shown), inset = 64.dp) { o -> OfferRow(lg, o, hero, selected == o.teamId) { onPick(o) } }
+    if (list.size > shown) Box(Modifier.padding(horizontal = Gutter, vertical = 8.dp)) {
+        SecondaryButton("Show more · ${list.size - shown} more schools", Modifier.fillMaxWidth()) { shown += 20 }
     }
 }
 
@@ -1066,9 +1092,7 @@ private fun LazyListScope.summerStep(vm: GameViewModel, lg: League, h: Player, t
     if (r.portal) item {
         Section("Transfer offers")
         if (r.offers.isEmpty()) Panel { Text("No offers came in. You'll stay at ${t.school}.", style = T.body, color = P.sub) }
-        GroupList(r.offers, inset = 64.dp) { o ->
-            OfferRow(lg, o, h, false) { vm.act { Road.transfer(it, o.teamId) }; vm.toast("Welcome to ${lg.team(o.teamId).school}") }
-        }
+        OfferBrowser(lg, r.offers, h, -1) { o -> vm.act { Road.transfer(it, o.teamId) }; vm.toast("Welcome to ${lg.team(o.teamId).school}") }
         Text("Tap a school to transfer. Or stay with the button below.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
     }
 }
