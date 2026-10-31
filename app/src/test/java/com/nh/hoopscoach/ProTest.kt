@@ -78,7 +78,7 @@ class ProTest {
         assertTrue("trade recorded", lg.proState!!.trades.last().hero)
         println(r.tradeNote)
         lg = SaveIO.decode(SaveIO.encode(lg))
-        while (lg.day < com.nh.hoopscoach.game.Trades.DEADLINE && lg.phase == Phase.REGULAR) Sim.playDay(lg)
+        while (lg.day < com.nh.hoopscoach.game.Trades.deadlineDay(lg) && lg.phase == Phase.REGULAR) Sim.playDay(lg)
         val ai = lg.proState!!.trades.filter { !it.hero && !it.offseason }
         ai.forEach { println("  " + com.nh.hoopscoach.game.Trades.describe(lg, it)) }
         assertTrue("deadline deals", ai.size >= 2)
@@ -260,7 +260,9 @@ class ProTest {
             seasons++
             assertEquals(Phase.REGULAR, lg.phase)
             assertTrue("salary paid", lg.road!!.salarySeason == lg.season)
-            assertEquals("58 games each", ProLeague.GAMES, lg.games.count { it.involves(lg.userTeamId) })
+            assertTrue("82 games each", lg.teams.all { t -> lg.games.count { it.involves(t.id) } == ProLeague.GAMES })
+            assertTrue("one game a day at most", lg.teams.all { t -> lg.games.filter { it.involves(t.id) }.groupBy { it.day }.values.all { it.size == 1 } })
+            assertTrue("no games on All-Star day", lg.games.none { it.day == ProLeague.allStarDay(lg) })
             var guard = 0
             while (lg.phase != Phase.OFFSEASON && guard++ < 200) {
                 Sim.playDay(lg)

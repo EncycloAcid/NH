@@ -18,10 +18,13 @@ object ProLeague {
 
     /** Pro teams have no logo files: their badge is drawn from team colors. */
     const val LOGO = -7
-    const val GAMES = 58
+    const val GAMES = 82
     /** No games on day 30: the All-Star break. The regular season ends on day 59. */
-    const val ALL_STAR_DAY = 30
-    const val LAST_DAY = 59
+    /** The All-Star break and the end of the regular season come from the schedule. */
+    fun allStarDay(lg: League) = lg.proState?.allStarDay ?: 30
+    fun lastDay(lg: League) = lg.proState?.lastDay ?: 59
+    /** Games each team plays this season (58 in saves from before the 82-game schedule). */
+    fun seasonGames(lg: League) = if (lastDay(lg) <= 59) 58 else GAMES
     const val ROSTER = 13
     const val MAX_ROSTER = 15
     val ROUND_NAMES = listOf("First Round", "Conference Semifinals", "Conference Finals", "Finals")
@@ -259,16 +262,39 @@ object ProLeague {
             rounds += (0 until n / 2).map { i -> val a = ids[i]; val b = ids[n - 1 - i]; if ((rd + i) % 2 == 0) a to b else b to a }
             ids.add(1, ids.removeAt(n - 1))
         }
-        val all = rounds.shuffled(Rng.r) + rounds.shuffled(Rng.r).map { rd -> rd.map { (h, a) -> a to h } }
+        val all = (rounds.shuffled(Rng.r) + rounds.shuffled(Rng.r).map { rd -> rd.map { (h, a) -> a to h } }).toMutableList<List<Pair<Int, Int>>>()
+        // 82 games: twice against everyone, and twice more against 12 of the 14 conference rivals.
+        val extra = mutableListOf<Pair<Int, Int>>()
+        for (c in lg.confs) {
+            val ring = c.teamIds.shuffled(Rng.r)
+            val m = ring.size
+            for (i in 0 until m) for (j in i + 1 until m) {
+                if (j - i == 1 || (i == 0 && j == m - 1)) continue
+                extra += ring[i] to ring[j]
+                extra += ring[j] to ring[i]
+            }
+        }
+        val extraRounds = mutableListOf<MutableList<Pair<Int, Int>>>()
+        val busy = mutableListOf<MutableSet<Int>>()
+        for (g in extra.shuffled(Rng.r)) {
+            val k = busy.indexOfFirst { g.first !in it && g.second !in it }
+            if (k >= 0) { extraRounds[k] += g; busy[k] += listOf(g.first, g.second) }
+            else { extraRounds += mutableListOf(g); busy += mutableSetOf(g.first, g.second) }
+        }
+        all += extraRounds
+        all.shuffle(Rng.r)
+        val ps = lg.proState
         var day = 1
-        for (rd in all) {
-            if (day == ALL_STAR_DAY) day++
+        for ((i, rd) in all.withIndex()) {
+            if (i == all.size / 2) { ps?.allStarDay = day; day++ }
+            if (i == (all.size * 0.68).toInt()) ps?.deadline = day
             for ((h, a) in rd) {
                 val type = if (lg.team(h).confId == lg.team(a).confId) GameType.CONF else GameType.NONCONF
                 lg.addGame(Game(lg.nextGameId++, day, h, a, false, type))
             }
             day++
         }
+        ps?.lastDay = day - 1
     }
 }
 
@@ -301,9 +327,9 @@ object ProSeason {
         when (lg.phase) {
             Phase.REGULAR -> {
                 upkeep(lg)
-                if (lg.day == ProLeague.ALL_STAR_DAY - 1) allStar(lg)
-                if (lg.day == Trades.DEADLINE - 1) Trades.deadline(lg)
-                if (lg.day >= ProLeague.LAST_DAY) { startPlayoffs(lg); return }
+                if (lg.day == ProLeague.allStarDay(lg) - 1) allStar(lg)
+                if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
+                if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
             }
             Phase.PLAYOFFS -> {
                 updateSeries(lg)
@@ -382,7 +408,7 @@ object ProSeason {
             if (u.id in ps.seeds) "The ${u.name} are in the playoffs as the No. ${ps.seeds[u.id]} seed in the ${lg.conf(u.confId).name}"
             else "The ${u.name} miss the playoffs at ${u.w}-${u.l}", true)
         lg.phase = Phase.PLAYOFFS
-        lg.day = ProLeague.LAST_DAY + 2
+        lg.day = ProLeague.lastDay(lg) + 2
         prepareDay(lg)
     }
 

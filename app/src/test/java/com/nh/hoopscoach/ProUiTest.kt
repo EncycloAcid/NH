@@ -115,7 +115,7 @@ class ProUiTest {
         vm.live?.let { lv -> lv.speed = 0; repeat(6) { lv.engine.stepToHero() }; lv.tick++ }
         shot("P09_live_spotlight"); vm.live?.done = true; vm.back(); idle()
         vm.live = null
-        while (lg.day < ProLeague.ALL_STAR_DAY && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        while (lg.day < ProLeague.allStarDay(lg) && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star")
         var guard = 0
         while (lg.phase == Phase.REGULAR && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }

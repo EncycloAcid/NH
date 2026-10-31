@@ -803,6 +803,10 @@ class ProState(
     val moved: MutableList<Int> = mutableListOf(),
     /** All-time list scores of players who retired in this league, by name. */
     val frozen: MutableMap<String, Double> = mutableMapOf(),
+    /** This season's calendar: the All-Star break, the trade deadline and the last regular-season day (58-game defaults for older saves). */
+    var allStarDay: Int = 30,
+    var deadline: Int = 40,
+    var lastDay: Int = 59,
     /** The records book, and this summer's star free agents. */
     val records: MutableList<BookRecord> = mutableListOf(),
     val freeStars: MutableList<Int> = mutableListOf(),

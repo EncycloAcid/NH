@@ -83,10 +83,10 @@ object RecordBook {
 
     /** A player's pro totals in this league, scaled to 82-game seasons. */
     fun careerTotals(lg: League, p: Player): DoubleArray {
-        val tot = StatLine()
-        p.career.filter { it.cls == PRO_YEAR }.forEach { tot.add(it.s) }
-        if (p.teamId >= 0 && p.career.none { it.season == lg.season && it.cls == PRO_YEAR }) tot.add(p.stats)
-        return DoubleArray(6) { stat(tot, it) * AllTime.SEASON_SCALE }
+        val out = DoubleArray(6)
+        for (l in p.career.filter { it.cls == PRO_YEAR }) { val k = AllTime.lineScale(l); for (i in 0 until 6) out[i] += stat(l.s, i) * k }
+        if (p.teamId >= 0 && p.career.none { it.season == lg.season && it.cls == PRO_YEAR }) for (i in 0 until 6) out[i] += stat(p.stats, i) * AllTime.currentScale(lg)
+        return out
     }
 
     private fun broke(lg: League, rec: BookRecord, p: Player, value: Double) {
@@ -129,13 +129,16 @@ object RecordBook {
         }
     }
 
-    /** End of the regular season: per-game records (41 games to qualify), and active holders' career totals. */
+    /** Games needed to qualify for a per-game record: 70% of the season. */
+    fun qualify(lg: League) = (ProLeague.seasonGames(lg) * 0.7).toInt()
+
+    /** End of the regular season: per-game records (70% of games to qualify), and active holders' career totals. */
     fun seasonEnd(lg: League) {
         val ps = lg.proState ?: return
         if (ps.records.isEmpty()) seed(lg)
         for (i in 0 until 6) {
             val rec = ps.records.first { it.key == "season_" + STATS[i] }
-            val best = lg.players.filter { it.stats.gp >= 41 }.maxByOrNull { stat(it.stats, i).toDouble() / it.stats.gp } ?: continue
+            val best = lg.players.filter { it.stats.gp >= qualify(lg) }.maxByOrNull { stat(it.stats, i).toDouble() / it.stats.gp } ?: continue
             val v = ((stat(best.stats, i).toDouble() / best.stats.gp) * 10).roundToInt() / 10.0
             if (v > rec.value) broke(lg, rec, best, v)
         }
@@ -153,7 +156,7 @@ object RecordBook {
         val i = STATS.indexOf(rec.key.substringAfter("_"))
         return when (rec.scope) {
             "Game" -> lg.road?.proBest?.getOrNull(i)?.toDouble() ?: 0.0
-            "Season" -> (h.career.filter { it.cls == PRO_YEAR && it.s.gp >= 41 }.map { it.s } + listOfNotNull(h.stats.takeIf { it.gp >= 41 }))
+            "Season" -> (h.career.filter { it.cls == PRO_YEAR && it.s.gp >= (it.w + it.l) * 0.7 }.map { it.s } + listOfNotNull(h.stats.takeIf { it.gp >= qualify(lg) }))
                 .maxOfOrNull { stat(it, i).toDouble() / it.gp } ?: 0.0
             else -> careerTotals(lg, h)[i]
         }
@@ -251,7 +254,7 @@ object StarRecruit {
             .flatMap { lg.rosterOf(it) }.filter { it.ovr >= 91 && it.id != lg.road?.rivalId }.sortedByDescending { it.ovr }.take(3)
     }
 
-    fun canPush(lg: League) = lg.phase == Phase.REGULAR && lg.day < Trades.DEADLINE && lg.road?.pushSeason != lg.season && lg.road?.ended == false
+    fun canPush(lg: League) = lg.phase == Phase.REGULAR && lg.day < Trades.deadlineDay(lg) && lg.road?.pushSeason != lg.season && lg.road?.ended == false
 
     /** He pushes for a trade for [pid]: the front office offers what it can spare (never him). Returns what happened. */
     fun push(lg: League, pid: Int): String {

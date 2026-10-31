@@ -18,9 +18,14 @@ object AllTime {
     const val ALL_STAR = 1.0
     const val DPOY = 2.0
     const val ROY = 1.0
-    /** Per thousand career points, on an 82-game scale (this league plays 58, so its points count 82/58). */
+    /** Per thousand career points, on an 82-game scale. */
     const val PER_1000 = 0.6
-    const val SEASON_SCALE = 82.0 / 58.0
+
+    /** A finished season counts as 82 games (older saves played 58). */
+    fun lineScale(l: SeasonLine) = if (l.w + l.l in 40..81) 82.0 / (l.w + l.l) else 1.0
+
+    /** The season in progress, the same way. */
+    fun currentScale(lg: League) = 82.0 / ProLeague.seasonGames(lg)
 
     /** You make the list at this score. */
     const val FLOOR = 20.0
@@ -62,14 +67,14 @@ object AllTime {
 
     /** What [p] has done in this league, by the same formula. */
     fun inGame(lg: League, p: Player): Double {
-        var pts = p.career.filter { it.cls == PRO_YEAR }.sumOf { it.s.pts }
-        if (p.teamId >= 0 && p.career.none { it.season == lg.season && it.cls == PRO_YEAR }) pts += p.stats.pts
+        var pts = p.career.filter { it.cls == PRO_YEAR }.sumOf { it.s.pts * lineScale(it) }
+        if (p.teamId >= 0 && p.career.none { it.season == lg.season && it.cls == PRO_YEAR }) pts += p.stats.pts * currentScale(lg)
         return count(p, "MVP") * MVP + count(p, "Finals MVP") * FINALS_MVP + count(p, "Champion") * RING +
             count(p, "All-League 1st") * ALL_LEAGUE_1 + count(p, "All-League 2nd") * ALL_LEAGUE_2 + count(p, "All-League 3rd") * ALL_LEAGUE_3 +
             count(p, "All-Star") * ALL_STAR + count(p, "Defensive Player of the Year") * DPOY + count(p, "Rookie of the Year") * ROY +
             count(p, "Olympics Gold") * 2.0 + count(p, "World Cup Gold") * 1.0 +
             p.awards.count { it.substringAfter(" ").startsWith("Record: ") } * 3.0 +
-            pts / 1000.0 * PER_1000 * SEASON_SCALE
+            pts / 1000.0 * PER_1000
     }
 
     /** A real player's career before this league, plus everything since. */

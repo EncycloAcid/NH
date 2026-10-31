@@ -8,8 +8,8 @@ import kotlin.math.roundToInt
  * at the deadline, and AI teams swap players at the deadline and over the summer.
  */
 object Trades {
-    /** No trades after day 40 of the 59-day regular season. */
-    const val DEADLINE = 40
+    /** No trades after the deadline, about two-thirds of the way through the regular season. */
+    fun deadlineDay(lg: League) = lg.proState?.deadline ?: 40
 
     // ---------- value ----------
 
@@ -81,7 +81,7 @@ object Trades {
         if (!lg.pro || r.ended || (r.contract?.years ?: 0) <= 0 || r.tradeKey == window(lg) || r.suitors.isNotEmpty()) return false
         if (lg.playerOrNull(lg.heroId)?.teamId?.let { it < 0 } != false) return false
         return when (lg.phase) {
-            Phase.REGULAR -> lg.day < DEADLINE
+            Phase.REGULAR -> lg.day < deadlineDay(lg)
             Phase.OFFSEASON -> lg.proState?.step == ProStep.DRAFT || lg.proState?.step == ProStep.FREE_AGENCY
             else -> false
         }

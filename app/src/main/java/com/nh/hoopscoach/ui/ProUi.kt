@@ -74,7 +74,7 @@ fun proPace(rank: Int) = when {
 }
 
 private fun proPhase(lg: League) = when (lg.phase) {
-    Phase.REGULAR -> if (lg.day == ProLeague.ALL_STAR_DAY) "All-Star break" else "Game ${(lg.user.gp + 1).coerceAtMost(ProLeague.GAMES)} of ${ProLeague.GAMES}"
+    Phase.REGULAR -> if (lg.day == ProLeague.allStarDay(lg)) "All-Star break" else "Game ${(lg.user.gp + 1).coerceAtMost(ProLeague.seasonGames(lg))} of ${ProLeague.seasonGames(lg)}"
     Phase.PLAYOFFS -> "Playoffs"
     else -> "Offseason"
 }
@@ -142,8 +142,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
                 Text("If you don't choose by the deadline, the front office takes the first offer.", style = T.small, color = P.sub)
             }
         }
-        if (lg.phase == Phase.REGULAR && lg.day in (com.nh.hoopscoach.game.Trades.DEADLINE - 10) until com.nh.hoopscoach.game.Trades.DEADLINE) item {
-            val left = com.nh.hoopscoach.game.Trades.DEADLINE - lg.day
+        if (lg.phase == Phase.REGULAR && lg.day in (com.nh.hoopscoach.game.Trades.deadlineDay(lg) - 10) until com.nh.hoopscoach.game.Trades.deadlineDay(lg)) item {
+            val left = com.nh.hoopscoach.game.Trades.deadlineDay(lg) - lg.day
             val mood = com.nh.hoopscoach.game.Trades.mood(lg)
             Section("Trade deadline", action = "Me", onAction = { vm.select(Tab.RECRUIT) })
             Panel {
@@ -151,7 +151,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
                 Text("You're ${mood.label.lowercase()}." + if (com.nh.hoopscoach.game.Trades.canRequest(lg)) " You can still ask for a trade." else "", style = T.small, color = P.sub)
             }
         }
-        if (ps != null && ps.allStarSeason == lg.season && ps.allStarNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day <= ProLeague.ALL_STAR_DAY + 7) item {
+        if (ps != null && ps.allStarSeason == lg.season && ps.allStarNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day <= ProLeague.allStarDay(lg) + 7) item {
             Section("All-Star Weekend")
             Panel(color = if (lg.heroId in ps.allStars) P.hero else P.surface) {
                 Text(ps.allStarNote, style = T.body, color = if (lg.heroId in ps.allStars) P.onHero else P.ink)
@@ -294,7 +294,7 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
                 fun item(label: String, a: () -> Unit) = DropdownMenuItem(text = { Text(label, style = T.body, color = P.ink) }, onClick = { menu = false; a() })
                 if (lg.phase == Phase.REGULAR) {
                     item("Sim one week") { vm.simDays(7) }
-                    if (lg.day < ProLeague.ALL_STAR_DAY) item("Sim to the All-Star break") { vm.simUntil("Simulating to the All-Star break") { it.day >= ProLeague.ALL_STAR_DAY } }
+                    if (lg.day < ProLeague.allStarDay(lg)) item("Sim to the All-Star break") { vm.simUntil("Simulating to the All-Star break") { it.day >= ProLeague.allStarDay(it) } }
                     item("Sim to the playoffs") { vm.simToPhase(Phase.PLAYOFFS, "Simulating the regular season") }
                 }
                 item("Sim to the end of the season") { vm.simUntil("Simulating the rest of the season") { it.phase == Phase.OFFSEASON } }
@@ -393,7 +393,7 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
     val ps = lg.proState ?: return
     if (ps.series.isEmpty()) {
         item {
-            Panel { Text("The playoffs start after game ${ProLeague.GAMES}: the top eight in each conference, best of seven all the way.", style = T.body, color = P.sub) }
+            Panel { Text("The playoffs start after game ${ProLeague.seasonGames(lg)}: the top eight in each conference, best of seven all the way.", style = T.body, color = P.sub) }
             for (c in 0..1) {
                 Section("${lg.conf(c).abbr} if the season ended today")
                 val st = ProSeason.standings(lg, c).take(8)
@@ -637,7 +637,7 @@ private fun LazyListScope.recordsBook(lg: League) {
                 }
             }
         }
-        if (scope == "Career") Text("Career totals count each 58-game season as a full 82. Breaking a record adds 3 legacy points.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+        if (scope == "Career") Text("Totals from 58-game seasons in older saves count as a full 82. Breaking a record adds 3 legacy points.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 }
 
@@ -817,7 +817,7 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
         } else if (trades.canRequest(lg)) {
             Spacer(Modifier.height(12.dp))
             Text(
-                if (lg.phase == Phase.REGULAR) "Want out? Ask before the deadline (day ${trades.DEADLINE}). Your fans won't like it; your agent finds who's interested and you pick."
+                if (lg.phase == Phase.REGULAR) "Want out? Ask before the deadline (day ${trades.deadlineDay(lg)}). Your fans won't like it; your agent finds who's interested and you pick."
                 else "Want a fresh start? Ask now and your agent finds who's interested. Your fans won't like it.",
                 style = T.small, color = P.sub,
             )
@@ -825,7 +825,7 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
             SecondaryButton("Request a trade", Modifier.fillMaxWidth()) {
                 vm.act { if (trades.request(it) == 0) vm.toast("Nobody made an offer. You're staying put.") }
             }
-        } else if (lg.phase == Phase.REGULAR && lg.day >= trades.DEADLINE) {
+        } else if (lg.phase == Phase.REGULAR && lg.day >= trades.deadlineDay(lg)) {
             Spacer(Modifier.height(8.dp))
             Text("The trade deadline has passed. You can ask again in the offseason.", style = T.small, color = P.sub)
         }
