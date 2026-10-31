@@ -206,7 +206,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         road?.let { it.moments++ }
         fun stolen(loser: Player, how: String) {
             line(o, loser).tov++
-            val stealer = Rng.weighted(defense) { (0.65 * it[Attr.STL] + 0.35 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+            val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
             line(d, stealer).stl++
             log(d, "${stealer.short} $how ${loser.short}!", 0)
             lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
@@ -605,7 +605,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val kind = Rng.d()
             when {
                 kind < 0.55 -> {
-                    val stealer = Rng.weighted(defense) { (0.65 * it[Attr.STL] + 0.35 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+                    val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
                     line(d, stealer).stl++
                     log(d, "${stealer.short} steals it from ${loser.short}", 0)
                 }
@@ -644,10 +644,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             // Pro rosters are all good, so shots spread out more than in college.
             val shooter = putback ?: pickShooter(o, offense)
             val type = if (putback != null) 0 else shotType(o, d, shooter, trail)
+            // His man matters: the defender at his position (or the nearest) is 40% of the perimeter defense and 30% inside.
+            val guard = defense.minByOrNull { kotlin.math.abs(it.pos.ordinal - shooter.pos.ordinal) * 10 + (if (it.pos2 == shooter.pos) -5 else 0) }
+            val pd = if (guard != null) perD * 0.6 + guard[Attr.PER] * 0.4 else perD
+            val id = if (guard != null) intD * 0.7 + guard[Attr.IDF] * 0.3 else intD
             var pMake = when (type) {
-                0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (intD - n[5]) * 0.0038) * talent
-                1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (perD - n[6]) * 0.003) * talent
-                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (perD - n[6]) * 0.0026) * talent
+                0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (id - n[5]) * 0.0038) * talent
+                1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (pd - n[6]) * 0.003) * talent
+                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (pd - n[6]) * 0.0026) * talent
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.

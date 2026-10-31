@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Attr
+import com.nh.hoopscoach.game.PRO_YEAR
 import com.nh.hoopscoach.game.Careers
 import com.nh.hoopscoach.game.Finance
 import com.nh.hoopscoach.game.Gameplan
@@ -241,7 +242,10 @@ private fun RatingsTab(p: Player) {
             Ring(avg(Attr.OUT, Attr.MID), 44.dp, label = "OUT")
             Ring(avg(Attr.INS), 44.dp, label = "INS")
             Ring(avg(Attr.HND, Attr.PAS), 44.dp, label = "PLAY")
-            Ring(avg(Attr.PER, Attr.IDF, Attr.STL, Attr.BLK), 44.dp, label = "DEF")
+            // Defense by what the position needs: perimeter defense and steals for guards and wings, interior defense and blocks for bigs.
+            val big = p.pos == com.nh.hoopscoach.game.Pos.PF || p.pos == com.nh.hoopscoach.game.Pos.C
+            Ring((if (big) 0.15 * p[Attr.PER] + 0.4 * p[Attr.IDF] + 0.15 * p[Attr.STL] + 0.3 * p[Attr.BLK]
+                else 0.55 * p[Attr.PER] + 0.1 * p[Attr.IDF] + 0.3 * p[Attr.STL] + 0.05 * p[Attr.BLK]).toInt(), 44.dp, label = "DEF")
             Ring(avg(Attr.REB), 44.dp, label = "REB")
         }
     }
@@ -287,16 +291,25 @@ private fun CareerTab(vm: GameViewModel, lg: League, p: Player) {
     else {
         if (rows.size > 1) rows += CareerRow("Career", "${rows.size} yrs", "", Careers.total(p), total = true)
         Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(rows, totals) }
+        Text("Swipe the table sideways for steals, blocks and shooting.", style = T.small, color = P.faint, modifier = Modifier.padding(start = Gutter + 4.dp, top = 4.dp))
         if (rows.any { it.current }) Text("Highlighted: season in progress.", style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 6.dp))
     }
 
     // NCAA Tournament.
     val march = p.career.filter { it.ncaa != null && it.ncaa.gp > 0 }.map { CareerRow("${it.season}", it.team, classLabel(it.cls), it.ncaa!!) }.toMutableList()
     if (inSchool && p.tourney.gp > 0 && p.career.none { it.season == lg.season }) march += CareerRow("${lg.season}", lg.team(p.teamId).abbr, p.cls, p.tourney, current = true)
-    if (march.isNotEmpty()) {
-        if (march.size > 1) march += CareerRow("Career", "${march.sumOf { it.s.gp }} G", "", Careers.total(p, ncaa = true), total = true)
-        Section("NCAA Tournament")
-        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(march, totals) }
+    // College tournament games and pro playoff games go in their own tables.
+    val proRows = march.filter { it.cls == "PRO" }
+    val collegeRows = march.filter { it.cls != "PRO" }
+    for ((title, list0) in listOf("NCAA Tournament" to collegeRows, "Playoffs" to proRows)) {
+        if (list0.isEmpty()) continue
+        val list = list0.toMutableList()
+        if (list.size > 1) {
+            val tot = StatLine().also { t -> list.forEach { t.add(it.s) } }
+            list += CareerRow("Career", "${tot.gp} G", "", tot, total = true)
+        }
+        Section(title)
+        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(list, totals) }
     }
 
     // Career highs.
@@ -407,11 +420,21 @@ private fun GrowthTab(p: Player) {
     Section("Overall by year")
     Panel {
         val sc = LocalRatingScale.current
-        val pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5).map(sc)
+        // A pro shows his pro seasons (on the pro scale) with their years; a college player his classes.
+        val proSeasons = p.career.filter { it.cls == PRO_YEAR }
+        val pts: List<Int>
+        val labels: List<String>
+        if (proSeasons.isNotEmpty() || p.year == PRO_YEAR) {
+            pts = (proSeasons.map { it.ovr } + p.ovr).takeLast(8).map(sc)
+            labels = (proSeasons.map { "'" + (it.season % 100).toString().padStart(2, '0') } + "Now").takeLast(8)
+        } else {
+            pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5)
+            labels = pts.indices.map { classLabel(it) }
+        }
         Sparkline(pts, sc(p.pot), Modifier.fillMaxWidth().height(120.dp))
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
-            pts.indices.forEach { i -> Text(classLabel(i), style = T.label, color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+            labels.forEach { l -> Text(l, style = T.label, color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
         }
     }
     Section("Development")

@@ -24,7 +24,7 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     SHARPSHOOTER("Sharpshooter", "SHP", listOf(Attr.INS, Attr.MID, Attr.OUT), "Elite shooter who stretches the floor from all three levels"),
     FLOOR_GENERAL("Floor General", "FLG", listOf(Attr.MID, Attr.HND, Attr.PAS), "Court commander who orchestrates the offense and controls tempo"),
     PLAYMAKER("Playmaker", "PLY", listOf(Attr.INS, Attr.HND, Attr.PAS), "Creative passer who finds open teammates and creates easy baskets"),
-    SLASHER("Slasher", "SLA", listOf(Attr.INS, Attr.PER, Attr.STL), "Explosive scorer who attacks the rim and finishes through contact"),
+    SLASHER("Slasher", "SLA", listOf(Attr.INS, Attr.PER, Attr.STL), "Attacks the rim on offense and jumps the passing lanes on defense"),
     LOCKDOWN("Lockdown Defender", "LCK", listOf(Attr.PER, Attr.STL, Attr.BLK), "Suffocating defender who shuts down the opposing team's best player"),
     COMBO_GUARD("Combo Guard", "CMB", listOf(Attr.MID, Attr.OUT, Attr.HND), "Scores and creates off the dribble from either guard spot"),
     POINT_FORWARD("Point Forward", "PTF", listOf(Attr.HND, Attr.PAS, Attr.REB), "Big wing who runs the offense and pushes the ball off the glass"),
@@ -45,7 +45,7 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     PEST("Pest", "PES", listOf(Attr.PAS, Attr.PER, Attr.STL), "Hounds the ball for 94 feet and makes the simple pass"),
     MICROWAVE("Microwave", "MIC", listOf(Attr.INS, Attr.OUT, Attr.HND), "Instant offense: gets to the rim or pulls up from deep the moment he checks in"),
     MOVEMENT_SHOOTER("Movement Shooter", "MOV", listOf(Attr.MID, Attr.OUT, Attr.PAS), "Never stops running off screens, and the defense bends to find him"),
-    BULLY_GUARD("Bully Guard", "BLY", listOf(Attr.INS, Attr.REB, Attr.PER), "Big guard who backs down smaller defenders and crashes the glass"),
+    BULLY_GUARD("Bully Guard", "BLY", listOf(Attr.INS, Attr.REB, Attr.PER), "Big guard who backs down smaller defenders, crashes the glass and bodies up on defense"),
     HIGH_FLYER("High Flyer", "FLY", listOf(Attr.INS, Attr.PER, Attr.BLK), "Finishes above the rim and chases down blocks in transition"),
     FACE_UP_FOUR("Face-Up Four", "FUP", listOf(Attr.MID, Attr.HND, Attr.REB), "Faces up from the elbow, drives past slower bigs and cleans the glass"),
     SWITCHABLE_BIG("Switchable Big", "SWB", listOf(Attr.PER, Attr.IDF, Attr.BLK), "Big who can guard all five spots and still protect the rim"),
@@ -62,7 +62,7 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     POINT_OF_ATTACK("Point-of-Attack Defender", "POA", listOf(Attr.PER, Attr.STL, Attr.REB), "Picks up full court, fights over every screen and rebounds like a wing"),
     // Shooting guards
     SPOT_UP("Spot-Up Shooter", "SPU", listOf(Attr.MID, Attr.OUT, Attr.REB), "Waits on the wing, catches and fires, and crashes the long rebounds"),
-    MIDRANGE_MAESTRO("Midrange Maestro", "MRM", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives at the elbow with a pull-up nobody can stop"),
+    MIDRANGE_MAESTRO("Midrange Maestro", "MRM", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives at the elbow with a pull-up nobody can stop, and guards his man on the other end"),
     DOWNHILL_GUARD("Downhill Guard", "DHG", listOf(Attr.INS, Attr.MID, Attr.PER), "Attacks closeouts, finishes in traffic and sits down on defense"),
     SPARK_PLUG("Spark Plug", "SPK", listOf(Attr.INS, Attr.OUT, Attr.PAS), "Instant energy off the bench: scores in bunches and finds the hot hand"),
     // Small forwards
