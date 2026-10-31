@@ -146,6 +146,7 @@ class MenuShotsTest {
         vm.installDraft(LeagueGen.newLeague())
         rule.setContent { App(vm) }
         rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
+        rule.onAllNodes(androidx.compose.ui.test.hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Shot Creator")); idle()
         rule.onAllNodes(hasText("Shot Creator")).onFirst().performClick(); idle()
         assertTrue("style picker open", rule.onAllNodes(hasText("Spark Plug")).fetchSemanticsNodes().isNotEmpty())
         shot("Z09_style_picker")

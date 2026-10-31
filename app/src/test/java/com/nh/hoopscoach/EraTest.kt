@@ -52,7 +52,9 @@ class EraTest {
             println("$era: ${lg.season}, ${named} of ${stars.values.flatten().size} stars in the league; clubs ${lg.teams.filter { it.logo == ProLeague.ERA_BADGE }.map { "${it.school} ${it.mascot}" }}")
             assertTrue("the era's stars are here", named >= stars.values.flatten().size * 0.85)
             assertTrue("no NBA Cup before 2023", ps.cupGroups.isEmpty() && lg.games.none { it.label.startsWith("NBA Cup") })
-            assertTrue("83 games each", lg.teams.all { tm -> lg.games.count { it.involves(tm.id) } == ProLeague.GAMES })
+            // 82 with an odd number of teams (23 in 1985-86, 29 in 1995-96 and 2002-03), 83 with 30.
+            assertTrue("a full schedule each", lg.teams.all { tm -> lg.games.count { it.involves(tm.id) } == ProLeague.seasonGames(lg) })
+            assertEquals("the real number of teams", com.nh.hoopscoach.game.EraData.teams(era.year)!!.size, lg.teams.size)
             val h = lg.hero!!
             assertTrue("money scaled to the era (${h.name}: ${lg.road!!.contract!!.salary})", lg.road!!.contract!!.salary <= ProCareer.rookieSalary(lg, 1))
             var guard = 0
