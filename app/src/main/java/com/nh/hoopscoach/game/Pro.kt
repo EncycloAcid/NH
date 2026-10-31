@@ -34,8 +34,12 @@ object ProLeague {
     /** Pro overalls from the roster data, as estimated. College players drop [STEP_UP] when they arrive instead. */
     fun proOverall(ovr: Int) = ovr.coerceIn(70, 99)
 
-    /** The pros are a step up: every rating drops this much when a college player arrives (his ceiling doesn't). */
+    /** The pros are a step up: a college player arrives at least this much lower, and no higher than [ROOKIE_MAX] (his ceiling stays). */
     const val STEP_UP = 5
+    const val ROOKIE_MAX = 83
+
+    /** Where a college player starts in the pros. */
+    fun rookieOverall(collegeOvr: Int) = minOf(collegeOvr - STEP_UP, ROOKIE_MAX)
 
     /** How strong each team's real roster is: its best eight count most. */
     private fun strength(team: Int): Double {
@@ -169,7 +173,9 @@ object ProLeague {
         // The league is a step up: a college star starts over as a pro rookie, with room to grow.
         if (p.year != PRO_YEAR) {
             if (p.id == lg.heroId) lg.road?.collegeOvr = p.ovr
-            for (i in p.attrs.indices) p.attrs[i] = (p.attrs[i] - STEP_UP).coerceAtLeast(25)
+            val target = rookieOverall(p.ovr)
+            var guard = 0
+            while (p.ovr > target && guard++ < 60) for (i in p.attrs.indices) p.attrs[i] = (p.attrs[i] - 1).coerceAtLeast(25)
             p.ovrHistory += p.ovr
         }
         p.teamId = t.id
@@ -662,7 +668,7 @@ object ProCareer {
         val lottery = order.take(4).shuffled(Rng.r)
         for (i in 0 until 4) order[i] = lottery[i]
         val rookies = mutableListOf<Pair<Pos, Int>>()
-        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (84 - i * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(74, 90)
+        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (82 - i * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(72, ProLeague.ROOKIE_MAX)
         rookies.sortByDescending { it.second }
         val rival = ps.pendingRival
         var rivalSlot = -1

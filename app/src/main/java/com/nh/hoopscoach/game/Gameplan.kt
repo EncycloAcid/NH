@@ -19,7 +19,9 @@ object Gameplan {
 
     /** Picks starters and backups by position and splits the minutes. */
     fun autoAllocate(lg: League, t: Team) {
-        val pool = lg.rosterOf(t).sortedByDescending { it.ovr }.toMutableList()
+        // Pro coaches give young, high-ceiling players development minutes: up to 4 points of credit.
+        fun rate(p: Player): Double = p.ovr + if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0
+        val pool = lg.rosterOf(t).sortedByDescending { rate(it) }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
@@ -28,7 +30,7 @@ object Gameplan {
                 val cand = pool.firstOrNull { it.pos == alt } ?: continue
                 if (rank == 0) { pool.remove(cand); return cand }
                 val natural = pool.firstOrNull { it.pos == pos }
-                if (natural == null || cand.ovr - natural.ovr > 6 * rank) { pool.remove(cand); return cand }
+                if (natural == null || rate(cand) - rate(natural) > 6 * rank) { pool.remove(cand); return cand }
             }
             return pool.removeFirstOrNull()
         }
@@ -42,7 +44,7 @@ object Gameplan {
             val sMin = when {
                 s == null -> 0
                 r == null -> 40
-                else -> (28 + (s.ovr - r.ovr) * 0.6).roundToInt().coerceIn(22, 36)
+                else -> (28 + (rate(s) - rate(r)) * 0.6).roundToInt().coerceIn(22, 36)
             }
             Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it, lg.pro) } ?: 50, r?.let { usageFor(it, lg.pro) } ?: 40)
         }

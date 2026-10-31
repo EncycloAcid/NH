@@ -1266,7 +1266,7 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 Panel(color = P.hero) {
                     Text(if (pick != null) "NO. ${pick.pick} OVERALL" else "UNDRAFTED FREE AGENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
                     Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
-                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start around ${h.ovr - com.nh.hoopscoach.game.ProLeague.STEP_UP} and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr)} and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }
             item { CareerStory(lg) }
