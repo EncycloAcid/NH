@@ -1248,6 +1248,10 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
             Text("Your contract is up. Pick where you play next.", style = T.head, color = P.ink)
             Text("Your agent's read: you're worth about ${money(ProCareer.marketValue(lg, h))} a season.", style = T.small, color = P.sub)
         }
+        if (r.restricted) Panel(Modifier.padding(top = 8.dp)) {
+            Text("RESTRICTED FREE AGENT", style = T.label, color = P.bad)
+            Text("You're coming off a first-round rookie deal. If you sign an offer sheet with another team, the ${t.name} can match it and keep you on the same terms.", style = T.small, color = P.ink)
+        }
         Section("Offers")
         Text("Tap an offer to negotiate: counter, set the length, add a player option, or take less to join a contender.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
     }
@@ -1284,7 +1288,7 @@ private fun OfferCard(vm: GameViewModel, lg: League, i: Int, o: com.nh.hoopscoac
         Spacer(Modifier.height(12.dp))
         Text("LENGTH", style = T.label, color = P.sub)
         Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (y in 1..ProCareer.maxYears(lg)) SmallButton("$y yr", Modifier.weight(1f), primary = y == years) { years = y }
+            for (y in 1..ProCareer.maxYears(lg, o.teamId)) SmallButton("$y yr", Modifier.weight(1f), primary = y == years) { years = y }
         }
         if (years >= 2) {
             Spacer(Modifier.height(8.dp))
@@ -1299,11 +1303,13 @@ private fun OfferCard(vm: GameViewModel, lg: League, i: Int, o: com.nh.hoopscoac
         Spacer(Modifier.height(8.dp))
         Text("${money(pay)} a season · ${money(pay * years)} over $years ${if (years == 1) "year" else "years"}", style = T.bodyB, color = P.ink)
         Spacer(Modifier.height(10.dp))
-        if (!o.countered && o.salary < ProCareer.MAX_SALARY) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val top = ProCareer.maxFor(lg, o.teamId)
+        if (!o.countered && o.salary < top) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SmallButton("Ask 10% more", Modifier.weight(1f)) { vm.act { ProCareer.counter(it, i, 0.10) } }
             SmallButton("Ask 20% more", Modifier.weight(1f)) { vm.act { ProCareer.counter(it, i, 0.20) } }
         }
-        if (!o.countered && o.salary < ProCareer.MAX_SALARY) Text("Asking more can raise the offer, or make them walk.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        if (!o.countered && o.salary < top) Text("Asking more can raise the offer, or make them walk. The max for you is ${money(top)}.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        if (lg.road?.restricted == true && !current) Text("Restricted free agent: the ${lg.user.name} can match this offer sheet and keep you.", style = T.small, color = P.bad, modifier = Modifier.padding(top = 4.dp))
         Spacer(Modifier.height(8.dp))
         PrimaryButton("Sign for ${money(pay)}", Modifier.fillMaxWidth()) {
             vm.act { val msg = ProCareer.signWith(it, i, years, option, false); vm.toast(msg) }

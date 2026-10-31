@@ -582,6 +582,8 @@ object Road {
                 Ratings.raise(h, i)
             }
         }
+        // A pro rookie still sharpens what he practices, but his overall holds at the rookie cap.
+        if (lg.pro) ProLeague.rookieCap(lg, h, practiceBoosts(lg, plan).map { it.ordinal }.toSet())
         if (plan == Practice.WEIGHTS && Rng.chance(0.25)) h.weight++
         r.fatigue = (r.fatigue + fatigueGain(lg, plan, minutes)).coerceIn(0, 100)
     }

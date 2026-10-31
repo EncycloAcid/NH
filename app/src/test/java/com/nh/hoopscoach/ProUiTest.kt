@@ -119,6 +119,10 @@ class ProUiTest {
         while (lg.day < ps.cupFinalDay + 1 && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         vm.install(lg); vm.select(Tab.TODAY); idle(); scrollToText("NBA CUP"); shot("P09b_cup_today")
         vm.select(Tab.LEAGUE); vm.leagueTab = 2; idle(); shot("P09c_cup"); scrollTo(4); shot("P09d_cup_groups"); vm.leagueTab = 0
+        lg.games.lastOrNull { it.played && it.box != null && it.involves(lg.userTeamId) }?.let { g ->
+            assertTrue("pro box scores go by quarter", g.box!!.quarters && g.box!!.halves.size >= 4)
+            vm.select(Tab.TODAY); vm.push(Route.Box(g.id)); idle(); shot("P09e_box_quarters"); vm.back(); idle()
+        }
         while (lg.day < ProLeague.allStarDay(lg) && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star"); scrollToText("ALL-STAR WEEKEND"); shot("P10b_all_star_weekend")
         var guard = 0

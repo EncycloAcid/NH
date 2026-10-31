@@ -193,7 +193,7 @@ object Summer {
         val before = h.ovr
         val startSum = h.attrs.sum()
         val startAttrs = h.attrs.copyOf()
-        val note: String
+        var note: String
         if (ev == SummerEvent.NATIONAL_TEAM) {
             for (i in h.attrs.indices) Ratings.raise(h, i)
             val event = proTournament(lg.season) ?: "World Cup"
@@ -233,6 +233,9 @@ object Summer {
                 (if (mvp) ". Named camp MVP" else "") + ". +${Road.count(gain)} followers."
         }
         if (h.ovr > h.pot) h.pot = h.ovr
+        // A pro rookie keeps the skills he worked on, but his overall stays at the rookie cap until he's played a season.
+        val capped = lg.pro && ProLeague.rookieCap(lg, h, (ev.boosts.map { it.ordinal }).toSet())
+        if (capped) note += " Rookies top out at ${ProLeague.ROOKIE_MAX} until their first summer."
         r.summer = lg.season
         r.summerNote = note + if (h.ovr > before) " Overall $before → ${h.ovr}." else ""
         val tag = when (ev) { SummerEvent.U19 -> "U19 Team USA"; SummerEvent.NATIONAL_TEAM -> "Team USA, ${proTournament(lg.season)}"; else -> ev.label }

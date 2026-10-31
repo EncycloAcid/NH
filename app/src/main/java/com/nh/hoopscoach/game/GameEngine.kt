@@ -2,6 +2,7 @@ package com.nh.hoopscoach.game
 
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -31,15 +32,31 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
     val score = IntArray(2)
-    /** Seconds in a half: 20 minutes in college, 24 in the pros (a 48-minute game). */
+    /**
+     * The rules of the level. NBA: four 12-minute quarters, a 24-second shot clock (14 after an
+     * offensive rebound), six fouls to foul out, and the penalty from a team's fifth foul in a quarter
+     * (fourth in overtime) or its second in the last two minutes. College: two 20-minute halves, a
+     * 30-second shot clock (20 after an offensive rebound), five fouls, a one-and-one from the seventh
+     * team foul in a half and two shots from the tenth. Overtime is five minutes in both.
+     */
+    val regPeriods = if (lg.pro) 4 else 2
+    val periodLen = if (lg.pro) 720.0 else 1200.0
+    /** Half of regulation (24 minutes in the pros, 20 in college): the rotation and the win chart work in halves. */
     val half = if (lg.pro) 1440.0 else 1200.0
+    private val foulLimit = if (lg.pro) 6 else 5
+    private val shotClock = if (lg.pro) 24.0 else 30.0
     var period = 1
         private set
-    var clock = half
+    var clock = periodLen
         private set
+    /** The last period of regulation, or overtime: when games are decided. */
+    val finalPeriod get() = period >= regPeriods
+    val overtime get() = period > regPeriods
     private var poss = if (Rng.chance(0.5)) 0 else 1
     private val firstPoss = poss
     private val teamFouls = IntArray(2)
+    /** Pro team fouls in the last two minutes of a period (the second one is a penalty foul). */
+    private val lateFouls = IntArray(2)
     val periodScores = mutableListOf(IntArray(2))
     var finished = false
         private set
@@ -134,7 +151,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     fun pendingMoment(): BigMoment? {
         val big = bigNight.isNotEmpty()
         if (!interactive || finished || heroSide < 0 || poss != heroSide || momentsAsked >= (if (big) 5 else 3)) return null
-        if (period < 2 || clock > (if (big) 180 else 120) || clock < 1.0) return null
+        if (!finalPeriod || clock > (if (big) 180 else 120) || clock < 1.0) return null
         val margin = score[heroSide] - score[1 - heroSide]
         val close = if (big) 7 else 5
         if (margin < -close || margin > close || (margin > 0 && clock < 40)) return null
@@ -212,15 +229,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val before = score[o] - score[d]
             val c = Clutch(o, shooter.name, what, period, clock, before, pts)
             lastBasket = c
-            if (period >= 2 && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
+            if (finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
             score[o] += pts
             if (passer != null) line(o, passer).ast++
             log(o, "★ ${shooter.short} ${if (type == 2) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
             lg.road?.let { it.momentsWon++ }
             lastMoment = if (passer != null) "Assist! ${shooter.short} buries the three." else "Bucket! ${shooter.short} hits the $what."
             if (fouled) {
-                val fouler = Rng.weighted(defense) { posFoul(it.pos) }
-                line(d, fouler).pf++; teamFouls[d]++
+                val fouler = pickFouler(d, defense)
+                line(d, fouler).pf++; teamFoul(d)
                 lastMoment += " And one!"
                 freeThrows(o, shooter, 1, offense, defense)
                 return
@@ -230,8 +247,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         if (fouled) {
             sl.fga--; if (type == 2) sl.tpa--
-            val fouler = Rng.weighted(defense) { posFoul(it.pos) }
-            line(d, fouler).pf++; teamFouls[d]++
+            val fouler = pickFouler(d, defense)
+            line(d, fouler).pf++; teamFoul(d)
             log(d, "★ ${fouler.short} fouls ${shooter.short} on the $what", 0)
             val before = score[o]
             freeThrows(o, shooter, pts, offense, defense)
@@ -256,6 +273,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
          * The offsets keep the original calibration: center = norm + offset.
          */
         private val OFFSET = doubleArrayOf(-1.31, -2.63, 0.48, -0.41, -3.43, -2.8, -1.45, -3.92, -2.93)
+
+        /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
+        const val NON_SHOOTING_PRO = 0.08
+        const val NON_SHOOTING_COLLEGE = 0.13
+        const val SHOOTING_FOUL_PRO = 1.0
+        const val SHOOTING_FOUL_COLLEGE = 1.15
 
         fun computeNorms(lg: League): DoubleArray {
             val sums = DoubleArray(9)
@@ -296,16 +319,37 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     // ---------- lineups ----------
 
-    private fun fouledOut(side: Int, id: Int) = (lines[side][id]?.pf ?: 0) >= 5
+    private fun fouledOut(side: Int, id: Int) = (lines[side][id]?.pf ?: 0) >= foulLimit
+
+    /**
+     * Who commits a defensive foul: never a player who has already fouled out, and players in
+     * foul trouble play more carefully. Big men foul most.
+     */
+    private fun pickFouler(d: Int, defense: List<Player>): Player {
+        val ok = defense.filter { !fouledOut(d, it.id) }.ifEmpty { defense }
+        return Rng.weighted(ok) { posFoul(it.pos) * (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble()) }
+    }
+
+    /** Seconds played in the current half of regulation, for the rotation (0 in overtime). */
+    private fun halfElapsed() = when {
+        overtime -> 0.0
+        lg.pro -> ((period - 1) % 2) * periodLen + (periodLen - clock)
+        else -> periodLen - clock
+    }
+
+    /** Coaches sit a starter in foul trouble: college, two in the first half or four in the second; pros, one more than the quarter. */
+    private fun foulTrouble(pf: Int) = if (lg.pro) {
+        period <= 4 && pf >= period + 1 && !(period == 4 && clock <= 300)
+    } else (period == 1 && pf >= 2 && clock > 300) || (period == 2 && pf >= 4 && clock > 240)
 
     private fun lineup(side: Int): List<Player> {
         val t = teams[side]
         val roster = rosters[side]
         val lookup = byId[side]
-        val elapsed = if (period <= 2) half - clock else 0.0
-        val late = period >= 2 && clock < 240
+        val elapsed = halfElapsed()
+        val late = finalPeriod && clock < 240
         val margin = score[side] - score[1 - side]
-        val garbage = period == 2 && clock < 270 && abs(margin) >= 18
+        val garbage = period == regPeriods && clock < 270 && abs(margin) >= 18
         val chosen = ArrayList<Player>(5)
         for ((i, s) in t.plan.slots.withIndex()) {
             if (i >= 5) break
@@ -313,13 +357,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val reserveSec = half - starterSec
             val a = starterSec * 0.55
             var useStarter = elapsed < a || elapsed >= a + reserveSec
-            if (period > 2 || (late && abs(margin) <= 12)) useStarter = true
+            if (overtime || (late && abs(margin) <= 12)) useStarter = true
             val st = lookup[s.starter]
             val rs = lookup[s.reserve]
             // Foul trouble: sit the starter.
             if (st != null && useStarter && rs != null) {
-                val pf = lines[side][st.id]?.pf ?: 0
-                if ((period == 1 && pf >= 2 && clock > 300) || (period == 2 && pf >= 4 && clock > 240)) useStarter = false
+                if (foulTrouble(lines[side][st.id]?.pf ?: 0)) useStarter = false
             }
             var pick = if (useStarter) st ?: rs else rs ?: st
             if (pick != null && fouledOut(side, pick.id)) pick = (if (pick === st) rs else st)?.takeIf { !fouledOut(side, it.id) }
@@ -358,8 +401,31 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         when (def(1 - o)) { Defense.PRESS -> base -= 2.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
         // The pro game is faster: a shorter shot clock and about 100 possessions a game.
         if (lg.pro) base *= 0.81
-        return base * (0.6 + Rng.d() * 0.8)
+        // Nobody holds it past the shot clock.
+        return (base * (0.6 + Rng.d() * 0.8)).coerceAtMost(shotClock - 0.5)
     }
+
+    /** A team foul, and the pro count of fouls in the last two minutes of the period. */
+    private fun teamFoul(d: Int) {
+        teamFouls[d]++
+        if (lg.pro && clock <= 120) lateFouls[d]++
+    }
+
+    /**
+     * Free throws a non-shooting foul by [d] gives: 0 (side out), 1 for a college one-and-one, or 2.
+     * Called after the foul is counted.
+     */
+    private fun penaltyShots(d: Int): Int = if (lg.pro) {
+        if (teamFouls[d] >= (if (overtime) 4 else 5) || lateFouls[d] >= 2) 2 else 0
+    } else when {
+        teamFouls[d] >= 10 -> 2
+        teamFouls[d] >= 7 -> 1
+        else -> 0
+    }
+
+    /** A non-shooting foul in the penalty: two shots, or a college one-and-one. */
+    private fun bonusFreeThrows(o: Int, shooter: Player, offense: List<Player>, defense: List<Player>, shots: Int) =
+        if (shots == 1) freeThrows(o, shooter, 2, offense, defense, oneAndOne = true) else freeThrows(o, shooter, 2, offense, defense)
 
     private fun usage(side: Int, p: Player): Double {
         for (s in teams[side].plan.slots) {
@@ -369,7 +435,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         return Gameplan.usageFor(p, lg.pro).toDouble() * 0.8
     }
 
-    private fun ft(p: Player): Double = (0.69 + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
+    /** Free-throw percentage: about 78% in the NBA and 71% in college for the average shooter. */
+    private fun ft(p: Player): Double = ((if (lg.pro) 0.675 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
 
     private fun line(side: Int, p: Player) = lines[side].getOrPut(p.id) { StatLine() }
 
@@ -406,21 +473,25 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val trail = score[o] - score[d]
 
         var len = possLength(o)
-        // Milk the clock with a late lead; hurry when behind; hold for the last shot when tied.
-        if (period >= 2 && clock < 60) {
-            if (trail > 0) len = min(clock, 30.0) else if (trail < 0) len = min(len, 8.0 + Rng.d() * 6)
-            else if (clock <= 30) len = (clock - Rng.d() * 3).coerceAtLeast(min(clock, 0.5))
+        // Milk the clock with a late lead (but not past the shot clock); hurry when behind; hold for the last shot when tied.
+        if (finalPeriod && clock < 60) {
+            if (trail > 0) len = min(clock, shotClock - 1.0) else if (trail < 0) len = min(len, 8.0 + Rng.d() * 6)
+            else if (clock <= shotClock) len = (clock - Rng.d() * 3).coerceAtLeast(min(clock, 0.5))
         }
-        // Intentional foul when the defense trails late.
-        if (period >= 2 && clock < 40 && trail in 1..9) {
+        // Fouling on purpose when the defense trails late. Before the penalty it's only a side out, so they keep fouling.
+        if (finalPeriod && clock < 40 && trail in 1..9) {
             val used = min(clock, 2.0 + Rng.d() * 4)
             elapse(used, offense, defense)
-            val fouler = Rng.pick(defense)
+            val fouler = pickFouler(d, defense)
             line(d, fouler).pf++
-            teamFouls[d]++
+            teamFoul(d)
             val shooter = Rng.weighted(offense) { it[Attr.HND].toDouble().pow(2) }
-            log(d, "${fouler.short} fouls ${shooter.short} intentionally", 0)
-            freeThrows(o, shooter, 2, offense, defense)
+            val shots = penaltyShots(d)
+            if (shots == 0) log(d, "${fouler.short} fouls ${shooter.short} to stop the clock. Not in the penalty yet: side out", 0)
+            else {
+                log(d, "${fouler.short} fouls ${shooter.short} to stop the clock", 0)
+                bonusFreeThrows(o, shooter, offense, defense, shots)
+            }
             endCheck()
             return !finished
         }
@@ -432,10 +503,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     private fun elapse(sec: Double, a: List<Player>, b: List<Player>) {
-        val s = sec.roundToInt()
+        // Whole seconds off the clock, so a game's minutes add up exactly (48 or 40, plus overtime).
+        val before = clock
+        clock -= sec
+        val s = (floor(before) - floor(clock.coerceAtLeast(0.0))).toInt()
         val sides = if (poss == 0) arrayOf(a, b) else arrayOf(b, a)
         for (side in 0..1) for (p in sides[side]) line(side, p).sec += s
-        clock -= sec
     }
 
     private fun runPossession(o: Int, offense: List<Player>, defense: List<Player>, trail: Int) {
@@ -465,24 +538,37 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (Rng.chance(pTo)) {
             val loser = if (Rng.chance(0.6)) handler else Rng.weighted(offense) { usage(o, it) }
             line(o, loser).tov++
-            if (Rng.chance(0.55)) {
-                val stealer = Rng.weighted(defense) { it[Attr.STL].toDouble().pow(3) }
-                line(d, stealer).stl++
-                log(d, "${stealer.short} steals it from ${loser.short}", 0)
-            } else log(o, "Turnover by ${loser.short}", 0)
+            val kind = Rng.d()
+            when {
+                kind < 0.55 -> {
+                    val stealer = Rng.weighted(defense) { it[Attr.STL].toDouble().pow(3) }
+                    line(d, stealer).stl++
+                    log(d, "${stealer.short} steals it from ${loser.short}", 0)
+                }
+                // An offensive foul is a personal foul. College counts it as a team foul; the NBA doesn't.
+                kind < 0.67 && !fouledOut(o, loser.id) -> {
+                    line(o, loser).pf++
+                    if (!lg.pro) teamFouls[o]++
+                    log(o, "Offensive foul on ${loser.short}", 0)
+                }
+                kind < 0.69 -> log(o, "Shot clock violation", 0)
+                kind < 0.75 -> log(o, "${loser.short} is called for traveling", 0)
+                else -> log(o, "Turnover by ${loser.short}", 0)
+            }
             poss = d
             return
         }
 
-        // Non-shooting foul
-        if (Rng.chance(0.1)) {
-            val fouler = Rng.weighted(defense) { posFoul(it.pos) }
+        // Non-shooting foul: free throws only in the penalty; otherwise the offense keeps the ball.
+        if (Rng.chance(if (lg.pro) NON_SHOOTING_PRO else NON_SHOOTING_COLLEGE)) {
+            val fouler = pickFouler(d, defense)
             line(d, fouler).pf++
-            teamFouls[d]++
-            if (teamFouls[d] >= 7) {
+            teamFoul(d)
+            val shots = penaltyShots(d)
+            if (shots > 0) {
                 val shooter = Rng.weighted(offense) { usage(o, it) }
-                log(d, "Foul on ${fouler.short}, ${shooter.short} to the line", 0)
-                freeThrows(o, shooter, 2, offense, defense)
+                log(d, "Foul on ${fouler.short}${if (shots == 1) ", one-and-one for" else ", two shots for"} ${shooter.short}", 0)
+                bonusFreeThrows(o, shooter, offense, defense, shots)
                 return
             }
         }
@@ -515,13 +601,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
-            if (shooter.has(Trait.CLUTCH) && period >= 2 && clock < 120 && abs(trail) <= 5) pMake += 0.03
+            if (shooter.has(Trait.CLUTCH) && finalPeriod && clock < 120 && abs(trail) <= 5) pMake += 0.03
             if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) - heroTired
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
-            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 }
+            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO else SHOOTING_FOUL_COLLEGE)
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
             val pts = if (type == 2) 3 else 2
@@ -536,7 +622,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 val before = score[o] - score[d]
                 val c = Clutch(o, shooter.name, what, period, clock, before, pts)
                 lastBasket = c
-                if (period >= 2 && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
+                if (finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
                 score[o] += pts
                 var astText = ""
                 // About half of made shots are assisted in college, closer to two-thirds in the pros.
@@ -553,8 +639,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 val verb = when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
                 log(o, "${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
                 if (fouled) {
-                    val fouler = Rng.weighted(defense) { posFoul(it.pos) }
-                    line(d, fouler).pf++; teamFouls[d]++
+                    val fouler = pickFouler(d, defense)
+                    line(d, fouler).pf++; teamFoul(d)
                     log(d, "And-one! Foul on ${fouler.short}", 0)
                     freeThrows(o, shooter, 1, offense, defense)
                     return
@@ -565,8 +651,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
             if (fouled) {
                 sl.fga--; if (type == 2) sl.tpa--
-                val fouler = Rng.weighted(defense) { posFoul(it.pos) }
-                line(d, fouler).pf++; teamFouls[d]++
+                val fouler = pickFouler(d, defense)
+                line(d, fouler).pf++; teamFoul(d)
                 log(d, "${fouler.short} fouls ${shooter.short} on the $what", 0)
                 freeThrows(o, shooter, pts, offense, defense)
                 return
@@ -604,7 +690,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun posReb(p: Pos) = when (p) { Pos.C -> 1.25; Pos.PF -> 1.2; Pos.SF -> 1.0; Pos.SG -> 0.8; Pos.PG -> 0.7 }
 
     private fun shotType(o: Int, d: Int, p: Player, trail: Int): Int {
-        if (period >= 2 && clock < 25 && trail == -3) return 2
+        if (finalPeriod && clock < 25 && trail == -3) return 2
         val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
         val pos3 = when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.15; Pos.SF -> .95; Pos.PF -> .55; Pos.C -> .16 }
         var wi = (p[Attr.INS] / 70.0).pow(3) * posIns
@@ -649,18 +735,22 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
     }
 
-    private fun freeThrows(o: Int, shooter: Player, n: Int, offense: List<Player>, defense: List<Player>) {
+    /** [n] free throws; a one-and-one stops after a miss on the first. */
+    private fun freeThrows(o: Int, shooter: Player, n: Int, offense: List<Player>, defense: List<Player>, oneAndOne: Boolean = false) {
         val d = 1 - o
         val pct = ft(shooter)
         var made = 0
+        var taken = 0
         var lastMade = true
         for (i in 0 until n) {
             val sl = line(o, shooter)
             sl.fta++
+            taken++
             lastMade = Rng.chance(pct)
             if (lastMade) { sl.ftm++; sl.pts++; score[o]++; made++ }
+            if (oneAndOne && !lastMade) break
         }
-        log(o, "${shooter.short} makes $made of $n free throw${if (n > 1) "s" else ""}", made)
+        log(o, if (oneAndOne && taken == 1) "${shooter.short} misses the front end of the one-and-one" else "${shooter.short} makes $made of $taken free throw${if (taken > 1) "s" else ""}", made)
         if (!lastMade) {
             val oReb = Rng.chance(0.14)
             if (oReb) {
@@ -678,10 +768,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun endCheck() {
         if (clock > 0.5) return
         periodScores.last().let { it[0] = score[0] - periodScores.dropLast(1).sumOf { s -> s[0] }; it[1] = score[1] - periodScores.dropLast(1).sumOf { s -> s[1] } }
-        if (period == 1) {
-            log(-1, "Halftime: ${teams[1].abbr} ${score[1]}, ${teams[0].abbr} ${score[0]}", 0)
-            period = 2; clock = half; teamFouls[0] = 0; teamFouls[1] = 0
-            poss = 1 - firstPoss
+        if (period < regPeriods) {
+            val halftime = period == regPeriods / 2
+            log(-1, "${if (halftime) "Halftime" else "End of the ${ordinalWord(period)} quarter"}: ${teams[1].abbr} ${score[1]}, ${teams[0].abbr} ${score[0]}", 0)
+            // Pros: the team that lost the opening tip gets the ball to start the 2nd and 3rd quarters, the winner the 4th.
+            poss = if (lg.pro) (if (period == 1 || period == 2) 1 - firstPoss else firstPoss) else 1 - firstPoss
+            period++
+            clock = periodLen
+            // Team fouls reset each quarter in the pros and at halftime in college.
+            if (lg.pro || halftime) { teamFouls[0] = 0; teamFouls[1] = 0 }
+            lateFouls[0] = 0; lateFouls[1] = 0
             periodScores += IntArray(2)
             return
         }
@@ -690,26 +786,44 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             period++; clock = 300.0
             log(-1, "Tied at ${score[0]}. Overtime!", 0)
             periodScores += IntArray(2)
+            // Each pro overtime starts its own foul count; college fouls carry over from the second half.
+            if (lg.pro) { teamFouls[0] = 0; teamFouls[1] = 0 }
+            lateFouls[0] = 0; lateFouls[1] = 0
             poss = if (Rng.chance(0.5)) 0 else 1
             return
         }
         finished = true
-        log(-1, "Final: ${teams[1].abbr} ${score[1]}, ${teams[0].abbr} ${score[0]}${if (period > 2) " (${if (period == 3) "" else "${period - 2}"}OT)" else ""}", 0)
+        val ots = period - regPeriods
+        log(-1, "Final: ${teams[1].abbr} ${score[1]}, ${teams[0].abbr} ${score[0]}${if (ots > 0) " (${if (ots == 1) "" else "$ots"}OT)" else ""}", 0)
     }
+
+    private fun ordinalWord(n: Int) = when (n) { 1 -> "1st"; 2 -> "2nd"; 3 -> "3rd"; else -> "${n}th" }
 
     fun simToEnd() {
         var guard = 0
         while (!finished && guard++ < 2000) step()
     }
 
-    val periodLabel get() = when { period == 1 -> "1st"; period == 2 -> "2nd"; period == 3 -> "OT"; else -> "${period - 2}OT" }
+    /** Short label for the scoreboard: "Q3" or "2nd" (half), "OT", "2OT". */
+    val periodLabel get() = when {
+        overtime -> if (period - regPeriods == 1) "OT" else "${period - regPeriods}OT"
+        lg.pro -> "Q$period"
+        else -> ordinalWord(period)
+    }
+
+    /** Longer label for the live game's header: "3rd quarter", "2nd half", "OT". */
+    val periodName get() = when {
+        overtime -> periodLabel
+        lg.pro -> "${ordinalWord(period)} quarter"
+        else -> "${ordinalWord(period)} half"
+    }
 
     fun boxScore(): BoxScore {
         fun side(s: Int) = lines[s].entries.map { (id, st) ->
             val p = lg.player(id)
             PlayerLine(id, p.short, p.pos, id in starters[s], st)
         }.sortedWith(compareByDescending<PlayerLine> { it.starter }.thenByDescending { it.s.sec })
-        return BoxScore(side(0), side(1), periodScores.map { it.copyOf() })
+        return BoxScore(side(0), side(1), periodScores.map { it.copyOf() }, quarters = lg.pro)
     }
 
     /** Writes the result into the league: records, stats, rankings inputs, logs. */
@@ -717,7 +831,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (committed) return
         committed = true
         if (!finished) simToEnd()
-        game.hs = score[0]; game.aws = score[1]; game.ot = max(0, period - 2)
+        game.hs = score[0]; game.aws = score[1]; game.ot = max(0, period - regPeriods)
         val userInvolved = game.involves(lg.userTeamId)
         val userConfTourney = game.type == GameType.CONF_TOURNEY && teams[0].confId == lg.user.confId
         if (userInvolved || game.type == GameType.NCAA || userConfTourney || lg.rivalry(game) != null) {
@@ -755,10 +869,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 }
                 // Development: playing time and production earn XP.
                 // Pros grow slower in season, and not past their ceiling, so the league's ratings hold steady.
-                val proRate = if (!lg.pro) 1.0 else if (p.ovr >= p.pot) 0.0 else 0.35
+                // First-year pros stop at the rookie cap of 83 until their first summer.
+                val proRate = if (!lg.pro) 1.0 else if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) 0.0 else 0.35
                 val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side])) *
                     (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0) * proRate
                 Ratings.addXp(p, xp.roundToInt())
+                if (lg.pro) ProLeague.rookieCap(lg, p)
                 Records.checkGame(lg, p, t, st)
                 Careers.track(lg, p, st, game, t.id)
             }

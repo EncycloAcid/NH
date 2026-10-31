@@ -218,7 +218,8 @@ class ScreenshotTest {
         }
         while (lg.phase == Phase.NCAA) Season.playDay(lg)
         vm.install(lg); vm.wrapPage = 0
-        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("cuts down the nets", substring = true))
+        // The wrap page shows the season's top four moments (your own first), so scroll to the section, not one story.
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("MARCH MOMENTS"))
         rule.waitForIdle(); shot("M04_wrap_moments")
         vm.select(Tab.LEAGUE); vm.leagueTab = 5; scrollTo(0); shot("M05_history_preview")
         vm.push(Route.History(HistoryKind.MOMENTS)); scrollTo(0); shot("M06_highlight_reel")

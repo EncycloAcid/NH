@@ -57,8 +57,9 @@ import kotlin.math.sqrt
 
 private fun clock(sec: Int) = "%d:%02d".format(sec / 60, sec % 60)
 
-/** Seconds elapsed in the game for a period/clock pair (two 20-minute halves, 5-minute overtimes). */
-private fun elapsed(period: Int, clock: Int, half: Int = 1200) = if (period <= 2) (period - 1) * half + (half - clock) else 2 * half + (period - 3) * 300 + (300 - clock)
+/** Seconds elapsed in the game for a period/clock pair: [regs] regulation periods of [len] seconds, then 5-minute overtimes. */
+private fun elapsed(period: Int, clock: Int, len: Int = 1200, regs: Int = 2) =
+    if (period <= regs) (period - 1) * len + (len - clock) else regs * len + (period - regs - 1) * 300 + (300 - clock)
 
 /** Home win probability given the score margin, time left and the pregame edge. */
 private fun winProb(margin: Int, secLeft: Int, pregameEdge: Double, game: Int = 2400): Double {
@@ -96,7 +97,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     val userHome = home.id == lg.userTeamId
     val edge = (home.elo - away.elo + Rankings.homeElo(lg, e.game)) / 28.0
     Column(Modifier.fillMaxSize()) {
-        BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodLabel} half · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
+        BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodName} · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)
@@ -125,8 +126,12 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
             val pts = remember(lv.tick) {
                 val half = e.half.toInt()
+                val len = e.periodLen.toInt()
                 val list = mutableListOf(0f to winProb(0, 2 * half, edge, 2 * half).toFloat())
-                for (ev in e.events) list += elapsed(ev.period, ev.clock, half).toFloat() to winProb(ev.hs - ev.aws, (2 * half - elapsed(ev.period, ev.clock, half)).coerceAtLeast(0), edge, 2 * half).toFloat()
+                for (ev in e.events) {
+                    val at = elapsed(ev.period, ev.clock, len, e.regPeriods)
+                    list += at.toFloat() to winProb(ev.hs - ev.aws, (2 * half - at).coerceAtLeast(0), edge, 2 * half).toFloat()
+                }
                 list
             }
             val now = pts.last().second
@@ -306,7 +311,15 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
             if (b != null) {
                 Spacer(Modifier.height(10.dp))
                 Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
-                    val heads = b.halves.indices.map { if (it == 0) "1ST" else if (it == 1) "2ND" else if (it == 2) "OT" else "${it - 1}OT" } + "T"
+                    // Pro games by quarter, college by half; then overtimes.
+                    val regs = if (b.quarters) 4 else 2
+                    val heads = b.halves.indices.map { i ->
+                        when {
+                            i < regs -> if (b.quarters) "Q${i + 1}" else if (i == 0) "1ST" else "2ND"
+                            i == regs -> "OT"
+                            else -> "${i - regs + 1}OT"
+                        }
+                    } + "T"
                     PeriodRow("", heads, P.sub, true)
                     PeriodRow(away.abbr, b.halves.map { "${it[1]}" } + "${g.aws}", P.ink, false)
                     PeriodRow(home.abbr, b.halves.map { "${it[0]}" } + "${g.hs}", P.ink, false)

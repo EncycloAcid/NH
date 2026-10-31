@@ -324,7 +324,7 @@ class Conference(val id: Int, val name: String, val abbr: String, val tier: Int,
 class PlayerLine(val pid: Int, val name: String, val pos: Pos, val starter: Boolean, val s: StatLine)
 
 @Serializable
-class BoxScore(val home: List<PlayerLine>, val away: List<PlayerLine>, val halves: List<IntArray>)
+class BoxScore(val home: List<PlayerLine>, val away: List<PlayerLine>, val halves: List<IntArray>, val quarters: Boolean = false)
 
 @Serializable
 class Game(
@@ -715,6 +715,8 @@ class RoadState(
     var tradeNote: String = "",
     /** Free agency: a player option on his last year that he has to decide on this summer. */
     var optionPending: Boolean = false,
+    /** Restricted free agency after a first-round rookie deal: his team can match any offer sheet. */
+    var restricted: Boolean = false,
     /** Playoff highlight reel, and his best pro single games (points, rebounds, assists, threes, steals, blocks). */
     val reel: MutableList<ReelEntry> = mutableListOf(),
     var proBest: IntArray = IntArray(6),

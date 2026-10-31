@@ -43,6 +43,18 @@ object ProLeague {
     /** Where a college player starts in the pros. */
     fun rookieOverall(collegeOvr: Int) = minOf(collegeOvr - STEP_UP, ROOKIE_MAX)
 
+    /** A first-year pro can't climb past [ROOKIE_MAX]: not at summer camp, not during the season. Growth starts his first summer. */
+    fun cappedRookie(lg: League, p: Player) = lg.pro && p.year == PRO_YEAR && p.proYears == 0
+
+    /** Holds a first-year pro at [ROOKIE_MAX], trimming the ratings in [keep] last. */
+    fun rookieCap(lg: League, p: Player, keep: Set<Int> = emptySet()): Boolean {
+        if (!cappedRookie(lg, p) || p.ovr <= ROOKIE_MAX) return false
+        val idx = p.attrs.indices.filter { it !in keep }.ifEmpty { p.attrs.indices.toList() }
+        var guard = 0
+        while (p.ovr > ROOKIE_MAX && guard++ < 60) for (i in idx) { p.attrs[i] = (p.attrs[i] - 1).coerceAtLeast(25); if (p.ovr <= ROOKIE_MAX) break }
+        return true
+    }
+
     /** How strong each team's real roster is: its best eight count most. */
     private fun strength(team: Int): Double {
         val top = NbaData.PLAYERS.filter { it.team == team }.map { proOverall(it.ovr) }.sortedDescending().take(8)
@@ -398,7 +410,9 @@ object ProSeason {
     private fun upkeep(lg: League) {
         for (t in lg.teams) for (pid in t.roster) {
             val p = lg.player(pid)
-            if (p.ovr < p.pot) Ratings.addXp(p, (3 * Ratings.devRate(p, Coaching.devOf(lg.coachOf(t)))).roundToInt())
+            if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) continue
+            Ratings.addXp(p, (3 * Ratings.devRate(p, Coaching.devOf(lg.coachOf(t)))).roundToInt())
+            ProLeague.rookieCap(lg, p)
         }
         if (lg.day % 7 == 0) for (t in lg.teams) Gameplan.autoAllocate(lg, t)
     }
@@ -563,15 +577,20 @@ object ProSeason {
      */
     private fun regularAwards(lg: League) {
         lg.seasonAwards.clear()
-        val ladder = Awards.ladder(lg)
-        if (ladder.isEmpty()) return
+        val all = Awards.ladder(lg)
+        if (all.isEmpty()) return
         val r = lg.road
         val ps = lg.proState
+        // The 65-game rule: MVP, Defensive Player, Sixth Man, Most Improved and the All-League and
+        // All-Defensive teams need 65 games (scaled for shorter seasons). Rookie honors don't.
+        val minGames = (65.0 * ProLeague.seasonGames(lg) / 82).toInt()
+        val rookies = all.filter { it.first.proYears == 0 }
+        val ladder = all.filter { it.first.stats.gp >= minGames }.ifEmpty { all }
         val votes = AwardsNight.mvpVote(lg, ladder)
         ps?.mvpVotes?.apply { clear(); addAll(votes) }
         val mvp = votes.firstOrNull()?.let { v -> ladder.first { it.first.id == v.pid } } ?: ladder.first()
         mvp.let { (p, t) -> give(lg, "MVP", p, t); if (p.id == lg.heroId && r != null) r.mvps++ }
-        ladder.firstOrNull { it.first.proYears == 0 }?.let { (p, t) -> give(lg, "Rookie of the Year", p, t) }
+        rookies.firstOrNull()?.let { (p, t) -> give(lg, "Rookie of the Year", p, t) }
         val defense = ladder.take(60).sortedByDescending { Awards.defScore(it.first) }
         defense.firstOrNull()?.let { (p, t) -> give(lg, "Defensive Player of the Year", p, t) }
         ladder.firstOrNull { it.first.stats.gs * 2 < it.first.stats.gp }?.let { (p, t) -> give(lg, "Sixth Man of the Year", p, t) }
@@ -579,7 +598,7 @@ object ProSeason {
         val allLeague = (listOf(mvp) + ladder.filter { it !== mvp }).take(15)
         allLeague.forEachIndexed { i, (p, t) -> give(lg, "All-League ${listOf("1st", "2nd", "3rd")[i / 5]}", p, t) }
         defense.take(5).forEach { (p, t) -> give(lg, "All-Defensive 1st", p, t) }
-        ladder.filter { it.first.proYears == 0 }.take(5).forEach { (p, t) -> give(lg, "All-Rookie 1st", p, t) }
+        rookies.take(5).forEach { (p, t) -> give(lg, "All-Rookie 1st", p, t) }
         val mine = lg.seasonAwards.filter { it.pid == lg.heroId }.map { it.award }
         if (mine.isNotEmpty()) lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
     }
@@ -636,6 +655,7 @@ object ProSeason {
             p.seasonGains = IntArray(10); p.seasonLevels = 0
         }
         lg.norms = null
+        for (p in lg.players) ProLeague.rookieCap(lg, p)
         ProLeague.rateTeams(lg)
         ProLeague.schedule(lg)
         lg.reindex()
@@ -650,11 +670,40 @@ object ProSeason {
 
 /** The user's pro career: contracts, salary and endorsements, the offseason, aging and retirement. */
 object ProCareer {
-    /** First-round picks get a four-year scale deal, second-rounders two years, undrafted players a two-way. */
+    /** The 2025-26 salary cap, in thousands. */
+    const val CAP = 154_647
+
+    /** Max salary by years in the league: 25% of the cap through six years, 30% for seven to nine, 35% from ten. */
+    fun maxSalary(proYears: Int) = (CAP * when { proYears >= 10 -> 0.35; proYears >= 7 -> 0.30; else -> 0.25 }).roundToInt() / 10 * 10
+
+    /** The biggest contract in the league (35% of the cap). */
+    val MAX_SALARY = maxSalary(10)
+
+    /** The league minimum by years in the league, 2025-26. */
+    private val MIN_SCALE = intArrayOf(1_273, 2_049, 2_296, 2_378, 2_461, 2_667, 2_872, 3_078, 3_283, 3_304, 3_634)
+    fun minSalary(proYears: Int) = MIN_SCALE[proYears.coerceIn(0, MIN_SCALE.size - 1)]
+
+    /**
+     * The most [teamId] can pay him. A seven-to-nine-year player re-signing with his own team after
+     * an MVP, a Defensive Player of the Year or an All-League season in the last three can get the
+     * 35% supermax.
+     */
+    fun maxFor(lg: League, teamId: Int): Int {
+        val h = lg.hero ?: return MAX_SALARY
+        val recent = h.awards.filter { a -> a.substringBefore(" ").toIntOrNull()?.let { it >= lg.season - 2 } == true }.map { it.substringAfter(" ") }
+        val honors = recent.any { it == "MVP" || it == "Defensive Player of the Year" || it.startsWith("All-League") }
+        val supermax = h.proYears in 7..9 && teamId == h.teamId && honors
+        return maxSalary(if (supermax) 10 else h.proYears)
+    }
+
+    /**
+     * First-round picks get a four-year rookie-scale deal (No. 1 about $13.8M down to about $2.4M at
+     * No. 30), second-rounders two years near the minimum, undrafted players a two-way at half the minimum.
+     */
     fun rookieSalary(pick: Int): Int = when {
-        pick <= 0 -> 750
-        pick <= 30 -> 10_500 - (pick - 1) * 290
-        else -> 1_600 - (pick - 31) * 15
+        pick <= 0 -> minSalary(0) / 2 / 10 * 10
+        pick <= 30 -> (13_830 * Math.pow(0.94, (pick - 1).toDouble())).roundToInt() / 10 * 10
+        else -> minSalary(0) + (60 - pick) * 10
     }
 
     fun rookieYears(pick: Int) = if (pick in 1..30) 4 else 2
@@ -670,7 +719,7 @@ object ProCareer {
         val recent = p.awards.filter { it.startsWith("${lg.season} ") || it.startsWith("${lg.season - 1} ") }
         if (recent.any { it.substringAfter(" ") == "MVP" }) v *= 1.15
         if (recent.any { it.endsWith("All-Star") }) v *= 1.08
-        return (v * agentCut(lg)).roundToInt().coerceIn(750, 55_000) / 10 * 10
+        return ((v * agentCut(lg)).roundToInt() / 10 * 10).coerceIn(minSalary(p.proYears), maxSalary(p.proYears))
     }
 
     private fun agentCut(lg: League) = if (Road.has(lg, Staff.AGENT)) 1.15 else 1.0
@@ -742,6 +791,8 @@ object ProCareer {
                 // A player option on the last year: he decides before free agency opens.
                 r.contract?.let { c -> if (c.option && c.years == 1) r.optionPending = true }
                 if ((r.contract?.years ?: 0) <= 0) {
+                    // Coming off a first-round rookie deal, he's a restricted free agent.
+                    r.restricted = r.contract?.kind == "Rookie scale"
                     r.proOffers.clear()
                     r.proOffers += offers(lg)
                     if (r.proOffers.isEmpty()) { retire(lg, "Nobody called. "); return }
@@ -751,7 +802,7 @@ object ProCareer {
             ProStep.FREE_AGENCY -> {
                 if (r.optionPending) optIn(lg)
                 ps.freeStars.clear()
-                if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, it) }
+                if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, matchOfferSheet(lg, it)) }
                 // The rosters start out current, so the league skips a summer of aging before its first season.
                 if (ps.history.isNotEmpty()) summer(lg)
                 ps.step = ProStep.SUMMER
@@ -851,18 +902,36 @@ object ProCareer {
         val pool = (listOf(lg.user) + lg.teams.filter { it.id != h.teamId }.shuffled(Rng.r)).take(count)
         return pool.map { t ->
             val ahead = lg.rosterOf(t).count { it.id != h.id && it.pos == h.pos && it.ovr >= h.ovr }
-            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(750, MAX_SALARY)
+            val top = maxFor(lg, t.id)
+            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(minSalary(h.proYears), top)
             // How far each team will stretch: a little more for his own team, never past the max.
-            val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, MAX_SALARY)
-            ProOffer(t.id, pay, years, roleFor(ahead), ahead, t.winPct, max)
+            val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, top)
+            ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max)
         }.sortedByDescending { it.salary }
     }
 
-    /** The biggest contract the league allows, in thousands a season. */
-    const val MAX_SALARY = 55_000
+    /** Longest deal at his age. Only his own team can go to five years (Bird rights); a new team stops at four. */
+    fun maxYears(lg: League, teamId: Int = lg.hero?.teamId ?: -1): Int {
+        val byAge = lg.hero?.age?.let { when { it <= 27 -> 5; it <= 30 -> 4; it <= 33 -> 3; it <= 36 -> 2; else -> 1 } } ?: 3
+        return if (teamId == lg.hero?.teamId) byAge else byAge.coerceAtMost(4)
+    }
 
-    /** Longest deal a team will give him at his age. */
-    fun maxYears(lg: League) = lg.hero?.age?.let { when { it <= 27 -> 5; it <= 30 -> 4; it <= 33 -> 3; it <= 36 -> 2; else -> 1 } } ?: 3
+    /**
+     * Restricted free agency: if he signs an offer sheet elsewhere, his team can match it and keep him.
+     * The better he is, the likelier they match. Returns the offer he ends up on.
+     */
+    fun matchOfferSheet(lg: League, o: ProOffer): ProOffer {
+        val r = lg.road ?: return o
+        val h = lg.hero ?: return o
+        if (!r.restricted || o.teamId == h.teamId) return o
+        val chance = (0.35 + (h.ovr - 85) * 0.06).coerceIn(0.2, 0.9)
+        if (!Rng.chance(chance)) {
+            lg.news += News(lg.season, 0, "The ${lg.user.name} decline to match ${h.name}'s offer sheet from the ${lg.team(o.teamId).name}", true)
+            return o
+        }
+        lg.news += News(lg.season, 0, "The ${lg.user.name} match the ${lg.team(o.teamId).name}' offer sheet: ${h.name} stays", true)
+        return ProOffer(h.teamId, o.salary, o.years.coerceAtMost(maxYears(lg, h.teamId)), o.role, o.ahead, lg.user.winPct, o.max, note = "Matched")
+    }
 
     /** A contender: won 55% last season or reached the conference finals. */
     fun contender(lg: League, teamId: Int): Boolean {
@@ -880,8 +949,9 @@ object ProCareer {
         val o = r.proOffers.getOrNull(i) ?: return ""
         val t = lg.team(o.teamId)
         if (o.countered) return o.note
-        if (o.salary >= MAX_SALARY) { o.note = "It's already a max offer."; return o.note }
-        val ask = ((o.salary * (1 + pct)).roundToInt() / 10 * 10).coerceAtMost(MAX_SALARY)
+        val top = maxFor(lg, o.teamId)
+        if (o.salary >= top) { o.note = "It's already a max offer."; return o.note }
+        val ask = ((o.salary * (1 + pct)).roundToInt() / 10 * 10).coerceAtMost(top)
         o.countered = true
         val walk = (if (pct >= 0.2) 0.3 else 0.1) + if (o.max < o.salary * 1.08) 0.15 else 0.0
         o.note = when {
@@ -902,16 +972,21 @@ object ProCareer {
      */
     fun signWith(lg: League, i: Int, years: Int, option: Boolean, discount: Boolean): String {
         val r = lg.road ?: return ""
-        val o = r.proOffers.getOrNull(i) ?: return ""
-        val y = years.coerceIn(1, maxYears(lg))
+        val offer = r.proOffers.getOrNull(i) ?: return ""
+        val y = years.coerceIn(1, maxYears(lg, offer.teamId))
+        val wanted = lg.team(offer.teamId)
+        // A restricted free agent's team can match the offer sheet.
+        val o = matchOfferSheet(lg, ProOffer(offer.teamId, offer.salary, y, offer.role, offer.ahead, offer.winPct, offer.max))
+        val matched = o.teamId != offer.teamId
         var pay = o.salary
         if (option && y >= 2) pay = (pay * 0.95).toInt() / 10 * 10
-        val ringDeal = discount && contender(lg, o.teamId)
+        val ringDeal = discount && !matched && contender(lg, o.teamId)
         val saved = if (ringDeal) pay - (pay * 0.85).toInt() / 10 * 10 else 0
         pay -= saved
         val t = lg.team(o.teamId)
-        sign(lg, ProOffer(o.teamId, pay, y, o.role, o.ahead, o.winPct, o.max))
-        r.contract?.option = option && y >= 2
+        sign(lg, ProOffer(o.teamId, pay, o.years, o.role, o.ahead, o.winPct, o.max))
+        r.contract?.option = option && o.years >= 2
+        if (matched) return "The ${t.name} matched the ${wanted.name}' offer sheet. You stay, on the same terms."
         if (!ringDeal) return "You sign with the ${t.name}."
         // The money he left on the table buys a good veteran.
         val add = ProLeague.makePro(lg, Rng.pick(Pos.entries), (88 + saved / 2500).coerceAtMost(94), Rng.range(27, 31), t)
@@ -958,9 +1033,10 @@ object ProCareer {
             if (r.proTeams.lastOrNull() != to.id) r.proTeams += to.id
         }
         Gameplan.autoAllocate(lg, to)
-        val kind = if (o.salary >= 45_000) "Max" else "Veteran"
+        val kind = if (o.salary >= maxSalary(h.proYears) - 10) "Max" else if (o.salary <= minSalary(h.proYears)) "Minimum" else "Veteran"
         r.contract = Contract(to.id, o.salary, o.years, kind, lg.season)
         r.proOffers.clear()
+        r.restricted = false
         Road.sync(lg)
         lg.news += News(lg.season, 0,
             if (from.id == to.id) "${h.name} re-signs with the ${to.name}: ${o.years} years, ${Road.dollars(o.salary)} a season"
