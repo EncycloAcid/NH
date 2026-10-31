@@ -709,6 +709,8 @@ class RoadState(
     var tradedSeason: Int = 0,
     var tradedDay: Int = -1,
     var tradeNote: String = "",
+    /** Free agency: a player option on his last year that he has to decide on this summer. */
+    var optionPending: Boolean = false,
     /** The all-time list: his rank (0 until he's on it), the names below him, and the last time he passed someone. */
     var allTimeRank: Int = 0,
     val allTimePassed: MutableList<String> = mutableListOf(),
@@ -732,11 +734,15 @@ class Trade(
 
 /** A pro contract. Salary in thousands of dollars a season. */
 @Serializable
-class Contract(val teamId: Int, val salary: Int, var years: Int, val kind: String, val signed: Int = 0)
+class Contract(val teamId: Int, val salary: Int, var years: Int, val kind: String, val signed: Int = 0, var option: Boolean = false)
 
 /** A free-agent offer. */
 @Serializable
-class ProOffer(val teamId: Int, val salary: Int, val years: Int, val role: String, val ahead: Int, val winPct: Double)
+class ProOffer(
+    val teamId: Int, var salary: Int, val years: Int, val role: String, val ahead: Int, val winPct: Double,
+    /** The most the team will pay (hidden), whether he's countered yet, and how the team answered. */
+    val max: Int = 0, var countered: Boolean = false, var note: String = "",
+)
 
 /** A best-of-seven playoff series. [conf] is -1 for the Finals; [slot] orders the bracket. */
 @Serializable

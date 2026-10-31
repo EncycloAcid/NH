@@ -519,7 +519,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                         Text("CONTRACT", style = T.label, color = P.sub)
                         if (c != null) {
                             Text("${money(c.salary)} a season", style = T.head, color = P.accent)
-                            Text("${c.kind} · ${if (c.years <= 0) "expiring" else "${c.years} ${if (c.years == 1) "year" else "years"} left"}", style = T.small, color = P.sub)
+                            Text("${c.kind} · ${if (c.years <= 0) "expiring" else "${c.years} ${if (c.years == 1) "year" else "years"} left"}" + if (c.option) " · player option" else "", style = T.small, color = P.sub)
                         } else Text("Free agent", style = T.head, color = P.accent)
                     }
                 }
@@ -806,11 +806,11 @@ fun ProOffseasonFlow(vm: GameViewModel, lg: League) {
     val rookie = h.proYears == 0 && ps.history.isEmpty()
     val steps = if (rookie) listOf("Contract", "Summer") else listOf("Review", "Draft", "Free agency", "Summer")
     val idx = if (rookie) (if (ps.step == ProStep.SUMMER) 1 else 0) else ps.step.ordinal
-    val needsSigning = ps.step == ProStep.FREE_AGENCY && (r.contract?.years ?: 0) <= 0 && r.proOffers.isNotEmpty()
+    val needsSigning = ps.step == ProStep.FREE_AGENCY && (r.optionPending || ((r.contract?.years ?: 0) <= 0 && r.proOffers.isNotEmpty()))
     val label = when (ps.step) {
         ProStep.REVIEW -> "Next: the draft"
         ProStep.DRAFT -> "Next: free agency"
-        ProStep.FREE_AGENCY -> if (needsSigning) "Pick a team above" else "Next: the summer"
+        ProStep.FREE_AGENCY -> if (r.optionPending) "Decide on your option" else if (needsSigning) "Pick a team above" else "Next: the summer"
         ProStep.SUMMER -> "Start the ${lg.season + 1} season"
     }
     Column(Modifier.fillMaxSize()) {
@@ -933,11 +933,25 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
             }
             return@item
         }
+        if (c != null && c.years > 0 && r.optionPending) {
+            Panel(color = P.hero) {
+                Text("PLAYER OPTION", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                Text("${money(c.salary)} for one more year", style = T.head, color = P.onHero)
+                Text("Opt in and stay with the ${lg.team(c.teamId).name} for the last year of your deal, or opt out and see what the market pays. Your agent thinks you're worth about ${money(ProCareer.marketValue(lg, h))} a season.",
+                    style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton("Opt in", Modifier.weight(1f)) { vm.act { ProCareer.optIn(it) } }
+                    SmallButton("Opt out", Modifier.weight(1f), primary = true) { vm.act { ProCareer.optOut(it) } }
+                }
+            }
+            return@item
+        }
         if (c != null && c.years > 0) {
             Panel {
                 Text("UNDER CONTRACT", style = T.label, color = P.accent)
                 Text("${money(c.salary)} a season with the ${lg.team(c.teamId).name}", style = T.head, color = P.ink)
-                Text("${c.kind} · ${c.years} ${if (c.years == 1) "year" else "years"} left.", style = T.small, color = P.sub)
+                Text("${c.kind} · ${c.years} ${if (c.years == 1) "year" else "years"} left" + (if (c.option) ", the last one a player option." else "."), style = T.small, color = P.sub)
             }
             SituationPanel(vm, lg)
             return@item
@@ -948,22 +962,72 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
             Text("Your agent's read: you're worth about ${money(ProCareer.marketValue(lg, h))} a season.", style = T.small, color = P.sub)
         }
         Section("Offers")
-        GroupList(r.proOffers, inset = 64.dp) { o ->
-            val ot = lg.team(o.teamId)
-            ListRow(onClick = { vm.act { ProCareer.sign(it, o) }; vm.toast("You sign with the ${ot.name}") }) {
-                TeamBadge(ot, 42.dp)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(ot.name + if (ot.id == t.id) " (re-sign)" else "", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${o.role} · ${ot.w}-${ot.l} last season · ${o.years} ${if (o.years == 1) "year" else "years"}", style = T.small, color = P.sub, maxLines = 1)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(money(o.salary), style = T.numSm, color = P.good)
-                    Text("PER YEAR", style = T.label.copy(fontSize = 9.sp), color = P.sub)
-                }
+        Text("Tap an offer to negotiate: counter, set the length, add a player option, or take less to join a contender.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+    }
+    for (i in r.proOffers.indices) item(key = "offer-${r.proOffers[i].teamId}") {
+        Spacer(Modifier.height(8.dp))
+        OfferCard(vm, lg, i, r.proOffers[i], current = r.proOffers[i].teamId == t.id)
+    }
+}
+
+/** One free-agent offer: tap to open the negotiation. */
+@Composable
+private fun OfferCard(vm: GameViewModel, lg: League, i: Int, o: com.nh.hoopscoach.game.ProOffer, current: Boolean) {
+    val ot = lg.team(o.teamId)
+    var open by remember(o.teamId) { mutableStateOf(false) }
+    var years by remember(o.teamId) { mutableStateOf(o.years) }
+    var option by remember(o.teamId) { mutableStateOf(false) }
+    val contender = ProCareer.contender(lg, o.teamId)
+    val pay = if (option && years >= 2) (o.salary * 0.95).toInt() / 10 * 10 else o.salary
+    Panel(onClick = { open = !open }, color = if (open) P.accentSoft else P.surface) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TeamBadge(ot, 42.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(ot.name + if (current) " (re-sign)" else "", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${o.role} · ${ot.w}-${ot.l}" + if (contender) " · contender" else "", style = T.small, color = if (contender) P.accent else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(money(o.salary), style = T.numSm, color = P.good)
+                Text("PER YEAR", style = T.label.copy(fontSize = 9.sp), color = P.sub)
             }
         }
-        Text("Tap a team to sign.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
+        if (o.note.isNotEmpty()) Text(o.note, style = T.small, color = P.accent, modifier = Modifier.padding(top = 6.dp))
+        if (!open) return@Panel
+        Spacer(Modifier.height(12.dp))
+        Text("LENGTH", style = T.label, color = P.sub)
+        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (y in 1..ProCareer.maxYears(lg)) SmallButton("$y yr", Modifier.weight(1f), primary = y == years) { years = y }
+        }
+        if (years >= 2) {
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { option = !option }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(if (option) P.accent else P.line), contentAlignment = Alignment.Center) {
+                    if (option) Text("✓", style = T.small, color = P.onAccent)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text("Player option on the last year (5% less a season). Opt out early if you outplay the deal.", style = T.small, color = P.ink)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("${money(pay)} a season · ${money(pay * years)} over $years ${if (years == 1) "year" else "years"}", style = T.bodyB, color = P.ink)
+        Spacer(Modifier.height(10.dp))
+        if (!o.countered && o.salary < ProCareer.MAX_SALARY) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallButton("Ask 10% more", Modifier.weight(1f)) { vm.act { ProCareer.counter(it, i, 0.10) } }
+            SmallButton("Ask 20% more", Modifier.weight(1f)) { vm.act { ProCareer.counter(it, i, 0.20) } }
+        }
+        if (!o.countered && o.salary < ProCareer.MAX_SALARY) Text("Asking more can raise the offer, or make them walk.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton("Sign for ${money(pay)}", Modifier.fillMaxWidth()) {
+            vm.act { val msg = ProCareer.signWith(it, i, years, option, false); vm.toast(msg) }
+        }
+        if (contender) {
+            Spacer(Modifier.height(6.dp))
+            SecondaryButton("Ring discount: sign for ${money((pay * 0.85).toInt() / 10 * 10)}", Modifier.fillMaxWidth()) {
+                vm.act { val msg = ProCareer.signWith(it, i, years, option, true); vm.toast(msg) }
+            }
+            Text("They'll spend what you leave on the table on a good veteran.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        }
     }
 }
 

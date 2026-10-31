@@ -146,7 +146,7 @@ object Trades {
         if (back.isEmpty() || to.id == from.id) { r.suitors.clear(); return false }
         execute(lg, from, to, listOf(h), back)
         r.suitors.clear()
-        r.contract = r.contract?.let { Contract(to.id, it.salary, it.years, it.kind, it.signed) }
+        r.contract = r.contract?.let { Contract(to.id, it.salary, it.years, it.kind, it.signed, it.option) }
         if (r.proTeams.lastOrNull() != to.id) r.proTeams += to.id
         r.tradedSeason = lg.season
         r.tradedDay = lg.day

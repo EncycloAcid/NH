@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
@@ -130,7 +131,12 @@ class ProUiTest {
         lg.road!!.contract!!.years = 0
         ProCareer.next(lg); vm.install(lg); shot("P14_free_agency")
         assertTrue("offers come in", lg.road!!.proOffers.isNotEmpty())
-        ProCareer.sign(lg, lg.road!!.proOffers.first())
+        // Negotiate: open the first offer, counter it, then sign.
+        rule.onAllNodes(androidx.compose.ui.test.hasText(lg.team(lg.road!!.proOffers.first().teamId).name, substring = true)).onFirst().performClick(); idle()
+        shot("P14b_negotiate")
+        ProCareer.counter(lg, 0, 0.1); vm.install(lg); idle()
+        shot("P14c_countered")
+        ProCareer.signWith(lg, 0, 2, option = true, discount = false)
         ProCareer.next(lg); vm.install(lg); shot("P15_summer")
         vm.select(Tab.CAREER); shot("P16_career"); scrollTo(3); shot("P16b_career_story")
         // The all-time list, with a big season added so he's on it.

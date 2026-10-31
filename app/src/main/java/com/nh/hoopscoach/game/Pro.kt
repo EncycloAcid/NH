@@ -596,6 +596,8 @@ object ProCareer {
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
+                // A player option on the last year: he decides before free agency opens.
+                r.contract?.let { c -> if (c.option && c.years == 1) r.optionPending = true }
                 if ((r.contract?.years ?: 0) <= 0) {
                     r.proOffers.clear()
                     r.proOffers += offers(lg)
@@ -604,6 +606,7 @@ object ProCareer {
                 ps.step = ProStep.FREE_AGENCY
             }
             ProStep.FREE_AGENCY -> {
+                if (r.optionPending) optIn(lg)
                 if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, it) }
                 // The rosters start out current, so the league skips a summer of aging before its first season.
                 if (ps.history.isNotEmpty()) summer(lg)
@@ -691,9 +694,92 @@ object ProCareer {
         val pool = (listOf(lg.user) + lg.teams.filter { it.id != h.teamId }.shuffled(Rng.r)).take(count)
         return pool.map { t ->
             val ahead = lg.rosterOf(t).count { it.id != h.id && it.pos == h.pos && it.ovr >= h.ovr }
-            val pay = (value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10
-            ProOffer(t.id, pay.coerceIn(750, 55_000), years, roleFor(ahead), ahead, t.winPct)
+            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(750, MAX_SALARY)
+            // How far each team will stretch: a little more for his own team, never past the max.
+            val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, MAX_SALARY)
+            ProOffer(t.id, pay, years, roleFor(ahead), ahead, t.winPct, max)
         }.sortedByDescending { it.salary }
+    }
+
+    /** The biggest contract the league allows, in thousands a season. */
+    const val MAX_SALARY = 55_000
+
+    /** Longest deal a team will give him at his age. */
+    fun maxYears(lg: League) = lg.hero?.age?.let { when { it <= 27 -> 5; it <= 30 -> 4; it <= 33 -> 3; else -> 2 } } ?: 3
+
+    /** A contender: won 55% last season or reached the conference finals. */
+    fun contender(lg: League, teamId: Int): Boolean {
+        val t = lg.team(teamId)
+        val deep = lg.proState?.series?.any { it.round >= 3 && it.involves(teamId) } == true
+        return t.winPct >= 0.55 || deep
+    }
+
+    /**
+     * He asks for [pct] more. The team agrees if it fits, comes up to its limit, or walks away
+     * (more likely the bigger the ask). One counter per offer. Returns the team's answer.
+     */
+    fun counter(lg: League, i: Int, pct: Double): String {
+        val r = lg.road ?: return ""
+        val o = r.proOffers.getOrNull(i) ?: return ""
+        val t = lg.team(o.teamId)
+        if (o.countered) return o.note
+        if (o.salary >= MAX_SALARY) { o.note = "It's already a max offer."; return o.note }
+        val ask = ((o.salary * (1 + pct)).roundToInt() / 10 * 10).coerceAtMost(MAX_SALARY)
+        o.countered = true
+        val walk = (if (pct >= 0.2) 0.3 else 0.1) + if (o.max < o.salary * 1.08) 0.15 else 0.0
+        o.note = when {
+            ask <= o.max -> { o.salary = ask; "Deal. The ${t.name} come up to ${Road.dollars(ask)}." }
+            Rng.chance(walk) -> {
+                r.proOffers.removeAt(i)
+                lg.news += News(lg.season, 0, "The ${t.name} pull their offer to ${lg.hero?.name}", true)
+                return "The ${t.name} walked away."
+            }
+            else -> { o.salary = o.max; "Final offer: the ${t.name} go to ${Road.dollars(o.max)} and no higher." }
+        }
+        return o.note
+    }
+
+    /**
+     * Signs offer [i] for [years], with a player option on the last year (5% less a season) if [option],
+     * or at a 15% ring discount with a contender, which spends the savings on a veteran.
+     */
+    fun signWith(lg: League, i: Int, years: Int, option: Boolean, discount: Boolean): String {
+        val r = lg.road ?: return ""
+        val o = r.proOffers.getOrNull(i) ?: return ""
+        val y = years.coerceIn(1, maxYears(lg))
+        var pay = o.salary
+        if (option && y >= 2) pay = (pay * 0.95).toInt() / 10 * 10
+        val ringDeal = discount && contender(lg, o.teamId)
+        val saved = if (ringDeal) pay - (pay * 0.85).toInt() / 10 * 10 else 0
+        pay -= saved
+        val t = lg.team(o.teamId)
+        sign(lg, ProOffer(o.teamId, pay, y, o.role, o.ahead, o.winPct, o.max))
+        r.contract?.option = option && y >= 2
+        if (!ringDeal) return "You sign with the ${t.name}."
+        // The money he left on the table buys a good veteran.
+        val add = ProLeague.makePro(lg, Rng.pick(Pos.entries), (88 + saved / 2500).coerceAtMost(94), Rng.range(27, 31), t)
+        ProLeague.trim(lg, t)
+        Gameplan.autoAllocate(lg, t)
+        lg.reindex()
+        lg.news += News(lg.season, 0, "${lg.hero?.name} takes less to chase a ring; the ${t.name} use the room to sign ${add.name}", true)
+        return "You took ${Road.dollars(saved)} less a season. The ${t.name} spent it on ${add.name} (${add.ovr})."
+    }
+
+    /** The player option on his last year: keep the year, or walk into free agency now. */
+    fun optIn(lg: League) {
+        val r = lg.road ?: return
+        r.optionPending = false
+        r.contract?.option = false
+        lg.news += News(lg.season, 0, "${lg.hero?.name} picks up his player option with the ${lg.user.name}", true)
+    }
+
+    fun optOut(lg: League) {
+        val r = lg.road ?: return
+        r.optionPending = false
+        r.contract?.let { it.years = 0; it.option = false }
+        r.proOffers.clear()
+        r.proOffers += offers(lg)
+        lg.news += News(lg.season, 0, "${lg.hero?.name} opts out and hits free agency", true)
     }
 
     fun roleFor(ahead: Int) = when (ahead) { 0 -> "Starter"; 1 -> "Sixth man"; 2 -> "Rotation"; else -> "Bench" }

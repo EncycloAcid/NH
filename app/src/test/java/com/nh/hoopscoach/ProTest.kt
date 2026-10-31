@@ -94,6 +94,66 @@ class ProTest {
         assertTrue("withdrawn", lg.road!!.suitors.isEmpty() && lg.player(lg.heroId).teamId == pick.teamId)
     }
 
+    private fun playSeason(lg: League) {
+        var guard = 0
+        while (lg.phase != Phase.OFFSEASON && guard++ < 200) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+    }
+
+    @Test
+    fun negotiation() {
+        var lg = ProLeague.create(toDraft(21))
+        val r = lg.road!!
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        playSeason(lg)
+        // His deal is up: free agency.
+        r.contract!!.years = 0
+        ProCareer.next(lg); ProCareer.next(lg)
+        assertEquals(ProStep.FREE_AGENCY, lg.proState!!.step)
+        assertTrue("offers", r.proOffers.size >= 2)
+        assertTrue("every offer has room to stretch", r.proOffers.all { it.max >= it.salary })
+        val before = r.proOffers.map { it.teamId to it.salary }
+        val answer = ProCareer.counter(lg, 0, 0.20)
+        println("counter: $answer; offers ${before.map { (t, s) -> "${lg.team(t).abbr} $s" }} -> ${r.proOffers.map { "${lg.team(it.teamId).abbr} ${it.salary}" }}")
+        assertTrue(answer.isNotEmpty())
+        val o0 = r.proOffers.firstOrNull { it.teamId == before[0].first }
+        if (o0 != null) {
+            assertTrue("a counter never lowers the offer", o0.salary >= before[0].second)
+            assertEquals("one counter per offer", o0.salary, ProCareer.counter(lg, r.proOffers.indexOf(o0), 0.1).let { o0.salary })
+        }
+        val i = r.proOffers.indices.last
+        val base = r.proOffers[i].salary
+        val msg = ProCareer.signWith(lg, i, 2, option = true, discount = false)
+        println(msg)
+        val c = r.contract!!
+        assertEquals(2, c.years)
+        assertTrue("player option", c.option)
+        assertEquals("5% less for the option", (base * 0.95).toInt() / 10 * 10, c.salary)
+        assertTrue("signed", r.proOffers.isEmpty())
+        lg = SaveIO.decode(SaveIO.encode(lg))
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        playSeason(lg)
+        ProCareer.next(lg); ProCareer.next(lg)
+        assertTrue("the option comes due", lg.road!!.optionPending)
+        ProCareer.optOut(lg)
+        val rr = lg.road!!
+        assertTrue("opting out opens free agency", rr.contract!!.years == 0 && rr.proOffers.isNotEmpty() && !rr.optionPending)
+        // A ring discount with a contender, if one calls.
+        val ci = rr.proOffers.indexOfFirst { ProCareer.contender(lg, it.teamId) }
+        if (ci >= 0) {
+            val o = rr.proOffers[ci]
+            val team = lg.team(o.teamId)
+            val rosterBefore = team.roster.toSet()
+            val note = ProCareer.signWith(lg, ci, 3, option = false, discount = true)
+            println(note)
+            assertTrue("15% less", kotlin.math.abs((o.salary * 0.85).toInt() / 10 * 10 - rr.contract!!.salary) <= 10)
+            assertTrue("the team adds a veteran", team.roster.any { it !in rosterBefore && it != lg.heroId })
+        } else {
+            ProCareer.signWith(lg, 0, 3, option = false, discount = true)
+            println("no contender called; the discount does nothing without one")
+        }
+        assertTrue("rosters legal", lg.teams.all { t -> t.roster.size in 13..15 })
+    }
+
     @Test
     fun proCareer() {
         val college = toDraft(21)
