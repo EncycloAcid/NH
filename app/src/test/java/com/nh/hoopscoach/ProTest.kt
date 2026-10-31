@@ -244,7 +244,7 @@ class ProTest {
         lg = SaveIO.decode(SaveIO.encode(lg))
 
         var seasons = 0
-        while (!lg.road!!.ended && seasons < 20) {
+        while (!lg.road!!.ended && seasons < 23) {
             // Contract, summer, then the new season.
             while (lg.phase == Phase.OFFSEASON) {
                 val ps = lg.proState!!

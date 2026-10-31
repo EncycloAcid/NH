@@ -350,7 +350,7 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(h.name, style = T.bodyB, color = P.ink)
-                Text("${Road.role(lg)} · ${planMin(lg, t, h.id)} min · ${if (lg.pro) "age ${h.age}" else h.cls}", style = T.small, color = P.accent)
+                Text("${Road.role(lg)} · ${planMin(lg, t, h.id)} min · ${if (lg.pro) "age ${h.age}" else if (h.age > 0) "${h.cls} · age ${h.age}" else h.cls}", style = T.small, color = P.accent)
                 if (h.stats.gp > 0) Text(statLine(h), style = T.small, color = P.sub)
             }
             Ring(h.ovr, 44.dp)

@@ -427,6 +427,7 @@ private fun BioTab(lg: League, p: Player) {
             p.awards.lastOrNull { it.contains("Draft #") }?.let { "Drafted" to "No. ${it.substringAfter("#")} in ${it.substringBefore(" ")}" },
             if (p.recruitRank > 0) "Recruit rating" to "${p.stars}★ · No. ${p.recruitRank} overall" else null,
         ) else listOfNotNull(
+            if (p.age > 0) "Age" to "${p.age}" else null,
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
             "Recruit rating" to when {

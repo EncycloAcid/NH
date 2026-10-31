@@ -316,7 +316,9 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
                 Text("${if (game.home == u.id) "vs" else "at"} ${opp.name}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             } else {
                 Text(proPhase(lg).uppercase(), style = T.label, color = P.accent, maxLines = 1)
-                Text(if (lg.phase == Phase.PLAYOFFS && userSeries(lg)?.let { it.done && it.winner != u.id } != false) "Your season is over" else "No game today", style = T.bodyB, color = P.ink, maxLines = 1)
+                val waiting = lg.phase == Phase.PLAYOFFS && userSeries(lg) == null && ProSeason.seed(lg, u.id) > 0
+                val over = lg.phase == Phase.PLAYOFFS && !waiting && userSeries(lg)?.let { it.done && it.winner != u.id } != false
+                Text(if (waiting) "In the playoffs · waiting on the play-in" else if (over) "Your season is over" else "No game today", style = T.bodyB, color = P.ink, maxLines = 1)
             }
         }
         Box {
@@ -515,6 +517,16 @@ private fun PlayoffCard(vm: GameViewModel, lg: League) {
     val s = userSeries(lg)
     Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = { vm.proRound = -1; vm.leagueTab = 1; vm.select(Tab.LEAGUE) })
     Panel {
+        val seed = ProSeason.seed(lg, u.id)
+        if (s == null && seed > 0) {
+            // A top-six seed sits out the play-in: in the playoffs, waiting for Round 1.
+            val opp = ProSeason.firstRoundOpponent(lg, u.id)
+            Text("NO. $seed SEED · ${lg.conf(u.confId).name.uppercase()}", style = T.label, color = P.accent)
+            Text("You're in. Round 1 starts after the play-in", style = T.head, color = P.ink)
+            Text(if (opp != null) "First-round opponent: the No. ${9 - seed} seed ${opp.name}. Sim a day or two while seeds 7 to 10 play in."
+                else "You'll face the play-in winner for the No. ${9 - seed} seed. Sim a day or two while seeds 7 to 10 play in.", style = T.small, color = P.sub)
+            return@Panel
+        }
         if (s == null) {
             Text("The ${u.mascot} missed the playoffs", style = T.head, color = P.ink)
             Text("The postseason goes on without you. Use the ⋮ menu to sim ahead and see who wins it all.", style = T.small, color = P.sub)

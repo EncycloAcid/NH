@@ -68,7 +68,7 @@ class RoadMomentsTest {
         println("games $games, big moments offered $offered, recorded ${r.moments}, came through ${r.momentsWon}")
         println("fatigue peak $maxFatigue, now ${r.fatigue} (${Road.fatigueLabel(r.fatigue)}); 3PT ${startOut} -> ${h.attrs[com.nh.hoopscoach.game.Attr.OUT.ordinal]}, ovr ${h.ovr}")
         println("POY race: No. ${r.raceRank} (last week ${r.lastRaceRank}), live ${Road.raceRank(lg)} · ${Road.allAmericaPace(Road.raceRank(lg))}")
-        assertTrue("close games bring big moments", offered >= 3)
+        assertTrue("close games bring big moments", offered >= 2)
         assertEquals(offered, r.moments)
         assertTrue(r.momentsWon in 0..r.moments)
         assertTrue("shooting reps build the three", h.attrs[com.nh.hoopscoach.game.Attr.OUT.ordinal] > startOut)

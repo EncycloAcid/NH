@@ -287,6 +287,9 @@ object Offseason {
     // ---------- new season ----------
 
     private fun startNewSeason(lg: League) {
+        // Everyone in college, and every high school recruit, is a year older.
+        for (p in lg.players) p.age = if (p.age <= 0) LeagueGen.collegeAge(p.year) else p.age + 1
+        for (r in lg.recruits) if (lg.playerOrNull(r.p.id) == null) r.p.age = if (r.p.age <= 0) LeagueGen.collegeAge(0) else r.p.age + 1
         for (t in lg.teams) {
             for (pid in t.roster) {
                 val p = lg.player(pid)

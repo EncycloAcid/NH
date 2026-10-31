@@ -139,6 +139,9 @@ object ProLeague {
             }
         }
         lg.reindex()
+        // The real rosters are the 2025-26 league. The years the user spent in college pass for them too:
+        // everyone ages, develops or declines, the oldest retire, and young draftees take the open spots.
+        if (era == Era.TODAY) repeat((college.season + 1 - DATA_SEASON).coerceIn(0, 8)) { pastYear(lg) }
         // The real draft class arrives: the user's classmates, the user's player, maybe his rival.
         val picks = college.draftHistory.filter { it.season == college.season }.sortedBy { it.pick }
         for (d in picks) {
@@ -215,7 +218,8 @@ object ProLeague {
             p.ovrHistory += p.ovr
         }
         p.teamId = t.id
-        p.age = 18 + collegeYears.coerceIn(1, 5)
+        // Ages are tracked through college; older saves start from his class.
+        if (p.age !in 18..30) p.age = 18 + collegeYears.coerceIn(1, 5)
         p.year = PRO_YEAR
         p.proYears = 0
         p.walkOn = false
@@ -262,6 +266,25 @@ object ProLeague {
         p.last = parts.getOrElse(1) { "" }
         p.country = null
         return p
+    }
+
+    /** The season of the real roster data (2025-26). */
+    const val DATA_SEASON = 2026
+
+    /** A year in the league before the user arrives: aging, growth or decline, retirements, and draftees. */
+    private fun pastYear(lg: League) {
+        for (p in lg.players) p.age++
+        for (t in lg.teams) {
+            val dev = Coaching.devOf(lg.coachOf(t))
+            for (pid in t.roster.toList()) {
+                val p = lg.player(pid)
+                val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
+                if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
+                ProCareer.develop(p, dev)
+            }
+            while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t)
+        }
+        lg.reindex()
     }
 
     /** The position a roster is thinnest at. */
@@ -415,7 +438,8 @@ object ProSeason {
         if (lg.phase != Phase.PLAYOFFS) return
         val ps = lg.proState ?: return
         for (s in ps.series) {
-            if (s.done || s.gameIds.any { !lg.game(it).played }) continue
+            // One game a day per series: a game the user already played live today counts, and no second one is made.
+            if (s.done || s.gameIds.any { val g = lg.game(it); !g.played || g.day == lg.day }) continue
             val n = s.gameIds.size + 1
             val hiHome = n in listOf(1, 2, 5, 7)
             val label = if (s.bestOf == 1) "Play-In · ${playInName(s)}" else "${roundName(s)} · Game $n"
@@ -508,6 +532,15 @@ object ProSeason {
             me == them -> "Series tied $me-$me. What changed tonight?"
             else -> "You cut it to $me-$them. Can you take this series back?"
         }
+    }
+
+    /** A top-six seed's Round 1 opponent while the play-in is on: known for seeds 3 to 6, null for 1 and 2 (a play-in winner). */
+    fun firstRoundOpponent(lg: League, teamId: Int): Team? {
+        val ps = lg.proState ?: return null
+        val seed = ps.seeds[teamId] ?: return null
+        if (seed !in 3..6) return null
+        val conf = lg.team(teamId).confId
+        return ps.seeds.entries.firstOrNull { it.value == 9 - seed && lg.team(it.key).confId == conf }?.let { lg.team(it.key) }
     }
 
     /** The three play-in games in each conference. */
@@ -656,7 +689,7 @@ object ProSeason {
     fun resultFor(lg: League, teamId: Int): String {
         val ps = lg.proState ?: return ""
         if (ps.champion == teamId) return "Champion"
-        val last = lastSeries(lg, teamId) ?: return if (lg.phase == Phase.REGULAR) "" else "Missed playoffs"
+        val last = lastSeries(lg, teamId) ?: return if (lg.phase == Phase.REGULAR) "" else if (teamId in ps.seeds) "Playoffs" else "Missed playoffs"
         return if (last.done && last.winner != teamId) "Lost in the ${roundName(last)}" else roundName(last)
     }
 

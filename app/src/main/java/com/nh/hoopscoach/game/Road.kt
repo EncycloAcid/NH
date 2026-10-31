@@ -34,6 +34,7 @@ object Road {
         p.style = s.style
         p.focus = s.style
         p.attrs = Ratings.build(s.pos, s.style, target)
+        p.age = 18
         p.country = null
         p.hometown = "${s.town.trim().ifEmpty { "Hometown" }}, ${s.state}"
         p.number = s.number.coerceIn(0, 99)
