@@ -141,6 +141,8 @@ object Trades {
             val best = lg.rosterOf(t).maxByOrNull { value(it) }
             val keep = if (best != null && value(best) < target * 0.9) emptySet() else setOfNotNull(best?.id)
             val pack = bundle(lg, t, target, lo, hi, keep) ?: continue
+            // Over the cap, the salaries have to match.
+            if (!Payroll.tradeWorks(lg, t, Payroll.salaryOf(lg, h), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
             val ahead = lg.rosterOf(t).count { it.pos == h.pos && it.ovr >= h.ovr && pack.none { p -> p.id == it.id } }
             out += Suitor(t.id, pack.map { it.id }, ProCareer.roleFor(ahead), ahead)
             if (out.size >= count * 2) break
@@ -232,6 +234,7 @@ object Trades {
             val vet = lg.rosterOf(seller).filter { it.id != lg.heroId && it.age >= 27 && it.ovr >= 87 && it.id !in lg.proState!!.moved }.maxByOrNull { it.ovr } ?: continue
             val keep = (listOf(lg.heroId) + lg.rosterOf(starTeam).filter { it.id != lg.heroId }.sortedByDescending { value(it) }.take(1).map { it.id }).toSet()
             val pack = bundle(lg, starTeam, value(vet), 0.7, 1.35, keep) ?: continue
+            if (!Payroll.tradeWorks(lg, starTeam, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
             val trade = execute(lg, seller, starTeam, listOf(vet), pack)
             lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
             made++
@@ -249,6 +252,7 @@ object Trades {
             val target = valueFor(lg, buyer, vet)
             val keep = lg.rosterOf(buyer).sortedByDescending { value(it) }.take(2).map { it.id }.toSet()
             val pack = bundle(lg, buyer, target, 0.75, 1.3, keep) ?: continue
+            if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
             val trade = execute(lg, seller, buyer, listOf(vet), pack)
             if (seller.id == lg.userTeamId || buyer.id == lg.userTeamId) lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
             made++

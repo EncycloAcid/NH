@@ -223,6 +223,9 @@ class Player(
     /** Pro league: age, and pro seasons finished (0 for a rookie). */
     var age: Int = 0,
     var proYears: Int = 0,
+    /** A pro's salary (thousands a season) and the years left on his deal (the user's player's live in his contract). */
+    var salary: Int = 0,
+    var contractYears: Int = 0,
     /** Headshot file for real pro players (assets/nba/heads/<photo>.webp), or empty. */
     var photo: String = "",
     /** A second position he can play (a neighbor of his first), or null. */

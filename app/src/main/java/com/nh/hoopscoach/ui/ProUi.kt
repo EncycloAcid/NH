@@ -369,6 +369,22 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             ScreenHeader("${lg.season} · ${lg.conf(u.confId).name}", u.name, "${teamLine(lg, u)} · Coach ${lg.coachOf(u).last}") { TeamBadge(u, 50.dp) }
+            // The payroll against the cap and the luxury tax line.
+            val pay = com.nh.hoopscoach.game.Payroll.total(lg, u)
+            val cap = com.nh.hoopscoach.game.Payroll.cap(lg)
+            val tax = com.nh.hoopscoach.game.Payroll.tax(lg)
+            if (pay > 0) Panel(Modifier.padding(bottom = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("PAYROLL", style = T.label, color = P.sub)
+                        Text(money(pay), style = T.head, color = P.ink)
+                    }
+                    Text(com.nh.hoopscoach.game.Payroll.status(lg, u), style = T.bodyB, color = if (pay > tax) P.bad else if (pay > cap) P.warn else P.good)
+                }
+                Spacer(Modifier.height(6.dp))
+                Bar((pay.toFloat() / (tax * 1.1f)).coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = if (pay > tax) P.bad else if (pay > cap) P.warn else P.good, height = 7.dp)
+                Text("Cap ${money(cap)} · tax line ${money(tax)}" + if (pay < cap) " · ${money(cap - pay)} in room" else "", style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+            }
             Segmented(listOf("Roster", "Schedule"), vm.teamTab.coerceIn(0, 1), { vm.teamTab = it })
             Spacer(Modifier.height(8.dp))
         }

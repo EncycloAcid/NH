@@ -104,6 +104,12 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
+                    // A pro's contract.
+                    if (lg.pro && team != null) {
+                        val sal = com.nh.hoopscoach.game.Payroll.salaryOf(lg, p)
+                        val yrs = if (p.id == lg.heroId) lg.road?.contract?.years ?: 0 else p.contractYears
+                        if (sal > 0) Text("${money(sal)} a season · " + (if (yrs <= 0) "expiring" else "$yrs ${if (yrs == 1) "year" else "years"} left"), style = T.small, color = P.sub)
+                    }
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }
             }

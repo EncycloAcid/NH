@@ -287,6 +287,8 @@ object ProLeague {
         lg.proState!!.step = ProStep.FREE_AGENCY
         lg.news += News(lg.season, 0, "${h.name} signs with the ${t.name}: ${r.contract!!.years} years, ${Road.dollars(r.contract!!.salary)} a season", true)
         RecordBook.seed(lg)
+        // Every pro gets a deal, so payrolls are real from day one.
+        Payroll.sign(lg)
         return lg
     }
 
@@ -404,6 +406,7 @@ object ProLeague {
                     val target = draftOverall(pk.pick)
                     makePro(lg, pk.pos ?: scarcest(lg, t), target, pk.age, t).also {
                         it.proYears = 0
+                        Payroll.rookie(lg, it, pk.pick)
                         it.awards += "$year Draft #${pk.pick}"
                         it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
                         EraData.apply(it, pk)
@@ -932,6 +935,7 @@ object ProSeason {
         lg.season++
         // An era career: this season's teams (new names, moves, expansion teams).
         Franchises.apply(lg, lg.season)
+        Payroll.newSeason(lg)
         lg.day = 1
         lg.phase = Phase.REGULAR
         lg.games.clear()
@@ -1184,6 +1188,7 @@ object ProCareer {
                 val pick = real[i + 1]
                 ProLeague.makePro(lg, pick?.pos ?: pos, target, pick?.age ?: Rng.range(19, 22), t).also {
                     it.proYears = 0
+                    Payroll.rookie(lg, it, i + 1)
                     it.awards += "${lg.season} Draft #${i + 1}"
                     // Rookies come in raw, with real upside.
                     it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
@@ -1211,13 +1216,15 @@ object ProCareer {
         val pool = listOf(lg.user) + lg.teams.filter { it.id != h.teamId }
         return pool.map { t ->
             val ahead = lg.rosterOf(t).count { it.id != h.id && it.pos == h.pos && it.ovr >= h.ovr }
-            val top = maxFor(lg, t.id)
+            // Cap room or the mid-level exception; his own team can go over the cap to keep him.
+            val (limit, how) = if (t.id == h.teamId) maxFor(lg, t.id) to "Bird rights" else Payroll.canOffer(lg, t)
+            val top = minOf(maxFor(lg, t.id), limit).coerceAtLeast(minSalary(lg, h.proYears))
             // Teams that need him at his position pay more; teams set there offer less.
             val need = when (ahead) { 0 -> 1.0; 1 -> 0.9; else -> 0.78 }
             val pay = ((value * (if (t.id == h.teamId) 1.05 else (0.78 + Rng.d() * 0.22) * need)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
             // How far each team will stretch: a little more for his own team, never past the max.
             val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, top)
-            ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max)
+            ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max, note = if (pay >= top) how else "")
         }.sortedByDescending { it.salary }
     }
 
