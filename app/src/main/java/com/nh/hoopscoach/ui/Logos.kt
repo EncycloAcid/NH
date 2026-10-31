@@ -16,13 +16,16 @@ object Logos {
     }
     private val missing = HashSet<String>()
 
-    fun get(ctx: Context, abbr: String): ImageBitmap? {
-        cache.get(abbr)?.let { return it }
-        if (abbr in missing) return null
+    fun get(ctx: Context, abbr: String): ImageBitmap? = asset(ctx, "logos/${abbr.lowercase()}.webp")
+
+    /** Any image in the assets folder, cached. */
+    fun asset(ctx: Context, path: String): ImageBitmap? {
+        cache.get(path)?.let { return it }
+        if (path in missing) return null
         val bmp = try {
-            ctx.assets.open("logos/${abbr.lowercase()}.webp").use { BitmapFactory.decodeStream(it) }
+            ctx.assets.open(path).use { BitmapFactory.decodeStream(it) }
         } catch (e: Exception) { null }
-        if (bmp == null) { missing += abbr; return null }
-        return bmp.asImageBitmap().also { cache.put(abbr, it) }
+        if (bmp == null) { missing += path; return null }
+        return bmp.asImageBitmap().also { cache.put(path, it) }
     }
 }

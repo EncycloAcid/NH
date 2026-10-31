@@ -230,6 +230,20 @@ fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, 
 fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
     val primary = t?.let { Color(it.primary) } ?: P.faint
     val secondary = t?.let { Color(it.secondary) } ?: Color.White
+    if (p.photo.isNotEmpty()) {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val img = remember(p.photo) { Logos.asset(ctx, "nba/heads/${p.photo}.webp") }
+        if (img != null) {
+            // A headshot on a soft team-colored plate, cropped to a circle from the top.
+            Box(Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f))) {
+                androidx.compose.foundation.Image(
+                    img, p.name, Modifier.size(size),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter,
+                )
+            }
+            return
+        }
+    }
     Jersey(p.number, primary, secondary, size)
 }
 

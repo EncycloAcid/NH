@@ -10,43 +10,11 @@ import kotlin.math.roundToInt
  * so the game engine, live games, big moments and box scores all work as they do in college.
  */
 object ProLeague {
-    class Franchise(val city: String, val name: String, val abbr: String, val primary: Long, val secondary: Long, val market: Int)
+    /** The 30 teams, East then West, in team-id order. */
+    val TEAMS get() = NbaData.TEAMS
 
-    val EAST = listOf(
-        Franchise("Atlanta", "Flight", "ATL", 0xFFC8102E, 0xFF1D1D1D, 74),
-        Franchise("Baltimore", "Monarchs", "BAL", 0xFF4B2E83, 0xFFF2A900, 64),
-        Franchise("Boston", "Admirals", "BOS", 0xFF00205B, 0xFFC5B783, 86),
-        Franchise("Brooklyn", "Bridges", "BKN", 0xFF111111, 0xFFB0B7BC, 82),
-        Franchise("Charlotte", "Copperheads", "CHA", 0xFF0B3B2E, 0xFFB87333, 62),
-        Franchise("Chicago", "Gales", "CHI", 0xFF0E3386, 0xFFE4002B, 90),
-        Franchise("Cleveland", "Ironmen", "CLE", 0xFF5C2D0F, 0xFFF26B21, 60),
-        Franchise("Detroit", "Motors", "DET", 0xFF1F4E9C, 0xFFB7BBBF, 66),
-        Franchise("Indianapolis", "Speed", "IND", 0xFF002D72, 0xFFFFC72C, 58),
-        Franchise("Miami", "Riptide", "MIA", 0xFF007A87, 0xFFF26F55, 84),
-        Franchise("Montreal", "Voyageurs", "MTL", 0xFFAF1E2D, 0xFF192168, 68),
-        Franchise("New York", "Empire", "NYE", 0xFF1A2B5F, 0xFFF47A20, 97),
-        Franchise("Philadelphia", "Founders", "PHI", 0xFF0B2265, 0xFFC4A35A, 80),
-        Franchise("Toronto", "Northmen", "TOR", 0xFFBA0C2F, 0xFF101820, 78),
-        Franchise("Washington", "Sentinels", "WAS", 0xFF002244, 0xFFE31837, 72),
-    )
-    val WEST = listOf(
-        Franchise("Dallas", "Wranglers", "DAL", 0xFF003DA5, 0xFFC0C0C0, 82),
-        Franchise("Denver", "Peaks", "DEN", 0xFF0D2240, 0xFF8BB8E8, 70),
-        Franchise("Houston", "Boosters", "HOU", 0xFF002D62, 0xFFEB6E1F, 80),
-        Franchise("Kansas City", "Blues", "KC", 0xFF004687, 0xFFBD9B60, 58),
-        Franchise("Las Vegas", "Neon", "LV", 0xFF161616, 0xFFFF2D87, 74),
-        Franchise("Los Angeles", "Waves", "LAW", 0xFF0057B8, 0xFFFFC72C, 98),
-        Franchise("Memphis", "Pharaohs", "MEM", 0xFF2E1A47, 0xFFD4AF37, 56),
-        Franchise("Minneapolis", "Frost", "MIN", 0xFF0C2340, 0xFF9EA2A2, 62),
-        Franchise("New Orleans", "Krewe", "NO", 0xFF4B0082, 0xFF00843D, 60),
-        Franchise("Oakland", "Redwoods", "OAK", 0xFF0B4F2E, 0xFFB5651D, 76),
-        Franchise("Phoenix", "Scorpions", "PHX", 0xFF3C1053, 0xFFE56020, 72),
-        Franchise("Portland", "Rain", "POR", 0xFF00594F, 0xFF97D700, 60),
-        Franchise("Salt Lake", "Summit", "SLC", 0xFF00275D, 0xFFC8C8C8, 56),
-        Franchise("San Antonio", "Outlaws", "SA", 0xFF101010, 0xFFC4CED4, 64),
-        Franchise("Seattle", "Sound", "SEA", 0xFF002244, 0xFF69BE28, 78),
-    )
-    val ALL = EAST + WEST
+    /** Logo file for a pro team, by its abbreviation. */
+    fun logoKey(abbr: String) = NbaData.TEAMS.firstOrNull { it.abbr == abbr }?.logo
 
     /** Pro teams have no logo files: their badge is drawn from team colors. */
     const val LOGO = -7
@@ -58,10 +26,22 @@ object ProLeague {
     const val MAX_ROSTER = 15
     val ROUND_NAMES = listOf("First Round", "Conference Semifinals", "Conference Finals", "Finals")
 
-    /** Overall targets for a roster, best to worst, before the team's own strength moves them. */
-    private val TARGETS = intArrayOf(97, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84)
+    /** Real players kept per team when the league is built; the draft class fills the rest. */
+    private const val REAL_ROSTER = 14
 
-    fun teamName(i: Int) = ALL[i].let { "${it.city} ${it.name}" }
+    fun teamName(i: Int) = TEAMS[i].let { "${it.city} ${it.name}" }
+
+    /**
+     * Pro overalls from the roster data, on this game's scale. College prospects rate high here,
+     * so the lower end of the pro scale is lifted a little; stars stay where they are.
+     */
+    fun proOverall(ovr: Int) = (ovr + (94 - ovr).coerceAtLeast(0) * 0.35).roundToInt().coerceIn(70, 99)
+
+    /** How strong each team's real roster is: its best eight count most. */
+    private fun strength(team: Int): Double {
+        val top = NbaData.PLAYERS.filter { it.team == team }.map { proOverall(it.ovr) }.sortedDescending().take(8)
+        return top.mapIndexed { i, o -> o * (1.0 - i * 0.07) }.sum() / top.indices.sumOf { 1.0 - it * 0.07 }
+    }
 
     /**
      * Draft Night, before the pro league exists: the order the pro teams pick in. Weak teams pick
@@ -69,8 +49,14 @@ object ProLeague {
      */
     fun planDraft(lg: League) {
         val r = lg.road ?: return
-        if (r.proOrder.isEmpty()) r.proOrder.addAll(ALL.indices.shuffled(Rng.r))
-        for (d in lg.draftHistory) if (d.season == lg.season) d.proTeam = teamName(r.proOrder[(d.pick - 1) % ALL.size])
+        if (r.proOrder.isEmpty()) {
+            // Weakest rosters first, give or take; a lottery shuffles the four worst.
+            val order = TEAMS.indices.sortedBy { strength(it) + Rng.gauss() * 0.6 }.toMutableList()
+            val lottery = order.take(4).shuffled(Rng.r)
+            for (i in 0 until 4) order[i] = lottery[i]
+            r.proOrder.addAll(order)
+        }
+        for (d in lg.draftHistory) if (d.season == lg.season) d.proTeam = teamName(r.proOrder[(d.pick - 1) % TEAMS.size])
     }
 
     /** Builds the pro league from the college league once the user's player has been drafted (or signed undrafted). */
@@ -84,13 +70,13 @@ object ProLeague {
             Conference(1, "Western Conference", "WEST", 0, mutableListOf()),
         )
         val teams = mutableListOf<Team>()
-        for ((c, list) in listOf(EAST, WEST).withIndex()) for (f in list) {
-            val t = Team(teams.size, f.city, f.name, f.abbr, c, f.market, f.primary, f.secondary, LOGO)
+        for (f in TEAMS) {
+            val t = Team(teams.size, f.city, f.name, f.abbr, f.conf, f.market, f.primary, f.secondary, LOGO)
             t.arena = 17_500 + (f.market - 55) * 80
             t.fans = 55.0 + (f.market - 55) * 0.6
             t.legacy = f.market.toDouble()
             t.buzz = 45.0
-            confs[c].teamIds += t.id
+            confs[f.conf].teamIds += t.id
             teams += t
         }
         val lg = League(
@@ -108,10 +94,9 @@ object ProLeague {
             lg.coaches += c
             t.coachId = c.id
         }
-        // The worst teams pick first, so the draft order sets how strong each roster is.
-        for ((k, id) in order.withIndex()) {
-            val q = -2.6 + 5.2 * k / (order.size - 1) + Rng.gauss() * 0.7
-            fillRoster(lg, lg.team(id), 11, q)
+        // The real rosters: each team's best players, by the roster data.
+        for (t in teams) {
+            for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
         }
         lg.reindex()
         // The real draft class arrives: the user's classmates, the user's player, maybe his rival.
@@ -220,14 +205,16 @@ object ProLeague {
         return p
     }
 
-    private fun proAge(slot: Int): Int {
-        val base = if (slot < 4) 24 + Rng.int(0, 7) else 21 + Rng.int(0, 13)
-        return base.coerceIn(20, 36)
-    }
-
-    private fun fillRoster(lg: League, t: Team, count: Int, q: Double) {
-        val pos = (listOf(Pos.PG, Pos.PG, Pos.SG, Pos.SG, Pos.SF, Pos.SF, Pos.PF, Pos.PF, Pos.C, Pos.C) + List(3) { Rng.pick(Pos.entries) }).shuffled(Rng.r)
-        for (i in 0 until count) makePro(lg, pos[i], (TARGETS[i] + q + Rng.gauss()).roundToInt().coerceIn(78, 99), proAge(i), t)
+    /** A real player from the roster data: his name, number, position, age and photo; ratings built to his overall. */
+    private fun makeReal(lg: League, np: NbaData.NbaPlayer, t: Team): Player {
+        val p = makePro(lg, np.pos, proOverall(np.ovr), np.age, t)
+        val parts = np.name.split(" ", limit = 2)
+        p.first = parts[0]
+        p.last = parts.getOrElse(1) { "" }
+        p.country = null
+        p.photo = np.photo
+        if (t.roster.none { it != p.id && lg.player(it).number == np.jersey }) p.number = np.jersey
+        return p
     }
 
     /** A roster over the limit cuts its weakest players (never the user's player or his rival). */
@@ -613,7 +600,8 @@ object ProCareer {
             }
             ProStep.FREE_AGENCY -> {
                 if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, it) }
-                summer(lg)
+                // The rosters start out current, so the league skips a summer of aging before its first season.
+                if (ps.history.isNotEmpty()) summer(lg)
                 ps.step = ProStep.SUMMER
             }
             ProStep.SUMMER -> ProSeason.startSeason(lg)

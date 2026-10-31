@@ -289,8 +289,11 @@ fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = 
 @Composable
 fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    // Pro franchises have no logo files: their badge is drawn from the team colors.
-    val logo = remember(t.abbr, t.logo) { if (t.logo == com.nh.hoopscoach.game.ProLeague.LOGO) null else Logos.get(ctx, t.abbr) }
+    // Pro teams use their own logo files (assets/nba/logos), kept apart from the college ones.
+    val logo = remember(t.abbr, t.logo) {
+        if (t.logo == com.nh.hoopscoach.game.ProLeague.LOGO) com.nh.hoopscoach.game.ProLeague.logoKey(t.abbr)?.let { Logos.asset(ctx, "nba/logos/$it.webp") }
+        else Logos.get(ctx, t.abbr)
+    }
     if (logo != null) {
         // Logos are drawn for light backgrounds, so they sit on a light plate in both themes.
         val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White
