@@ -101,7 +101,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 Column(Modifier.weight(1f)) {
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
+                    Text("${p.posLabel} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }

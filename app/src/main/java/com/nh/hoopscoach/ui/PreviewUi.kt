@@ -197,7 +197,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, onRead: () -> Unit) {
                     Text("NO. 1", style = T.label, color = accent)
                     Text(top.school.uppercase(), style = T.title.copy(fontSize = 34.sp, lineHeight = 34.sp), color = fg)
                     Text("Is this ${possessive(top.school)} year?", style = T.bodyB, color = fg)
-                    if (star != null) Text("${star.name} · ${star.pos} · ${star.cls}", style = T.small, color = fg.copy(alpha = 0.85f))
+                    if (star != null) Text("${star.name} · ${star.posLabel} · ${star.cls}", style = T.small, color = fg.copy(alpha = 0.85f))
                 }
             }
             Spacer(Modifier.height(18.dp))
@@ -268,7 +268,7 @@ private fun LazyListScope.topFive(vm: GameViewModel, lg: League, pv: Preview) {
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("STAR", style = T.label.copy(fontSize = 9.sp), color = P.accent)
-                            Text("${star.name} · ${star.pos} · ${star.cls}", style = T.bodyB, color = P.ink)
+                            Text("${star.name} · ${star.posLabel} · ${star.cls}", style = T.bodyB, color = P.ink)
                         }
                         Ring(star.ovr, 38.dp, textSize = 14.sp)
                     }
@@ -326,7 +326,7 @@ private fun LazyListScope.allAmerica(vm: GameViewModel, lg: League, pv: Preview)
     listOf("First team" to aa.take(5), "Second team" to aa.drop(5).take(5), "Third team" to aa.drop(10).take(5)).forEach { (title, list) ->
         if (list.isNotEmpty()) item {
             Section(title)
-            GroupList(list, inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.pos} · ${p.cls}${lastLine(p)}") }
+            GroupList(list, inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.posLabel} · ${p.cls}${lastLine(p)}") }
         }
     }
     item {
@@ -382,7 +382,7 @@ private fun LazyListScope.transfers(vm: GameViewModel, lg: League, pv: Preview) 
         if (list.isEmpty()) Panel { Text("A quiet portal: no impact transfers moved this offseason, so rosters stayed together.", style = T.body, color = P.sub) }
         GroupList(list, inset = 70.dp) { p ->
             val from = p.career.last().teamId.takeIf { it >= 0 }?.let { lg.team(it).school } ?: p.career.last().team
-            PlayerLine(vm, lg, lg.team(p.teamId), p, "$from → ${lg.team(p.teamId).school} · ${p.pos}${lastLine(p)}")
+            PlayerLine(vm, lg, lg.team(p.teamId), p, "$from → ${lg.team(p.teamId).school} · ${p.posLabel}${lastLine(p)}")
         }
         if (winners.isNotEmpty()) {
             Section("Portal winners")
@@ -400,7 +400,7 @@ private fun LazyListScope.transfers(vm: GameViewModel, lg: League, pv: Preview) 
         val seniors = lg.teams.flatMap { lg.rosterOf(it) }.filter { it.year >= 4 && !it.walkOn }.sortedByDescending { it.ovr }.take(8)
         if (seniors.isNotEmpty()) {
             Section("Last call: top seniors")
-            GroupList(seniors, inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.pos} · final season${lastLine(p)}") }
+            GroupList(seniors, inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.posLabel} · final season${lastLine(p)}") }
         }
     }
 }
@@ -411,9 +411,9 @@ private fun LazyListScope.breakouts(vm: GameViewModel, lg: League, pv: Preview) 
     item {
         Deck("Next year's All-Americans, and stars hiding in plain sight.")
         Section("Breakout candidates")
-        GroupList(players(lg, pv.breakouts), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.pos} · ${p.cls}${lastLine(p)}") }
+        GroupList(players(lg, pv.breakouts), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.posLabel} · ${p.cls}${lastLine(p)}") }
         Section("Under the radar")
-        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.pos} · ${p.cls}${lastLine(p)}") }
+        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.posLabel} · ${p.cls}${lastLine(p)}") }
     }
 }
 
@@ -434,7 +434,7 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
                 Column(Modifier.weight(1f)) {
                     Text("PRESEASON PLAYER OF THE YEAR", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                     Text(p.name, style = T.head, color = P.ink)
-                    Text("${lg.team(p.teamId).school} · ${p.pos} · ${p.cls}${lastLine(p)}", style = T.small, color = P.sub)
+                    Text("${lg.team(p.teamId).school} · ${p.posLabel} · ${p.cls}${lastLine(p)}", style = T.small, color = P.sub)
                 }
                 Ring(p.ovr, 44.dp)
             }
@@ -458,7 +458,7 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
                     Text("  now ${Previews.ordinal(n)}", style = T.small, color = when { n < pr.confRank -> P.good; n > pr.confRank -> P.bad; else -> P.sub })
                 }
             }
-            if (star != null) Text("${star.name} (${star.pos}, ${star.cls}) leads the way.", style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 2.dp))
+            if (star != null) Text("${star.name} (${star.posLabel}, ${star.cls}) leads the way.", style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 2.dp))
         }
     }
     Text("Projected conference record · overall record.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
@@ -541,16 +541,16 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
             }
         }
         Section("Projected starting five")
-        GroupList(starters, inset = 70.dp) { p -> PlayerLine(vm, lg, u, p, "${p.pos} · ${p.cls}${lastLine(p)}") }
+        GroupList(starters, inset = 70.dp) { p -> PlayerLine(vm, lg, u, p, "${p.posLabel} · ${p.cls}${lastLine(p)}") }
         if (bench.isNotEmpty()) {
             Section("Off the bench")
-            GroupList(bench, inset = 70.dp) { p -> PlayerLine(vm, lg, u, p, "${p.pos} · ${p.cls} · ${p.style.label}") }
+            GroupList(bench, inset = 70.dp) { p -> PlayerLine(vm, lg, u, p, "${p.posLabel} · ${p.cls} · ${p.style.label}") }
         }
         if (newcomers.isNotEmpty()) {
             Section("Newcomers")
             GroupList(newcomers.take(5), inset = 70.dp) { p ->
                 val from = p.career.lastOrNull()?.teamId?.takeIf { it >= 0 && it != u.id }?.let { "Transfer from ${lg.team(it).school}" } ?: if (p.recruitRank > 0) "${p.stars}★ freshman · No. ${p.recruitRank}" else "Walk-on"
-                PlayerLine(vm, lg, u, p, "${p.pos} · $from")
+                PlayerLine(vm, lg, u, p, "${p.posLabel} · $from")
             }
         }
         Section("Scouting report")

@@ -44,6 +44,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     var last by remember(playerId) { mutableStateOf(p.last) }
     var number by remember(playerId) { mutableIntStateOf(p.number) }
     var pos by remember(playerId) { mutableStateOf(p.pos) }
+    var pos2 by remember(playerId) { mutableStateOf(p.pos2) }
     var height by remember(playerId) { mutableIntStateOf(p.height) }
     var weight by remember(playerId) { mutableIntStateOf(p.weight) }
     var town by remember(playerId) { mutableStateOf(p.hometown) }
@@ -57,7 +58,8 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         else -> null
     }
     val ovr = Ratings.ovr(pos, p.attrs)
-    val styles = Ratings.styles(pos)
+    if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
+    val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
     if (style !in styles) style = styles.first()
     LazyColumn(Modifier.fillMaxSize()) {
         item {
@@ -99,6 +101,9 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
 
             Section("Position")
             Segmented(Pos.entries.map { it.name }, pos.ordinal, { pos = Pos.entries[it] })
+            val seconds = listOf<Pos?>(null) + Ratings.secondOptions(pos)
+            Text("SECOND POSITION", style = T.label, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 12.dp, bottom = 6.dp))
+            Segmented(seconds.map { it?.name ?: "None" }, seconds.indexOf(pos2).coerceAtLeast(0), { pos2 = seconds[it] })
             Text(
                 if (pos == p.pos) "His overall is rated for the position he plays." else "At $pos his overall would be $ovr (now ${p.ovr} at ${p.pos}). Ratings don't change, only how they're weighed.",
                 style = T.small, color = if (pos == p.pos) P.sub else P.warn, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
@@ -133,11 +138,11 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                 SecondaryButton("Cancel", Modifier.weight(1f)) { vm.back() }
                 PrimaryButton("Save", Modifier.weight(1f), enabled = first.isNotBlank() && last.isNotBlank() && numberProblem == null) {
                     val f = first.trim(); val l = last.trim(); val tn = town.trim(); val hs = school.trim()
-                    val n = number; val ps = pos; val h = height; val w = weight; val st = style
+                    val n = number; val ps = pos; val ps2 = pos2; val h = height; val w = weight; val st = style
                     vm.act {
                         val pl = it.player(playerId)
-                        val moved = pl.pos != ps
-                        pl.first = f; pl.last = l; pl.number = n; pl.pos = ps; pl.height = h; pl.weight = w
+                        val moved = pl.pos != ps || pl.pos2 != ps2
+                        pl.first = f; pl.last = l; pl.number = n; pl.pos = ps; pl.pos2 = ps2; pl.height = h; pl.weight = w
                         if (tn.isNotEmpty()) pl.hometown = tn
                         if (hs.isNotEmpty()) pl.highSchool = hs
                         pl.style = st

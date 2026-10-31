@@ -30,16 +30,17 @@ object Gameplan {
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
             for ((rank, alt) in NEIGHBORS.getValue(pos).withIndex()) {
+                // A player whose first or second position is this one is a natural fit.
                 // Allow an out-of-position player only if he's clearly better.
-                val cand = pool.firstOrNull { it.pos == alt } ?: continue
+                val cand = (if (rank == 0) pool.firstOrNull { it.plays(pos) } else pool.firstOrNull { it.pos == alt }) ?: continue
                 if (rank == 0) { pool.remove(cand); return cand }
-                val natural = pool.firstOrNull { it.pos == pos }
+                val natural = pool.firstOrNull { it.plays(pos) }
                 if (natural == null || rate(cand) - rate(natural) > 6 * rank) { pool.remove(cand); return cand }
             }
             return pool.removeFirstOrNull()
         }
         // Fill the scarcest positions first.
-        val order = Pos.entries.sortedBy { pos -> pool.count { it.pos == pos } }
+        val order = Pos.entries.sortedBy { pos -> pool.count { it.plays(pos) } }
         for (pos in order) starters[pos.ordinal] = take(pos)
         for (pos in order) reserves[pos.ordinal] = take(pos)
         // A backup clearly better than the starter at his own or the next position starts there instead.
@@ -47,7 +48,7 @@ object Gameplan {
             var best: Triple<Int, Int, Double>? = null
             for (ri in 0 until 5) {
                 val r = reserves[ri] ?: continue
-                for (alt in NEIGHBORS.getValue(r.pos).take(2)) {
+                for (alt in (NEIGHBORS.getValue(r.pos).take(2) + listOfNotNull(r.pos2)).distinct()) {
                     val s = starters[alt.ordinal] ?: continue
                     val gain = rate(r) - rate(s)
                     if (gain >= 3.0 && (best == null || gain > best!!.third)) best = Triple(ri, alt.ordinal, gain)
@@ -63,7 +64,7 @@ object Gameplan {
         var guard = 0
         while (guard++ < 5) {
             val out = pool.maxByOrNull { rate(it) } ?: break
-            val near = NEIGHBORS.getValue(out.pos).take(3)
+            val near = NEIGHBORS.getValue(out.pos).take(3) + listOfNotNull(out.pos2)
             val i = (0 until 5).filter { Pos.entries[it] in near && reserves[it] != null }.minByOrNull { rate(reserves[it]!!) } ?: break
             val bench = reserves[i]!!
             if (rate(out) < rate(bench) + 1.0) break

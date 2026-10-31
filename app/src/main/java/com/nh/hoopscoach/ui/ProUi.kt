@@ -384,7 +384,7 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
                         Column(Modifier.weight(1f)) {
                             Text(if (me) "${p.name} (you)" else p.name, style = T.bodyB, color = if (me) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val mins = planMin(lg, u, p.id)
-                            Text("${p.pos} · age ${p.age} · ${if (p.id in starters) "Starter" else if (mins > 0) "$mins min" else "Bench"}" +
+                            Text("${p.posLabel} · age ${p.age} · ${if (p.id in starters) "Starter" else if (mins > 0) "$mins min" else "Bench"}" +
                                 if (p.stats.gp > 0) " · ${f1(p.stats.ppg)} ppg" else "", style = T.small, color = P.sub, maxLines = 1)
                         }
                         Ring(p.ovr, 40.dp)
@@ -711,7 +711,7 @@ private fun LeaderRow(vm: GameViewModel, lg: League, rank: Int, p: Player, t: Te
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = if (me) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${t.name} · ${p.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${t.name} · ${p.posLabel}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(value, style = if (value.length > 6) T.small else T.numSm, color = P.ink, textAlign = TextAlign.End, modifier = Modifier.widthIn(value))
     }
@@ -785,7 +785,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
     val c = r.contract
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            ScreenHeader("Pro career · year ${h.proYears + 1}", h.last, "${h.pos} · age ${h.age} · ${t.name}") { PlayerJersey(h, t, 50.dp) }
+            ScreenHeader("Pro career · year ${h.proYears + 1}", h.last, "${h.posLabel} · age ${h.age} · ${t.name}") { PlayerJersey(h, t, 50.dp) }
             Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Ring(h.ovr, 54.dp, label = "OVR", textSize = 19.sp)
@@ -828,7 +828,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                     ), style = T.numSm)
                 }
             }
-            Section("Depth chart · ${h.pos}")
+            Section("Depth chart · ${h.posLabel}")
             GroupList(Road.depth(lg), inset = 64.dp) { p ->
                 ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (p.id == h.id) Modifier.background(P.accentSoft) else Modifier) {
                     PlayerJersey(p, t, 40.dp)
@@ -941,7 +941,7 @@ internal fun ContenderPanel(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("${p.name} · ${p.ovr}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${p.pos} · age ${p.age} · ${t.name}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${p.posLabel} · age ${p.age} · ${t.name}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("With him: %.0f%% title odds".format(after * 100) + if (pitch) " · %.0f%% he says yes".format(sr.chance(lg, p) * 100) else "", style = T.small, color = P.good)
                 }
                 Spacer(Modifier.width(8.dp))
@@ -1286,7 +1286,7 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League, t: Team) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, style = T.bodyB, color = P.ink)
-                        Text("${p.pos} · age ${p.age} · ${p.awards.lastOrNull { it.contains("Draft #") }?.substringAfter(" ") ?: ""}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · age ${p.age} · ${p.awards.lastOrNull { it.contains("Draft #") }?.substringAfter(" ") ?: ""}", style = T.small, color = P.sub)
                     }
                     Ring(p.ovr, 40.dp)
                 }
@@ -1328,7 +1328,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(if (p.id == h.id) "${p.name} (you)" else p.name, style = T.bodyB, color = if (p.id == h.id) P.accent else P.ink, maxLines = 1)
-                        Text("${p.pos} · age ${p.age}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · age ${p.age}", style = T.small, color = P.sub)
                     }
                     Ring(p.ovr, 40.dp)
                 }

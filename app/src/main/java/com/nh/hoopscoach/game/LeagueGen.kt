@@ -124,6 +124,7 @@ object LeagueGen {
         p.posRank = (p.recruitRank / 5.0 + Rng.range(-3, 3)).roundToInt().coerceAtLeast(1)
         p.happiness = Rng.range(55, 85)
         p.age = collegeAge(year)
+        p.pos2 = Ratings.secondFor(pos, p.attrs)
         return p
     }
 

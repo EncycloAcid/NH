@@ -74,6 +74,30 @@ object Ratings {
     fun defense(p: Player) = group(p.pos, p.attrs, DEF)
     fun shooting(p: Player) = group(p.pos, p.attrs, SHOOT)
 
+    /** Second positions a player at [pos] can have: the spots next to his. */
+    fun secondOptions(pos: Pos): List<Pos> = when (pos) {
+        Pos.PG -> listOf(Pos.SG); Pos.SG -> listOf(Pos.PG, Pos.SF); Pos.SF -> listOf(Pos.SG, Pos.PF); Pos.PF -> listOf(Pos.SF, Pos.C); Pos.C -> listOf(Pos.PF)
+    }
+
+    /**
+     * How much better than usual his rating at the next spot has to be for him to play it. Each position's
+     * overall weighs ratings differently (a power forward almost always rates higher as a center), so the
+     * bar is set per pair, about a third of each position qualifying.
+     */
+    private val SECOND_BAR = mapOf(
+        (Pos.PG to Pos.SG) to -2, (Pos.SG to Pos.PG) to 1, (Pos.SG to Pos.SF) to -1, (Pos.SF to Pos.SG) to 2,
+        (Pos.SF to Pos.PF) to 0, (Pos.PF to Pos.SF) to -2, (Pos.PF to Pos.C) to 3, (Pos.C to Pos.PF) to -3,
+    )
+
+    /** A second position when his ratings fit it better than most at his position, else null. */
+    fun secondFor(pos: Pos, a: IntArray): Pos? {
+        val mine = ovr(pos, a)
+        return secondOptions(pos).map { it to ovr(it, a) - mine - (SECOND_BAR[pos to it] ?: 0) }.filter { it.second >= 0 }.maxByOrNull { it.second }?.first
+    }
+
+    /** Play styles for a player: his position's, and his second position's too. */
+    fun stylesFor(p: Player): List<Arch> = styles(p.pos) + (p.pos2?.let { styles(it) } ?: emptyList())
+
     fun styles(pos: Pos): List<Arch> = when (pos) {
         // Every archetype belongs to one position.
         Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER,

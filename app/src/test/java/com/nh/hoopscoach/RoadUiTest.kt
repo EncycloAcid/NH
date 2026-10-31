@@ -89,9 +89,13 @@ class RoadUiTest {
         shot("Y00_new_game")
         rule.onNodeWithText("Play as a player").performClick(); idle()
         shot("Y01_create")
+        // Pick a second position: the second "PG" on screen is in the second-position row.
+        rule.onAllNodesWithText("PG")[1].performClick(); idle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("SECOND POSITION")); idle()
+        shot("Y01b_create_second_pos")
         scrollTo(1); shot("Y02_create_more")
 
-        val hero = Road.createHero(draft, Road.Spec("Marcus", "Hayes", Pos.PG, 74, 185, "Lexington", "KY", Arch.FLOOR_GENERAL, 5, 1))
+        val hero = Road.createHero(draft, Road.Spec("Marcus", "Hayes", Pos.PG, 74, 185, "Lexington", "KY", Arch.FLOOR_GENERAL, 5, 1, pos2 = Pos.SG))
         vm.roadHero = hero
         vm.roadOffers = Road.offers(draft, hero)
         idle(); shot("Y03_offers"); swipe(); shot("Y04_offers_more")

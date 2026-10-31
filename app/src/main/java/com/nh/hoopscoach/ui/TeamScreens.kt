@@ -141,7 +141,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 }
             }
             Text(
-                "${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
+                "${p.posLabel} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
                 style = T.small, color = P.sub, maxLines = 1,
             )
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
@@ -218,7 +218,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             title = { Text("${if (starter) "Starting" else "Backup"} ${Pos.entries[idx].name}", style = T.head, color = P.ink) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { it.pos.ordinal == idx }.thenByDescending { it.ovr })) { p ->
+                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { it.pos.ordinal == idx }.thenByDescending { it.plays(Pos.entries[idx]) }.thenByDescending { it.ovr })) { p ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable {
                                 choose = null
@@ -226,7 +226,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                             }.padding(vertical = 8.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(p.pos.name, style = T.small, color = P.sub, modifier = Modifier.width(32.dp))
+                            Text(p.posLabel, style = T.small, color = if (p.plays(Pos.entries[idx])) P.accent else P.sub, modifier = Modifier.width(50.dp))
                             Text(p.name, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(Gameplan.role(t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
                             Ring(p.ovr, 34.dp, textSize = 14.sp)
@@ -309,7 +309,7 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             Spacer(Modifier.height(8.dp))
         }
         // Only the archetypes of his position (plus whatever he trains now, for older saves).
-        items(Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.styles(p.pos) }) { a ->
+        items(Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.stylesFor(p) }) { a ->
             val current = p.focus == a
             Panel(
                 Modifier.padding(bottom = 8.dp),

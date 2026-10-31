@@ -214,8 +214,14 @@ class Player(
     var proYears: Int = 0,
     /** Headshot file for real pro players (assets/nba/heads/<photo>.webp), or empty. */
     var photo: String = "",
+    /** A second position he can play (a neighbor of his first), or null. */
+    var pos2: Pos? = null,
 ) {
     val name get() = "$first $last".trim()
+    /** "PG/SG" for a two-position player, else just his position. */
+    val posLabel get() = pos2?.let { "$pos/$it" } ?: "$pos"
+    /** He can play [p]: his first position or his second. */
+    fun plays(p: Pos) = pos == p || pos2 == p
     /** "J. Smith", or the one name for players known by one ("Nene"). */
     val short get() = if (last.isEmpty() || first.isEmpty()) name else "${first.first()}. $last"
     val ovr: Int get() = Ratings.ovr(pos, attrs)

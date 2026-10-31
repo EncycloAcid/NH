@@ -189,7 +189,7 @@ fun FormerPlayers(vm: GameViewModel, lg: League, t: Team) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(listOf(years, "${p.pos}", p.left).filter { it.isNotEmpty() }.joinToString(" · "), style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOf(years, "${p.posLabel}", p.left).filter { it.isNotEmpty() }.joinToString(" · "), style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(f1(tot.ppg), style = T.numSm, color = P.ink)

@@ -205,7 +205,7 @@ private fun TopPlayers(vm: GameViewModel, lg: League, t: Team) {
     val ps = lg.rosterOf(t)
     val top = if (t.gp > 0) ps.sortedByDescending { it.stats.ppg }.take(3) else ps.sortedByDescending { it.ovr }.take(3)
     Section(if (t.gp > 0) "Top performers" else "Key players", action = "Roster", onAction = { vm.teamTab = 0; vm.select(Tab.TEAM) })
-    GroupList(top, inset = 70.dp) { p -> PlayerLine(vm, lg, t, p, if (t.gp > 0) statLine(p) else "${p.pos} · ${p.cls} · ${p.style.label}") }
+    GroupList(top, inset = 70.dp) { p -> PlayerLine(vm, lg, t, p, if (t.gp > 0) statLine(p) else "${p.posLabel} · ${p.cls} · ${p.style.label}") }
 }
 
 fun statLine(p: Player) = "${f1(p.stats.ppg)} pts · ${f1(p.stats.rpg)} reb · ${f1(p.stats.apg)} ast"

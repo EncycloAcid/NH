@@ -17,6 +17,8 @@ object Road {
     class Spec(
         val first: String, val last: String, val pos: Pos, val height: Int, val weight: Int,
         val town: String, val state: String, val style: Arch, val stars: Int, val number: Int,
+        /** An optional second position, next to his first. */
+        val pos2: Pos? = null,
     )
 
     fun targetOvr(stars: Int) = when (stars) { 5 -> 82; 4 -> 77; else -> 71 }
@@ -35,6 +37,7 @@ object Road {
         p.focus = s.style
         p.attrs = Ratings.build(s.pos, s.style, target)
         p.age = 18
+        p.pos2 = s.pos2?.takeIf { it in Ratings.secondOptions(s.pos) }
         p.country = null
         p.hometown = "${s.town.trim().ifEmpty { "Hometown" }}, ${s.state}"
         p.number = s.number.coerceIn(0, 99)

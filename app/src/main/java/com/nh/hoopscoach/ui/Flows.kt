@@ -439,7 +439,7 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, style = T.bodyB, color = P.ink)
-                        Text("${p.pos} · ${p.cls} · ${Offseason.projection(board[p.id], p.year)} grade · ${money(p.nil)}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · ${p.cls} · ${Offseason.projection(board[p.id], p.year)} grade · ${money(p.nil)}", style = T.small, color = P.sub)
                         Text(if (leaving) "Declaring for the draft" else "Returning next season", style = T.small, color = if (leaving) P.warn else P.good)
                     }
                     Ring(p.ovr, 42.dp)
@@ -481,7 +481,7 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
     item {
         Section("Rest of the roster")
         GroupList(rest, inset = 70.dp) { p ->
-            PlayerLine(vm, lg, t, p, if (p.recruitRank == 0) "${p.pos} · ${p.cls} · walk-on" else "${p.pos} · ${p.cls} · ${money(p.nil)}") {
+            PlayerLine(vm, lg, t, p, if (p.recruitRank == 0) "${p.posLabel} · ${p.cls} · walk-on" else "${p.posLabel} · ${p.cls} · ${money(p.nil)}") {
                 Row(verticalAlignment = Alignment.CenterVertically) { Ring(p.ovr, 40.dp, textSize = 15.sp); Spacer(Modifier.width(8.dp)); ReleaseButton(vm, p, compact = true) }
             }
         }
@@ -608,7 +608,7 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1)
-                        Text("${p.pos} · now a ${p.cls}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · now a ${p.cls}", style = T.small, color = P.sub)
                     }
                     Text("${gr.before} → ", style = T.small, color = P.sub)
                     Text("${gr.after}", style = T.numSm, color = tier(gr.after))
@@ -659,7 +659,7 @@ private fun LazyListScope.tryoutsStep(vm: GameViewModel, lg: League) {
     if (current.isNotEmpty()) item {
         Section("Your walk-ons")
         GroupList(current, inset = 70.dp) { p ->
-            PlayerLine(vm, lg, t, p, "${p.pos} · ${p.cls} · ${if (p.tryout > 0) "made the team in ${p.tryout}" else "walk-on"}") {
+            PlayerLine(vm, lg, t, p, "${p.posLabel} · ${p.cls} · ${if (p.tryout > 0) "made the team in ${p.tryout}" else "walk-on"}") {
                 SmallButton("Release", danger = true) { vm.act { Tryouts.release(it, p.id) } }
             }
         }
@@ -689,7 +689,7 @@ private fun TryoutCard(vm: GameViewModel, lg: League, i: Int, tr: Tryout, looks:
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${p.pos} · ${com.nh.hoopscoach.game.classLabel(p.year)} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub, maxLines = 1)
+                Text("${p.posLabel} · ${com.nh.hoopscoach.game.classLabel(p.year)} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub, maxLines = 1)
                 Text(p.hometown, style = T.small.copy(fontSize = 12.sp), color = P.faint, maxLines = 1)
             }
             if (tr.looked) Ring(p.ovr, 46.dp, label = "OVR", textSize = 16.sp) else UnknownRating()

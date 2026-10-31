@@ -76,6 +76,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     var first by remember { mutableStateOf("") }
     var last by remember { mutableStateOf("") }
     var pos by remember { mutableStateOf(Pos.SG) }
+    var pos2 by remember { mutableStateOf<Pos?>(null) }
     var height by remember { mutableIntStateOf(76) }
     var weight by remember { mutableIntStateOf(200) }
     var town by remember { mutableStateOf("") }
@@ -84,7 +85,8 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     var stars by remember { mutableIntStateOf(4) }
     var number by remember { mutableIntStateOf(3) }
     val range = heightRange(pos)
-    val styles = Ratings.styles(pos)
+    if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
+    val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
     if (style !in styles) style = styles.first()
     if (height !in range) height = (range.first + range.last) / 2
     Column(Modifier.fillMaxSize()) {
@@ -100,6 +102,12 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                 }
                 Section("Position")
                 Segmented(Pos.entries.map { it.name }, pos.ordinal, { pos = Pos.entries[it] })
+                // A second position: none, or a spot next to his.
+                val seconds = listOf<Pos?>(null) + Ratings.secondOptions(pos)
+                Text("SECOND POSITION", style = T.label, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 12.dp, bottom = 6.dp))
+                Segmented(seconds.map { it?.name ?: "None" }, seconds.indexOf(pos2).coerceAtLeast(0), { pos2 = seconds[it] })
+                Text(if (pos2 == null) "One position. Coaches play you there." else "You can play $pos or $pos2: coaches use you at either, and you can train either position's styles.",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
                 Section("Size")
                 Panel {
                     Text("Height · ${Ratings.heightLabel(height)}", style = T.bodyB, color = P.ink)
@@ -141,7 +149,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
         }
         Column(Modifier.fillMaxWidth().background(P.bg).navigationBarsPadding().padding(horizontal = Gutter, vertical = 10.dp)) {
             PrimaryButton("See scholarship offers", Modifier.fillMaxWidth()) {
-                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number))
+                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number, pos2))
             }
         }
     }
@@ -160,7 +168,7 @@ private fun RoadOffers(vm: GameViewModel, lg: League, hero: Player, header: @Com
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(hero.name, style = T.head, color = P.ink)
-                            Text("${hero.pos} · ${Ratings.heightLabel(hero.height)} · ${hero.weight} lbs · ${hero.hometown}", style = T.small, color = P.sub)
+                            Text("${hero.posLabel} · ${Ratings.heightLabel(hero.height)} · ${hero.weight} lbs · ${hero.hometown}", style = T.small, color = P.sub)
                             Text("${Road.starLabel(hero.stars)} · No. ${hero.recruitRank} nationally · ${hero.style.label}", style = T.small, color = P.accent)
                         }
                         Ring(hero.ovr, 48.dp, label = "OVR", textSize = 17.sp)
@@ -225,7 +233,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
     val rank = board[h.id]
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            ScreenHeader("Road to the League · ${classLong(h.year)}", h.last, "${h.pos} · ${Ratings.heightLabel(h.height)} · ${t.school}") { PlayerJersey(h, t, 50.dp) }
+            ScreenHeader("Road to the League · ${classLong(h.year)}", h.last, "${h.posLabel} · ${Ratings.heightLabel(h.height)} · ${t.school}") { PlayerJersey(h, t, 50.dp) }
             Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Ring(h.ovr, 54.dp, label = "OVR", textSize = 19.sp)
@@ -266,7 +274,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                     ), style = T.numSm)
                 }
             }
-            Section("Depth chart · ${h.pos}")
+            Section("Depth chart · ${h.posLabel}")
             GroupList(Road.depth(lg), inset = 64.dp) { p ->
                 ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (p.id == h.id) Modifier.background(P.accentSoft) else Modifier) {
                     PlayerJersey(p, t, 40.dp)
@@ -443,8 +451,8 @@ internal fun RivalPanel(vm: GameViewModel, lg: League) {
                 Text(rv.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     when {
-                        active != null && lg.pro -> "${lg.team(rv.teamId).name} · ${rv.pos} · age ${rv.age}"
-                        active != null -> "${lg.team(rv.teamId).school} · ${rv.pos} · ${rv.cls} · was the No. ${rv.recruitRank} recruit"
+                        active != null && lg.pro -> "${lg.team(rv.teamId).name} · ${rv.posLabel} · age ${rv.age}"
+                        active != null -> "${lg.team(rv.teamId).school} · ${rv.posLabel} · ${rv.cls} · was the No. ${rv.recruitRank} recruit"
                         lg.pro && r.rivalLeft.isEmpty() -> "Still in college. He enters next year's draft."
                         else -> "Your rival ${r.rivalLeft}."
                     },
