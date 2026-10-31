@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Arch
+import com.nh.hoopscoach.game.DraftPick
 import com.nh.hoopscoach.game.Awards
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.Geo
@@ -52,6 +54,7 @@ import com.nh.hoopscoach.game.Road
 import com.nh.hoopscoach.game.SchoolOffer
 import com.nh.hoopscoach.game.StatLine
 import com.nh.hoopscoach.game.Team
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private fun classLong(year: Int) = when (year) { 1 -> "Freshman"; 2 -> "Sophomore"; 3 -> "Junior"; 4 -> "Senior"; else -> "Graduate" }
@@ -203,6 +206,7 @@ private fun OfferRow(lg: League, o: SchoolOffer, hero: Player, selected: Boolean
 
 @Composable
 fun HeroScreen(vm: GameViewModel, lg: League) {
+    if (Road.inGreenRoom(lg)) { GreenRoomWait(vm); return }
     val r = lg.road
     val h = lg.playerOrNull(lg.heroId)
     if (h == null || r == null || h.teamId < 0) {
@@ -599,6 +603,7 @@ private fun CareerStory(lg: League) {
 
 @Composable
 fun HeroCareerScreen(vm: GameViewModel, lg: League) {
+    if (Road.inGreenRoom(lg)) { GreenRoomWait(vm); return }
     val h = lg.hero
     val r = lg.road
     LazyColumn(Modifier.fillMaxWidth()) {
@@ -645,10 +650,11 @@ private fun CareerTotals(h: Player) {
 fun RoadOffseasonFlow(vm: GameViewModel, lg: League) {
     val os = lg.offseason ?: return
     val r = lg.road ?: return
+    if (Road.inGreenRoom(lg)) { GreenRoom(vm, lg); return }
     if (r.ended) { RoadEnding(vm, lg); return }
     val h = lg.playerOrNull(lg.heroId) ?: return
     val t = lg.team(h.teamId)
-    val steps = listOf("Decision", "Draft Night", "Summer", "Next season")
+    val steps = ROAD_STEPS
     val idx = when (os.step) { OffStep.ROSTER -> 0; OffStep.DRAFT -> 1; OffStep.CAREER, OffStep.DEVELOPMENT -> 2; else -> 3 }
     val label = when (os.step) {
         OffStep.ROSTER -> "Go to Draft Night"
@@ -726,6 +732,142 @@ private fun LazyListScope.draftResultStep(vm: GameViewModel, lg: League, h: Play
                 }
             }
         }
+    }
+}
+
+// ---------- draft night ----------
+
+private val ROAD_STEPS = listOf("Decision", "Draft Night", "Summer", "Next season")
+
+private val GREEN_ROOM = listOf(
+    "Cameras sweep across the green room.",
+    "Your agent checks his phone again.",
+    "Your family hasn't touched the food.",
+    "A scout gives you a nod from across the room.",
+    "The commissioner walks back to the podium.",
+    "Someone at your table exhales. Not yet.",
+    "Your coach texts: \"Stay ready.\"",
+    "The room is a little emptier now.",
+)
+
+/** How long each pick takes to come in: the lottery is slow, the second round flies. */
+private fun pickPace(pick: Int): Long = when { pick == 1 -> 1800L; pick <= 14 -> 1200L; pick <= 30 -> 700L; else -> 350L }
+
+/** What the room is talking about while the next team is on the clock. */
+private fun greenRoomLine(last: DraftPick?, shown: Int, h: Player, schoolId: Int): String = when {
+    last == null -> "The commissioner steps to the podium."
+    last.teamId == schoolId && last.pid != h.id -> "Your teammate ${last.playerName} just went No. ${last.pick}."
+    last.pos == h.pos -> "Another ${last.pos} comes off the board."
+    else -> GREEN_ROOM[shown % GREEN_ROOM.size]
+}
+
+/** Draft Night from the green room: picks come in one at a time until your name is called, or the night ends. */
+@Composable
+private fun GreenRoom(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val h = lg.hero ?: return
+    val picks = remember(lg.season, lg.draftHistory.size) { lg.draftHistory.filter { it.season == lg.season }.sortedBy { it.pick } }
+    val mine = picks.indexOfFirst { it.pid == lg.heroId }
+    val stop = if (mine >= 0) mine + 1 else picks.size
+    val shown = if (vm.revealSeason == lg.season) vm.reveal.coerceAtMost(stop) else 0
+    var ringing by remember { mutableStateOf(false) }
+    LaunchedEffect(lg.season, stop) {
+        if (vm.revealSeason != lg.season) { vm.revealSeason = lg.season; vm.reveal = 0 }
+        while (vm.reveal < stop) {
+            if (vm.reveal == mine) { ringing = true; delay(2400); ringing = false } else delay(pickPace(vm.reveal + 1))
+            vm.reveal = (vm.reveal + 1).coerceAtMost(stop)
+        }
+    }
+    val done = shown >= stop
+    val school = r.schools.lastOrNull() ?: h.teamId
+    val myPick = picks.getOrNull(mine)
+    val onHero = P.onHero
+    Column(Modifier.fillMaxSize()) {
+        StepHeader("Offseason · ${lg.season}", ROAD_STEPS, 1)
+        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            item {
+                Panel(color = P.hero) {
+                    when {
+                        done && myPick != null -> {
+                            Text("YOUR NAME IS CALLED", style = T.label, color = onHero.copy(alpha = 0.8f))
+                            Text("NO. ${myPick.pick} OVERALL", style = T.hero, color = onHero)
+                            val verdict = when {
+                                r.draftRank <= 0 -> ""
+                                myPick.pick <= r.draftRank - 5 -> " Earlier than anyone projected."
+                                myPick.pick >= r.draftRank + 8 -> " A longer wait than the big board said, but you're in."
+                                else -> " Right about where the big board had you."
+                            }
+                            Text("${h.name} hugs his family and walks to the stage.$verdict", style = T.small, color = onHero.copy(alpha = 0.9f))
+                        }
+                        done -> {
+                            Text("THE DRAFT IS OVER", style = T.label, color = onHero.copy(alpha = 0.8f))
+                            Text("UNDRAFTED", style = T.hero, color = onHero)
+                            val next = if (r.ended) "Your agent already has calls in from overseas."
+                                else "You head back to ${lg.team(school).school} for your ${classLong(h.year + 1).lowercase()} season."
+                            Text("${picks.size} names called, none of them yours. $next", style = T.small, color = onHero.copy(alpha = 0.9f))
+                        }
+                        else -> {
+                            Text("THE GREEN ROOM · ${lg.season} DRAFT", style = T.label, color = onHero.copy(alpha = 0.8f))
+                            Text("PICK ${shown + 1}", style = T.hero, color = onHero)
+                            Text(
+                                if (ringing) "Your phone is ringing..." else "On the clock. " + greenRoomLine(picks.getOrNull(shown - 1), shown, h, school),
+                                style = if (ringing) T.bodyB else T.small, color = onHero.copy(alpha = 0.9f),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Bar(if (picks.isEmpty()) 1f else shown / picks.size.toFloat(), Modifier.fillMaxWidth(), color = onHero, track = onHero.copy(alpha = 0.22f))
+                    Spacer(Modifier.height(6.dp))
+                    val status = when {
+                        done && myPick == null -> "All ${picks.size} picks in"
+                        done -> "Round ${if (myPick!!.pick <= 30) 1 else 2} · pick ${myPick.pick} of ${picks.size}"
+                        else -> "Round ${if (shown < 30) 1 else 2} · $shown of ${picks.size} picks in"
+                    }
+                    val proj = if (r.draftRank > 0) " · big board No. ${r.draftRank}" else ""
+                    Text(status + proj, style = T.small, color = onHero.copy(alpha = 0.75f))
+                }
+            }
+            if (shown > 0) item {
+                Section(if (done) "The board" else "Picks so far")
+                GroupList(picks.take(shown).asReversed()) { d -> DraftRow(vm, lg, d, me = d.pid == lg.heroId, fresh = !done && d.pick == shown) }
+            }
+            item { Spacer(Modifier.height(20.dp)) }
+        }
+        when {
+            !done -> FlowFooter(null, "Skip ahead") { vm.revealSeason = lg.season; vm.reveal = stop }
+            r.ended -> FlowFooter(null, "Continue") { vm.act { Road.watchedDraft(it) } }
+            else -> FlowFooter(null, "Next: the summer") { vm.roadNext() }
+        }
+    }
+}
+
+/** Other tabs during Draft Night: no spoilers, just a way back to the green room. */
+@Composable
+private fun GreenRoomWait(vm: GameViewModel) {
+    Column(Modifier.fillMaxWidth()) {
+        ScreenHeader("Road to the League", "Draft Night", "You're waiting in the green room. Your story picks up once the night is over.")
+        Box(Modifier.padding(horizontal = Gutter)) {
+            PrimaryButton("Back to the green room", Modifier.fillMaxWidth()) { vm.select(Tab.TODAY) }
+        }
+    }
+}
+
+@Composable
+private fun DraftRow(vm: GameViewModel, lg: League, d: DraftPick, me: Boolean, fresh: Boolean) {
+    val t = lg.team(d.teamId)
+    ListRow(onClick = if (d.pid >= 0 && lg.anyPlayer(d.pid) != null) ({ vm.openPlayer(d.pid) }) else null, modifier = if (me) Modifier.background(P.accentSoft) else Modifier) {
+        Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
+        Jersey(d.number, androidx.compose.ui.graphics.Color(t.primary), androidx.compose.ui.graphics.Color(t.secondary), 40.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(d.playerName, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (me) { Spacer(Modifier.width(6.dp)); Tag("YOU", P.accent, filled = true) }
+                else if (fresh) { Spacer(Modifier.width(6.dp)); Tag("JUST IN", P.good) }
+            }
+            Text("${t.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("${d.ovr}", style = T.numSm, color = tier(d.ovr))
     }
 }
 

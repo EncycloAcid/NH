@@ -203,6 +203,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var roadHero by mutableStateOf<com.nh.hoopscoach.game.Player?>(null)
     var roadOffers by mutableStateOf<List<com.nh.hoopscoach.game.SchoolOffer>>(emptyList())
 
+    /** Draft Night: how many picks are in so far, for [revealSeason]. Lives here so a tab switch doesn't restart the night. */
+    var reveal by mutableIntStateOf(0)
+    var revealSeason by mutableIntStateOf(-1)
+
     fun roadFindOffers(spec: com.nh.hoopscoach.game.Road.Spec) {
         val d = draft ?: return
         busy = "Coaches are calling"

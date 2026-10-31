@@ -76,10 +76,15 @@ class RoadTest {
             val pool = lg.players.filter { it.teamId >= 0 && (it.year >= 4 || it.id in os.entrants) }
             println("   draft board rank $rank, year ${me.year}, ovr ${me.ovr}/${me.pot}; pool ${pool.size}, pool ovr>=${me.ovr}: ${pool.count { it.ovr >= me.ovr }}")
             if (!transferred && seasons == 2 && !lg.road!!.declared) lg.road!!.portal = true
+            val inDraft = lg.road!!.declared || me.year >= 4
             Road.next(lg)
+            // Draft Night: only a player who was in the draft waits in the green room, and his board rank is kept.
+            assertEquals(inDraft, Road.inGreenRoom(lg))
+            if (inDraft) assertEquals(rank ?: 0, lg.road!!.draftRank)
             if (lg.road!!.ended) break
             assertEquals(OffStep.DRAFT, os.step)
             Road.next(lg)
+            assertTrue("green room closes after the draft", !Road.inGreenRoom(lg))
             assertEquals(OffStep.DEVELOPMENT, os.step)
             if (lg.road!!.portal) {
                 assertTrue("transfer offers", lg.road!!.offers.isNotEmpty())
@@ -104,6 +109,10 @@ class RoadTest {
         r.story.forEach { println("  $it") }
         assertTrue(r.ended)
         assertTrue(r.ending.isNotEmpty())
+        assertTrue("the ending waits for the green room", Road.inGreenRoom(lg))
+        Road.watchedDraft(lg)
+        assertTrue(!Road.inGreenRoom(lg))
+        assertTrue("save keeps draft night", SaveIO.decode(SaveIO.encode(lg)).road!!.draftWatched == lg.season)
         assertTrue("career kept", lg.hero != null && lg.alumni.any { it.id == lg.heroId })
         assertTrue(r.earned > 0)
         println("press questions answered: $presses, topics $topics; followers ${Road.count(startFollowers)} -> ${Road.count(r.followers)}; log: ${r.pressLog.takeLast(2)}")

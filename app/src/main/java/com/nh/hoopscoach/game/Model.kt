@@ -645,6 +645,10 @@ class RoadState(
     var hiredSeason: Int = 0,
     /** Season whose guaranteed NIL was already paid at signing. */
     var paidSeason: Int = 0,
+    /** Draft Night: the season he was in the draft, his big-board rank going in, and the season whose green room he watched to the end. */
+    var draftSeason: Int = -1,
+    var draftRank: Int = 0,
+    var draftWatched: Int = -1,
 )
 
 /** People the user's player can pay out of his NIL money, one season at a time. Costs in thousands. */

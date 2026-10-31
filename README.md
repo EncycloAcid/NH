@@ -19,7 +19,7 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
 - **NIL deals**: each season pick one. A hometown dealership pays full value. A performance deal pays 60% plus 4% per point you average and a bonus for All-America honors. A national brand pays 150% but costs 15% of your development that season. Richer programs pay more.
 - **The offseason** in four steps:
   1. **Decision**: return to school, declare for the draft (undrafted underclassmen go back to school), or enter the transfer portal.
-  2. **Draft Night**.
+  2. **Draft Night**. If you're in the draft (you declared, or you're a senior), you wait in the green room while the picks come in one at a time: slow through the lottery, quicker through the first round, fast in the second. The room talks about each pick (a teammate going, another player at your position off the board), and your phone rings right before your name is called. Skip ahead any time. Then you see your pick against your big-board rank, or that the night ended without your name. The other tabs stay spoiler-free until the night is over.
   3. **Summer**: workouts, and transfer offers if you entered the portal.
   4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
 - **Media and followers**: you start with a following that matches your ranking (about 150K for a top five-star, 50K to 70K for a four-star, 10K for a three-star). Big games grow it, more on big stages (NCAA Tournament x3, conference tournaments and rivalries x1.5, ranked opponents x1.3) and at big-brand schools. Thirty-point nights and game-winners go viral. Every follower adds $1 a year to your NIL value, and sponsors pay one-time bonuses at 100K, 250K, 500K, 1M, 2.5M and 5M followers.

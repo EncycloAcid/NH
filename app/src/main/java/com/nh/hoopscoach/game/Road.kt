@@ -270,7 +270,19 @@ object Road {
         val h = lg.playerOrNull(lg.heroId) ?: return
         os.entrants.remove(h.id)
         if (r.declared && h.year < 4) os.entrants += h.id
+        if (r.declared || h.year >= 4) {
+            r.draftSeason = lg.season
+            r.draftRank = Offseason.draftBoard(lg)[h.id] ?: 0
+        }
     }
+
+    /** He was in tonight's draft and hasn't sat through the green room yet. */
+    fun inGreenRoom(lg: League): Boolean {
+        val r = lg.road ?: return false
+        return r.draftSeason == lg.season && r.draftWatched != lg.season && lg.offseason?.step == OffStep.DRAFT
+    }
+
+    fun watchedDraft(lg: League) { lg.road?.draftWatched = lg.season }
 
     /** After Draft Night: a drafted player (or a senior) is done; an undrafted underclassman goes back to school. */
     fun afterDraft(lg: League) {
@@ -332,7 +344,7 @@ object Road {
         if (r.ended) return
         when (os.step) {
             OffStep.ROSTER -> Offseason.advance(lg)
-            OffStep.DRAFT -> { Offseason.advance(lg); if (os.step == OffStep.CAREER) Offseason.advance(lg) }
+            OffStep.DRAFT -> { watchedDraft(lg); Offseason.advance(lg); if (os.step == OffStep.CAREER) Offseason.advance(lg) }
             OffStep.CAREER -> Offseason.advance(lg)
             else -> {
                 if (r.portal) stay(lg)

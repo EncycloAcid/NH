@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -170,6 +171,17 @@ class RoadUiTest {
             if (seasons == 1) { shot("Y16_today_year2"); walk(vm, lg) }
         }
         assertTrue(lg.road!!.ended)
+        // Draft Night: the green room fills in pick by pick, then the ending.
+        assertTrue(Road.inGreenRoom(lg))
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        rule.mainClock.advanceTimeBy(4_000); shot("Y16a_green_room")
+        rule.mainClock.advanceTimeBy(4_500); shot("Y16b_green_room_later")
+        println("green room after 8.5s: ${vm.reveal} picks in")
+        vm.select(Tab.RECRUIT); idle(); shot("Y16d_me_green_room"); vm.select(Tab.TODAY); idle()
+        if (rule.onAllNodesWithText("Skip ahead").fetchSemanticsNodes().isNotEmpty()) { rule.onNodeWithText("Skip ahead").performClick(); idle() }
+        shot("Y16c_draft_called")
+        rule.onNodeWithText("Continue").performClick(); idle()
+        assertTrue(!Road.inGreenRoom(lg))
         vm.install(lg); vm.select(Tab.TODAY); shot("Y17_ending"); scrollTo(2); shot("Y18_ending_story")
         vm.select(Tab.CAREER); shot("Y19_career")
         vm.select(Tab.RECRUIT); shot("Y20_me_after")

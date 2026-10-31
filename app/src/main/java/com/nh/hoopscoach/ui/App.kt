@@ -161,9 +161,10 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
         when (lg.phase) {
             Phase.WRAP_UP, Phase.OFFSEASON -> {
                 Column(Modifier.weight(1f)) {
-                    val done = lg.road?.ended == true
-                    Text(if (done) "CAREER COMPLETE" else if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
-                    Text(if (done) "See how it ended" else if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
+                    val draft = com.nh.hoopscoach.game.Road.inGreenRoom(lg)
+                    val done = lg.road?.ended == true && !draft
+                    Text(if (draft) "DRAFT NIGHT" else if (done) "CAREER COMPLETE" else if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
+                    Text(if (draft) "Back to the green room" else if (done) "See how it ended" else if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
                 }
                 SmallButton("Continue", primary = true) { vm.select(Tab.TODAY) }
             }
