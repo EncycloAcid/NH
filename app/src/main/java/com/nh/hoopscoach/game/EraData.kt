@@ -12,7 +12,10 @@ import kotlin.math.roundToInt
 object EraData {
     class Star(val era: Era, val id: String, val name: String, val team: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray?, val photo: String)
     class Pick(val year: Int, val pick: Int, val id: String, val name: String, val college: String, val pos: Pos?, val age: Int, val peak: Int, val photo: String)
-    class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double)
+    class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double,
+        val id: String = "", val ours: String = "")
+    /** A franchise in a season: its place in today's league ([slot]) and what it was called then. */
+    class Franchise(val slot: String, val abbr: String, val city: String, val name: String)
 
     private fun table(name: String): List<List<String>> =
         (EraData::class.java.getResourceAsStream("/eras/$name")?.bufferedReader(Charsets.UTF_8)?.use { it.readLines() } ?: emptyList())
@@ -35,9 +38,24 @@ object EraData {
     private val colleges: Map<String, List<College>> by lazy {
         table("college.tsv").map { f ->
             f[0] to College(f[1].toInt() + 1, f[2], f[3], listOf("FR", "SO", "JR", "SR").indexOf(f[4]) + 1, f[5].toIntOrNull() ?: 0,
-                f[6].toDoubleOrNull() ?: 0.0, f[7].toDoubleOrNull() ?: 0.0, f[8].toDoubleOrNull() ?: 0.0, f[9].toDoubleOrNull() ?: 0.0)
+                f[6].toDoubleOrNull() ?: 0.0, f[7].toDoubleOrNull() ?: 0.0, f[8].toDoubleOrNull() ?: 0.0, f[9].toDoubleOrNull() ?: 0.0, f[0], f.getOrElse(10) { "" })
         }.groupBy({ it.first }, { it.second })
     }
+
+    private val franchises: Map<Int, List<Franchise>> by lazy {
+        table("teams.tsv").map { f -> f[0].toInt() to Franchise(f[1], f[2], f[3], f[4]) }.groupBy({ it.first }, { it.second })
+    }
+
+    private val picksById: Map<String, Pick> by lazy { drafts.values.flatten().associateBy { it.id } }
+
+    /** The teams of [season] (the year it ends), 1986 to 2027, or null outside the data. */
+    fun teams(season: Int): List<Franchise>? = franchises[season]
+
+    /** Real players at the game's schools in [season]: who played where, in what class. */
+    fun collegeSeason(season: Int): List<College> = colleges.values.flatten().filter { it.season == season && it.ours.isNotEmpty() }
+
+    /** Where a drafted player went: his year and pick. */
+    fun pickOf(id: String): Pick? = picksById[id]
 
     fun stars(era: Era): List<Star> = allStars.filter { it.era == era }
 

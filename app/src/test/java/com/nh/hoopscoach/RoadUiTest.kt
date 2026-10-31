@@ -93,6 +93,9 @@ class RoadUiTest {
         rule.onAllNodesWithText("PG")[1].performClick(); idle()
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("SECOND POSITION")); idle()
         shot("Y01b_create_second_pos")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("ERA")); idle()
+        rule.onNodeWithText("1986").performClick(); idle(); shot("Y01c_create_era_1986")
+        rule.onNodeWithText("Today").performClick(); idle()
         scrollTo(1); shot("Y02_create_more")
 
         val hero = Road.createHero(draft, Road.Spec("Marcus", "Hayes", Pos.PG, 74, 185, "Lexington", "KY", Arch.FLOOR_GENERAL, 5, 1, pos2 = Pos.SG))

@@ -24,7 +24,78 @@ object ProLeague {
     fun allStarDay(lg: League) = lg.proState?.allStarDay ?: 30
     fun lastDay(lg: League) = lg.proState?.lastDay ?: 59
     /** Games each team plays this season (58 in saves from before the 83-game schedule). */
-    fun seasonGames(lg: League) = if (lastDay(lg) <= 59) 58 else GAMES
+    fun seasonGames(lg: League) = lg.proState?.games?.takeIf { it > 0 } ?: if (lastDay(lg) <= 59) 58 else GAMES
+
+    /**
+     * A season for a league that isn't 30 teams (23 in 1985-86, 27 in 1989-90...): everyone twice,
+     * then more games against conference rivals, to 82 (an odd number of teams can't all play 83)
+     * or 83. No Cup or Rivalry Night; one day for the All-Star break.
+     */
+    private fun scheduleAny(lg: League) {
+        lg.games.clear()
+        val ps = lg.proState
+        val n = lg.teams.size
+        val target = if (n % 2 == 1) 82 else GAMES
+        ps?.games = target
+        val ids = lg.teams.map { it.id }.shuffled(Rng.r).toMutableList<Int>()
+        if (ids.size % 2 == 1) ids += -1
+        val m = ids.size
+        val rounds = mutableListOf<MutableList<Pair<Int, Int>>>()
+        for (rd in 0 until m - 1) {
+            rounds += (0 until m / 2).mapNotNull { i ->
+                val a = ids[i]; val b = ids[m - 1 - i]
+                if (a < 0 || b < 0) null else if ((rd + i) % 2 == 0) a to b else b to a
+            }.toMutableList()
+            ids.add(1, ids.removeAt(m - 1))
+        }
+        val all = (rounds + rounds.map { rd -> rd.map { (h, a) -> a to h }.toMutableList() }).toMutableList()
+        // The rest, mostly against conference rivals, spread over them.
+        val need = lg.teams.associate { it.id to target - 2 * (n - 1) }.toMutableMap()
+        val met = mutableMapOf<Long, Int>()
+        fun key(a: Int, b: Int) = minOf(a, b) * 1000L + maxOf(a, b)
+        val extra = mutableListOf<Pair<Int, Int>>()
+        var guard = 0
+        while (need.values.any { it > 0 } && guard++ < 5000) {
+            val a = need.filter { it.value > 0 }.maxBy { it.value + Rng.d() }.key
+            val conf = lg.team(a).confId
+            val b = need.filter { it.value > 0 && it.key != a }.keys
+                .maxByOrNull { b -> (if (lg.team(b).confId == conf) 50.0 else 0.0) - (met[key(a, b)] ?: 0) * 8 + need.getValue(b) + Rng.d() }
+            if (b == null) {
+                // One team left needing games: split an existing extra game around it.
+                val g = extra.firstOrNull { it.first != a && it.second != a } ?: break
+                extra.remove(g)
+                extra += a to g.first; extra += g.second to a
+                need[a] = need.getValue(a) - 2
+                continue
+            }
+            extra += if (Rng.chance(0.5)) a to b else b to a
+            need[a] = need.getValue(a) - 1
+            need[b] = need.getValue(b) - 1
+            met[key(a, b)] = (met[key(a, b)] ?: 0) + 1
+        }
+        val busy = mutableListOf<MutableSet<Int>>()
+        val extraRounds = mutableListOf<MutableList<Pair<Int, Int>>>()
+        for (g in extra.shuffled(Rng.r)) {
+            val k = busy.indexOfFirst { g.first !in it && g.second !in it }
+            if (k >= 0) { extraRounds[k] += g; busy[k] += listOf(g.first, g.second) }
+            else { extraRounds += mutableListOf(g); busy += mutableSetOf(g.first, g.second) }
+        }
+        all += extraRounds
+        all.shuffle(Rng.r)
+        var day = 1
+        for ((i, rd) in all.withIndex()) {
+            if (i == all.size / 2) { ps?.allStarDay = day; day++ }
+            if (i == (all.size * 0.68).toInt()) ps?.deadline = day
+            for ((h, a) in rd) {
+                val type = if (lg.team(h).confId == lg.team(a).confId) GameType.CONF else GameType.NONCONF
+                lg.addGame(Game(lg.nextGameId++, day, h, a, false, type, ""))
+            }
+            day++
+        }
+        ps?.rivalryDay = 0
+        ps?.lastDay = day - 1
+        NbaAwards.preseason(lg)
+    }
     const val ROSTER = 13
     const val MAX_ROSTER = 15
     val ROUND_NAMES = listOf("First Round", "Conference Semifinals", "Conference Finals", "Finals")
@@ -68,14 +139,20 @@ object ProLeague {
      */
     fun planDraft(lg: League) {
         val r = lg.road ?: return
+        // An era career drafts into that year's league (27 teams in 1989...), in a shuffled order.
+        val eraList = if (lg.era != Era.TODAY.name) EraData.teams(lg.season + 1) else null
         if (r.proOrder.isEmpty()) {
             // Weakest rosters first, give or take; a lottery shuffles the four worst.
-            val order = TEAMS.indices.sortedBy { strength(it) + Rng.gauss() * 0.6 }.toMutableList()
+            val order = if (eraList != null) eraList.indices.shuffled(Rng.r).toMutableList()
+                else TEAMS.indices.sortedBy { strength(it) + Rng.gauss() * 0.6 }.toMutableList()
             val lottery = order.take(4).shuffled(Rng.r)
             for (i in 0 until 4) order[i] = lottery[i]
             r.proOrder.addAll(order)
         }
-        for (d in lg.draftHistory) if (d.season == lg.season) d.proTeam = teamName(r.proOrder[(d.pick - 1) % TEAMS.size])
+        for (d in lg.draftHistory) if (d.season == lg.season) {
+            val k = r.proOrder[(d.pick - 1) % r.proOrder.size]
+            d.proTeam = eraList?.getOrNull(k)?.let { "${it.city} ${it.name}" } ?: teamName(k % TEAMS.size)
+        }
     }
 
     /** Builds the pro league from the college league once the user's player has been drafted (or signed undrafted), in [era]. */
@@ -88,29 +165,37 @@ object ProLeague {
             Conference(0, "Eastern Conference", "EAST", 0, mutableListOf()),
             Conference(1, "Western Conference", "WEST", 0, mutableListOf()),
         )
+        // An era career in college joins the league the year he's drafted, after the years he spent in school.
+        val inEra = era != Era.TODAY && college.era == era.name && college.season >= era.year
+        // A past era has only the teams that existed (23 in 1985-86), under their names then.
+        val startList = if (era != Era.TODAY) EraData.teams(era.year) else null
         val teams = mutableListOf<Team>()
         for (f in TEAMS) {
+            val fr = startList?.firstOrNull { it.slot == f.abbr }
+            if (startList != null && fr == null) continue
             // A past era uses the franchise's old name where it had one (the Seattle SuperSonics, the New Jersey Nets...).
-            val club = Eras.club(era, f.abbr)
+            val club = if (startList != null) null else Eras.club(era, f.abbr)
             val t = Team(teams.size, club?.city ?: f.city, club?.name ?: f.name, club?.abbr ?: f.abbr, f.conf, f.market,
                 club?.primary ?: f.primary, club?.secondary ?: f.secondary, if (club != null) ERA_BADGE else LOGO)
             t.arena = 17_500 + (f.market - 55) * 80
             t.fans = 55.0 + (f.market - 55) * 0.6
             t.legacy = f.market.toDouble()
             t.buzz = 45.0
-            confs[f.conf].teamIds += t.id
+            t.slot = f.abbr
+            if (fr != null) Franchises.dress(t, fr)
+            confs[t.confId].teamIds += t.id
             teams += t
         }
         val lg = League(
             // A past era starts in its own year: the first season is the era's.
-            season = if (era == Era.TODAY) college.season else era.year - 1, teams = teams, players = mutableListOf(), coaches = mutableListOf(), confs = confs,
+            season = if (era == Era.TODAY || inEra) college.season else era.year - 1, teams = teams, players = mutableListOf(), coaches = mutableListOf(), confs = confs,
             userTeamId = 0, userCoachId = 0, nextPlayerId = college.nextPlayerId + 1, nextCoachId = 1,
         )
         lg.mode = GameMode.PLAYER
         lg.level = Level.PRO
         lg.heroId = college.heroId
         lg.road = r
-        lg.proState = ProState(era = era.name)
+        lg.proState = ProState(era = era.name, realTeams = startList != null)
         for (t in teams) {
             val c = Coach(lg.nextCoachId++, Rng.pick(Names.first), Rng.pick(Names.last), Rng.range(38, 66), t.id,
                 Rng.range(55, 92), Rng.range(55, 92), Rng.range(40, 80), Rng.range(50, 90), Rng.int(0, 1_000_000))
@@ -125,11 +210,10 @@ object ProLeague {
         } else {
             // The era's stars on their real teams, and generated players around them. Clubs that didn't exist yet are all generated.
             val stars = Eras.stars(era)
-            for ((i, f) in TEAMS.withIndex()) {
-                val t = teams[i]
-                for (s in stars[f.abbr].orEmpty()) makeStar(lg, s, t)
+            for (t in teams) {
+                for (s in stars[t.slot].orEmpty()) makeStar(lg, s, t)
                 // About as deep as today's real rosters, so the stars carry their teams without taking every shot.
-                val bench = if (Eras.expansion(era, f.abbr)) listOf(90, 89, 88, 87, 86, 86, 85, 85, 84, 83, 83, 82, 81, 80)
+                val bench = if (startList == null && Eras.expansion(era, t.slot)) listOf(90, 89, 88, 87, 86, 86, 85, 85, 84, 83, 83, 82, 81, 80)
                     else listOf(88, 87, 86, 86, 85, 85, 84, 84, 83, 82, 82, 81)
                 var k = 0
                 while (t.roster.size < REAL_ROSTER) {
@@ -142,20 +226,32 @@ object ProLeague {
         // The real rosters are the 2025-26 league. The years the user spent in college pass for them too:
         // everyone ages, develops or declines, the oldest retire, and young draftees take the open spots.
         if (era == Era.TODAY) repeat((college.season + 1 - DATA_SEASON).coerceIn(0, 8)) { pastYear(lg) }
+        // An era career: the years he spent in college pass for the pros too, with that year's teams and real draft class
+        // (the players still in college, or drafted with him, come in below as his classmates instead).
+        val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
+        val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
+        if (inEra) for (y in era.year..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
+        // Picks go by the order planned on Draft Night, to the team in that franchise's place.
+        val eraList = if (inEra) EraData.teams(college.season + 1) else null
+        fun teamFor(pick: Int): Team {
+            val k = order[(pick - 1) % order.size]
+            val slot = if (eraList != null) eraList.getOrNull(k)?.slot else TEAMS.getOrNull(k)?.abbr
+            return lg.teams.firstOrNull { it.slot == slot } ?: lg.teams[k % lg.teams.size]
+        }
         // The real draft class arrives: the user's classmates, the user's player, maybe his rival.
         val picks = college.draftHistory.filter { it.season == college.season }.sortedBy { it.pick }
         for (d in picks) {
             val p = college.anyPlayer(d.pid) ?: continue
             if (lg.playerOrNull(p.id) != null) continue
-            joinPro(lg, p, lg.team(order[(d.pick - 1) % order.size]), d.cls)
+            joinPro(lg, p, teamFor(d.pick), d.cls)
         }
         if (lg.playerOrNull(hero.id) == null) {
             // Undrafted: a two-way deal with one of the weaker teams.
-            val t = lg.team(order[Rng.int(0, 9)])
+            val t = teamFor(Rng.int(1, 10))
             joinPro(lg, hero, t, hero.year)
         }
         importRival(college, lg, order)
-        for (t in teams) {
+        for (t in lg.teams) {
             trim(lg, t)
             while (t.roster.size < ROSTER) makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
             Gameplan.autoAllocate(lg, t)
@@ -276,7 +372,7 @@ object ProLeague {
     const val DATA_SEASON = 2026
 
     /** A year in the league before the user arrives: aging, growth or decline, retirements, and draftees. */
-    private fun pastYear(lg: League) {
+    private fun pastYear(lg: League, year: Int? = null, skip: Set<String> = emptySet(), draft: Boolean = false) {
         for (p in lg.players) p.age++
         for (t in lg.teams) {
             val dev = Coaching.devOf(lg.coachOf(t))
@@ -287,7 +383,32 @@ object ProLeague {
                 if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
                 ProCareer.develop(p, dev)
             }
-            while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t).proYears = 0
+            if (year == null) while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t).proYears = 0
+        }
+        if (year != null) {
+            // Next season's teams (expansion teams draft their rosters), then that summer's real draft class.
+            Franchises.apply(lg, year + 1)
+            val firstRound = mutableSetOf<Int>()
+            if (draft) {
+                val order = lg.teams.sortedBy { t -> lg.rosterOf(t).map { it.ovr }.sortedDescending().take(8).average() }
+                val names = lg.players.map { it.name }.toSet()
+                for (pk in EraData.draft(year).filter { it.pick <= 2 * lg.teams.size && it.name !in skip && it.name !in names }) {
+                    val t = order[(pk.pick - 1) % order.size]
+                    val target = (82 - (pk.pick - 1) * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(72, ROOKIE_MAX)
+                    makePro(lg, pk.pos ?: scarcest(lg, t), target, pk.age, t).also {
+                        it.proYears = 0
+                        it.awards += "$year Draft #${pk.pick}"
+                        it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
+                        EraData.apply(it, pk)
+                        if (pk.pick <= lg.teams.size) firstRound += it.id
+                    }
+                }
+            }
+            for (t in lg.teams) {
+                // Teams keep their first-round picks.
+                trim(lg, t, firstRound)
+                while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t).proYears = 0
+            }
         }
         lg.reindex()
     }
@@ -310,8 +431,8 @@ object ProLeague {
     }
 
     /** A roster over the limit cuts its weakest players (never the user's player or his rival). */
-    fun trim(lg: League, t: Team) {
-        val keep = setOf(lg.heroId, lg.road?.rivalId ?: -1)
+    fun trim(lg: League, t: Team, protect: Set<Int> = emptySet()) {
+        val keep = setOf(lg.heroId, lg.road?.rivalId ?: -1) + protect
         while (t.roster.size > MAX_ROSTER) {
             val cut = lg.rosterOf(t).filter { it.id !in keep }.minByOrNull { it.ovr - (30 - it.age).coerceAtLeast(0) * 0.3 } ?: break
             t.roster.remove(cut.id)
@@ -366,6 +487,8 @@ object ProLeague {
      * and one for the All-Star break.
      */
     fun schedule(lg: League) {
+        if (lg.teams.size != 30) { scheduleAny(lg); return }
+        lg.proState?.games = GAMES
         lg.games.clear()
         val ps = lg.proState
         val ids = lg.teams.map { it.id }.shuffled(Rng.r).toMutableList()
@@ -785,6 +908,8 @@ object ProSeason {
     fun startSeason(lg: League) {
         val ps = lg.proState!!
         lg.season++
+        // An era career: this season's teams (new names, moves, expansion teams).
+        Franchises.apply(lg, lg.season)
         lg.day = 1
         lg.phase = Phase.REGULAR
         lg.games.clear()
@@ -1005,6 +1130,8 @@ object ProCareer {
         val order = (drawn + byRecord.filter { it !in drawn }).toMutableList()
         lg.news += News(lg.season, lg.day, "Lottery night: the ${lg.team(drawn.first()).name} win the No. 1 pick" +
             (if (lotteryTeams.indexOf(drawn.first()) > 2) ", jumping from No. ${lotteryTeams.indexOf(drawn.first()) + 1}" else ""), drawn.first() == lg.userTeamId)
+        // Two rounds: 60 picks with 30 teams, fewer in a smaller league.
+        val picks = minOf(60, 2 * lg.teams.size)
         val rookies = mutableListOf<Pair<Pos, Int>>()
         for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (82 - i * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(72, ProLeague.ROOKIE_MAX)
         rookies.sortByDescending { it.second }
@@ -1012,12 +1139,13 @@ object ProCareer {
         var rivalSlot = -1
         if (rival != null) {
             Ratings.offseasonGrowth(rival, 70)
-            rivalSlot = rookies.indexOfFirst { it.second <= rival.ovr }.let { if (it < 0) 59 else it }
+            rivalSlot = rookies.indexOfFirst { it.second <= rival.ovr }.let { if (it < 0 || it >= picks) picks - 1 else it }
         }
         ps.draftedByUser.clear()
         // Past eras draft the real class of that year (1986 to 2026): names, colleges, ceilings and photos.
-        val real = if (Eras.of(lg) != Era.TODAY) EraData.draft(lg.season).associateBy { it.pick } else emptyMap()
-        for (i in 0 until 60) {
+        val names = lg.players.map { it.name }.toSet()
+        val real = if (Eras.of(lg) != Era.TODAY) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
+        for (i in 0 until picks) {
             val t = lg.team(order[i % order.size])
             val p = if (i == rivalSlot && rival != null) {
                 ProLeague.joinPro(lg, rival, t, rival.year + 1)
@@ -1040,8 +1168,10 @@ object ProCareer {
             }
             if (t.id == lg.userTeamId) ps.draftedByUser += p.id
         }
+        // Teams keep their first-round picks.
+        val firstRound = lg.players.filter { p -> p.awards.any { a -> a.startsWith("${lg.season} Draft #") && (a.substringAfter("#").toIntOrNull() ?: 99) <= lg.teams.size } }.map { it.id }.toSet()
         for (t in lg.teams) {
-            ProLeague.trim(lg, t)
+            ProLeague.trim(lg, t, firstRound)
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
         }
         lg.reindex()

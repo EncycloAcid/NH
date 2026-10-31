@@ -1526,7 +1526,9 @@ fun ProEnding(vm: GameViewModel, lg: League) {
 fun GoProScreen(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val h = lg.hero ?: return
-    var era by remember { mutableStateOf(com.nh.hoopscoach.game.Era.TODAY) }
+    // A career that started in an era goes pro into it; otherwise pick one here.
+    val careerEra = com.nh.hoopscoach.game.Era.entries.firstOrNull { it.name == lg.era && it != com.nh.hoopscoach.game.Era.TODAY }
+    var era by remember { mutableStateOf(careerEra ?: com.nh.hoopscoach.game.Era.TODAY) }
     val pick = lg.draftHistory.lastOrNull { it.pid == h.id }
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f)) {
@@ -1538,10 +1540,19 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                     Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr)} and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }
-            item { EraPicker(era) { era = it } }
+            if (careerEra != null) item {
+                val teams = com.nh.hoopscoach.game.EraData.teams(lg.season + 1)
+                Section("Your league")
+                Panel {
+                    Text("THE ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} NBA", style = T.label, color = P.accent)
+                    Text(careerEra.title, style = T.head, color = P.ink)
+                    Text("${teams?.size ?: 30} teams. The stars of ${careerEra.year - 1}-${(careerEra.year % 100).toString().padStart(2, '0')} are ${lg.season + 1 - careerEra.year} years older, and the real draft classes since have arrived.", style = T.small, color = P.sub)
+                    Text(eraRules(careerEra), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 4.dp))
+                }
+            } else item { EraPicker(era) { era = it } }
             item { CareerStory(lg) }
         }
-        FlowFooter(null, if (era == com.nh.hoopscoach.game.Era.TODAY) "Start your pro career" else "Start your career in ${era.year}") { vm.goPro(era) }
+        FlowFooter(null, if (era == com.nh.hoopscoach.game.Era.TODAY) "Start your pro career" else if (careerEra != null) "Start your pro career in ${lg.season + 1}" else "Start your career in ${era.year}") { vm.goPro(era) }
     }
 }
 

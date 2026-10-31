@@ -5,6 +5,7 @@ from PIL import Image
 
 D, REPO = sys.argv[1], sys.argv[2]
 RES = os.path.join(REPO, 'app/src/main/resources/eras')
+SCHOOLS_KT = os.path.join(REPO, 'app/src/main/java/com/nh/hoopscoach/game/Schools.kt')
 HEADS = os.path.join(REPO, 'app/src/main/assets/nba/heads/eras')
 os.makedirs(RES, exist_ok=True)
 
@@ -123,6 +124,26 @@ for f in glob.glob(f'{D}/era-*/college_drafted_players.csv'):
         if r['class'] not in ('FR', 'SO', 'JR', 'SR'): continue
         college.setdefault(r['player_id'], {})[r['season']] = r
 
+# The game's schools, to place real college players on their real teams.
+schools = re.findall(r'^\s+([^|\n]+)\|([A-Z&]+)\|[^|]+\|', open(SCHOOLS_KT, encoding='utf-8').read(), re.M)
+STATE_ABBR = {'Ky.': 'Kentucky', 'Mich.': 'Michigan', 'Ala.': 'Alabama', 'Fla.': 'Florida', 'Wash.': 'Washington', 'Ill.': 'Illinois',
+    'Ariz.': 'Arizona', 'Conn': 'Connecticut', 'Tenn.': 'Tennessee', 'Ga.': 'Georgia', 'Ia.': 'Iowa', 'Colo.': 'Colorado', 'Ind.': 'Indiana',
+    'Miss.': 'Mississippi', 'La.': 'Louisiana', 'Ark.': 'Arkansas', 'Okla.': 'Oklahoma', 'Tex.': 'Texas', 'Ky': 'Kentucky', 'Car.': 'Carolina'}
+def norm(x):
+    for k, v in STATE_ABBR.items(): x = x.replace(k, v)
+    return re.sub(r'[^a-z0-9]', '', x.lower().replace('st.', 'state').replace('saint', 'st'))
+by_norm = {}
+for name, abbr in schools:
+    by_norm.setdefault(norm(name), name); by_norm.setdefault(norm(abbr), name)
+SCHOOL_ALIAS = {'UNC': 'North Carolina', 'UConn': 'Connecticut', 'Ga Tech': 'Georgia Tech', 'Miami (FL)': 'Miami', 'Pitt': 'Pittsburgh',
+    'Cal': 'California', "St. John's (NY)": "St. John's", 'Miss. St.': 'Mississippi State', 'Ole Miss': 'Mississippi', 'LSU': 'LSU',
+    'UMass': 'Massachusetts', 'Massachusetts': 'UMass', 'Texas-El Paso': 'UTEP', 'Southern California': 'USC', 'Nevada-Las Vegas': 'UNLV', 'UCSB': 'UC Santa Barbara',
+    'Miami (OH)': 'Miami (OH)', 'Loyola (IL)': 'Loyola Chicago', 'Saint Mary\'s (CA)': "Saint Mary's", 'VCU': 'VCU', 'Penn': 'Penn'}
+def our_school(x):
+    a = SCHOOL_ALIAS.get(x)
+    if a and norm(a) in by_norm: return by_norm[norm(a)]
+    return by_norm.get(norm(x), '')
+
 drafts, college_out, seen = [], [], set()
 for f in sorted(glob.glob(f'{D}/era-*/drafts.csv')):
     for r in rows(f):
@@ -139,7 +160,8 @@ for f in sorted(glob.glob(f'{D}/era-*/drafts.csv')):
             pos = {'C': 'C'}.get(g) or (('PG' if apg >= 4 else 'SG') if g == 'G' else ('PF' if rpg >= 7 else 'SF'))
         else: pos = ''
         cls = last['class'] if last else ''
-        age = {'FR': 19, 'SO': 20, 'JR': 21, 'SR': 22}.get(cls, 19)
+        # No college seasons in the data: a senior from a small school, or straight from high school or overseas.
+        age = {'FR': 19, 'SO': 20, 'JR': 21, 'SR': 22}.get(cls, 22 if r['college'] else 19)
         pk_game = peak.get(pid, (0, ''))[0]
         if not pk_game and r['player'] in classic: pk_game = round(42.85 + 0.567 * (classic[r['player']] - 2))
         # The first photo of him from after his draft.
@@ -149,14 +171,43 @@ for f in sorted(glob.glob(f'{D}/era-*/drafts.csv')):
         drafts.append([str(y), str(pk), pid, r['player'], r['college'], pos, str(age), str(pk_game), ph])
         for season in sorted(seasons):
             c = seasons[season]
-            college_out.append([pid, season[:4], c['school'], c['conference'], c['class'], c['g'], c['mpg'], c['ppg'], c['rpg'], c['apg']])
+            college_out.append([pid, season[:4], c['school'], c['conference'], c['class'], c['g'], c['mpg'], c['ppg'], c['rpg'], c['apg'], our_school(c['school'])])
 
 with open(f'{RES}/drafts.tsv', 'w', encoding='utf-8') as f:
     f.write('# year|pick|id|name|college|pos|age|peak|photo (first 60 picks; peak = best game rating he reaches in the era lists, 0 unknown)\n')
     for d in sorted(drafts, key=lambda d: (int(d[0]), int(d[1]))): f.write('|'.join(d) + '\n')
 with open(f'{RES}/college.tsv', 'w', encoding='utf-8') as f:
-    f.write('# id|season start|school|conference|class|g|mpg|ppg|rpg|apg\n')
+    f.write('# id|season start|school|conference|class|g|mpg|ppg|rpg|apg|the game\'s school (empty when it isn\'t in the game)\n')
     for c in college_out: f.write('|'.join(c) + '\n')
+
+# Which franchises play each season (lg.season = the year it ends), by today's slot, and what they were called.
+# Membership follows the real expansions and moves; names come from the data, carried forward year to year.
+SLOT = {'NJN': 'BKN', 'BRK': 'BKN', 'SEA': 'OKC', 'WSB': 'WAS', 'PHO': 'PHX', 'CHH': 'CHA', 'CHO': 'CHA',
+        'NOH': 'NOP', 'NOK': 'NOP', 'VAN': 'MEM', 'KCK': 'SAC', 'SDC': 'LAC'}
+start86 = rows(f'{D}/eras/1985-86/teams.csv')
+JOIN = {1989: ['MIA', 'CHA'], 1990: ['MIN', 'ORL'], 1996: ['TOR', 'MEM'], 2003: ['NOP'], 2005: ['CHA']}
+LEAVE = {2003: ['CHA']}
+names = {}   # slot -> [(first season, bbref abbr, full name)]
+for r in start86: names.setdefault(SLOT.get(r['abbr'], r['abbr']), []).append((1986, r['abbr'], r['team']))
+for r in rows(f'{D}/teams_by_draft_year.csv'):
+    names.setdefault(SLOT.get(r['abbr'], r['abbr']), []).append((int(r['draft_year']), r['abbr'], r['name']))
+active = [SLOT.get(r['abbr'], r['abbr']) for r in start86]
+team_rows = []
+for season in range(1986, 2028):
+    for x in LEAVE.get(season, []): active.remove(x)
+    active += JOIN.get(season, [])
+    for slot in sorted(active):
+        known = sorted(n for n in names.get(slot, []) if n[0] <= season)
+        if slot == 'CHA' and season >= 2005: known = [n for n in known if n[0] >= 2005] or known
+        if not known: known = sorted(names.get(slot, []))[:1]
+        _, abbr, full = known[-1]
+        city, nick = (full[:-len(' Trail Blazers')], 'Trail Blazers') if full.endswith('Trail Blazers') else full.rsplit(' ', 1)
+        team_rows.append([str(season), slot, abbr, city, nick])
+with open(f'{RES}/teams.tsv', 'w', encoding='utf-8') as f:
+    f.write('# season|slot (today\'s abbreviation)|abbreviation then|city|name\n')
+    for t in team_rows: f.write('|'.join(t) + '\n')
+print('team seasons', len(team_rows), {y: sum(1 for t in team_rows if t[0] == str(y)) for y in (1986, 1989, 1990, 1996, 2003, 2004, 2005, 2027)})
+print('college rows on a game school', sum(1 for c in college_out if c[10]), 'of', len(college_out))
 
 # Headshots for era stars and for draftees who have one.
 need = {s[8] for s in stars_out if s[8]} | {d[8] for d in drafts if d[8]}

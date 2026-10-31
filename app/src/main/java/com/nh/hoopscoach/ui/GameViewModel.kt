@@ -214,9 +214,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var revealSeason by mutableIntStateOf(-1)
 
     fun roadFindOffers(spec: com.nh.hoopscoach.game.Road.Spec) {
-        val d = draft ?: return
+        val d0 = draft ?: return
         busy = "Coaches are calling"
         viewModelScope.launch {
+            // A different era needs a college league that starts in that era's season, with its real players.
+            val d = if (d0.era == spec.era.name) d0 else withContext(Dispatchers.Default) {
+                if (spec.era == com.nh.hoopscoach.game.Era.TODAY) LeagueGen.newLeague() else com.nh.hoopscoach.game.EraCollege.newLeague(spec.era)
+            }
+            draft = d
             val (h, o) = withContext(Dispatchers.Default) {
                 val h = com.nh.hoopscoach.game.Road.createHero(d, spec)
                 h to com.nh.hoopscoach.game.Road.offers(d, h)

@@ -304,6 +304,8 @@ object Offseason {
             if (!c.isUser) Coaching.aiGrowth(c)
         }
         lg.season++
+        // An era career's college years: this season's real players join their schools.
+        EraCollege.populate(lg)
         setupSeason(lg, carryElo = true)
         lg.news += News(lg.season, 0, "Welcome to the ${lg.season} season", true)
         if (lg.news.size > 250) lg.news.subList(0, lg.news.size - 250).clear()

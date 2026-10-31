@@ -75,6 +75,7 @@ class EraDataTest {
             println("Rodman ${rodman.ovr}/${rodman.pot}, peak in the data $peak")
             assertTrue("the ceiling he reached", rodman.pot >= peak - 1)
         }
-        assertTrue("most of the class is real", drafted.count { p -> EraData.draft(1986).any { it.name == p.name } } >= 50)
+        val firstRound = drafted.filter { p -> (p.awards.first { it.startsWith("1986 Draft #") }.substringAfter("#").toIntOrNull() ?: 99) <= lg.teams.size }
+        assertTrue("the first round is real and stays", firstRound.size >= lg.teams.size - 2 && firstRound.count { p -> EraData.draft(1986).any { it.name == p.name } } >= firstRound.size - 2)
     }
 }

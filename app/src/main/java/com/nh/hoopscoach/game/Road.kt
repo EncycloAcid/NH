@@ -19,6 +19,8 @@ object Road {
         val town: String, val state: String, val style: Arch, val stars: Int, val number: Int,
         /** An optional second position, next to his first. */
         val pos2: Pos? = null,
+        /** Era mode from the start: his college years are that era's, then he turns pro into its league. */
+        val era: Era = Era.TODAY,
     )
 
     fun targetOvr(stars: Int) = when (stars) { 5 -> 82; 4 -> 77; else -> 71 }

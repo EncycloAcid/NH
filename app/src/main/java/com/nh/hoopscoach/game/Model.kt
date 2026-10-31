@@ -273,6 +273,8 @@ class Team(
     var secondary: Long,
     var logo: Int,
     var coachId: Int = -1,
+    /** The franchise's place in today's league (its abbreviation today), whatever it's called this season. */
+    var slot: String = "",
     var roster: MutableList<Int> = mutableListOf(),
     var plan: GamePlan = GamePlan(),
     var w: Int = 0, var l: Int = 0, var cw: Int = 0, var cl: Int = 0, var streak: Int = 0,
@@ -888,6 +890,9 @@ class ProState(
     val mvpVotes: MutableList<Vote> = mutableListOf(),
     /** Era mode: the season this career started in (an [Era] name). */
     var era: String = "TODAY",
+    /** The league follows the real list of teams each season (expansions and moves); games a team plays this season. */
+    var realTeams: Boolean = false,
+    var games: Int = 0,
     /** Every honor of this season (weekly and monthly awards, awards night, the playoffs, the Cup and All-Star), and the season awards of past ones. */
     val honors: MutableList<Honor> = mutableListOf(),
     /** Season stats and team records (wins, losses, points for and against) when this week and month began, to measure them. */
@@ -1069,6 +1074,9 @@ class League(
     var road: RoadState? = null,
     var level: Level = Level.COLLEGE,
     var proState: ProState? = null,
+    /** Era mode from the start: the college years are that era's ("TODAY" otherwise), and the real players already placed (their data id to player id). */
+    var era: String = "TODAY",
+    val eraIds: MutableMap<String, Int> = mutableMapOf(),
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

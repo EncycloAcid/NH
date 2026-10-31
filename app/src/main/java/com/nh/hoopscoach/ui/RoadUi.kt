@@ -77,6 +77,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     var last by remember { mutableStateOf("") }
     var pos by remember { mutableStateOf(Pos.SG) }
     var pos2 by remember { mutableStateOf<Pos?>(null) }
+    var era by remember { mutableStateOf(com.nh.hoopscoach.game.Era.TODAY) }
     var height by remember { mutableIntStateOf(76) }
     var weight by remember { mutableIntStateOf(200) }
     var town by remember { mutableStateOf("") }
@@ -93,6 +94,15 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
         LazyColumn(Modifier.weight(1f)) {
             item { header() }
             item {
+                // When: today, or a past era from his first college season to the pros.
+                Section("Era")
+                val eras = com.nh.hoopscoach.game.Era.entries.sortedBy { if (it.year == 0) 9999 else it.year }.reversed()
+                Segmented(eras.map { it.label }, eras.indexOf(era), { era = eras[it] }, scroll = true)
+                Text(
+                    if (era == com.nh.hoopscoach.game.Era.TODAY) "Today's college game, then today's NBA."
+                    else "College starts in ${era.year - 1}-${(era.year % 100).toString().padStart(2, '0')}, with the real future pros at their schools (${eraCollegeNames(era)}). You turn pro into that era's NBA: its teams that year, its stars, and a real draft class every summer.",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
+                )
                 Section("Your player")
                 Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(first, { first = it.take(16) }, placeholder = { Text("First name", color = P.faint) }, singleLine = true, modifier = Modifier.weight(1f),
@@ -149,7 +159,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
         }
         Column(Modifier.fillMaxWidth().background(P.bg).navigationBarsPadding().padding(horizontal = Gutter, vertical = 10.dp)) {
             PrimaryButton("See scholarship offers", Modifier.fillMaxWidth()) {
-                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number, pos2))
+                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number, pos2, era))
             }
         }
     }
@@ -1115,3 +1125,8 @@ fun LazyListScope.heroSeasonPage(vm: GameViewModel, lg: League) {
         Box(Modifier.padding(horizontal = Gutter)) { SecondaryButton("Open your player card", Modifier.fillMaxWidth()) { vm.openPlayer(h.id) } }
     }
 }
+
+/** A few real college players of an era's first season, for the creator. */
+private fun eraCollegeNames(era: com.nh.hoopscoach.game.Era): String =
+    com.nh.hoopscoach.game.EraData.collegeSeason(era.year).mapNotNull { c -> com.nh.hoopscoach.game.EraData.pickOf(c.id)?.let { it to c } }
+        .sortedBy { it.first.pick + (it.first.year - it.second.season) * 100 }.take(3).joinToString(", ") { "${it.first.name}, ${it.second.ours}" }

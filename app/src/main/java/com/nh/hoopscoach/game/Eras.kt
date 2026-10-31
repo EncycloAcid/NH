@@ -54,6 +54,9 @@ object Eras {
     private val NOH = Club("New Orleans", "Hornets", "NOH", 0xFF00778B, 0xFF280071)
     private val BOBCATS = Club("Charlotte", "Bobcats", "CHA", 0xFFF26532, 0xFF29588B)
 
+    /** An old club by its abbreviation then (NJN, SEA, WSB, VAN, NOH, or CHA for the Bobcats). */
+    fun clubByAbbr(abbr: String): Club? = listOf(NJN, SEA, WSB, VAN, NOH, BOBCATS).firstOrNull { it.abbr == abbr }
+
     /** Old names, by today's abbreviation. */
     fun club(era: Era, abbr: String): Club? = when (era) {
         Era.Y1986 -> mapOf("BKN" to NJN, "OKC" to SEA, "WAS" to WSB)
