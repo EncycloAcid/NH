@@ -111,6 +111,33 @@ class RoadUiTest {
         if (lg.road!!.press != null) { scrollTo(1); shot("Y10b_press") }
         vm.select(Tab.RECRUIT); scrollTo(1); shot("Y10c_me_media"); vm.select(Tab.TODAY)
         if (lg.road!!.press != null) { vm.act { Road.answer(it, 1) }; idle() }
+        vm.act { Road.setPractice(it, com.nh.hoopscoach.game.Practice.SHOOTING) }
+        repeat(4) { Season.playDay(lg) }
+        vm.install(lg); vm.select(Tab.RECRUIT); idle()
+        scrollTo(1); shot("Y10d_me_races"); scrollTo(2); shot("Y10e_me_practice")
+        // Play live games until one comes down to a big moment.
+        var found = false
+        var tries2 = 0
+        while (!found && tries2++ < 20 && lg.phase == Phase.REGULAR) {
+            val g = Season.userGameToday(lg)
+            if (g == null) { Season.playDay(lg); continue }
+            val e = com.nh.hoopscoach.game.GameEngine(lg, g, true).also { it.interactive = true }
+            var m: com.nh.hoopscoach.game.GameEngine.BigMoment? = null
+            while (!e.finished) { m = e.pendingMoment(); if (m != null) break; e.step() }
+            if (m != null) {
+                val lv = com.nh.hoopscoach.ui.LiveGame(e).also { it.speed = 0; it.moment = m }
+                vm.live = lv; vm.push(Route.Live); idle()
+                shot("Y21_big_moment")
+                e.playMoment(m.options.first().first); lv.momentResult = e.lastMoment; lv.moment = null; lv.tick++; idle()
+                shot("Y22_moment_result")
+                found = true
+            }
+            e.simToEnd(); e.commit()
+            vm.live?.done = true
+            if (found) { vm.back(); idle() }
+            Season.playDay(lg)
+        }
+        vm.install(lg); vm.select(Tab.TODAY); idle()
         vm.startLive(); idle()
         vm.live?.let { lv -> lv.speed = 0; repeat(80) { lv.engine.step() }; lv.tick++ }
         shot("Y11_live"); vm.back(); idle()

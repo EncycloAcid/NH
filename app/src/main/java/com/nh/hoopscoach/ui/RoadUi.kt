@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Arch
+import com.nh.hoopscoach.game.Awards
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.Geo
 import com.nh.hoopscoach.game.League
@@ -233,6 +234,8 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         }
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
         if (lg.road?.press != null) item { PressCard(vm, lg) }
+        item { RacePanel(vm, lg) }
+        item { PracticePanel(vm, lg) }
         item { MediaPanel(lg) }
         item {
             val mins = Gameplan.plannedMinutes(t, h.id)
@@ -348,7 +351,8 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
         }
         lg.road?.let { r ->
             Spacer(Modifier.height(6.dp))
-            Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.sub)
+            val race = if (r.raceRank in 1..100) "POY race No. ${r.raceRank} · " else ""
+            Text("$race${Road.fatigueLabel(r.fatigue)} · ${r.practice.label} · ${Road.count(r.followers)} followers", style = T.small, color = P.sub)
         }
         if (Road.needsDeal(lg)) {
             Spacer(Modifier.height(10.dp))
@@ -399,6 +403,102 @@ fun PressCard(vm: GameViewModel, lg: League) {
     }
 }
 
+/** Player of the Year ladder, All-America pace, and the conference and freshman races. */
+@Composable
+private fun RacePanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val h = lg.playerOrNull(lg.heroId) ?: return
+    if (h.teamId < 0) return
+    val ladder = remember(vm.rev, lg) { Awards.ladder(lg) }
+    val rank = remember(vm.rev, lg) { Road.raceRank(lg) }
+    Section("Award races")
+    Panel {
+        if (rank == 0) {
+            Text("The races start once you've played.", style = T.body, color = P.sub)
+            return@Panel
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("PLAYER OF THE YEAR", style = T.label, color = P.sub)
+                Text(if (rank <= 100) "No. $rank" else "Outside the top 100", style = T.title.copy(fontSize = if (rank <= 100) 30.sp else 22.sp), color = P.accent)
+                Text(Road.allAmericaPace(rank), style = T.small, color = P.ink)
+            }
+            if (r.lastRaceRank in 1..100 && r.raceRank in 1..100 && r.raceRank != r.lastRaceRank) {
+                val up = r.raceRank < r.lastRaceRank
+                Text("${if (up) "▲" else "▼"} ${kotlin.math.abs(r.lastRaceRank - r.raceRank)} this week", style = T.bodyB, color = if (up) P.good else P.bad)
+            }
+        }
+        val t = lg.team(h.teamId)
+        val conf = Road.rankAmong(lg) { _, pt -> pt.confId == t.confId }
+        val fr = if (h.year == 1) Road.rankAmong(lg) { p, _ -> p.year == 1 } else 0
+        Spacer(Modifier.height(6.dp))
+        Text(listOfNotNull(
+            if (conf > 0) "No. $conf in the ${lg.conf(t.confId).abbr} Player of the Year race" else null,
+            if (fr > 0) "No. $fr among freshmen" else null,
+        ).joinToString(" · "), style = T.small, color = P.sub)
+        Spacer(Modifier.height(10.dp))
+        val top = ladder.take(5)
+        top.forEachIndexed { i, (p, pt) -> RaceRow(i + 1, p, pt, p.id == h.id) }
+        if (rank > 5) {
+            Text("···", style = T.small, color = P.faint, modifier = Modifier.padding(start = 6.dp))
+            RaceRow(rank, h, t, true)
+        }
+        Text("The ladder uses the same formula as the end-of-season awards: production, efficiency and winning.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
+        if (h.stats.gp < (t.gp * 0.6)) Text("Play in 60% of games to qualify for national awards.", style = T.small, color = P.warn, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+@Composable
+private fun RaceRow(rank: Int, p: Player, t: Team, you: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (you) P.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("$rank", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
+        TeamBadge(t, 22.dp)
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(if (you) "${p.name} (you)" else p.name, style = T.bodyB.copy(fontSize = 14.sp), color = if (you) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${t.abbr} · ${statLine(p)}", style = T.small, color = P.sub, maxLines = 1)
+        }
+    }
+}
+
+/** This week's practice plan, and what it's costing. */
+@Composable
+private fun PracticePanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    Section("Practice this week")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("FATIGUE", style = T.label, color = P.sub, modifier = Modifier.weight(1f))
+            Text(Road.fatigueLabel(r.fatigue), style = T.bodyB, color = when { r.fatigue >= 75 -> P.bad; r.fatigue >= 55 -> P.warn; else -> P.good })
+        }
+        Spacer(Modifier.height(6.dp))
+        Bar(r.fatigue / 100f, Modifier.fillMaxWidth(), color = when { r.fatigue >= 75 -> P.bad; r.fatigue >= 55 -> P.warn; else -> P.good }, height = 6.dp)
+        Text(Road.fatigueEffect(r.fatigue), style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+        Spacer(Modifier.height(10.dp))
+        for (plan in com.nh.hoopscoach.game.Practice.entries) {
+            val sel = r.practice == plan
+            val boosts = Road.practiceBoosts(lg, plan).joinToString(", ") { it.label }
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (sel) P.accentSoft else P.surface2)
+                    .border(if (sel) 2.dp else 0.dp, if (sel) P.accent else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(14.dp))
+                    .clickable { vm.act { Road.setPractice(it, plan) } }.padding(horizontal = 12.dp, vertical = 9.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(plan.label, style = T.bodyB, color = if (sel) P.accent else P.ink, modifier = Modifier.weight(1f))
+                    Text(if (plan.tiring > 0) "+${plan.tiring} fatigue" else "${plan.tiring} fatigue", style = T.small, color = if (plan.tiring > 5) P.warn else if (plan.tiring < 0) P.good else P.sub)
+                }
+                Text(if (boosts.isNotEmpty()) "${plan.blurb.substringBefore('.')}. Builds $boosts." else plan.blurb, style = T.small, color = P.sub)
+            }
+        }
+        Text("Applied after every game. Minutes tire you too; each game you recover a little.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
 /** Followers, persona, sponsors and recent press. */
 @Composable
 private fun MediaPanel(lg: League) {
@@ -424,6 +524,10 @@ private fun MediaPanel(lg: League) {
             Bar(r.followers / need.toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
             Spacer(Modifier.height(4.dp))
             Text("Next sponsor at ${Road.count(need)} followers: ${money(pay)} for one post.", style = T.small, color = P.sub)
+        }
+        if (r.moments > 0) {
+            Spacer(Modifier.height(8.dp))
+            Text("Big moments: came through in ${r.momentsWon} of ${r.moments}.", style = T.small, color = P.ink)
         }
         if (r.pressLog.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))

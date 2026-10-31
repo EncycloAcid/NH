@@ -59,6 +59,9 @@ class LiveGame(val engine: GameEngine) {
     var tick by mutableIntStateOf(0)
     var speed by mutableIntStateOf(2)
     var done by mutableStateOf(false)
+    /** Player mode: the big moment waiting for a choice, and how the last one went. */
+    var moment by mutableStateOf<GameEngine.BigMoment?>(null)
+    var momentResult by mutableStateOf<String?>(null)
 }
 
 class GameViewModel(app: Application) : AndroidViewModel(app) {
@@ -83,7 +86,6 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var guide by mutableStateOf<Guide?>(null)
     var guideTab by mutableIntStateOf(0)
     var live by mutableStateOf<LiveGame?>(null)
-        private set
     var message by mutableStateOf<String?>(null)
 
     // Sub-tab memory so switching tabs doesn't reset what you were looking at.
@@ -367,7 +369,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun startLive() {
         val lg = league ?: return
         val g = Season.userGameToday(lg) ?: return
-        live = LiveGame(GameEngine(lg, g, true))
+        live = LiveGame(GameEngine(lg, g, true).also { it.interactive = lg.playerMode })
         stack.add(Route.Live)
     }
 

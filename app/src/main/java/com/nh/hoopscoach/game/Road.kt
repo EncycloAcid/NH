@@ -214,6 +214,10 @@ object Road {
             " · ${count(r.followers)} followers"
         r.seasonStartFollowers = r.followers
         r.press = null
+        r.fatigue = 0
+        r.raceRank = 0
+        r.lastRaceRank = 0
+        r.raceDay = -99
     }
 
     /** Before Draft Night: the user's decision puts his player in the draft, or keeps him in school. */
@@ -328,6 +332,8 @@ object Road {
         val h = lg.playerOrNull(lg.heroId) ?: return
         if (!g.involves(h.teamId)) return
         val line = h.log.lastOrNull()?.takeIf { it.gameId == g.id } ?: return
+        practiceDay(lg, h, line.min)
+        updateRace(lg)
         val t = lg.team(h.teamId)
         val opp = lg.team(g.opp(t.id))
         val won = g.winner() == t.id
@@ -427,6 +433,93 @@ object Road {
         r.press = null
         payMilestones(lg)
         return delta
+    }
+
+    // ---------- practice and fatigue ----------
+
+    const val PRACTICE_STEP = 300
+
+    fun fatigueLabel(f: Int) = when {
+        f >= 75 -> "Exhausted"
+        f >= 55 -> "Tired"
+        f >= 30 -> "Fine"
+        else -> "Fresh"
+    }
+
+    /** What fatigue does right now, in words. */
+    fun fatigueEffect(f: Int): String {
+        val shooting = ((f - 40).coerceAtLeast(0) * 0.15).roundToInt()
+        return when {
+            f >= 70 -> "Shooting −$shooting% in games, and practice gains are cut in half."
+            shooting > 0 -> "Shooting −$shooting% in games."
+            else -> "No effect on your game."
+        }
+    }
+
+    /** The ratings a plan works on: a specialty, or the training focus for team practice. */
+    fun practiceBoosts(lg: League, plan: Practice): List<Attr> {
+        val h = lg.playerOrNull(lg.heroId)
+        return if (plan == Practice.TEAM) h?.focus?.boosts.orEmpty() else plan.boosts
+    }
+
+    fun setPractice(lg: League, plan: Practice) { lg.road?.practice = plan }
+
+    /** A week of practice around each game: work banked toward ratings, and fatigue from the work and the minutes. */
+    private fun practiceDay(lg: League, h: Player, minutes: Int) {
+        val r = lg.road ?: return
+        val plan = r.practice
+        if (r.practiceXp.size != 10) r.practiceXp = IntArray(10)
+        val coach = Coaching.devOf(lg.coachOf(lg.team(h.teamId)))
+        val gain = plan.xp * (0.8 + coach / 250.0) * (if (r.fatigue >= 70) 0.5 else 1.0)
+        for (a in practiceBoosts(lg, plan)) {
+            val i = a.ordinal
+            r.practiceXp[i] += gain.roundToInt()
+            while (r.practiceXp[i] >= PRACTICE_STEP) {
+                r.practiceXp[i] -= PRACTICE_STEP
+                if (h.attrs[i] < 99) { h.attrs[i]++; h.seasonGains[i]++ }
+            }
+        }
+        if (plan == Practice.WEIGHTS && Rng.chance(0.25)) h.weight++
+        r.fatigue = (r.fatigue + plan.tiring + minutes / 8 - 5).coerceIn(0, 100)
+    }
+
+    // ---------- award races ----------
+
+    /** Where the user's player stands in the Player of the Year race (0 if he hasn't played). */
+    fun raceRank(lg: League): Int {
+        val h = lg.playerOrNull(lg.heroId) ?: return 0
+        if (h.teamId < 0 || h.stats.gp == 0) return 0
+        val mine = Awards.score(h, lg.team(h.teamId))
+        return Awards.ladder(lg).count { it.first.id != h.id && Awards.score(it.first, it.second) > mine } + 1
+    }
+
+    /** Take a new reading once a week, keeping last week's for the arrow. */
+    private fun updateRace(lg: League) {
+        val r = lg.road ?: return
+        if (lg.day - r.raceDay < 7) return
+        r.lastRaceRank = r.raceRank
+        r.raceRank = raceRank(lg)
+        r.raceDay = lg.day
+    }
+
+    fun allAmericaPace(rank: Int) = when {
+        rank == 0 -> "Not ranked yet"
+        rank == 1 -> "Player of the Year pace"
+        rank <= 5 -> "First Team All-America pace"
+        rank <= 10 -> "Second Team All-America pace"
+        rank <= 15 -> "Third Team All-America pace"
+        rank <= 30 -> "On the All-America watch list"
+        else -> "Outside the national races"
+    }
+
+    /** The user's player's rank among one group (conference or freshmen), or 0. */
+    fun rankAmong(lg: League, filter: (Player, Team) -> Boolean): Int {
+        val h = lg.playerOrNull(lg.heroId) ?: return 0
+        if (h.teamId < 0 || h.stats.gp == 0) return 0
+        val t = lg.team(h.teamId)
+        if (!filter(h, t)) return 0
+        val mine = Awards.score(h, t)
+        return Awards.ladder(lg).count { (p, pt) -> p.id != h.id && filter(p, pt) && Awards.score(p, pt) > mine } + 1
     }
 
     /** Thousands of dollars as "$850K" or "$1.37M". */

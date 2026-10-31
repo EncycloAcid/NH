@@ -626,7 +626,28 @@ class RoadState(
     /** The open postgame press question, if any. */
     var press: PressQuestion? = null,
     val pressLog: MutableList<String> = mutableListOf(),
+    /** This week's practice plan, and how worn down he is (0 fresh, 100 exhausted). */
+    var practice: Practice = Practice.TEAM,
+    var fatigue: Int = 0,
+    /** Practice work banked toward each rating; every 300 is +1. */
+    var practiceXp: IntArray = IntArray(10),
+    /** Player of the Year ladder: this week's rank, last week's, and the day it was taken. */
+    var raceRank: Int = 0,
+    var lastRaceRank: Int = 0,
+    var raceDay: Int = -99,
+    /** Big moments in live games: how many he got, and how many he came through in. */
+    var moments: Int = 0,
+    var momentsWon: Int = 0,
 )
+
+/** The weekly practice plan in player mode. */
+enum class Practice(val label: String, val blurb: String, val tiring: Int, val boosts: List<Attr>, val xp: Int) {
+    TEAM("Team practice", "The normal schedule: steady work on your training focus.", 3, emptyList(), 14),
+    SHOOTING("Shooting reps", "Extra shots after practice. Inside, Mid-Range and 3-Point grow faster.", 7, listOf(Attr.INS, Attr.MID, Attr.OUT), 40),
+    FILM("Film study", "Watch tape. Handling, Passing and Perimeter D grow. Easy on the legs.", 2, listOf(Attr.HND, Attr.PAS, Attr.PER), 30),
+    WEIGHTS("Weight room", "Lift heavy. Inside, Rebound and Interior D grow. The most tiring.", 9, listOf(Attr.INS, Attr.REB, Attr.IDF), 40),
+    REST("Rest", "No extra work. Fatigue drops fast.", -12, emptyList(), 0),
+}
 
 /** One answer at the postgame podium and what it does. */
 @Serializable

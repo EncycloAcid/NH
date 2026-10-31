@@ -75,7 +75,12 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val tick = lv.tick
     LaunchedEffect(lv) {
         while (!e.finished) {
-            if (lv.speed > 0) { e.step(); lv.tick++ }
+            // In player mode the game stops for big moments until the user picks a play.
+            if (lv.speed > 0 && lv.moment == null) {
+                val m = e.pendingMoment()
+                if (m != null) lv.moment = m else e.step()
+                lv.tick++
+            }
             delay(when (lv.speed) { 0 -> 150L; 1 -> 650L; 2 -> 260L; else -> 70L })
         }
         vm.completeLive()
@@ -107,19 +112,26 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(96.dp))
         }
         Spacer(Modifier.height(10.dp))
-        if (!lv.done) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Segmented(listOf(if (lv.speed == 0) "▶" else "❚❚", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it }, Modifier.weight(1f).padding(horizontal = 0.dp))
-                SmallButton("Finish", primary = true) { vm.completeLive() }
-            }
+        lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
+        lv.momentResult?.takeIf { lv.moment == null }?.let {
+            Panel(color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
             Spacer(Modifier.height(8.dp))
-            val t = e.teams[if (userHome) 0 else 1]
-            if (lg.playerMode) {
-                Text("Coach ${lg.coachOf(t).last} calls it: ${t.plan.offense.label} offense, ${t.plan.defense.label} defense.", style = T.small, color = P.sub,
-                    modifier = Modifier.padding(horizontal = Gutter + 4.dp))
-            } else Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.offense = Offense.entries[i]; lv.tick++ }
-                Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.defense = Defense.entries[i]; lv.tick++ }
+        }
+        if (!lv.done) {
+            if (lv.moment == null) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Segmented(listOf(if (lv.speed == 0) "▶" else "❚❚", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it }, Modifier.weight(1f).padding(horizontal = 0.dp))
+                    SmallButton("Finish", primary = true) { vm.completeLive() }
+                }
+                Spacer(Modifier.height(8.dp))
+                val t = e.teams[if (userHome) 0 else 1]
+                if (lg.playerMode) {
+                    Text("Coach ${lg.coachOf(t).last} calls it: ${t.plan.offense.label} offense, ${t.plan.defense.label} defense.", style = T.small, color = P.sub,
+                        modifier = Modifier.padding(horizontal = Gutter + 4.dp))
+                } else Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.offense = Offense.entries[i]; lv.tick++ }
+                    Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.defense = Defense.entries[i]; lv.tick++ }
+                }
             }
         } else {
             val won = e.score[if (userHome) 0 else 1] > e.score[if (userHome) 1 else 0]
@@ -308,3 +320,33 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
         }
     }
 }
+
+/** Player mode: late and close, the ball is yours. Pick the play; your ratings decide the rest. */
+@Composable
+private fun MomentCard(lg: League, lv: LiveGame, m: com.nh.hoopscoach.game.GameEngine.BigMoment) {
+    val e = lv.engine
+    Panel(color = P.hero) {
+        Text("BIG MOMENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+        val sit = when { m.margin < 0 -> "down ${-m.margin}"; m.margin > 0 -> "up ${m.margin}"; else -> "tied" }
+        Text("${clock(m.clock.toInt())} left · $sit · your ball", style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
+        Text("${lg.hero?.name ?: "You"} has it at the top of the key. What's the play?", style = T.small, color = P.onHero.copy(alpha = 0.85f))
+        Spacer(Modifier.height(10.dp))
+        for ((choice, label, pct) in m.options) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(P.onHero.copy(alpha = 0.14f))
+                    .clickable {
+                        e.playMoment(choice)
+                        lv.momentResult = e.lastMoment
+                        lv.moment = null
+                        lv.tick++
+                    }.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(label, style = T.bodyB, color = P.onHero, modifier = Modifier.weight(1f))
+                Text("$pct%", style = T.numSm, color = P.onHero)
+            }
+        }
+        Text("Chance to score, from your ratings against this defense.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 4.dp))
+    }
+}
+

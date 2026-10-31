@@ -24,6 +24,15 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
   4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
 - **Media and followers**: you start with a following that matches your ranking (about 150K for a top five-star, 50K to 70K for a four-star, 10K for a three-star). Big games grow it, more on big stages (NCAA Tournament x3, conference tournaments and rivalries x1.5, ranked opponents x1.3) and at big-brand schools. Thirty-point nights and game-winners go viral. Every follower adds $1 a year to your NIL value, and sponsors pay one-time bonuses at 100K, 250K, 500K, 1M, 2.5M and 5M followers.
 - **Postgame press**: after notable games (a big night, a game-winner, a rivalry win, a tournament win, a tough loss, draft buzz) you get a question on Today and the Me tab with three answers. Humble answers please fans and teammates. Brash ones grow your following faster but cost locker-room goodwill. Your answers shape a persona: Fan favorite (wins lift the fan base more), Quiet pro, or Lightning rod (big games grow your following 20% faster).
+- **Big moments**: in live games, when your team has the ball in the last two minutes and it's within five, the game pauses (up to three times a game). Pick the play: a pull-up jumper or three, a drive to the rim, or a kick-out to your best shooter. Each shows its chance to score from your ratings against that defense. Then the engine plays it out, with fouls, turnovers and rebounds. Simmed games play on their own. The Me tab counts how often you came through.
+- **Weekly practice**: choose a plan, applied after every game.
+  - Team practice: works your training focus.
+  - Shooting reps: Inside, Mid-Range and 3-Point.
+  - Film study: Handling, Passing and Perimeter D. Easy on the legs.
+  - Weight room: Inside, Rebound and Interior D. The most tiring.
+  - Rest: recovers fatigue.
+  Practice work banks toward each rating (+1 per 300). Fatigue comes from practice and minutes. Past 40 it costs you up to 9% shooting in games, and past 70 practice gains are halved.
+- **Award races**: a Player of the Year ladder on the Me tab, scored the same way as the end-of-season awards. It shows your rank, your All-America pace, a weekly up or down arrow, your conference race and the freshman race.
 - **The ending**: drafted (with your pick) or, after four seasons, undrafted and overseas. You get a career summary with totals, your story, NIL earned and every school you played for.
 
 ## Install on your phone

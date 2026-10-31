@@ -16,8 +16,8 @@ android {
         applicationId = "com.nh.hoopscoach.road"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "3.4-road.2"
+        versionCode = 18
+        versionName = "3.4-road.3"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from

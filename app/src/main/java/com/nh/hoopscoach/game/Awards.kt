@@ -20,6 +20,9 @@ object Awards {
 
     fun line(p: Player): String = "%.1f ppg · %.1f rpg · %.1f apg".format(p.stats.ppg, p.stats.rpg, p.stats.apg)
 
+    /** Everyone eligible for national awards, best first by the award score. */
+    fun ladder(lg: League): List<Pair<Player, Team>> = eligible(lg).sortedByDescending { score(it.first, it.second) }
+
     private fun eligible(lg: League, ids: Collection<Int>? = null): List<Pair<Player, Team>> {
         val out = mutableListOf<Pair<Player, Team>>()
         for (t in lg.teams) for (pid in t.roster) {

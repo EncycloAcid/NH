@@ -63,6 +63,176 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
     private var committed = false
     private val n: DoubleArray = lg.norms ?: computeNorms(lg).also { lg.norms = it }
+    // ---------- player mode: the user's player ----------
+
+    private val heroId = if (lg.playerMode) lg.heroId else -1
+    private val heroSide = when {
+        heroId < 0 -> -1
+        rosters[0].any { it.id == heroId } -> 0
+        rosters[1].any { it.id == heroId } -> 1
+        else -> -1
+    }
+    /** Fatigue costs the user's player up to 9 points of shooting percentage. */
+    private val heroTired = ((lg.road?.fatigue ?: 0) - 40).coerceAtLeast(0) * 0.0015
+
+    /** The three ways to play a big moment. */
+    enum class MomentChoice { PULL_UP, DRIVE, KICK }
+
+    /** A late, close possession for the user's player, with each option's chance of scoring. */
+    class BigMoment(val period: Int, val clock: Double, val margin: Int, val options: List<Triple<MomentChoice, String, Int>>)
+
+    /** Live games in player mode pause for big moments; simmed games never do. */
+    var interactive = false
+    private var momentsAsked = 0
+    private var forced: MomentChoice? = null
+    /** What happened on the last big moment, for the live screen. */
+    var lastMoment: String? = null
+        private set
+
+    private class DefStats(val stealD: Double, val perD: Double, val intD: Double, val blkD: Double)
+
+    private fun defStats(defense: List<Player>): DefStats {
+        val idfs = defense.map { it[Attr.IDF] }
+        val blks = defense.map { it[Attr.BLK] }
+        return DefStats(
+            defense.map { it[Attr.STL] }.average(), defense.map { it[Attr.PER] }.average(),
+            idfs.average() * 0.5 + idfs.max() * 0.5, blks.average() * 0.4 + blks.max() * 0.6,
+        )
+    }
+
+    /** Chance a shot of [type] goes in (0 inside, 1 mid-range, 2 three), as the regular possession figures it. */
+    private fun makeChance(o: Int, d: Int, shooter: Player, type: Int, ds: DefStats, trail: Int): Double {
+        var p = when (type) {
+            0 -> 0.522 + (shooter[Attr.INS] - n[0]) * 0.0055 - (ds.intD - n[5]) * 0.0038
+            1 -> 0.365 + (shooter[Attr.MID] - n[1]) * 0.0047 - (ds.perD - n[6]) * 0.003
+            else -> 0.312 + (shooter[Attr.OUT] - n[2]) * 0.0043 - (ds.perD - n[6]) * 0.0026
+        }
+        p += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
+        p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+        if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
+        if (shooter.id == heroId) p -= heroTired
+        return p.coerceIn(0.12, 0.82)
+    }
+
+    private fun pullType(hero: Player, trail: Int) = if (trail == -3 || hero[Attr.OUT] >= hero[Attr.MID] + 3) 2 else 1
+
+    private fun kickTarget(offense: List<Player>, hero: Player) =
+        offense.filter { it.id != hero.id }.maxByOrNull { it[Attr.OUT] * 1.0 + it[Attr.MID] * 0.3 }
+
+    /** A big moment is due: the user's team has the ball, late and close, with him on the floor. */
+    fun pendingMoment(): BigMoment? {
+        if (!interactive || finished || heroSide < 0 || poss != heroSide || momentsAsked >= 3) return null
+        if (period < 2 || clock > 120 || clock < 1.0) return null
+        val margin = score[heroSide] - score[1 - heroSide]
+        if (margin < -5 || margin > 5 || (margin > 0 && clock < 40)) return null
+        val offense = lineup(heroSide)
+        val hero = offense.firstOrNull { it.id == heroId } ?: return null
+        val o = heroSide
+        val d = 1 - o
+        val ds = defStats(lineup(d))
+        val type = pullType(hero, margin)
+        val pull = makeChance(o, d, hero, type, ds, margin) - 0.02
+        val driveTo = (0.07 + (ds.stealD - hero[Attr.HND]) * 0.002).coerceIn(0.03, 0.18)
+        val drive = (1 - driveTo) * makeChance(o, d, hero, 0, ds, margin)
+        val mate = kickTarget(offense, hero)
+        val kickTo = (0.04 + (ds.stealD - hero[Attr.PAS]) * 0.0015).coerceIn(0.02, 0.12)
+        val kick = if (mate == null) 0.0 else (1 - kickTo) * (makeChance(o, d, mate, 2, ds, margin) + 0.04 + (hero[Attr.PAS] - 70) * 0.001).coerceAtMost(0.8)
+        fun pct(x: Double) = (x * 100).roundToInt()
+        return BigMoment(period, clock, margin, listOfNotNull(
+            Triple(MomentChoice.PULL_UP, if (type == 2) "Pull-up three" else "Pull-up jumper", pct(pull)),
+            Triple(MomentChoice.DRIVE, "Drive to the rim", pct(drive)),
+            mate?.let { Triple(MomentChoice.KICK, "Kick to ${it.short} for three", pct(kick)) },
+        ))
+    }
+
+    /** Play the big moment the user chose, then carry on. */
+    fun playMoment(choice: MomentChoice) {
+        momentsAsked++
+        forced = choice
+        lastMoment = null
+        step()
+    }
+
+    private fun heroPossession(o: Int, offense: List<Player>, defense: List<Player>, trail: Int, hero: Player, choice: MomentChoice) {
+        val d = 1 - o
+        val ds = defStats(defense)
+        val road = lg.road
+        road?.let { it.moments++ }
+        fun stolen(loser: Player, how: String) {
+            line(o, loser).tov++
+            val stealer = Rng.weighted(defense) { it[Attr.STL].toDouble().pow(3) }
+            line(d, stealer).stl++
+            log(d, "${stealer.short} $how ${loser.short}!", 0)
+            lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
+            poss = d
+        }
+        when (choice) {
+            MomentChoice.PULL_UP -> heroShot(o, d, hero, pullType(hero, trail), offense, defense, ds, trail, -0.02, 0.04, null)
+            MomentChoice.DRIVE -> {
+                if (Rng.chance((0.07 + (ds.stealD - hero[Attr.HND]) * 0.002).coerceIn(0.03, 0.18))) { stolen(hero, "strips"); return }
+                heroShot(o, d, hero, 0, offense, defense, ds, trail, 0.0, 0.3, null)
+            }
+            MomentChoice.KICK -> {
+                val mate = kickTarget(offense, hero) ?: return heroShot(o, d, hero, 1, offense, defense, ds, trail, 0.0, 0.04, null)
+                if (Rng.chance((0.04 + (ds.stealD - hero[Attr.PAS]) * 0.0015).coerceIn(0.02, 0.12))) { stolen(hero, "picks off the pass from"); return }
+                heroShot(o, d, mate, 2, offense, defense, ds, trail, 0.04 + (hero[Attr.PAS] - 70) * 0.001, 0.02, hero)
+            }
+        }
+    }
+
+    /** One shot in a big moment: the same math as any shot, with the play's bonus or contest. */
+    private fun heroShot(
+        o: Int, d: Int, shooter: Player, type: Int, offense: List<Player>, defense: List<Player>,
+        ds: DefStats, trail: Int, bonus: Double, foulP: Double, passer: Player?,
+    ) {
+        val pMake = (makeChance(o, d, shooter, type, ds, trail) + bonus).coerceIn(0.12, 0.85)
+        val fouled = Rng.chance(foulP)
+        val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
+        val pts = if (type == 2) 3 else 2
+        val sl = line(o, shooter)
+        sl.fga++
+        if (type == 2) sl.tpa++
+        val what = when (type) { 0 -> "layup"; 1 -> "pull-up jumper"; else -> "three" }
+        if (made) {
+            sl.fgm++; sl.pts += pts
+            if (type == 2) sl.tpm++
+            val before = score[o] - score[d]
+            val c = Clutch(o, shooter.name, what, period, clock, before, pts)
+            lastBasket = c
+            if (period >= 2 && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
+            score[o] += pts
+            if (passer != null) line(o, passer).ast++
+            log(o, "★ ${shooter.short} ${if (type == 2) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
+            lg.road?.let { it.momentsWon++ }
+            lastMoment = if (passer != null) "Assist! ${shooter.short} buries the three." else "Bucket! ${shooter.short} hits the $what."
+            if (fouled) {
+                val fouler = Rng.weighted(defense) { posFoul(it.pos) }
+                line(d, fouler).pf++; teamFouls[d]++
+                lastMoment += " And one!"
+                freeThrows(o, shooter, 1, offense, defense)
+                return
+            }
+            poss = d
+            return
+        }
+        if (fouled) {
+            sl.fga--; if (type == 2) sl.tpa--
+            val fouler = Rng.weighted(defense) { posFoul(it.pos) }
+            line(d, fouler).pf++; teamFouls[d]++
+            log(d, "★ ${fouler.short} fouls ${shooter.short} on the $what", 0)
+            val before = score[o]
+            freeThrows(o, shooter, pts, offense, defense)
+            val made = score[o] - before
+            if (made > 0 && shooter.id == heroId) lg.road?.let { it.momentsWon++ }
+            lastMoment = "Fouled on the $what: $made of $pts at the line."
+            return
+        }
+        log(o, "★ ${shooter.short} misses the $what", 0)
+        lastMoment = "No good. ${shooter.short} misses the $what."
+        val reb = rebound(o, offense, defense, false)
+        poss = if (reb.first == o) o else d
+    }
+
     private val skillOff = DoubleArray(2) { if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0 }
     private val skillDef = DoubleArray(2) { if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0 }
 
@@ -237,6 +407,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     private fun runPossession(o: Int, offense: List<Player>, defense: List<Player>, trail: Int) {
+        val f = forced
+        if (f != null) {
+            forced = null
+            val hero = offense.firstOrNull { it.id == heroId }
+            if (hero != null && o == heroSide) { heroPossession(o, offense, defense, trail, hero, f); return }
+        }
         val d = 1 - o
         val stealD = defense.map { it[Attr.STL] }.average()
         val perD = defense.map { it[Attr.PER] }.average()
@@ -301,6 +477,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && period >= 2 && clock < 120 && abs(trail) <= 5) pMake += 0.03
+            if (shooter.id == heroId) pMake -= heroTired
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
