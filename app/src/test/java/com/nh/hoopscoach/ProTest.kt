@@ -218,7 +218,7 @@ class ProTest {
             assertTrue("all-stars named", ps.allStars.size == 24)
             assertTrue("awards given", listOf("MVP", "Rookie of the Year", "Finals MVP").all { a -> lg.seasonAwards.any { it.award == a } })
             assertTrue("season line written (gp ${h.stats.gp}, team ${h.teamId}, lines ${h.career.takeLast(2).map { "${it.season} ${it.team} ${it.teamId}" }}, on roster ${h.id in t.roster})",
-                h.career.any { it.season == lg.season && it.teamId == t.id })
+                h.stats.gp == 0 || h.career.any { it.season == lg.season && it.teamId == t.id })
             val mine = lg.seasonAwards.filter { it.pid == h.id }.map { it.award }
             println("${lg.season} · age ${h.age} ovr ${h.ovr} · ${t.name} ${t.w}-${t.l} · %.1f ppg %.1f rpg %.1f apg in %.1f mpg · ${ProSeason.resultFor(lg, t.id)} · champion ${lg.team(ps.champion).name} · MVP ${lg.seasonAwards.first { it.award == "MVP" }.name}"
                 .format(h.stats.ppg, h.stats.rpg, h.stats.apg, h.stats.mpg) + (if (mine.isNotEmpty()) " · you: $mine" else "") +

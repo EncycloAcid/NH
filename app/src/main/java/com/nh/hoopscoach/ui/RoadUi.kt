@@ -866,7 +866,7 @@ internal fun SummerCard(lg: League, ev: SummerEvent, onGo: () -> Unit) {
                 Text(ev.blurb, style = T.small, color = if (u19) P.onHero.copy(alpha = 0.85f) else P.sub)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    (if (u19) "Every rating +1" else ev.boosts.joinToString(" · ") { "${it.label} +2" }) + " · " + Summer.followerRange(lg, ev),
+                    (if (u19) "Every rating up to +1" else ev.boosts.joinToString(" · ") { "${it.label} up to +2" }) + " · " + Summer.followerRange(lg, ev),
                     style = T.small, color = if (u19) P.onHero else P.accent,
                 )
             }

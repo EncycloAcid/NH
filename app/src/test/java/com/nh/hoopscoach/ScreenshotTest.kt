@@ -154,7 +154,8 @@ class ScreenshotTest {
         rule.waitForIdle(); shot("E02_edit_player_more")
         vm.back()
         vm.push(Route.Focus(star.id)); rule.waitForIdle()
-        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(14)
+        // Training focus lists only his position's archetypes now (plus Manual).
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(6)
         rule.waitForIdle(); shot("E03_archetypes")
     }
 

@@ -57,7 +57,8 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         else -> null
     }
     val ovr = Ratings.ovr(pos, p.attrs)
-    val styles = Arch.entries.filter { it != Arch.MANUAL }
+    val styles = Ratings.styles(pos)
+    if (style !in styles) style = styles.first()
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar("Edit player", p.name, onBack = { vm.back() })

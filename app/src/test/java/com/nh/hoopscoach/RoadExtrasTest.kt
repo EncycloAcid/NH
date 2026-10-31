@@ -27,11 +27,19 @@ class RoadExtrasTest {
     @Test
     fun archetypes() {
         val styles = Arch.entries.filter { it != Arch.MANUAL }
-        assertEquals("thirty archetypes", 30, styles.size)
+        assertEquals("thirty-four archetypes", 34, styles.size)
         assertEquals("short codes are unique", styles.size, styles.map { it.short }.toSet().size)
         assertTrue("each boosts three ratings", styles.all { it.boosts.size == 3 && it.boosts.toSet().size == 3 })
-        for (pos in Pos.entries) assertTrue("$pos has at least 11 styles", Ratings.styles(pos).size >= 11)
-        assertTrue("every archetype is used somewhere", styles.all { a -> Pos.entries.any { a in Ratings.styles(it) } })
+        for (pos in Pos.entries) assertTrue("$pos has 6 or 7 styles", Ratings.styles(pos).size in 6..7)
+        assertTrue("every archetype belongs to exactly one position", styles.all { a -> Pos.entries.count { a in Ratings.styles(it) } == 1 })
+        // Growth slows above 90: a 98 rarely moves, a 70 always does.
+        Rng.r = Random(2)
+        val p = LeagueGen.makePlayer(LeagueGen.newLeague(), Pos.SG, 1, 75, -1)
+        p.attrs[0] = 70; p.attrs[1] = 98
+        var low = 0; var high = 0
+        repeat(200) { p.attrs[0] = 70; p.attrs[1] = 98; if (Ratings.raise(p, 0)) low++; if (Ratings.raise(p, 1)) high++ }
+        assertEquals(200, low)
+        assertTrue("98 moves about one time in ten ($high)", high in 5..40)
         Rng.r = Random(1)
         for (pos in Pos.entries) for (a in Ratings.styles(pos)) {
             val attrs = Ratings.build(pos, a, 75)
@@ -153,7 +161,7 @@ class RoadExtrasTest {
             assertTrue(note.isNotEmpty())
             assertTrue("followers grow", lg.road!!.followers > followers)
             if (ev == SummerEvent.U19) assertTrue("U19 raises every rating", h.attrs.indices.all { h.attrs[it] >= attrs[it] } && h.attrs.sum() > attrs.sum())
-            else for (a in ev.boosts) assertTrue("${a.label} goes up", h.attrs[a.ordinal] > attrs[a.ordinal] || attrs[a.ordinal] == 99)
+            else for (a in ev.boosts) assertTrue("${a.label} goes up (or is already 90+)", h.attrs[a.ordinal] > attrs[a.ordinal] || attrs[a.ordinal] >= 90)
             assertTrue("one per summer", !Summer.open(lg))
             assertEquals("", Summer.attend(lg, ev))
             lg = SaveIO.decode(SaveIO.encode(lg))

@@ -99,16 +99,17 @@ object Rival {
     fun afterDraft(lg: League) {
         val r = lg.road ?: return
         if (r.rivalId < 0 || r.rivalLeft.isNotEmpty()) return
-        val rv = player(lg) ?: return
+        // An undrafted senior leaves no record behind, so his name comes from the save.
+        val name = player(lg)?.name ?: r.rivalName
         val pick = lg.draftHistory.lastOrNull { it.season == lg.season && it.pid == r.rivalId }
         when {
             pick != null -> {
                 r.rivalPick = pick.pick
                 r.rivalDraft = lg.season
                 r.rivalLeft = "went No. ${pick.pick} in the ${lg.season} draft"
-                if (lg.playerOrNull(lg.heroId) != null) lg.news += News(lg.season, lg.day, "Your rival ${rv.name} goes No. ${pick.pick} overall. You're still in school.", true)
+                if (lg.playerOrNull(lg.heroId) != null) lg.news += News(lg.season, lg.day, "Your rival $name goes No. ${pick.pick} overall. You're still in school.", true)
             }
-            lg.playerOrNull(rv.id) == null -> {
+            lg.playerOrNull(r.rivalId) == null -> {
                 r.rivalDraft = lg.season
                 r.rivalLeft = "went undrafted in ${lg.season}"
             }
@@ -118,15 +119,16 @@ object Rival {
     /** One line for the career ending: how the two of them came out. */
     fun ending(lg: League, myPick: Int): String {
         val r = lg.road ?: return ""
-        val rv = player(lg) ?: return ""
+        if (r.rivalId < 0) return ""
+        val rvName = player(lg)?.name ?: r.rivalName.ifEmpty { return "" }
         val (w, l) = record(lg)
         val h2h = if (w + l > 0) " You went $w-$l head to head." else ""
         val draft = when {
             r.rivalPick > 0 && r.rivalDraft == lg.season && myPick > 0 ->
-                if (myPick < r.rivalPick) " You went ${r.rivalPick - myPick} ${if (r.rivalPick - myPick == 1) "pick" else "picks"} ahead of your rival ${rv.name}."
-                else " Your rival ${rv.name} went ${myPick - r.rivalPick} ${if (myPick - r.rivalPick == 1) "pick" else "picks"} ahead of you, at No. ${r.rivalPick}."
-            r.rivalLeft.isNotEmpty() -> " Your rival ${rv.name} ${r.rivalLeft}."
-            else -> " Your rival ${rv.name} is still in college."
+                if (myPick < r.rivalPick) " You went ${r.rivalPick - myPick} ${if (r.rivalPick - myPick == 1) "pick" else "picks"} ahead of your rival $rvName."
+                else " Your rival $rvName went ${myPick - r.rivalPick} ${if (myPick - r.rivalPick == 1) "pick" else "picks"} ahead of you, at No. ${r.rivalPick}."
+            r.rivalLeft.isNotEmpty() -> " Your rival $rvName ${r.rivalLeft}."
+            else -> " Your rival $rvName is still in college."
         }
         return (draft + h2h).trim()
     }
@@ -189,9 +191,11 @@ object Summer {
         val h = lg.playerOrNull(lg.heroId) ?: return ""
         if (!open(lg) || ev !in invites(lg)) return ""
         val before = h.ovr
+        val startSum = h.attrs.sum()
+        val startAttrs = h.attrs.copyOf()
         val note: String
         if (ev == SummerEvent.NATIONAL_TEAM) {
-            for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99)
+            for (i in h.attrs.indices) Ratings.raise(h, i)
             val event = proTournament(lg.season) ?: "World Cup"
             val roll = Rng.d()
             val (medal, fans) = when { roll < 0.6 -> "gold" to 600_000; roll < 0.82 -> "silver" to 300_000; roll < 0.94 -> "bronze" to 220_000; else -> "fourth place" to 150_000 }
@@ -199,10 +203,10 @@ object Summer {
             val gain = (fans + r.followers * 0.04 * Road.damp(r.followers)).roundToInt()
             r.followers += gain
             if (medal != "fourth place") h.awards += "${lg.season} $event ${medal.replaceFirstChar { it.uppercase() }}"
-            note = "$event: Team USA wins $medal. You average %.1f points. Every rating +1, +${Road.count(gain)} followers.".format(ppg)
+            note = "$event: Team USA wins $medal. You average %.1f points. Ratings +${h.attrs.sum() - startSum} in all, +${Road.count(gain)} followers.".format(ppg)
             lg.news += News(lg.season, lg.day, "${h.name} and Team USA take $medal at the $event", true)
         } else if (ev == SummerEvent.U19) {
-            for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99)
+            for (i in h.attrs.indices) Ratings.raise(h, i)
             val roll = Rng.d()
             val (medal, fans) = when {
                 roll < 0.45 -> "gold" to 120_000
@@ -218,14 +222,14 @@ object Summer {
             val withRival = rv != null && (Offseason.draftBoard(lg)[rv.id] ?: 99) <= 40
             note = "U19 World Cup: Team USA wins $medal. You average %.1f points".format(ppg) +
                 (if (withRival) ", sharing the floor with your rival ${rv!!.last}" else "") +
-                ". Every rating +1, +${Road.count(gain)} followers."
+                ". Ratings +${h.attrs.sum() - startSum} in all, +${Road.count(gain)} followers."
             lg.news += News(lg.season, lg.day, "${h.name} and Team USA take $medal at the U19 World Cup", true)
         } else {
-            for (a in ev.boosts) h.attrs[a.ordinal] = (h.attrs[a.ordinal] + 2).coerceAtMost(99)
+            for (a in ev.boosts) repeat(2) { Ratings.raise(h, a.ordinal) }
             val mvp = Rng.chance(((h.ovr - 70) / 40.0).coerceIn(0.1, 0.6))
             val gain = (Rng.range(8_000, 20_000) + r.followers * 0.03 * Road.damp(r.followers) + if (mvp) 15_000 else 0).roundToInt()
             r.followers += gain
-            note = "${ev.label}: ${ev.boosts.joinToString(", ") { "${it.label} +2" }}" +
+            note = "${ev.label}: ${ev.boosts.joinToString(", ") { "${it.label} +${h.attrs[it.ordinal] - startAttrs[it.ordinal]}" }}" +
                 (if (mvp) ". Named camp MVP" else "") + ". +${Road.count(gain)} followers."
         }
         if (h.ovr > h.pot) h.pot = h.ovr

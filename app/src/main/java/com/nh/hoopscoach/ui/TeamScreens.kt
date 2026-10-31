@@ -308,7 +308,8 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        items(Arch.entries) { a ->
+        // Only the archetypes of his position (plus whatever he trains now, for older saves).
+        items(Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.styles(p.pos) }) { a ->
             val current = p.focus == a
             Panel(
                 Modifier.padding(bottom = 8.dp),

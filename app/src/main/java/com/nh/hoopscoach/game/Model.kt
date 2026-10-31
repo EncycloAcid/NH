@@ -50,7 +50,11 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     FACE_UP_FOUR("Face-Up Four", "FUP", listOf(Attr.MID, Attr.HND, Attr.REB), "Faces up from the elbow, drives past slower bigs and cleans the glass"),
     SWITCHABLE_BIG("Switchable Big", "SWB", listOf(Attr.PER, Attr.IDF, Attr.BLK), "Big who can guard all five spots and still protect the rim"),
     PICK_AND_POP("Pick-and-Pop Big", "PNP", listOf(Attr.MID, Attr.OUT, Attr.IDF), "Sets the screen, pops to the arc and holds his own in the paint"),
-    HUSTLE_BIG("Hustle Big", "HUS", listOf(Attr.REB, Attr.STL, Attr.BLK), "All energy: tips, deflections, loose balls and second chances");
+    HUSTLE_BIG("Hustle Big", "HUS", listOf(Attr.REB, Attr.STL, Attr.BLK), "All energy: tips, deflections, loose balls and second chances"),
+    LOGO_SHOOTER("Logo Shooter", "LGO", listOf(Attr.OUT, Attr.HND, Attr.PAS), "Pulls up from the logo and punishes every defender who goes under the screen"),
+    ISO_WING("Iso Wing", "ISO", listOf(Attr.MID, Attr.HND, Attr.PER), "Wins one-on-one at both ends: the pull-up on offense, the lockdown on defense"),
+    ATHLETIC_FOUR("Athletic Four", "ATH", listOf(Attr.INS, Attr.PER, Attr.REB), "Runs the floor, guards wings and owns the glass"),
+    UNICORN("Unicorn", "UNI", listOf(Attr.OUT, Attr.HND, Attr.BLK), "A seven-footer who handles, shoots threes and blocks everything at the rim");
 }
 
 enum class Trait(val label: String, val good: Boolean) {

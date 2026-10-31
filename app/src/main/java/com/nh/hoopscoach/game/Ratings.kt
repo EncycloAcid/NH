@@ -75,16 +75,12 @@ object Ratings {
     fun shooting(p: Player) = group(p.pos, p.attrs, SHOOT)
 
     fun styles(pos: Pos): List<Arch> = when (pos) {
-        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.SLASHER, Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.SHOT_CREATOR,
-            Arch.TWO_WAY_GUARD, Arch.PEST, Arch.MICROWAVE)
-        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.SLASHER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.PLAYMAKER, Arch.THREE_AND_D, Arch.SHOT_CREATOR, Arch.BALL_HAWK,
-            Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD, Arch.HIGH_FLYER)
-        Pos.SF -> listOf(Arch.SLASHER, Arch.POINT_FORWARD, Arch.SHARPSHOOTER, Arch.LOCKDOWN, Arch.STRETCH, Arch.THREE_AND_D, Arch.GLUE_GUY, Arch.SHOT_CREATOR,
-            Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD, Arch.HIGH_FLYER, Arch.FACE_UP_FOUR)
-        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.POST_SCORER, Arch.POINT_FORWARD, Arch.RIM_PROTECTOR, Arch.GLUE_GUY, Arch.RIM_RUNNER, Arch.ENFORCER,
-            Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG)
-        Pos.C -> listOf(Arch.REBOUNDER, Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.STRETCH, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER,
-            Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG)
+        // Every archetype belongs to one position.
+        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER)
+        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD)
+        Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING)
+        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR)
+        Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN)
     }
 
     /** Build an attribute set whose overall lands near [target]. */
@@ -131,16 +127,24 @@ object Ratings {
         return (v / 5).roundToInt() * 5
     }
 
+    /**
+     * One point of growth for rating [i], if it takes. Up to 90 it always does; above that each point
+     * is harder (60% at 93, 30% at 96, 10% at 98), so 99s are rare and earned.
+     */
+    fun raise(p: Player, i: Int): Boolean {
+        val a = p.attrs[i]
+        if (a >= 99) return false
+        if (a >= 90 && !Rng.chance((99 - a) / 10.0)) return false
+        p.attrs[i] = a + 1
+        p.seasonGains[i] += 1
+        return true
+    }
+
     /** Applies one training level-up to a player. Returns the attributes raised. */
     fun levelUp(p: Player, arch: Arch): List<Attr> {
         val raised = mutableListOf<Attr>()
         for (a in arch.boosts) {
-            val i = a.ordinal
-            if (p.attrs[i] < 99) {
-                p.attrs[i] += 1
-                p.seasonGains[i] += 1
-                raised += a
-            }
+            if (raise(p, a.ordinal)) raised += a
         }
         p.seasonLevels++
         p.careerLevels++
@@ -175,10 +179,7 @@ object Ratings {
     fun spendBanked(p: Player, arch: Arch) {
         while (p.banked > 0) {
             p.banked--
-            for (a in arch.boosts) {
-                val i = a.ordinal
-                if (p.attrs[i] < 99) { p.attrs[i] += 1; p.seasonGains[i] += 1 }
-            }
+            for (a in arch.boosts) raise(p, a.ordinal)
         }
     }
 
@@ -203,7 +204,7 @@ object Ratings {
         if (steps > 0) {
             repeat(steps) {
                 val i = Rng.weighted(idx) { w[it] * (if (p.attrs[it] >= 99) 0.0 else 1.0) }
-                p.attrs[i] = min(99, p.attrs[i] + 1)
+                if (raise(p, i)) p.seasonGains[i] -= 1
             }
         } else if (steps < 0) {
             repeat(-steps) {

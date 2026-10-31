@@ -40,7 +40,8 @@ object Road {
         p.traits = mutableListOf()
         p.year = 1
         // The user's player is the story: a real ceiling at every level, so the league is always in reach.
-        p.pot = (when (s.stars) { 5 -> 99; 4 -> 98; else -> 96 } - Rng.range(0, 1)).coerceIn(p.ovr + 8, 99)
+        // A real ceiling at every level, but 99 has to be earned: growth slows above 90.
+        p.pot = (when (s.stars) { 5 -> Rng.range(97, 99); 4 -> Rng.range(95, 98); else -> Rng.range(93, 97) }).coerceIn(p.ovr + 8, 99)
         p.stars = s.stars
         p.recruitRank = when (s.stars) { 5 -> Rng.range(4, 18); 4 -> Rng.range(40, 90); else -> Rng.range(160, 320) }
         p.posRank = (p.recruitRank / 5.0).roundToInt().coerceAtLeast(1)
@@ -574,7 +575,7 @@ object Road {
             r.practiceXp[i] += gain.roundToInt()
             while (r.practiceXp[i] >= PRACTICE_STEP) {
                 r.practiceXp[i] -= PRACTICE_STEP
-                if (h.attrs[i] < 99) { h.attrs[i]++; h.seasonGains[i]++ }
+                Ratings.raise(h, i)
             }
         }
         if (plan == Practice.WEIGHTS && Rng.chance(0.25)) h.weight++
