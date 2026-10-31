@@ -263,6 +263,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         poss = if (reb.first == o) o else d
     }
 
+    /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
+    private val era = if (lg.pro) Eras.of(lg) else Era.TODAY
+
     private val skillOff = DoubleArray(2) { if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0 }
     private val skillDef = DoubleArray(2) { if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0 }
 
@@ -400,7 +403,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         when (def(1 - o)) { Defense.PRESS -> base -= 2.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
         // The pro game is faster: a shorter shot clock and about 100 possessions a game.
-        if (lg.pro) base *= 0.81
+        if (lg.pro) base *= 0.81 * era.pace
         // Nobody holds it past the shot clock.
         return (base * (0.6 + Rng.d() * 0.8)).coerceAtMost(shotClock - 0.5)
     }
@@ -560,7 +563,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
 
         // Non-shooting foul: free throws only in the penalty; otherwise the offense keeps the ball.
-        if (Rng.chance(if (lg.pro) NON_SHOOTING_PRO else NON_SHOOTING_COLLEGE)) {
+        if (Rng.chance(if (lg.pro) NON_SHOOTING_PRO * era.fouls else NON_SHOOTING_COLLEGE)) {
             val fouler = pickFouler(d, defense)
             line(d, fouler).pf++
             teamFoul(d)
@@ -590,7 +593,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.
-            if (lg.pro) pMake += if (type == 2) 0.014 else 0.028
+            if (lg.pro) pMake += if (type == 2) 0.014 else 0.028 + era.fg
             pMake += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             when (def(d)) {
@@ -607,7 +610,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
-            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO else SHOOTING_FOUL_COLLEGE)
+            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE)
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
             val pts = if (type == 2) 3 else 2
@@ -631,7 +634,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     val mates = offense.filter { it.id != shooter.id }
                     if (mates.isNotEmpty()) {
                         // The best passers, point guards above all, get most of the assists.
-                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 14.0) * posAst(it.pos) }
+                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) }
                         line(o, passer).ast++
                         astText = " (${passer.short} assists)"
                     }
@@ -663,7 +666,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val pBlk = when (type) { 0 -> 0.23 * (blkD / n[8]).pow(2); 1 -> 0.055; else -> 0.017 } * (if (lg.pro) 1.25 else 1.0)
             if (Rng.chance(pBlk)) {
                 // Rim protectors, big men above all, get most of the blocks.
-                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(4) * posBlk(it.pos) }
+                // Rim protectors get most blocks at the rim; on jump shots anyone closing out can get a hand on it.
+                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) }
                 line(d, b).blk++
                 blocked = true
                 log(d, "${b.short} blocks ${shooter.short}!", 0)
@@ -684,18 +688,27 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     private fun proShotPos(p: Pos) = when (p) { Pos.C -> 1.2; Pos.PF -> 1.1; else -> 1.0 }
-    private fun posAst(p: Pos) = when (p) { Pos.PG -> 1.6; Pos.SG -> 1.15; Pos.SF -> 1.0; Pos.PF -> 0.7; Pos.C -> 0.6 }
-    private fun posBlk(p: Pos) = when (p) { Pos.C -> 2.2; Pos.PF -> 1.6; Pos.SF -> 0.9; Pos.SG -> 0.5; Pos.PG -> 0.35 }
+    private fun posAst(p: Pos) = when (p) { Pos.PG -> 1.25; Pos.SG -> 1.05; Pos.SF -> 1.0; Pos.PF -> 0.95; Pos.C -> 1.1 }
+    private fun posBlk(p: Pos) = when (p) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
     private fun posFoul(p: Pos) = when (p) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
-    private fun posReb(p: Pos) = when (p) { Pos.C -> 1.25; Pos.PF -> 1.2; Pos.SF -> 1.0; Pos.SG -> 0.8; Pos.PG -> 0.7 }
+    private fun posReb(p: Pos) = if (lg.pro) when (p) { Pos.C -> 1.3; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 0.9; Pos.PG -> 0.85 }
+        else when (p) { Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05 }
+
+    /** Who grabs a rebound: good rebounders and big men most, but guards chase long ones too. */
+    private fun rebounder(side: List<Player>) = Rng.weighted(side) { (it[Attr.REB] / 70.0).pow(2) * posReb(it.pos) }
+
+    /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
+    private val teamRebound get() = Rng.chance(if (lg.pro) 0.11 else 0.05)
 
     private fun shotType(o: Int, d: Int, p: Player, trail: Int): Int {
         if (finalPeriod && clock < 25 && trail == -3) return 2
         val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
-        val pos3 = when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.15; Pos.SF -> .95; Pos.PF -> .55; Pos.C -> .16 }
+        // Modern pro bigs step out more than college bigs.
+        val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
+            else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> .95; Pos.PF -> .66; Pos.C -> .34 }
         var wi = (p[Attr.INS] / 70.0).pow(3) * posIns
         var wm = (p[Attr.MID] / 70.0).pow(3) * 0.5
-        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 3 else 4) * pos3 * (if (lg.pro) 1.3 else 1.2)
+        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 2.5 else 4.0) * pos3 * (if (lg.pro) 1.38 * era.threes else 1.2)
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }
@@ -713,7 +726,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         return when { x < wi -> 0; x < wi + wm -> 1; else -> 2 }
     }
 
-    private fun rebound(o: Int, offense: List<Player>, defense: List<Player>, blocked: Boolean): Pair<Int, Player> {
+    private fun rebound(o: Int, offense: List<Player>, defense: List<Player>, blocked: Boolean): Pair<Int, Player?> {
         val d = 1 - o
         val oR = offense.map { it[Attr.REB] }.average()
         val dR = defense.map { it[Attr.REB] }.average()
@@ -724,12 +737,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (blocked) pOff += 0.04
         pOff = pOff.coerceIn(0.15, 0.45)
         return if (Rng.chance(pOff)) {
-            val r = Rng.weighted(offense) { it[Attr.REB].toDouble().pow(2.5) * posReb(it.pos) }
+            if (teamRebound) { log(o, "Out of bounds, ${teams[o].abbr} ball", 0); return o to null }
+            val r = rebounder(offense)
             line(o, r).orb++
             log(o, "${r.short} grabs the offensive board", 0)
             o to r
         } else {
-            val r = Rng.weighted(defense) { it[Attr.REB].toDouble().pow(2.5) * posReb(it.pos) }
+            if (teamRebound) return d to null
+            val r = rebounder(defense)
             line(d, r).drb++
             d to r
         }
@@ -754,13 +769,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (!lastMade) {
             val oReb = Rng.chance(0.14)
             if (oReb) {
-                val r = Rng.weighted(offense) { it[Attr.REB].toDouble().pow(2.5) * posReb(it.pos) }
-                line(o, r).orb++
+                if (!teamRebound) line(o, rebounder(offense)).orb++
                 poss = o
                 return
             }
-            val r = Rng.weighted(defense) { it[Attr.REB].toDouble().pow(2.5) * posReb(it.pos) }
-            line(d, r).drb++
+            if (!teamRebound) line(d, rebounder(defense)).drb++
         }
         poss = d
     }

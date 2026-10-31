@@ -30,7 +30,7 @@ class StatsTest {
             tot.pts / g, tot.fga / g, tot.fgPct, tot.tpm / g, tot.tpa / g, tot.tpPct, tot.ftm / g, tot.fta / g, tot.orb / g, tot.drb / g, tot.reb / g, tot.ast / g, tot.stl / g, tot.blk / g, tot.tov / g, tot.pf / g))
         out["pts"] = tot.pts / g; out["fg"] = tot.fgPct; out["3pa"] = tot.tpa / g; out["ast"] = tot.ast / g
         out["blk"] = tot.blk / g; out["orb"] = tot.orb / g; out["tov"] = tot.tov / g
-        out["fta"] = tot.fta / g; out["ft"] = tot.ftm.toDouble() / tot.fta.coerceAtLeast(1); out["pf"] = tot.pf / g
+        out["reb"] = tot.reb / g; out["fta"] = tot.fta / g; out["ft"] = tot.ftm.toDouble() / tot.fta.coerceAtLeast(1); out["pf"] = tot.pf / g
 
         val qual = lg.players.filter { it.stats.gp >= (if (lg.pro) 30 else 15) && it.teamId >= 0 }
         for ((n, f) in listOf<Pair<String, (StatLine) -> Double>>("ppg" to { it.ppg }, "rpg" to { it.rpg }, "apg" to { it.apg }, "spg" to { it.spg }, "bpg" to { it.bpg }, "3pm" to { it.per(it.tpm) })) {
@@ -43,6 +43,7 @@ class StatsTest {
             if (starters.isEmpty()) continue
             val s = StatLine(); starters.forEach { s.add(it.stats) }
             if (pos == Pos.PG) out["pgAst"] = s.apg
+            out["$pos reb"] = s.rpg; out["$pos ast"] = s.apg; out["$pos blk"] = s.bpg; out["$pos 3pm"] = s.per(s.tpm)
             println("  $pos starters (${starters.size}): %.1f pts %.1f reb %.1f ast %.1f stl %.1f blk %.1f 3pm in %.1f min".format(s.ppg, s.rpg, s.apg, s.spg, s.bpg, s.per(s.tpm), s.mpg))
         }
         return out
@@ -61,6 +62,12 @@ class StatsTest {
         check("pro tov", p["tov"]!!, 12.0..17.0); check("pro top ppg", p["ppg"]!!, 26.0..38.0); check("pro top apg", p["apg"]!!, 8.0..13.5)
         check("pro top bpg", p["bpg"]!!, 1.8..4.0); check("pro top 3pm", p["3pm"]!!, 3.5..6.5); check("pro PG apg", p["pgAst"]!!, 5.5..10.0)
         check("pro fta", p["fta"]!!, 19.0..25.0); check("pro ft%", p["ft"]!!, 0.75..0.81); check("pro pf", p["pf"]!!, 16.5..21.0)
+        // Starters by position, against real NBA starters: rebounds, assists, blocks and threes spread like the real game.
+        check("pro reb", p["reb"]!!, 41.0..47.5)
+        check("pro PG reb", p["PG reb"]!!, 3.3..5.8); check("pro PG ast", p["PG ast"]!!, 5.0..8.8); check("pro PG blk", p["PG blk"]!!, 0.2..0.7)
+        check("pro SG reb", p["SG reb"]!!, 3.3..5.5); check("pro SF reb", p["SF reb"]!!, 4.3..7.0)
+        check("pro PF reb", p["PF reb"]!!, 5.8..9.0); check("pro PF ast", p["PF ast"]!!, 1.6..3.8)
+        check("pro C reb", p["C reb"]!!, 8.0..11.5); check("pro C ast", p["C ast"]!!, 1.6..4.0); check("pro C blk", p["C blk"]!!, 0.9..2.0); check("pro C 3pm", p["C 3pm"]!!, 0.3..1.4)
 
         Rng.r = Random(5)
         val c = Offseason.claimTeam(LeagueGen.newLeague(), 0, "Test", "Coach")
@@ -70,5 +77,7 @@ class StatsTest {
         check("college pts", k["pts"]!!, 66.0..80.0); check("college ast", k["ast"]!!, 11.0..17.0); check("college blk", k["blk"]!!, 2.5..4.5)
         check("college top ppg", k["ppg"]!!, 18.0..28.0); check("college top apg", k["apg"]!!, 6.0..10.5)
         check("college fta", k["fta"]!!, 15.5..22.0); check("college ft%", k["ft"]!!, 0.68..0.75); check("college pf", k["pf"]!!, 15.0..19.5)
+        check("college reb", k["reb"]!!, 30.0..36.0)
+        check("college PG reb", k["PG reb"]!!, 2.3..4.5); check("college C ast", k["C ast"]!!, 0.8..2.4); check("college PF reb", k["PF reb"]!!, 5.0..8.0)
     }
 }

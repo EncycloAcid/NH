@@ -82,7 +82,7 @@ class ProUiTest {
         vm.revealSeason = college.season; vm.reveal = 60; idle()
         shot("P00_green_room_pro")
         Road.watchedDraft(college); vm.install(college); idle()
-        shot("P01_going_pro")
+        shot("P01_going_pro"); scrollToText("CHOOSE YOUR ERA"); shot("P01b_choose_era")
 
         var lg = ProLeague.create(college)
         vm.install(lg); vm.select(Tab.TODAY); idle()
@@ -129,7 +129,7 @@ class ProUiTest {
         while (lg.phase == Phase.REGULAR && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         repeat(3) { Sim.playDay(lg) }
         vm.install(lg); vm.select(Tab.TODAY); shot("P11_playoffs"); scrollToText("AWARDS NIGHT"); shot("P11a_awards_night")
-        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); scrollToText("PLAY-IN TOURNAMENT"); shot("P11d_play_in"); vm.leagueTab = 4; shot("P11c_awards"); vm.leagueTab = 0
+        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); vm.proRound = 0; idle(); shot("P11d_play_in"); vm.proRound = -1; vm.leagueTab = 4; shot("P11c_awards"); vm.leagueTab = 0
         walk(vm, lg)
         guard = 0
         while (lg.phase != Phase.OFFSEASON && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }

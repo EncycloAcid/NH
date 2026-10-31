@@ -17,11 +17,13 @@ object BigNights {
         val mine = before.count { it.winner() == teamId }
         val theirs = before.size - mine
         val finals = s.round == 4
+        // Best of seven, or best of five in an older era's first round.
+        val need = s.bestOf / 2 + 1
         return when {
-            n == 7 -> if (finals) "Game 7 of the Finals" else "Game 7"
-            !s.involves(teamId) -> if (before.count { it.winner() == s.hi } == 3 || before.count { it.winner() == s.lo } == 3) "Elimination game" else ""
-            mine == 3 -> if (finals) "Win and you're champions" else "Close-out game"
-            theirs == 3 -> if (finals) "Win or the title is theirs" else "Win or go home"
+            n == s.bestOf -> if (finals) "Game ${s.bestOf} of the Finals" else "Game ${s.bestOf}"
+            !s.involves(teamId) -> if (before.count { it.winner() == s.hi } == need - 1 || before.count { it.winner() == s.lo } == need - 1) "Elimination game" else ""
+            mine == need - 1 -> if (finals) "Win and you're champions" else "Close-out game"
+            theirs == need - 1 -> if (finals) "Win or the title is theirs" else "Win or go home"
             else -> ""
         }
     }

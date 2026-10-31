@@ -244,7 +244,7 @@ class ProTest {
         lg = SaveIO.decode(SaveIO.encode(lg))
 
         var seasons = 0
-        while (!lg.road!!.ended && seasons < 18) {
+        while (!lg.road!!.ended && seasons < 20) {
             // Contract, summer, then the new season.
             while (lg.phase == Phase.OFFSEASON) {
                 val ps = lg.proState!!
@@ -289,6 +289,7 @@ class ProTest {
             assertTrue("an NBA Cup winner", ps.cupChampion >= 0 && ps.cup.count { it.round == 1 } == 4 && ps.cup.single { it.round == 3 }.winner == ps.cupChampion)
             assertTrue("Cup knockouts don't count", lg.games.filter { it.type == GameType.CUP }.size == 7 && lg.teams.all { it.w + it.l == ProLeague.GAMES })
             assertTrue("All-Star Saturday", ps.weekend.size >= 2)
+            println("   MVP vote: ${ps.mvpVotes.take(6).map { "${it.name} ${it.points}/${it.firsts}" }}; award ${lg.seasonAwards.firstOrNull { it.award == "MVP" }?.name}")
             assertTrue("an MVP vote", ps.mvpVotes.size >= 5 && ps.mvpVotes.first().name == lg.seasonAwards.first { it.award == "MVP" }.name && ps.mvpVotes.sumOf { it.firsts } == 100)
             assertTrue("awards night extras", listOf("All-Defensive 1st", "All-Rookie 1st").all { a -> lg.seasonAwards.count { it.award == a } == 5 })
             assertTrue("playoff games kept apart", lg.games.filter { it.type == GameType.PLAYOFF }.all { it.played })

@@ -90,6 +90,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     // Sub-tab memory so switching tabs doesn't reset what you were looking at.
     var teamTab by mutableIntStateOf(0)
+    /** The playoff round shown on the bracket page; -1 follows the current round. */
+    var proRound by mutableIntStateOf(-1)
     var leagueConf by mutableIntStateOf(-1)
     var leagueTab by mutableIntStateOf(0)
     var awardsScope by mutableIntStateOf(0)
@@ -242,13 +244,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     /** One step of the player-mode offseason. */
     /** Draft Night is over: build the pro league and move the career into it. */
-    fun goPro() {
+    fun goPro(era: com.nh.hoopscoach.game.Era = com.nh.hoopscoach.game.Era.TODAY) {
         val lg = league ?: return
         if (busy != null || !(lg.road?.goingPro ?: false)) return
         busy = "Welcome to the league"
         viewModelScope.launch {
             delay(60)
-            val pro = mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.ProLeague.create(lg) } }
+            val pro = mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.ProLeague.create(lg, era) } }
             stack.clear()
             sheet = null
             live = null

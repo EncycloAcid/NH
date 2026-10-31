@@ -16,8 +16,9 @@ object ProLeague {
     /** Logo file for a pro team, by its abbreviation. */
     fun logoKey(abbr: String) = NbaData.TEAMS.firstOrNull { it.abbr == abbr }?.logo
 
-    /** Pro teams have no logo files: their badge is drawn from team colors. */
+    /** Pro teams use their logo files by abbreviation; an era's old club names get a monogram badge instead. */
     const val LOGO = -7
+    const val ERA_BADGE = -8
     const val GAMES = 83
     /** The All-Star break and the end of the regular season come from the schedule. */
     fun allStarDay(lg: League) = lg.proState?.allStarDay ?: 30
@@ -77,8 +78,8 @@ object ProLeague {
         for (d in lg.draftHistory) if (d.season == lg.season) d.proTeam = teamName(r.proOrder[(d.pick - 1) % TEAMS.size])
     }
 
-    /** Builds the pro league from the college league once the user's player has been drafted (or signed undrafted). */
-    fun create(college: League): League {
+    /** Builds the pro league from the college league once the user's player has been drafted (or signed undrafted), in [era]. */
+    fun create(college: League, era: Era = Era.TODAY): League {
         val r = college.road!!
         val hero = college.hero!!
         if (r.proOrder.isEmpty()) planDraft(college)
@@ -89,7 +90,10 @@ object ProLeague {
         )
         val teams = mutableListOf<Team>()
         for (f in TEAMS) {
-            val t = Team(teams.size, f.city, f.name, f.abbr, f.conf, f.market, f.primary, f.secondary, LOGO)
+            // A past era uses the franchise's old name where it had one (the Seattle SuperSonics, the New Jersey Nets...).
+            val club = Eras.club(era, f.abbr)
+            val t = Team(teams.size, club?.city ?: f.city, club?.name ?: f.name, club?.abbr ?: f.abbr, f.conf, f.market,
+                club?.primary ?: f.primary, club?.secondary ?: f.secondary, if (club != null) ERA_BADGE else LOGO)
             t.arena = 17_500 + (f.market - 55) * 80
             t.fans = 55.0 + (f.market - 55) * 0.6
             t.legacy = f.market.toDouble()
@@ -98,23 +102,41 @@ object ProLeague {
             teams += t
         }
         val lg = League(
-            season = college.season, teams = teams, players = mutableListOf(), coaches = mutableListOf(), confs = confs,
+            // A past era starts in its own year: the first season is the era's.
+            season = if (era == Era.TODAY) college.season else era.year - 1, teams = teams, players = mutableListOf(), coaches = mutableListOf(), confs = confs,
             userTeamId = 0, userCoachId = 0, nextPlayerId = college.nextPlayerId + 1, nextCoachId = 1,
         )
         lg.mode = GameMode.PLAYER
         lg.level = Level.PRO
         lg.heroId = college.heroId
         lg.road = r
-        lg.proState = ProState()
+        lg.proState = ProState(era = era.name)
         for (t in teams) {
             val c = Coach(lg.nextCoachId++, Rng.pick(Names.first), Rng.pick(Names.last), Rng.range(38, 66), t.id,
                 Rng.range(55, 92), Rng.range(55, 92), Rng.range(40, 80), Rng.range(50, 90), Rng.int(0, 1_000_000))
             lg.coaches += c
             t.coachId = c.id
         }
-        // The real rosters: each team's best players, by the roster data.
-        for (t in teams) {
-            for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
+        if (era == Era.TODAY) {
+            // The real rosters: each team's best players, by the roster data.
+            for (t in teams) {
+                for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
+            }
+        } else {
+            // The era's stars on their real teams, and generated players around them. Clubs that didn't exist yet are all generated.
+            val stars = Eras.stars(era)
+            for ((i, f) in TEAMS.withIndex()) {
+                val t = teams[i]
+                for (s in stars[f.abbr].orEmpty()) makeStar(lg, s, t)
+                // About as deep as today's real rosters, so the stars carry their teams without taking every shot.
+                val bench = if (Eras.expansion(era, f.abbr)) listOf(90, 89, 88, 87, 86, 86, 85, 85, 84, 83, 83, 82, 81, 80)
+                    else listOf(88, 87, 86, 86, 85, 85, 84, 84, 83, 82, 82, 81)
+                var k = 0
+                while (t.roster.size < REAL_ROSTER) {
+                    makePro(lg, scarcest(lg, t), bench[k.coerceAtMost(bench.size - 1)] + Rng.int(-1, 1), Rng.range(22, 33), t)
+                    k++
+                }
+            }
         }
         lg.reindex()
         // The real draft class arrives: the user's classmates, the user's player, maybe his rival.
@@ -153,7 +175,7 @@ object ProLeague {
         r.proTeams += h.teamId
         val t = lg.team(h.teamId)
         val pick = r.draftPick
-        r.contract = Contract(t.id, ProCareer.rookieSalary(if (r.undrafted) 0 else pick), ProCareer.rookieYears(if (r.undrafted) 0 else pick),
+        r.contract = Contract(t.id, ProCareer.rookieSalary(lg, if (r.undrafted) 0 else pick), ProCareer.rookieYears(if (r.undrafted) 0 else pick),
             if (r.undrafted) "Two-way" else if (pick <= 30) "Rookie scale" else "Second-round", lg.season)
         lg.userTeamId = t.id
         lg.userCoachId = t.coachId
@@ -231,6 +253,19 @@ object ProLeague {
         t.roster += p.id
         return p
     }
+
+    /** An era star: his name, position and age, ratings built to his overall (no photo: the headshots are today's). */
+    private fun makeStar(lg: League, s: Eras.Star, t: Team): Player {
+        val p = makePro(lg, s.pos, proOverall(s.ovr), s.age, t)
+        val parts = s.name.split(" ", limit = 2)
+        p.first = parts[0]
+        p.last = parts.getOrElse(1) { "" }
+        p.country = null
+        return p
+    }
+
+    /** The position a roster is thinnest at. */
+    private fun scarcest(lg: League, t: Team): Pos = Pos.entries.minBy { pos -> lg.rosterOf(t).count { it.pos == pos } * 10 + Rng.int(0, 9) }
 
     /** A real player from the roster data: his name, number, position, age and photo; ratings built to his overall. */
     private fun makeReal(lg: League, np: NbaData.NbaPlayer, t: Team): Player {
@@ -311,11 +346,13 @@ object ProLeague {
             ids.add(1, ids.removeAt(n - 1))
         }
         val second = rounds.map { rd -> rd.map { (h, a) -> a to h } }
-        // The NBA Cup draw, and its group games out of the first-half meetings.
-        val groups = NbaCup.draw(lg)
+        // The NBA Cup draw, and its group games out of the first-half meetings. The Cup began in 2023: past eras don't have it.
+        val cupOn = Eras.of(lg).cup
+        val groups = if (cupOn) NbaCup.draw(lg) else emptyList()
         ps?.cupGroups?.apply { clear(); addAll(groups.map { it.toMutableList() }) }
         ps?.cup?.clear(); ps?.cupSeeds?.clear(); ps?.cupChampion = -1; ps?.cupMvp = ""; ps?.cupNote = ""
-        val nights = NbaCup.groupNights(groups).map { night -> night.map { (a, b) -> takeMeeting(rounds, a, b) } }
+        ps?.cupQfDay = 0; ps?.cupSfDay = 0; ps?.cupFinalDay = 0
+        val nights = if (cupOn) NbaCup.groupNights(groups).map { night -> night.map { (a, b) -> takeMeeting(rounds, a, b) } } else emptyList()
         val all = (rounds.filter { it.isNotEmpty() } + second).toMutableList<List<Pair<Int, Int>>>()
         // Twice more against 12 of the 14 conference rivals.
         val extra = mutableListOf<Pair<Int, Int>>()
@@ -340,7 +377,7 @@ object ProLeague {
         val rivalry = rivalryNight(lg)
         val m = all.size
         fun at(f: Double) = (m * f).toInt()
-        val cupAt = listOf(0.05, 0.09, 0.13, 0.17, 0.21).map(::at)
+        val cupAt = if (cupOn) listOf(0.05, 0.09, 0.13, 0.17, 0.21).map(::at) else emptyList()
         fun play(day: Int, games: List<Pair<Int, Int>>, label: (Int) -> String = { "" }) {
             for ((h, a) in games) {
                 val type = if (lg.team(h).confId == lg.team(a).confId) GameType.CONF else GameType.NONCONF
@@ -350,9 +387,9 @@ object ProLeague {
         var day = 1
         for ((i, rd) in all.withIndex()) {
             cupAt.forEachIndexed { k, c -> if (c == i) { play(day, nights[k]) { h -> NbaCup.groupLabel(groups.indexOfFirst { h in it }) }; day++ } }
-            if (i == at(0.26)) { ps?.cupQfDay = day; day++ }
-            if (i == at(0.28)) { ps?.cupSfDay = day; day++ }
-            if (i == at(0.30)) { ps?.cupFinalDay = day; day++ }
+            if (cupOn && i == at(0.26)) { ps?.cupQfDay = day; day++ }
+            if (cupOn && i == at(0.28)) { ps?.cupSfDay = day; day++ }
+            if (cupOn && i == at(0.30)) { ps?.cupFinalDay = day; day++ }
             if (i == m / 2) { ps?.allStarDay = day; day++ }
             if (i == at(0.62)) { ps?.rivalryDay = day; play(day, rivalry) { "Rivalry Night" }; day++ }
             if (i == at(0.68)) ps?.deadline = day
@@ -424,6 +461,55 @@ object ProSeason {
 
     fun roundName(s: Series) = if (s.round == 0) "Play-In" else ProLeague.ROUND_NAMES[s.round - 1]
 
+    /** Games won by [teamId] and by the other side in [s], counting games already played today. */
+    fun seriesScore(lg: League, s: Series, teamId: Int): Pair<Int, Int> {
+        val played = s.gameIds.map { lg.game(it) }.filter { it.played }
+        val mine = played.count { it.winner() == teamId }
+        return mine to played.size - mine
+    }
+
+    /** The series in a few words: "Nuggets lead 2-1", "Series tied 2-2", "Celtics win 4-1". */
+    fun seriesStatus(lg: League, s: Series): String {
+        val (h, l) = seriesScore(lg, s, s.hi)
+        val hi = lg.team(s.hi).mascot
+        val lo = lg.team(s.lo).mascot
+        val need = s.bestOf / 2 + 1
+        return when {
+            s.bestOf == 1 -> if (h + l == 0) "One game" else "${if (h > l) hi else lo} win"
+            h == need -> "$hi win $h-$l"
+            l == need -> "$lo win $l-$h"
+            h + l == 0 -> "Series starts"
+            h == l -> "Series tied $h-$l"
+            h > l -> "$hi lead $h-$l"
+            else -> "$lo lead $l-$h"
+        }
+    }
+
+    /** The next game in [s]: "Game 3 at Denver", or "" once it's over. Higher seeds host games 1, 2, 5 and 7. */
+    fun nextGame(lg: League, s: Series): String {
+        val (h, l) = seriesScore(lg, s, s.hi)
+        val need = s.bestOf / 2 + 1
+        if (h == need || l == need) return ""
+        val n = h + l + 1
+        val home = if (s.bestOf == 1 || n in listOf(1, 2, 5, 7)) s.hi else s.lo
+        return if (s.bestOf == 1) "At ${lg.team(home).school}" else "Game $n at ${lg.team(home).school}"
+    }
+
+    /** A reporter's question after a playoff win, by where the series stands. */
+    fun winQuestion(lg: League, g: Game, teamId: Int): String {
+        val s = lg.proState?.series?.firstOrNull { g.id in it.gameIds } ?: return "You won. What's next?"
+        if (s.bestOf == 1) return "You win the play-in game. Ready for what's next?"
+        val (me, them) = seriesScore(lg, s, teamId)
+        val need = s.bestOf / 2 + 1
+        return when {
+            me == need -> if (s.round == 4) "You're champions. What does this one mean?" else "You're through to the ${ProLeague.ROUND_NAMES[s.round]}. Who do you want next?"
+            me == need - 1 -> "One more win and you're through. How do you close it out?"
+            me > them -> "You're up $me-$them in the series. What's working?"
+            me == them -> "Series tied $me-$me. What changed tonight?"
+            else -> "You cut it to $me-$them. Can you take this series back?"
+        }
+    }
+
     /** The three play-in games in each conference. */
     fun playInName(s: Series) = when (s.slot) { 0 -> "7 vs 8"; 1 -> "9 vs 10"; else -> "for the 8 seed" }
 
@@ -474,18 +560,26 @@ object ProSeason {
         ps.series.clear()
         ps.seeds.clear()
         ps.champion = -1
-        // Seeds 1 to 6 are in. Seeds 7 to 10 play in for the last two spots.
+        // Today: seeds 1 to 6 are in and seeds 7 to 10 play in for the last two spots.
+        // Past eras: the top eight go straight in, with best-of-five first rounds before 2003.
+        val era = Eras.of(lg)
         for (c in 0..1) {
-            val top = standings(lg, c).take(10)
-            top.forEachIndexed { i, t -> ps.seeds[t.id] = i + 1 }
-            ps.series += Series(0, c, 0, top[6].id, top[7].id, bestOf = 1)
-            ps.series += Series(0, c, 1, top[8].id, top[9].id, bestOf = 1)
+            if (era.playIn) {
+                val top = standings(lg, c).take(10)
+                top.forEachIndexed { i, t -> ps.seeds[t.id] = i + 1 }
+                ps.series += Series(0, c, 0, top[6].id, top[7].id, bestOf = 1)
+                ps.series += Series(0, c, 1, top[8].id, top[9].id, bestOf = 1)
+            } else {
+                val top = standings(lg, c).take(8)
+                top.forEachIndexed { i, t -> ps.seeds[t.id] = i + 1 }
+                listOf(0 to 7, 3 to 4, 2 to 5, 1 to 6).forEachIndexed { slot, (a, b) -> ps.series += Series(1, c, slot, top[a].id, top[b].id, bestOf = era.firstRoundBestOf) }
+            }
         }
         val u = lg.user
         val seed = ps.seeds[u.id] ?: 0
         lg.news += News(lg.season, lg.day,
             when {
-                seed in 1..6 -> "The ${u.name} are in the playoffs as the No. $seed seed in the ${lg.conf(u.confId).name}"
+                seed in 1..(if (era.playIn) 6 else 8) -> "The ${u.name} are in the playoffs as the No. $seed seed in the ${lg.conf(u.confId).name}"
                 seed > 0 -> "The ${u.name} are in the play-in as the No. $seed seed in the ${lg.conf(u.confId).name}"
                 else -> "The ${u.name} miss the playoffs at ${u.w}-${u.l}"
             }, true)
@@ -583,8 +677,10 @@ object ProSeason {
         val ps = lg.proState
         // The 65-game rule: MVP, Defensive Player, Sixth Man, Most Improved and the All-League and
         // All-Defensive teams need 65 games (scaled for shorter seasons). Rookie honors don't.
-        val minGames = (65.0 * ProLeague.seasonGames(lg) / 82).toInt()
-        val rookies = all.filter { it.first.proYears == 0 }
+        val minGames = if (Eras.of(lg).gamesRule) (65.0 * ProLeague.seasonGames(lg) / 82).toInt() else 0
+        // Rookie honors look at every rookie who played, not just the award-eligible.
+        val rookies = lg.teams.flatMap { t -> lg.rosterOf(t).filter { it.proYears == 0 && it.stats.gp > 0 }.map { it to t } }
+            .sortedByDescending { (p, t) -> Awards.score(p, t) }
         val ladder = all.filter { it.first.stats.gp >= minGames }.ifEmpty { all }
         val votes = AwardsNight.mvpVote(lg, ladder)
         ps?.mvpVotes?.apply { clear(); addAll(votes) }
@@ -673,15 +769,15 @@ object ProCareer {
     /** The 2025-26 salary cap, in thousands. */
     const val CAP = 154_647
 
+    /** The cap in the league's era (past eras scale every salary by their cap). */
+    fun cap(lg: League) = Eras.of(lg).cap
+
     /** Max salary by years in the league: 25% of the cap through six years, 30% for seven to nine, 35% from ten. */
-    fun maxSalary(proYears: Int) = (CAP * when { proYears >= 10 -> 0.35; proYears >= 7 -> 0.30; else -> 0.25 }).roundToInt() / 10 * 10
+    fun maxSalary(lg: League, proYears: Int) = (cap(lg) * when { proYears >= 10 -> 0.35; proYears >= 7 -> 0.30; else -> 0.25 }).roundToInt() / 10 * 10
 
-    /** The biggest contract in the league (35% of the cap). */
-    val MAX_SALARY = maxSalary(10)
-
-    /** The league minimum by years in the league, 2025-26. */
+    /** The league minimum by years in the league, 2025-26, scaled to the era. */
     private val MIN_SCALE = intArrayOf(1_273, 2_049, 2_296, 2_378, 2_461, 2_667, 2_872, 3_078, 3_283, 3_304, 3_634)
-    fun minSalary(proYears: Int) = MIN_SCALE[proYears.coerceIn(0, MIN_SCALE.size - 1)]
+    fun minSalary(lg: League, proYears: Int) = ((MIN_SCALE[proYears.coerceIn(0, MIN_SCALE.size - 1)] * Eras.of(lg).money).roundToInt() / 10 * 10).coerceAtLeast(10)
 
     /**
      * The most [teamId] can pay him. A seven-to-nine-year player re-signing with his own team after
@@ -689,21 +785,21 @@ object ProCareer {
      * 35% supermax.
      */
     fun maxFor(lg: League, teamId: Int): Int {
-        val h = lg.hero ?: return MAX_SALARY
+        val h = lg.hero ?: return maxSalary(lg, 10)
         val recent = h.awards.filter { a -> a.substringBefore(" ").toIntOrNull()?.let { it >= lg.season - 2 } == true }.map { it.substringAfter(" ") }
         val honors = recent.any { it == "MVP" || it == "Defensive Player of the Year" || it.startsWith("All-League") }
-        val supermax = h.proYears in 7..9 && teamId == h.teamId && honors
-        return maxSalary(if (supermax) 10 else h.proYears)
+        val supermax = Eras.of(lg).supermax && h.proYears in 7..9 && teamId == h.teamId && honors
+        return maxSalary(lg, if (supermax) 10 else h.proYears)
     }
 
     /**
      * First-round picks get a four-year rookie-scale deal (No. 1 about $13.8M down to about $2.4M at
      * No. 30), second-rounders two years near the minimum, undrafted players a two-way at half the minimum.
      */
-    fun rookieSalary(pick: Int): Int = when {
-        pick <= 0 -> minSalary(0) / 2 / 10 * 10
-        pick <= 30 -> (13_830 * Math.pow(0.94, (pick - 1).toDouble())).roundToInt() / 10 * 10
-        else -> minSalary(0) + (60 - pick) * 10
+    fun rookieSalary(lg: League, pick: Int): Int = when {
+        pick <= 0 -> minSalary(lg, 0) / 2 / 10 * 10
+        pick <= 30 -> (13_830 * Eras.of(lg).money * Math.pow(0.94, (pick - 1).toDouble())).roundToInt() / 10 * 10
+        else -> minSalary(lg, 0) + ((60 - pick) * 10 * Eras.of(lg).money).roundToInt() / 10 * 10
     }
 
     fun rookieYears(pick: Int) = if (pick in 1..30) 4 else 2
@@ -719,7 +815,7 @@ object ProCareer {
         val recent = p.awards.filter { it.startsWith("${lg.season} ") || it.startsWith("${lg.season - 1} ") }
         if (recent.any { it.substringAfter(" ") == "MVP" }) v *= 1.15
         if (recent.any { it.endsWith("All-Star") }) v *= 1.08
-        return ((v * agentCut(lg)).roundToInt() / 10 * 10).coerceIn(minSalary(p.proYears), maxSalary(p.proYears))
+        return ((v * agentCut(lg) * Eras.of(lg).money).roundToInt() / 10 * 10).coerceIn(minSalary(lg, p.proYears), maxSalary(lg, p.proYears))
     }
 
     private fun agentCut(lg: League) = if (Road.has(lg, Staff.AGENT)) 1.15 else 1.0
@@ -728,7 +824,7 @@ object ProCareer {
     fun endorsements(lg: League): Int {
         val f = (lg.road?.followers ?: 0).toDouble()
         val v = minOf(f, 2_000_000.0) / 1000 * 2.0 + (f - 2_000_000.0).coerceAtLeast(0.0) / 1000 * 0.5
-        return (v * agentCut(lg)).roundToInt()
+        return (v * agentCut(lg) * Eras.of(lg).money).roundToInt()
     }
 
     /** Salary lands when the season starts, so he can spend it during the season. */
@@ -761,7 +857,8 @@ object ProCareer {
         r.lastRaceRank = 0
         r.raceDay = -99
         r.hired.clear()
-        for (p in lg.players) if (p.stats.gp > 0 || p.tourney.gp > 0) p.proYears++
+        // A year in the league counts for everyone on a roster, played or not.
+        for (p in lg.players) if (p.teamId >= 0 || p.stats.gp > 0 || p.tourney.gp > 0) p.proYears++
     }
 
     /** Old enough to call it a career. */
@@ -847,7 +944,7 @@ object ProCareer {
         // Lottery night: the 14 teams that missed the playoffs draw for the top four picks, worst odds-on.
         val inPlayoffs = ps.series.filter { it.round >= 1 }.flatMap { listOf(it.hi, it.lo) }.toSet()
         val lotteryTeams = byRecord.filter { it !in inPlayoffs }.take(14)
-        val drawn = Lottery.draw(lotteryTeams)
+        val drawn = Lottery.draw(lotteryTeams, Eras.of(lg))
         ps.lotteryPre.apply { clear(); addAll(lotteryTeams) }
         ps.lotteryPicks.apply { clear(); addAll(drawn) }
         ps.lotterySeason = lg.season
@@ -903,7 +1000,7 @@ object ProCareer {
         return pool.map { t ->
             val ahead = lg.rosterOf(t).count { it.id != h.id && it.pos == h.pos && it.ovr >= h.ovr }
             val top = maxFor(lg, t.id)
-            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(minSalary(h.proYears), top)
+            val pay = ((value * (if (t.id == h.teamId) 1.05 else 0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
             // How far each team will stretch: a little more for his own team, never past the max.
             val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, top)
             ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max)
@@ -1033,7 +1130,7 @@ object ProCareer {
             if (r.proTeams.lastOrNull() != to.id) r.proTeams += to.id
         }
         Gameplan.autoAllocate(lg, to)
-        val kind = if (o.salary >= maxSalary(h.proYears) - 10) "Max" else if (o.salary <= minSalary(h.proYears)) "Minimum" else "Veteran"
+        val kind = if (o.salary >= maxSalary(lg, h.proYears) - 10) "Max" else if (o.salary <= minSalary(lg, h.proYears)) "Minimum" else "Veteran"
         r.contract = Contract(to.id, o.salary, o.years, kind, lg.season)
         r.proOffers.clear()
         r.restricted = false

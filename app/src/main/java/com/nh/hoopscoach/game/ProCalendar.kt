@@ -213,8 +213,8 @@ object AllStarWeekend {
         if (pool.size < 8) return
         val hid = lg.heroId
 
-        // Rising Stars: first- and second-year players.
-        val young = pool.filter { it.first.proYears <= 1 }.sortedByDescending { Awards.score(it.first, it.second) }.take(20)
+        // Rising Stars: first- and second-year players (from 1994).
+        val young = if (Eras.of(lg).risingStars) pool.filter { it.first.proYears <= 1 }.sortedByDescending { Awards.score(it.first, it.second) }.take(20) else emptyList()
         if (young.size >= 4) {
             val mvp = young.maxBy { Awards.score(it.first, it.second) + Rng.gauss() * 5 }.first
             mvp.awards += "${lg.season} Rising Stars MVP"
@@ -289,12 +289,23 @@ object Lottery {
     /** Chances at No. 1, in tenths of a percent, worst record first. */
     val ODDS = listOf(140, 140, 140, 125, 105, 90, 75, 60, 45, 30, 20, 15, 10, 5)
 
-    /** The pick order for [teams] (worst first): four drawn by the odds, the rest by record. */
-    fun draw(teams: List<Int>): List<Int> {
+    /** 1994 to 2018: steeper odds (25% for the worst record), and only the top three picks were drawn. */
+    val ODDS_1994 = listOf(250, 199, 156, 119, 88, 63, 43, 28, 17, 11, 8, 7, 6, 5)
+
+    /** How the lottery works in [era], in a sentence. */
+    fun rules(era: Era) = when {
+        era == Era.TODAY -> "The 14 teams that missed the playoffs drew for the top four picks. The three worst records had a 14% shot at No. 1."
+        era.year >= 1994 -> "The 14 teams that missed the playoffs drew for the top three picks. The worst record had a 25% shot at No. 1."
+        else -> "The teams that missed the playoffs drew for the top three picks, every team with the same chance."
+    }
+
+    /** The pick order for [teams] (worst first): the top picks drawn by the era's odds, the rest by record. */
+    fun draw(teams: List<Int>, era: Era = Era.TODAY): List<Int> {
         val left = teams.toMutableList()
         val top = mutableListOf<Int>()
-        repeat(minOf(4, teams.size)) {
-            val t = Rng.weighted(left) { ODDS.getOrElse(teams.indexOf(it)) { 1 }.toDouble() }
+        val odds = when { era == Era.TODAY -> ODDS; era.year >= 1994 -> ODDS_1994; else -> List(14) { 10 } }
+        repeat(minOf(if (era == Era.TODAY) 4 else 3, teams.size)) {
+            val t = Rng.weighted(left) { odds.getOrElse(teams.indexOf(it)) { 1 }.toDouble() }
             top += t
             left.remove(t)
         }
@@ -323,7 +334,8 @@ object AwardsNight {
             val order = cands.indices.sortedByDescending { seen[it] }
             listOf(10, 7, 5, 3, 1).forEachIndexed { k, v -> order.getOrNull(k)?.let { i -> pts[i] += v; if (k == 0) firsts[i]++ } }
         }
-        return cands.indices.sortedByDescending { pts[it] * 1000 + firsts[it] }.filter { pts[it] > 0 }.take(10)
+        // Everyone who got a vote is listed, like the real results.
+        return cands.indices.sortedByDescending { pts[it] * 1000 + firsts[it] }.filter { pts[it] > 0 }
             .map { i -> Vote(cands[i].first.id, cands[i].first.name, cands[i].second.id, pts[i], firsts[i]) }
     }
 

@@ -190,8 +190,9 @@ class Player(
     /** Headshot file for real pro players (assets/nba/heads/<photo>.webp), or empty. */
     var photo: String = "",
 ) {
-    val name get() = "$first $last"
-    val short get() = "${first.first()}. $last"
+    val name get() = "$first $last".trim()
+    /** "J. Smith", or the one name for players known by one ("Nene"). */
+    val short get() = if (last.isEmpty() || first.isEmpty()) name else "${first.first()}. $last"
     val ovr: Int get() = Ratings.ovr(pos, attrs)
     operator fun get(a: Attr) = attrs[a.ordinal]
     fun has(t: Trait) = t in traits
@@ -838,6 +839,8 @@ class ProState(
     var lotterySeason: Int = 0,
     /** Awards night: the MVP vote. */
     val mvpVotes: MutableList<Vote> = mutableListOf(),
+    /** Era mode: the season this career started in (an [Era] name). */
+    var era: String = "TODAY",
 )
 
 /** One player's share of the MVP vote: 100 voters, 10-7-5-3-1. */

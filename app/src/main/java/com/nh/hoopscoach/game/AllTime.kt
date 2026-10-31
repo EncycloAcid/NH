@@ -84,7 +84,9 @@ object AllTime {
     fun list(lg: League): List<Entry> {
         val out = mutableListOf<Entry>()
         val names = HashSet<String>()
-        for ((n, s) in LEGENDS) { out += Entry(n, s, "Retired"); names += n }
+        // In a past era some legends are still playing here: they're on the list by what they do in this league.
+        val here = (lg.players.map { it.name } + lg.alumni.map { it.name }).toSet()
+        for ((n, s) in LEGENDS) { if (n in here) continue; out += Entry(n, s, "Retired"); names += n }
         for (p in lg.players) {
             if (p.id == lg.heroId) continue
             val s = total(lg, p)

@@ -392,6 +392,7 @@ fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
     // Pro teams use their own logo files (assets/nba/logos), kept apart from the college ones.
     val logo = remember(t.abbr, t.logo) {
         if (t.logo == com.nh.hoopscoach.game.ProLeague.LOGO) com.nh.hoopscoach.game.ProLeague.logoKey(t.abbr)?.let { Logos.asset(ctx, "nba/logos/$it.webp") }
+        else if (t.logo == com.nh.hoopscoach.game.ProLeague.ERA_BADGE) null
         else Logos.get(ctx, t.abbr)
     }
     if (logo != null) {

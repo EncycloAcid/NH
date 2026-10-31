@@ -80,6 +80,23 @@ class MenuShotsTest {
         idle()
     }
 
+    /** A 1996 league: the era's stars, old club names and monogram badges. */
+    @Test
+    fun eraLeague() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(5)
+        val lg = ProLeague.create(ProTest().toDraft(21), com.nh.hoopscoach.game.Era.Y1996)
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        repeat(12) { Sim.playDay(lg) }
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.setContent { App(vm) }
+        vm.select(Tab.LEAGUE); vm.leagueTab = 3; idle(); shot("Z05_era_leaders")
+        vm.leagueTab = 0; idle(); shot("Z06_era_standings")
+        vm.leagueTab = 4; idle(); shot("Z07_era_history")
+        vm.select(Tab.TODAY); idle(); shot("Z08_era_today")
+    }
+
     @Test
     fun statePicker() {
         GameViewModel.autoLoad = false

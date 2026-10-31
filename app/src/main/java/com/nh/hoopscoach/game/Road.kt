@@ -482,11 +482,10 @@ object Road {
                 )
             }
             tourney && won && Rng.chance(0.6) -> q(
-                "Moving on", if (g.type == GameType.PLAYOFF && g.label.startsWith("Play-In")) "You win the play-in game. Ready for what's next?"
-                    else if (g.type == GameType.PLAYOFF) "${g.label.substringAfter("· ")} goes your way. How do you close out this series?"
+                "Moving on", if (g.type == GameType.PLAYOFF) ProSeason.winQuestion(lg, g, t.id)
                     else "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
                 PressAnswer("Whoever's next. We'll be ready.", 0.012),
-                PressAnswer("Give us the best team in the country.", 0.04, persona = 2),
+                PressAnswer(if (lg.pro) "Give us the best team in the league." else "Give us the best team in the country.", 0.04, persona = 2),
                 PressAnswer("All credit to our staff. They had us ready.", 0.012, fans = 1, teammates = 3, persona = -1),
             )
             rivalry && won && Rng.chance(0.8) -> q(

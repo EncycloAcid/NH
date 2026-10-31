@@ -20,7 +20,11 @@ object Gameplan {
     /** Picks starters and backups by position and splits the minutes. */
     fun autoAllocate(lg: League, t: Team) {
         // Pro coaches give young, high-ceiling players development minutes: up to 4 points of credit.
-        fun rate(p: Player): Double = p.ovr + if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0
+        // The user's young pro gets a little extra: teams play the player they drafted to build around.
+        // High-ceiling rookies get a bit more, as lottery picks do.
+        fun rate(p: Player): Double = p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
+            (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
+            (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
         val pool = lg.rosterOf(t).sortedByDescending { rate(it) }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
@@ -38,6 +42,35 @@ object Gameplan {
         val order = Pos.entries.sortedBy { pos -> pool.count { it.pos == pos } }
         for (pos in order) starters[pos.ordinal] = take(pos)
         for (pos in order) reserves[pos.ordinal] = take(pos)
+        // A backup clearly better than the starter at his own or the next position starts there instead.
+        repeat(5) {
+            var best: Triple<Int, Int, Double>? = null
+            for (ri in 0 until 5) {
+                val r = reserves[ri] ?: continue
+                for (alt in NEIGHBORS.getValue(r.pos).take(2)) {
+                    val s = starters[alt.ordinal] ?: continue
+                    val gain = rate(r) - rate(s)
+                    if (gain >= 3.0 && (best == null || gain > best!!.third)) best = Triple(ri, alt.ordinal, gain)
+                }
+            }
+            val b = best ?: return@repeat
+            val promoted = reserves[b.first]!!
+            reserves[b.first] = starters[b.second]
+            starters[b.second] = promoted
+        }
+        // Coaches play their best: a player left out who is better than a backup at his own or a nearby
+        // position takes that backup's minutes, so nobody good sits all season for being third at his spot.
+        var guard = 0
+        while (guard++ < 5) {
+            val out = pool.maxByOrNull { rate(it) } ?: break
+            val near = NEIGHBORS.getValue(out.pos).take(3)
+            val i = (0 until 5).filter { Pos.entries[it] in near && reserves[it] != null }.minByOrNull { rate(reserves[it]!!) } ?: break
+            val bench = reserves[i]!!
+            if (rate(out) < rate(bench) + 1.0) break
+            reserves[i] = out
+            pool.remove(out)
+            pool += bench
+        }
         t.plan.slots = MutableList(5) { i ->
             val s = starters[i]
             val r = reserves[i]
