@@ -54,7 +54,32 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     LOGO_SHOOTER("Logo Shooter", "LGO", listOf(Attr.OUT, Attr.HND, Attr.PAS), "Pulls up from the logo and punishes every defender who goes under the screen"),
     ISO_WING("Iso Wing", "ISO", listOf(Attr.MID, Attr.HND, Attr.PER), "Wins one-on-one at both ends: the pull-up on offense, the lockdown on defense"),
     ATHLETIC_FOUR("Athletic Four", "ATH", listOf(Attr.INS, Attr.PER, Attr.REB), "Runs the floor, guards wings and owns the glass"),
-    UNICORN("Unicorn", "UNI", listOf(Attr.OUT, Attr.HND, Attr.BLK), "A seven-footer who handles, shoots threes and blocks everything at the rim");
+    UNICORN("Unicorn", "UNI", listOf(Attr.OUT, Attr.HND, Attr.BLK), "A seven-footer who handles, shoots threes and blocks everything at the rim"),
+    // Point guards
+    SCORING_POINT("Scoring Point", "SPG", listOf(Attr.INS, Attr.MID, Attr.OUT), "Score-first point guard who hunts his own shot from every spot"),
+    SPEEDSTER("Speedster", "SPD", listOf(Attr.INS, Attr.HND, Attr.STL), "A blur in the open floor who gets downhill before the defense is set"),
+    PNR_MAESTRO("Pick-and-Roll Maestro", "PNR", listOf(Attr.MID, Attr.OUT, Attr.PAS), "Reads every pick-and-roll: the pocket pass, the pull-up, the skip to the corner"),
+    POINT_OF_ATTACK("Point-of-Attack Defender", "POA", listOf(Attr.PER, Attr.STL, Attr.REB), "Picks up full court, fights over every screen and rebounds like a wing"),
+    // Shooting guards
+    SPOT_UP("Spot-Up Shooter", "SPU", listOf(Attr.MID, Attr.OUT, Attr.REB), "Waits on the wing, catches and fires, and crashes the long rebounds"),
+    MIDRANGE_MAESTRO("Midrange Maestro", "MRM", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives at the elbow with a pull-up nobody can stop"),
+    DOWNHILL_GUARD("Downhill Guard", "DHG", listOf(Attr.INS, Attr.MID, Attr.PER), "Attacks closeouts, finishes in traffic and sits down on defense"),
+    SPARK_PLUG("Spark Plug", "SPK", listOf(Attr.INS, Attr.OUT, Attr.PAS), "Instant energy off the bench: scores in bunches and finds the hot hand"),
+    // Small forwards
+    THREE_LEVEL("Three-Level Scorer", "3LV", listOf(Attr.INS, Attr.MID, Attr.OUT), "Scores at the rim, from the elbow and from deep"),
+    POST_WING("Post Wing", "PWG", listOf(Attr.INS, Attr.MID, Attr.REB), "Backs down smaller wings and turns over either shoulder"),
+    CORNER_SPECIALIST("Corner Specialist", "CRN", listOf(Attr.OUT, Attr.REB, Attr.PER), "Lives in the corner, guards the wing and boxes out"),
+    TWO_WAY_WING("Two-Way Wing", "2WW", listOf(Attr.MID, Attr.OUT, Attr.PER), "Creates his own shot and still takes the toughest assignment"),
+    // Power forwards
+    LOW_POST_FOUR("Low-Post Four", "LPF", listOf(Attr.INS, Attr.REB, Attr.IDF), "Old-school power forward: drop steps, hook shots and boxing out"),
+    PLAYMAKING_FOUR("Playmaking Four", "PMF", listOf(Attr.MID, Attr.HND, Attr.PAS), "Runs the offense from the top of the key and hits every cutter"),
+    DUNKER_SPOT("Dunker Spot Big", "DNK", listOf(Attr.INS, Attr.REB, Attr.STL), "Lurks on the baseline for dump-offs, putbacks and deflections"),
+    DEFENSIVE_FOUR("Defensive Anchor", "DAF", listOf(Attr.PER, Attr.IDF, Attr.STL), "Guards the other team's best forward and wins the hustle plays"),
+    // Centers
+    GLASS_CLEANER("Glass Cleaner", "GLS", listOf(Attr.REB, Attr.PAS, Attr.IDF), "Owns the defensive glass and starts the break with an outlet"),
+    ELBOW_HUB("Elbow Hub", "ELB", listOf(Attr.MID, Attr.PAS, Attr.IDF), "Runs the offense from the elbow with a soft jumper and sharp passes"),
+    MOBILE_BIG("Mobile Big", "MOB", listOf(Attr.PER, Attr.REB, Attr.BLK), "Switches onto guards, contests at the rim and runs the floor"),
+    PAINT_BEAST("Paint Beast", "BST", listOf(Attr.INS, Attr.IDF, Attr.BLK), "Overpowers everyone inside on both ends of the floor");
 }
 
 enum class Trait(val label: String, val good: Boolean) {

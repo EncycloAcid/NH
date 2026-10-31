@@ -111,6 +111,20 @@ class MenuShotsTest {
         shot("Z04_state_picker")
     }
 
+    /** The play style picker in the creator: the position's own styles, now 10 or 11 of them. */
+    @Test
+    fun stylePicker() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(9)
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.installDraft(LeagueGen.newLeague())
+        rule.setContent { App(vm) }
+        rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
+        rule.onAllNodes(hasText("Shot Creator")).onFirst().performClick(); idle()
+        assertTrue("style picker open", rule.onAllNodes(hasText("Spark Plug")).fetchSemanticsNodes().isNotEmpty())
+        shot("Z09_style_picker")
+    }
+
     @Test
     fun menus() {
         GameViewModel.autoLoad = false

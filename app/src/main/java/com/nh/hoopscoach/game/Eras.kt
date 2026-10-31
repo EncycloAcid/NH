@@ -18,7 +18,7 @@ enum class Era(
     TODAY(0, "Today", "Today's league", "The real teams and players of today, threes everywhere, the NBA Cup and the play-in.",
         154_647, 1.0, 1.0, 0.0, 1.0),
     Y2013(2013, "2013", "LeBron's Heat", "LeBron, Wade and Bosh chase a repeat. Durant and Westbrook in OKC, Lob City, Curry's first big year. The three is taking over.",
-        58_044, 1.08, 0.44, -0.035, 0.95),
+        58_044, 1.08, 0.44, -0.042, 0.95),
     Y2003(2003, "2003", "Shaq, Kobe and Duncan", "The Lakers' three-peat ends and Duncan wins again. McGrady, Iverson, Garnett, Kidd's Nets. Hand-checking and grind-it-out defense.",
         40_271, 1.09, 0.31, -0.065, 1.0),
     Y1996(1996, "1996", "Jordan's Bulls", "Jordan, Pippen and Rodman go 72-10. Shaq and Penny, Payton and Kemp, Malone and Stockton, Hakeem. A shorter three-point line.",

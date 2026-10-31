@@ -76,11 +76,16 @@ object Ratings {
 
     fun styles(pos: Pos): List<Arch> = when (pos) {
         // Every archetype belongs to one position.
-        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER)
-        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD)
-        Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING)
-        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR)
-        Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN)
+        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER,
+            Arch.SCORING_POINT, Arch.SPEEDSTER, Arch.PNR_MAESTRO, Arch.POINT_OF_ATTACK)
+        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD,
+            Arch.SPOT_UP, Arch.MIDRANGE_MAESTRO, Arch.DOWNHILL_GUARD, Arch.SPARK_PLUG)
+        Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING,
+            Arch.THREE_LEVEL, Arch.POST_WING, Arch.CORNER_SPECIALIST, Arch.TWO_WAY_WING)
+        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR,
+            Arch.LOW_POST_FOUR, Arch.PLAYMAKING_FOUR, Arch.DUNKER_SPOT, Arch.DEFENSIVE_FOUR)
+        Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN,
+            Arch.GLASS_CLEANER, Arch.ELBOW_HUB, Arch.MOBILE_BIG, Arch.PAINT_BEAST)
     }
 
     /** Build an attribute set whose overall lands near [target]. */
