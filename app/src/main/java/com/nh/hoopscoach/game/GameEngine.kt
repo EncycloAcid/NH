@@ -206,7 +206,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         road?.let { it.moments++ }
         fun stolen(loser: Player, how: String) {
             line(o, loser).tov++
-            val stealer = Rng.weighted(defense) { it[Attr.STL].toDouble().pow(3) * Tendency.stl(it) }
+            val stealer = Rng.weighted(defense) { (0.65 * it[Attr.STL] + 0.35 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
             line(d, stealer).stl++
             log(d, "${stealer.short} $how ${loser.short}!", 0)
             lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
@@ -475,6 +475,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (others.isEmpty()) 1.0 else 1.0 + 0.4 * ((h.ovr - others.average()) / 8.0).coerceIn(0.0, 1.0)
     }
 
+    /** As the user's player becomes his team's star he does more of everything his style does, not just score. */
+    private val heroSpec = 1.0 + (heroUsage.max() - 1.0) * 0.6
+    private fun spec(p: Player) = if (p.id == heroId) heroSpec else 1.0
+
     /**
      * Who takes the shot. In the pros the gap between stars and starters is flattened a little and
      * nobody takes much more than a third of his team's shots, so one star doesn't score 40 a night
@@ -601,7 +605,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val kind = Rng.d()
             when {
                 kind < 0.55 -> {
-                    val stealer = Rng.weighted(defense) { it[Attr.STL].toDouble().pow(3) * Tendency.stl(it) }
+                    val stealer = Rng.weighted(defense) { (0.65 * it[Attr.STL] + 0.35 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
                     line(d, stealer).stl++
                     log(d, "${stealer.short} steals it from ${loser.short}", 0)
                 }
@@ -690,7 +694,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     val mates = offense.filter { it.id != shooter.id }
                     if (mates.isNotEmpty()) {
                         // The best passers, point guards above all, get most of the assists.
-                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) * Tendency.pass(it) }
+                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) * Tendency.pass(it) * spec(it) }
                         line(o, passer).ast++
                         astText = " (${passer.short} assists)"
                     }
@@ -723,7 +727,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (Rng.chance(pBlk)) {
                 // Rim protectors, big men above all, get most of the blocks.
                 // Rim protectors get most blocks at the rim; on jump shots anyone closing out can get a hand on it.
-                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) }
+                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) * spec(it) }
                 line(d, b).blk++
                 blocked = true
                 log(d, "${b.short} blocks ${shooter.short}!", 0)
@@ -751,7 +755,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         else when (p) { Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05 }
 
     /** Who grabs a rebound: good rebounders and big men most, but guards chase long ones too. */
-    private fun rebounder(side: List<Player>) = Rng.weighted(side) { (it[Attr.REB] / 70.0).pow(2) * posReb(it.pos) * Tendency.reb(it) }
+    private fun rebounder(side: List<Player>) = Rng.weighted(side) { (it[Attr.REB] / 70.0).pow(2) * posReb(it.pos) * Tendency.reb(it) * spec(it) }
 
     /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
     private val teamRebound get() = Rng.chance(if (lg.pro) 0.11 else 0.05)
