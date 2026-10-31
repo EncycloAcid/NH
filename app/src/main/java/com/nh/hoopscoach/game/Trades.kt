@@ -30,6 +30,12 @@ object Trades {
         return exp((p.ovr - 82) / 3.5 + upside + prod) * age
     }
 
+    /** His trade value in a word: Franchise, All-Star, Starter, Rotation or Bench. */
+    fun tier(p: Player): String {
+        val v = value(p)
+        return when { v >= 40 -> "Franchise"; v >= 12 -> "All-Star"; v >= 4 -> "Starter"; v >= 1.5 -> "Rotation"; else -> "Bench" }
+    }
+
     /** How [t] sees him: a rebuilding team pays more for youth and less for veterans; a contender the other way. */
     fun valueFor(lg: League, t: Team, p: Player): Double {
         val v = value(p)

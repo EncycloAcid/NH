@@ -101,7 +101,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 Column(Modifier.weight(1f)) {
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${p.posLabel} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
+                    Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
+                        " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }
@@ -114,11 +115,30 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Ring(Ratings.defense(p), 50.dp, label = "DEF")
                 }
             }
+            // This season at a glance.
+            val s = p.stats
+            if (s.gp > 0) {
+                Spacer(Modifier.height(8.dp))
+                Panel(padding = PaddingValues(vertical = 10.dp, horizontal = 8.dp)) {
+                    Text("${lg.season} · ${s.gp} ${if (s.gp == 1) "game" else "games"} · ${"%.1f".format(s.mpg)} min", style = T.label, color = P.sub, modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        for ((label, v) in listOf("PTS" to "%.1f".format(s.ppg), "REB" to "%.1f".format(s.rpg), "AST" to "%.1f".format(s.apg),
+                            "STL" to "%.1f".format(s.spg), "BLK" to "%.1f".format(s.bpg), "FG%" to "%.0f".format(s.fgPct * 100), "3P%" to "%.0f".format(s.tpPct * 100))) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(v, style = T.numSm, color = P.ink)
+                                Text(label, style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                            }
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag(p.style.label.uppercase(), P.accent)
-                if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
-                if (team != null) {
+                // College players have a draft stock and a mood; pros have a trade value.
+                if (lg.pro && team != null) Tag("TRADE VALUE: ${com.nh.hoopscoach.game.Trades.tier(p).uppercase()}", P.sub)
+                else if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
+                if (team != null && !lg.pro) {
                     val m = Morale.mood(p)
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
                 }
@@ -126,7 +146,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
             }
-            Spacer(Modifier.height(12.dp))
+            Text(playsLike(p), style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+            Spacer(Modifier.height(6.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // In player mode you only manage yourself, and your NIL comes from your deal.
                 val coaching = mine && !lg.playerMode
@@ -195,12 +216,33 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
     }
 }
 
+/** What his play style does on the floor, in a line: "Two-Way Guard: hunts threes, creates off the dribble, locks down the perimeter." */
+private fun playsLike(p: Player): String = p.style.label + ": " + p.style.boosts.joinToString(", ") {
+    when (it) {
+        Attr.OUT -> "hunts threes"; Attr.INS -> "attacks the rim"; Attr.MID -> "pulls up from mid-range"; Attr.PAS -> "sets up teammates"
+        Attr.HND -> "creates off the dribble"; Attr.REB -> "crashes the glass"; Attr.PER -> "locks down the perimeter"; Attr.IDF -> "guards the paint"
+        Attr.STL -> "jumps passing lanes"; Attr.BLK -> "blocks shots"
+    }
+} + "."
+
 @Composable
 private fun RatingsTab(p: Player) {
+    // The five categories, then every rating.
+    Section("Categories")
+    Panel(padding = PaddingValues(vertical = 12.dp, horizontal = 6.dp)) {
+        fun avg(vararg a: Attr) = a.map { p[it] }.average().toInt()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Ring(avg(Attr.OUT, Attr.MID), 44.dp, label = "OUT")
+            Ring(avg(Attr.INS), 44.dp, label = "INS")
+            Ring(avg(Attr.HND, Attr.PAS), 44.dp, label = "PLAY")
+            Ring(avg(Attr.PER, Attr.IDF, Attr.STL, Attr.BLK), 44.dp, label = "DEF")
+            Ring(avg(Attr.REB), 44.dp, label = "REB")
+        }
+    }
     Section("Offense")
-    Panel { listOf(Attr.INS, Attr.MID, Attr.OUT, Attr.HND, Attr.PAS).forEach { AttrBar(it.label, p[it], p.seasonGains[it.ordinal]) } }
+    Panel { listOf(Attr.INS, Attr.MID, Attr.OUT, Attr.HND, Attr.PAS).forEach { AttrBar(it.label, shown(p[it]), p.seasonGains[it.ordinal]) } }
     Section("Defense")
-    Panel { listOf(Attr.REB, Attr.PER, Attr.IDF, Attr.STL, Attr.BLK).forEach { AttrBar(it.label, p[it], p.seasonGains[it.ordinal]) } }
+    Panel { listOf(Attr.REB, Attr.PER, Attr.IDF, Attr.STL, Attr.BLK).forEach { AttrBar(it.label, shown(p[it]), p.seasonGains[it.ordinal]) } }
 }
 
 @Composable
