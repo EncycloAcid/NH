@@ -38,7 +38,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Awards
+import com.nh.hoopscoach.game.AwardsNight
+import com.nh.hoopscoach.game.GameType
 import com.nh.hoopscoach.game.League
+import com.nh.hoopscoach.game.Lottery
+import com.nh.hoopscoach.game.NbaCup
 import com.nh.hoopscoach.game.PRO_YEAR
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Player
@@ -73,10 +77,20 @@ fun proPace(rank: Int) = when {
     else -> "Outside the award races"
 }
 
-private fun proPhase(lg: League) = when (lg.phase) {
-    Phase.REGULAR -> if (lg.day == ProLeague.allStarDay(lg)) "All-Star break" else "Game ${(lg.user.gp + 1).coerceAtMost(ProLeague.seasonGames(lg))} of ${ProLeague.seasonGames(lg)}"
-    Phase.PLAYOFFS -> "Playoffs"
-    else -> "Offseason"
+private fun proPhase(lg: League): String {
+    val ps = lg.proState
+    return when (lg.phase) {
+        Phase.REGULAR -> when (lg.day) {
+            ProLeague.allStarDay(lg) -> "All-Star break"
+            ps?.cupQfDay -> "NBA Cup quarterfinals"
+            ps?.cupSfDay -> "NBA Cup semifinals"
+            ps?.cupFinalDay -> "NBA Cup Final"
+            ps?.rivalryDay -> "Rivalry Night"
+            else -> "Game ${(lg.user.gp + 1).coerceAtMost(ProLeague.seasonGames(lg))} of ${ProLeague.seasonGames(lg)}"
+        }
+        Phase.PLAYOFFS -> if ((ps?.series?.maxOfOrNull { it.round } ?: 1) == 0) "Play-in" else "Playoffs"
+        else -> "Offseason"
+    }
 }
 
 private fun seedText(lg: League, t: Team): String {
@@ -87,7 +101,7 @@ private fun seedText(lg: League, t: Team): String {
 }
 
 /** The series the user's team is in right now (or the last one it played). */
-private fun userSeries(lg: League): Series? = lg.proState?.series?.filter { it.involves(lg.userTeamId) }?.maxByOrNull { it.round }
+private fun userSeries(lg: League): Series? = ProSeason.lastSeries(lg, lg.userTeamId)
 
 private fun seriesLine(lg: League, s: Series, from: Int): String {
     val mine = if (s.hi == from) s.hiWins else s.loWins
@@ -154,8 +168,31 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         if (ps != null && ps.allStarSeason == lg.season && ps.allStarNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day <= ProLeague.allStarDay(lg) + 7) item {
             Section("All-Star Weekend")
             Panel(color = if (lg.heroId in ps.allStars) P.hero else P.surface) {
+                Text("SUNDAY · ALL-STAR GAME", style = T.label, color = if (lg.heroId in ps.allStars) P.onHero.copy(alpha = 0.8f) else P.accent)
                 Text(ps.allStarNote, style = T.body, color = if (lg.heroId in ps.allStars) P.onHero else P.ink)
             }
+            if (ps.weekend.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                GroupList(ps.weekend) { line ->
+                    val mine = line.contains(" you") || line.contains(" You") || line.contains("That's you")
+                    Column(Modifier.fillMaxWidth().then(if (mine) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(line.substringBefore(":").uppercase(), style = T.label, color = P.accent)
+                        Text(line.substringAfter(": "), style = T.small, color = P.ink)
+                    }
+                }
+            }
+        }
+        if (ps != null && NbaCup.active(lg) && lg.phase == Phase.REGULAR && lg.day <= ps.cupFinalDay + 6 && lg.games.any { it.played && it.label.startsWith("NBA Cup") }) item {
+            Section("NBA Cup", action = "Groups", onAction = { vm.leagueTab = 2; vm.select(Tab.LEAGUE) })
+            val won = ps.cupChampion >= 0 && ps.cupChampion == u.id
+            Panel(color = if (won) P.hero else P.surface) {
+                Text(if (ps.cupChampion >= 0) "CUP CHAMPIONS" else if (ps.cup.isNotEmpty()) "KNOCKOUT ROUND" else "GROUP STAGE", style = T.label, color = if (won) P.onHero.copy(alpha = 0.8f) else P.accent)
+                Text(NbaCup.status(lg), style = T.bodyB, color = if (won) P.onHero else P.ink)
+                if (ps.cup.isEmpty()) Text("Group winners and one wild card per conference go to the knockouts. The semifinals and Final are in Las Vegas.", style = T.small, color = P.sub)
+            }
+        }
+        if (ps != null && lg.phase == Phase.PLAYOFFS && ps.mvpVotes.isNotEmpty() && (ps.series.maxOfOrNull { it.round } ?: 0) <= 1) item {
+            AwardsNightCard(vm, lg)
         }
         if (lg.phase == Phase.PLAYOFFS) item {
             Section("Playoffs", action = "Bracket", onAction = { vm.leagueTab = 1; vm.select(Tab.LEAGUE) })
@@ -163,8 +200,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             Panel {
                 if (s == null) Text("The ${u.name} missed the playoffs. The postseason goes on without you.", style = T.body, color = P.sub)
                 else {
-                    Text(ProSeason.roundName(s).uppercase(), style = T.label, color = P.accent)
-                    Text(seriesLine(lg, s, u.id), style = T.head, color = P.ink)
+                    Text((if (s.bestOf == 1) "Play-in · ${ProSeason.playInName(s)}" else ProSeason.roundName(s)).uppercase(), style = T.label, color = P.accent)
+                    Text(if (s.bestOf == 1) playInLine(lg, s, u.id) else seriesLine(lg, s, u.id), style = T.head, color = P.ink)
                     if (s.done && s.winner != u.id) Text("Your season is over. Sim ahead to see who wins it all.", style = T.small, color = P.sub)
                 }
             }
@@ -245,7 +282,7 @@ private fun StandingRow(vm: GameViewModel, lg: League, rank: Int, t: Team, leade
     val mine = t.id == lg.userTeamId
     val gb = ((leader.w - t.w) + (t.l - leader.l)) / 2.0
     ListRow(modifier = if (mine) Modifier.background(P.accentSoft) else Modifier) {
-        Text("$rank", style = T.numSm, color = if (rank <= 8) P.accent else P.faint, modifier = Modifier.width(28.dp))
+        Text("$rank", style = T.numSm, color = if (rank <= 6) P.accent else if (rank <= 10) P.gold else P.faint, modifier = Modifier.width(28.dp))
         TeamBadge(t, 32.dp)
         Spacer(Modifier.width(10.dp))
         Text(t.name, style = if (mine) T.bodyB else T.body, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -277,7 +314,11 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
         Column(Modifier.weight(1f)) {
             if (game != null) {
                 val opp = lg.team(game.opp(u.id))
-                val tag = if (game.type == com.nh.hoopscoach.game.GameType.PLAYOFF) game.label.uppercase() else "GAME ${u.gp + 1} · ${if (game.home == u.id) "HOME" else "AWAY"}"
+                val tag = when {
+                    game.type == GameType.PLAYOFF || game.type == GameType.CUP -> game.label.uppercase()
+                    game.label.isNotEmpty() -> "GAME ${u.gp + 1} · ${game.label.removePrefix("NBA Cup · ").let { if (game.label.startsWith("NBA Cup")) "CUP NIGHT" else it }.uppercase()}"
+                    else -> "GAME ${u.gp + 1} · ${if (game.home == u.id) "HOME" else "AWAY"}"
+                }
                 Text(tag, style = T.label, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${if (game.home == u.id) "vs" else "at"} ${opp.name}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             } else {
@@ -367,11 +408,11 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
 
 @Composable
 fun ProLeagueScreen(vm: GameViewModel, lg: League) {
-    val tab = vm.leagueTab.coerceIn(0, 3)
+    val tab = vm.leagueTab.coerceIn(0, 4)
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", "The League", null)
-            Segmented(listOf("Standings", "Playoffs", "Leaders", "History"), tab, { vm.leagueTab = it }, scroll = false)
+            Segmented(listOf("Standings", "Playoffs", "Cup", "Leaders", "History"), tab, { vm.leagueTab = it })
             Spacer(Modifier.height(8.dp))
         }
         when (tab) {
@@ -379,10 +420,11 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
                 val st = ProSeason.standings(lg, c)
                 Section(lg.conf(c).name)
                 GroupList(st) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
-                Text("Top eight make the playoffs.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+                Text("Top six make the playoffs. Seven to ten go to the play-in.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
             }
             1 -> playoffs(vm, lg)
-            2 -> leaders(vm, lg)
+            2 -> cup(lg)
+            3 -> leaders(vm, lg)
             else -> history(lg)
         }
         item { Spacer(Modifier.height(16.dp)) }
@@ -393,12 +435,15 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
     val ps = lg.proState ?: return
     if (ps.series.isEmpty()) {
         item {
-            Panel { Text("The playoffs start after game ${ProLeague.seasonGames(lg)}: the top eight in each conference, best of seven all the way.", style = T.body, color = P.sub) }
+            Panel { Text("After game ${ProLeague.seasonGames(lg)}, the top six in each conference are in. Seeds 7 to 10 play in: the 7-8 winner is the 7 seed, the 9-10 loser goes home, and the last two play for the 8 seed. Then it's best of seven all the way.", style = T.body, color = P.sub) }
             for (c in 0..1) {
                 Section("${lg.conf(c).abbr} if the season ended today")
-                val st = ProSeason.standings(lg, c).take(8)
-                GroupList(listOf(0 to 7, 3 to 4, 2 to 5, 1 to 6)) { (a, b) ->
-                    Text("${a + 1} ${st.getOrNull(a)?.name ?: ""}  vs  ${b + 1} ${st.getOrNull(b)?.name ?: ""}", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                val st = ProSeason.standings(lg, c).take(10)
+                GroupList(listOf(0 to 7, 3 to 4, 2 to 5, 1 to 6, 6 to 7, 8 to 9)) { (a, b) ->
+                    val playIn = a >= 6
+                    val right = if (!playIn && b >= 6) "${b + 1} play-in winner" else "${b + 1} ${st.getOrNull(b)?.name ?: ""}"
+                    Text((if (playIn) "Play-in · " else "") + "${a + 1} ${st.getOrNull(a)?.name ?: ""}  vs  $right",
+                        style = T.small, color = if (playIn) P.sub else P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
                 }
             }
         }
@@ -410,25 +455,119 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
             Text(lg.team(ps.champion).name.uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
         }
     }
-    for (round in 4 downTo 1) {
+    for (round in 4 downTo 0) {
         val list = ps.series.filter { it.round == round }.sortedWith(compareBy<Series> { it.conf }.thenBy { it.slot })
         if (list.isEmpty()) continue
         item {
-            Section(ProLeague.ROUND_NAMES[round - 1])
+            Section(if (round == 0) "Play-In Tournament" else ProLeague.ROUND_NAMES[round - 1])
             GroupList(list) { s -> SeriesRow(lg, s) }
         }
     }
 }
 
+private fun playInLine(lg: League, s: Series, from: Int): String {
+    val opp = lg.team(if (s.hi == from) s.lo else s.hi)
+    return when {
+        !s.done -> "One game vs the ${opp.name}"
+        s.winner == from -> when (s.slot) { 0 -> "Beat the ${opp.name}. You're the 7 seed"; 1 -> "Beat the ${opp.name}. One more win to get in"; else -> "Beat the ${opp.name}. You're the 8 seed" }
+        else -> if (s.slot == 0) "Lost to the ${opp.name}. One more chance" else "Lost to the ${opp.name}. Season over"
+    }
+}
+
+/** The NBA Cup: knockout bracket, then the six groups. */
+private fun LazyListScope.cup(lg: League) {
+    val ps = lg.proState ?: return
+    if (!NbaCup.active(lg)) {
+        item { Panel { Text("The NBA Cup starts with next season's schedule.", style = T.body, color = P.sub) } }
+        return
+    }
+    if (ps.cupChampion >= 0) item {
+        Panel(color = P.hero) {
+            Text("NBA CUP CHAMPIONS", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+            Text(lg.team(ps.cupChampion).name.uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+            if (ps.cupMvp.isNotEmpty()) Text("Cup MVP: ${ps.cupMvp}", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+        }
+    }
+    if (ps.cup.isEmpty()) item {
+        Panel {
+            Text("FIVE CUP NIGHTS", style = T.label, color = P.accent)
+            Text("Each team plays its four group mates once. Those games count in the standings. Group winners and the best runner-up in each conference reach the quarterfinals. The semifinals and Final are in Las Vegas, and the knockout games don't count in the standings.", style = T.small, color = P.ink)
+        }
+    }
+    for (round in 3 downTo 1) {
+        val list = ps.cup.filter { it.round == round }.sortedWith(compareBy<Series> { it.conf }.thenBy { it.slot })
+        if (list.isEmpty()) continue
+        item {
+            Section(when (round) { 1 -> "Quarterfinals"; 2 -> "Semifinals · Las Vegas"; else -> "Final · Las Vegas" })
+            GroupList(list) { s -> SeriesRow(lg, s, cup = true) }
+        }
+    }
+    for (g in ps.cupGroups.indices) item {
+        Section(NbaCup.groupName(g))
+        GroupList(NbaCup.table(lg, g).withIndex().toList()) { (i, row) ->
+            val t = lg.team(row.teamId)
+            val mine = t.id == lg.userTeamId
+            ListRow(modifier = if (mine) Modifier.background(P.accentSoft) else Modifier) {
+                Text("${i + 1}", style = T.numSm, color = if (row.teamId in ps.cupSeeds) P.accent else P.faint, modifier = Modifier.width(28.dp))
+                TeamBadge(t, 30.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(t.name, style = if (mine) T.bodyB else T.body, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${row.w}-${row.l}", style = T.numSm, color = P.ink, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
+                Text(if (row.diff > 0) "+${row.diff}" else "${row.diff}", style = T.small, color = P.sub, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
+            }
+        }
+    }
+}
+
+/** Awards night: the MVP vote, then the rest of the season's honors. */
 @Composable
-private fun SeriesRow(lg: League, s: Series) {
+private fun AwardsNightCard(vm: GameViewModel, lg: League) {
+    val ps = lg.proState ?: return
+    Section("Awards night", action = "All awards", onAction = { vm.leagueTab = 4; vm.select(Tab.LEAGUE) })
+    val top = ps.mvpVotes.firstOrNull()
+    val heroWon = top?.pid == lg.heroId
+    Panel(color = if (heroWon) P.hero else P.surface) {
+        Text("${lg.season} MOST VALUABLE PLAYER", style = T.label, color = if (heroWon) P.onHero.copy(alpha = 0.8f) else P.accent)
+        Text(top?.name ?: "", style = T.hero.copy(fontSize = 26.sp), color = if (heroWon) P.onHero else P.ink)
+        if (top != null) Text("${lg.team(top.teamId).name} · ${top.firsts} of 100 first-place votes", style = T.small, color = if (heroWon) P.onHero.copy(alpha = 0.9f) else P.sub)
+        val finish = AwardsNight.heroFinish(lg)
+        if (finish > 1) Text("You finished ${ordinal(finish)} in the voting.", style = T.bodyB, color = P.accent)
+    }
+    Spacer(Modifier.height(8.dp))
+    GroupList(ps.mvpVotes.take(5).withIndex().toList()) { (i, v) ->
+        ListRow(modifier = if (v.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier) {
+            Text("${i + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(28.dp))
+            Text(v.name, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${v.points} pts", style = T.numSm, color = P.ink)
+        }
+    }
+    val major = lg.seasonAwards.filter { it.award in listOf("Rookie of the Year", "Defensive Player of the Year", "Sixth Man of the Year", "Most Improved Player") }
+    if (major.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        GroupList(major) { a ->
+            Column(Modifier.fillMaxWidth().then(if (a.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Text(a.award.uppercase(), style = T.label, color = P.accent)
+                Text("${a.name} · ${lg.team(a.teamId).name}", style = T.bodyB, color = P.ink)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeriesRow(lg: League, s: Series, cup: Boolean = false) {
     val mine = s.involves(lg.userTeamId)
+    // One-game rounds show the score, not a series count.
+    val game = if (s.bestOf == 1) s.gameIds.lastOrNull()?.let { lg.game(it) }?.takeIf { it.played } else null
     Column(Modifier.fillMaxWidth().then(if (mine) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
-        for ((tid, wins) in listOf(s.hi to s.hiWins, s.lo to s.loWins)) {
+        if (s.bestOf == 1 && !cup) Text(ProSeason.playInName(s).uppercase(), style = T.label, color = P.faint)
+        for ((tid, w) in listOf(s.hi to s.hiWins, s.lo to s.loWins)) {
             val t = lg.team(tid)
             val won = s.winner == tid
+            val wins = if (s.bestOf == 1) (if (game == null) "" else "${game.scoreFor(tid)}") else "$w"
+            // Play-in seeds change as the games are played, so those rows lean on the "7 vs 8" label instead.
+            val seed = if (cup) lg.proState?.cupSeeds?.get(tid) ?: 0 else if (s.bestOf == 1) 0 else ProSeason.seed(lg, tid)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                Text("${ProSeason.seed(lg, tid).takeIf { it > 0 } ?: ""}", style = T.small, color = P.faint, modifier = Modifier.width(22.dp))
+                Text("${seed.takeIf { it > 0 } ?: ""}", style = T.small, color = P.faint, modifier = Modifier.width(22.dp))
                 TeamBadge(t, 26.dp)
                 Spacer(Modifier.width(8.dp))
                 Text(t.name, style = if (won) T.bodyB else T.body, color = if (s.done && !won) P.faint else P.ink, modifier = Modifier.weight(1f), maxLines = 1)
@@ -486,6 +625,19 @@ private fun LazyListScope.history(lg: League) {
                 Text(a.award.uppercase(), style = T.label, color = P.accent)
                 Text("${a.name} · ${lg.team(a.teamId).name}", style = T.bodyB, color = P.ink)
                 Text(a.line, style = T.small, color = P.sub)
+            }
+        }
+    }
+    if (ps.mvpVotes.isNotEmpty()) item {
+        Section("${lg.season} MVP vote")
+        GroupList(ps.mvpVotes.withIndex().toList()) { (i, v) ->
+            ListRow(modifier = if (v.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier) {
+                Text("${i + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(28.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(v.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${lg.team(v.teamId).name} · ${v.firsts} first-place", style = T.small, color = P.sub, maxLines = 1)
+                }
+                Text("${v.points}", style = T.numSm, color = P.ink)
             }
         }
     }
@@ -637,7 +789,7 @@ private fun LazyListScope.recordsBook(lg: League) {
                 }
             }
         }
-        if (scope == "Career") Text("Totals from 58-game seasons in older saves count as a full 82. Breaking a record adds 3 legacy points.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+        if (scope == "Career") Text("Totals from 58-game seasons in older saves count as a full 83. Breaking a record adds 3 legacy points.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 }
 
@@ -985,9 +1137,29 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
 private fun LazyListScope.draftStep(vm: GameViewModel, lg: League, t: Team) {
     val ps = lg.proState!!
     item {
+        if (ps.lotterySeason == lg.season && ps.lotteryPicks.isNotEmpty()) {
+            Section("Lottery night")
+            Panel(Modifier.padding(bottom = 8.dp)) {
+                Text("THE BALLS ARE DRAWN", style = T.label, color = P.accent)
+                Text("The 14 teams that missed the playoffs drew for the top four picks. The three worst records had a 14% shot at No. 1.", style = T.small, color = P.ink)
+            }
+            GroupList(ps.lotteryPicks.take(14).withIndex().toList()) { (i, tid) ->
+                val team = lg.team(tid)
+                val mv = Lottery.move(lg, tid)
+                val mine = tid == lg.userTeamId
+                ListRow(modifier = if (mine) Modifier.background(P.accentSoft) else Modifier) {
+                    Text("${i + 1}", style = T.numSm, color = if (i < 4) P.accent else P.faint, modifier = Modifier.width(28.dp))
+                    TeamBadge(team, 30.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text(team.name, style = if (mine) T.bodyB else T.body, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (mv > 0) "▲ $mv" else if (mv < 0) "▼ ${-mv}" else "—", style = T.small, color = if (mv > 0) P.good else if (mv < 0) P.bad else P.faint)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Panel {
             Text("DRAFT NIGHT", style = T.label, color = P.accent)
-            Text("Sixty rookies join the league. The worst teams picked first.", style = T.body, color = P.ink)
+            Text("Sixty rookies join the league, in the order the lottery and the standings set.", style = T.body, color = P.ink)
         }
         val mine = ps.draftedByUser.mapNotNull { lg.playerOrNull(it) }
         if (mine.isNotEmpty()) {

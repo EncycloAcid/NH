@@ -18,14 +18,14 @@ object AllTime {
     const val ALL_STAR = 1.0
     const val DPOY = 2.0
     const val ROY = 1.0
-    /** Per thousand career points, on an 82-game scale. */
+    /** Per thousand career points, on an 83-game scale. */
     const val PER_1000 = 0.6
 
-    /** A finished season counts as 82 games (older saves played 58). */
-    fun lineScale(l: SeasonLine) = if (l.w + l.l in 40..81) 82.0 / (l.w + l.l) else 1.0
+    /** A finished season counts as a full 83 games (older saves played 58). */
+    fun lineScale(l: SeasonLine) = if (l.w + l.l in 40..82) ProLeague.GAMES.toDouble() / (l.w + l.l) else 1.0
 
     /** The season in progress, the same way. */
-    fun currentScale(lg: League) = 82.0 / ProLeague.seasonGames(lg)
+    fun currentScale(lg: League) = ProLeague.GAMES.toDouble() / ProLeague.seasonGames(lg)
 
     /** You make the list at this score. */
     const val FLOOR = 20.0

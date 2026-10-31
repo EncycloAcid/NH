@@ -89,7 +89,7 @@ enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON, PLAYOFFS }
 /** College basketball, or (once the user's player is drafted) the pro league. */
 enum class Level { COLLEGE, PRO }
 
-enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT"), PLAYOFF("PO") }
+enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT"), PLAYOFF("PO"), CUP("CUP") }
 
 @Serializable
 class StatLine(
@@ -760,14 +760,20 @@ class ProOffer(
     val max: Int = 0, var countered: Boolean = false, var note: String = "",
 )
 
-/** A best-of-seven playoff series. [conf] is -1 for the Finals; [slot] orders the bracket. */
+/**
+ * A playoff series, best of seven unless [bestOf] says otherwise (play-in and NBA Cup games are one game).
+ * [conf] is -1 for the Finals; [slot] orders the bracket. Round 0 is the play-in.
+ */
 @Serializable
 class Series(
     val round: Int, val conf: Int, val slot: Int, val hi: Int, val lo: Int,
     var hiWins: Int = 0, var loWins: Int = 0, val gameIds: MutableList<Int> = mutableListOf(),
+    val bestOf: Int = 7,
 ) {
-    val done get() = hiWins == 4 || loWins == 4
-    val winner get() = if (hiWins == 4) hi else if (loWins == 4) lo else -1
+    private val need get() = bestOf / 2 + 1
+    val done get() = hiWins == need || loWins == need
+    val winner get() = if (hiWins == need) hi else if (loWins == need) lo else -1
+    val loser get() = if (hiWins == need) lo else if (loWins == need) hi else -1
     fun involves(t: Int) = hi == t || lo == t
 }
 
@@ -810,7 +816,31 @@ class ProState(
     /** The records book, and this summer's star free agents. */
     val records: MutableList<BookRecord> = mutableListOf(),
     val freeStars: MutableList<Int> = mutableListOf(),
+    /** The NBA Cup: six groups of five (East first), the knockout bracket, its days and its winner. */
+    val cupGroups: MutableList<MutableList<Int>> = mutableListOf(),
+    val cup: MutableList<Series> = mutableListOf(),
+    val cupSeeds: MutableMap<Int, Int> = mutableMapOf(),
+    var cupQfDay: Int = 0,
+    var cupSfDay: Int = 0,
+    var cupFinalDay: Int = 0,
+    var cupChampion: Int = -1,
+    var cupMvp: String = "",
+    var cupNote: String = "",
+    /** Game 83: Rivalry Night. */
+    var rivalryDay: Int = 0,
+    /** All-Star Saturday and the Rising Stars: one line per event. */
+    val weekend: MutableList<String> = mutableListOf(),
+    /** Lottery night: the 14 lottery teams worst first, and the order the balls set. */
+    val lotteryPre: MutableList<Int> = mutableListOf(),
+    val lotteryPicks: MutableList<Int> = mutableListOf(),
+    var lotterySeason: Int = 0,
+    /** Awards night: the MVP vote. */
+    val mvpVotes: MutableList<Vote> = mutableListOf(),
 )
+
+/** One player's share of the MVP vote: 100 voters, 10-7-5-3-1. */
+@Serializable
+class Vote(val pid: Int, val name: String, val teamId: Int, val points: Int, val firsts: Int)
 
 /** One night in his playoff highlight reel. */
 @Serializable

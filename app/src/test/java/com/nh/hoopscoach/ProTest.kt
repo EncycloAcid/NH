@@ -260,7 +260,14 @@ class ProTest {
             seasons++
             assertEquals(Phase.REGULAR, lg.phase)
             assertTrue("salary paid", lg.road!!.salarySeason == lg.season)
-            assertTrue("82 games each", lg.teams.all { t -> lg.games.count { it.involves(t.id) } == ProLeague.GAMES })
+            assertEquals(83, ProLeague.GAMES)
+            assertTrue("83 games each", lg.teams.all { t -> lg.games.count { it.involves(t.id) && it.type != GameType.CUP } == ProLeague.GAMES })
+            val ps0 = lg.proState!!
+            assertTrue("six Cup groups of five", ps0.cupGroups.size == 6 && ps0.cupGroups.all { it.size == 5 })
+            assertTrue("four Cup group games each", lg.teams.all { t -> lg.games.count { it.involves(t.id) && it.label.startsWith("NBA Cup") } == 4 })
+            assertTrue("Cup group games stay in the group", lg.games.filter { it.label.startsWith("NBA Cup") }.all { g -> ps0.cupGroups.any { g.home in it && g.away in it } })
+            assertTrue("Rivalry Night: one game each", lg.teams.all { t -> lg.games.count { it.involves(t.id) && it.label == "Rivalry Night" } == 1 })
+            assertTrue("Cup knockout days are free", lg.games.none { it.day in listOf(ps0.cupQfDay, ps0.cupSfDay, ps0.cupFinalDay) })
             assertTrue("one game a day at most", lg.teams.all { t -> lg.games.filter { it.involves(t.id) }.groupBy { it.day }.values.all { it.size == 1 } })
             assertTrue("no games on All-Star day", lg.games.none { it.day == ProLeague.allStarDay(lg) })
             var guard = 0
@@ -277,6 +284,13 @@ class ProTest {
             assertTrue("AI teams trade at the deadline", lg.proState!!.trades.any { it.season == lg.season && !it.offseason })
             assertTrue("a champion", ps.champion >= 0)
             assertTrue("16 playoff teams", ps.seeds.size == 16)
+            assertTrue("a play-in: three games a conference", ps.series.count { it.round == 0 } == 6 && ps.series.filter { it.round == 0 }.all { it.done && it.gameIds.size == 1 })
+            assertTrue("play-in teams fill seeds 7 and 8", (0..1).all { c -> ps.series.filter { it.round == 1 && it.conf == c }.flatMap { listOf(it.hi, it.lo) }.map { ps.seeds[it] }.toSet() == (1..8).toSet() })
+            assertTrue("an NBA Cup winner", ps.cupChampion >= 0 && ps.cup.count { it.round == 1 } == 4 && ps.cup.single { it.round == 3 }.winner == ps.cupChampion)
+            assertTrue("Cup knockouts don't count", lg.games.filter { it.type == GameType.CUP }.size == 7 && lg.teams.all { it.w + it.l == ProLeague.GAMES })
+            assertTrue("All-Star Saturday", ps.weekend.size >= 2)
+            assertTrue("an MVP vote", ps.mvpVotes.size >= 5 && ps.mvpVotes.first().name == lg.seasonAwards.first { it.award == "MVP" }.name && ps.mvpVotes.sumOf { it.firsts } == 100)
+            assertTrue("awards night extras", listOf("All-Defensive 1st", "All-Rookie 1st").all { a -> lg.seasonAwards.count { it.award == a } == 5 })
             assertTrue("playoff games kept apart", lg.games.filter { it.type == GameType.PLAYOFF }.all { it.played })
             assertTrue("all-stars named", ps.allStars.size == 24)
             assertTrue("awards given", listOf("MVP", "Rookie of the Year", "Finals MVP").all { a -> lg.seasonAwards.any { it.award == a } })
@@ -294,8 +308,8 @@ class ProTest {
             val top = lg.seasonAwards.first { it.award == "MVP" }
             println("   MVP line: ${top.line}; scoring leader %.1f".format(lg.players.filter { it.stats.gp >= 30 }.maxOf { it.stats.ppg }))
             lg = SaveIO.decode(SaveIO.encode(lg))
-            // Retire at 35, unless the league retires him first.
-            if (ProCareer.age(lg) >= 35) { ProCareer.retire(lg); break }
+            // Retire at 39, unless the league retires him first.
+            if (ProCareer.age(lg) >= 39) { ProCareer.retire(lg); break }
         }
         val rr = lg.road!!
         println("ending: ${rr.ending}")

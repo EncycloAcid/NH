@@ -725,11 +725,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         val hw = score[0] > score[1]
         // Pro playoff games count in their own stat line, not the standings or the season's averages.
+        // NBA Cup knockout games don't count anywhere, so every team still plays exactly 83.
         val playoff = game.type == GameType.PLAYOFF
+        val counts = !playoff && game.type != GameType.CUP
         for (side in 0..1) {
             val t = teams[side]
             val won = if (side == 0) hw else !hw
-            if (!playoff) {
+            if (counts) {
                 if (won) { t.w++; t.streak = if (t.streak > 0) t.streak + 1 else 1 } else { t.l++; t.streak = if (t.streak < 0) t.streak - 1 else -1 }
                 if (game.type == GameType.CONF) { if (won) t.cw++ else t.cl++ }
             }
@@ -741,7 +743,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 if (st.sec <= 0 && st.fga == 0 && st.fta == 0) continue
                 st.gp = 1
                 if (id in starters[side]) st.gs = 1
-                if (!playoff) p.stats.add(st)
+                if (counts) p.stats.add(st)
                 if (game.type == GameType.NCAA || playoff) p.tourney.add(st)
                 tot.add(st.copy().also { it.gp = 0; it.gs = 0 })
                 if (t.id == lg.userTeamId) {
@@ -761,9 +763,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 Careers.track(lg, p, st, game, t.id)
             }
             tot.gp = 1
-            if (!playoff) t.totals.add(tot)
+            if (counts) t.totals.add(tot)
         }
-        if (!playoff) {
+        if (counts) {
             teams[0].opp.add(lastTotals(1))
             teams[1].opp.add(lastTotals(0))
         }

@@ -7,8 +7,11 @@ import kotlin.math.roundToInt
 object BigNights {
     /** What's riding on playoff game [g] for [teamId], or "" for an ordinary night. */
     fun stakes(lg: League, g: Game, teamId: Int = lg.userTeamId): String {
-        if (!lg.pro || g.type != GameType.PLAYOFF) return ""
+        if (!lg.pro) return ""
+        if (g.type == GameType.CUP) return if (g.label.endsWith("Final")) "NBA Cup Final" else "NBA Cup knockout"
+        if (g.type != GameType.PLAYOFF) return ""
         val s = lg.proState?.series?.firstOrNull { g.id in it.gameIds } ?: return ""
+        if (s.bestOf == 1) return if (s.slot == 0 && s.involves(teamId)) "Win and you're the 7 seed" else if (s.involves(teamId)) "Play-in: win or go home" else ""
         val n = s.gameIds.indexOf(g.id) + 1
         val before = s.gameIds.take(n - 1).map { lg.game(it) }.filter { it.played }
         val mine = before.count { it.winner() == teamId }
@@ -47,7 +50,7 @@ object BigNights {
 
 /**
  * The records book: real single-game, season and career records, with the real holders. Anyone in
- * this league can break them. Career totals count each 58-game season as a full 82, like the
+ * this league can break them. Career totals count each 58-game season as a full 83, like the
  * all-time list. Breaking one adds a "Record" honor (3 legacy points).
  */
 object RecordBook {
@@ -81,7 +84,7 @@ object RecordBook {
 
     private fun stat(s: StatLine, i: Int) = when (i) { 0 -> s.pts; 1 -> s.reb; 2 -> s.ast; 3 -> s.tpm; 4 -> s.stl; else -> s.blk }
 
-    /** A player's pro totals in this league, scaled to 82-game seasons. */
+    /** A player's pro totals in this league, scaled to 83-game seasons. */
     fun careerTotals(lg: League, p: Player): DoubleArray {
         val out = DoubleArray(6)
         for (l in p.career.filter { it.cls == PRO_YEAR }) { val k = AllTime.lineScale(l); for (i in 0 until 6) out[i] += stat(l.s, i) * k }
@@ -172,9 +175,9 @@ object StarRecruit {
     /** Title odds from each team's best eight, weighted toward the top. */
     fun odds(lg: League, rosters: Map<Int, List<Player>> = emptyMap()): Map<Int, Double> {
         val ps = lg.proState
+        // In the playoffs, only teams still alive can win it. Losing the 7-8 play-in game isn't the end.
         val alive = if (lg.phase == Phase.PLAYOFFS && ps != null) {
-            val round = ps.series.maxOfOrNull { it.round } ?: 0
-            ps.series.filter { it.round == round && !it.done }.flatMap { listOf(it.hi, it.lo) }.toSet()
+            ps.seeds.keys.filter { id -> ps.series.none { it.done && it.loser == id && !(it.round == 0 && it.slot == 0) } }.toSet()
         } else lg.teams.map { it.id }.toSet()
         val strength = lg.teams.associate { t ->
             val top = (rosters[t.id] ?: lg.rosterOf(t)).map { it.ovr }.sortedDescending().take(8)

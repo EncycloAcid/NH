@@ -59,7 +59,7 @@ class ProUiTest {
         for (t in Tab.entries) {
             vm.select(t); idle()
             if (t == Tab.TEAM) for (i in 0..1) { vm.teamTab = i; idle() }
-            if (t == Tab.LEAGUE) for (i in 0..3) { vm.leagueTab = i; idle() }
+            if (t == Tab.LEAGUE) for (i in 0..4) { vm.leagueTab = i; idle() }
         }
         val routes = mutableListOf<Route>(Route.Settings)
         lg.playerOrNull(lg.heroId)?.let { routes += Route.Focus(it.id) }
@@ -100,7 +100,7 @@ class ProUiTest {
         scrollTo(3); shot("P05b_today_more")
         vm.select(Tab.RECRUIT); shot("P06_me"); scrollTo(2); shot("P06b_me_races"); scrollToText("YOUR RIVAL"); shot("P06c_me_rival")
         vm.select(Tab.TEAM); vm.teamTab = 0; shot("P07_roster"); vm.teamTab = 1; shot("P07b_schedule")
-        vm.select(Tab.LEAGUE); vm.leagueTab = 0; shot("P08_standings"); vm.leagueTab = 2; shot("P08b_leaders"); vm.leagueTab = 0
+        vm.select(Tab.LEAGUE); vm.leagueTab = 0; shot("P08_standings"); vm.leagueTab = 3; shot("P08b_leaders"); vm.leagueTab = 0
         // Trades: how he feels, asking out, the teams that call, and the move.
         vm.select(Tab.RECRUIT); idle(); scrollToText("YOUR SITUATION"); shot("P08c_situation")
         assertTrue(com.nh.hoopscoach.game.Trades.request(lg) > 0)
@@ -115,13 +115,17 @@ class ProUiTest {
         vm.live?.let { lv -> lv.speed = 0; repeat(6) { lv.engine.stepToHero() }; lv.tick++ }
         shot("P09_live_spotlight"); vm.live?.done = true; vm.back(); idle()
         vm.live = null
+        val ps = lg.proState!!
+        while (lg.day < ps.cupFinalDay + 1 && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        vm.install(lg); vm.select(Tab.TODAY); idle(); scrollToText("NBA CUP"); shot("P09b_cup_today")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 2; idle(); shot("P09c_cup"); scrollTo(4); shot("P09d_cup_groups"); vm.leagueTab = 0
         while (lg.day < ProLeague.allStarDay(lg) && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
-        vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star")
+        vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star"); scrollToText("ALL-STAR WEEKEND"); shot("P10b_all_star_weekend")
         var guard = 0
         while (lg.phase == Phase.REGULAR && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         repeat(3) { Sim.playDay(lg) }
-        vm.install(lg); vm.select(Tab.TODAY); shot("P11_playoffs")
-        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); vm.leagueTab = 3; shot("P11c_awards"); vm.leagueTab = 0
+        vm.install(lg); vm.select(Tab.TODAY); shot("P11_playoffs"); scrollToText("AWARDS NIGHT"); shot("P11a_awards_night")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); scrollToText("PLAY-IN TOURNAMENT"); shot("P11d_play_in"); vm.leagueTab = 4; shot("P11c_awards"); vm.leagueTab = 0
         walk(vm, lg)
         guard = 0
         while (lg.phase != Phase.OFFSEASON && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
@@ -156,7 +160,7 @@ class ProUiTest {
         ProCareer.next(lg)
         lg.hero!!.age = 34
         guard = 0
-        while (lg.phase != Phase.OFFSEASON && guard++ < 120) Sim.playDay(lg)
+        while (lg.phase != Phase.OFFSEASON && guard++ < 220) Sim.playDay(lg)
         vm.install(lg); vm.select(Tab.TODAY); idle()
         assertTrue(lg.proState!!.step == ProStep.REVIEW && ProCareer.canRetire(lg))
         scrollToText("Retire"); shot("P17_retire_option")

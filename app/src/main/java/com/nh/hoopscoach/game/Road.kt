@@ -417,7 +417,7 @@ object Road {
         val rivalry = lg.rivalry(g) != null
         val duel = Rival.afterGame(lg, g, line, won)
         val stakes = BigNights.stakes(lg, g)
-        val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.PLAYOFF -> 2.2; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
+        val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.PLAYOFF -> 2.2; GameType.CONF_TOURNEY, GameType.NIT, GameType.CUP -> 1.5; else -> 1.0 } *
             (if (stakes.isNotEmpty()) 1.6 else 1.0) *
             (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7) *
             (if (duel != null) (if (duel.won && duel.me > duel.him) 1.8 else 1.3) else 1.0)
@@ -482,7 +482,8 @@ object Road {
                 )
             }
             tourney && won && Rng.chance(0.6) -> q(
-                "Moving on", if (g.type == GameType.PLAYOFF) "${g.label.substringAfter("· ")} goes your way. How do you close out this series?"
+                "Moving on", if (g.type == GameType.PLAYOFF && g.label.startsWith("Play-In")) "You win the play-in game. Ready for what's next?"
+                    else if (g.type == GameType.PLAYOFF) "${g.label.substringAfter("· ")} goes your way. How do you close out this series?"
                     else "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
                 PressAnswer("Whoever's next. We'll be ready.", 0.012),
                 PressAnswer("Give us the best team in the country.", 0.04, persona = 2),
