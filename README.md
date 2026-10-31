@@ -22,6 +22,8 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
   2. **Draft Night**.
   3. **Summer**: workouts, and transfer offers if you entered the portal.
   4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
+- **Media and followers**: you start with a following that matches your ranking (about 150K for a top five-star, 50K to 70K for a four-star, 10K for a three-star). Big games grow it, more on big stages (NCAA Tournament x3, conference tournaments and rivalries x1.5, ranked opponents x1.3) and at big-brand schools. Thirty-point nights and game-winners go viral. Every follower adds $1 a year to your NIL value, and sponsors pay one-time bonuses at 100K, 250K, 500K, 1M, 2.5M and 5M followers.
+- **Postgame press**: after notable games (a big night, a game-winner, a rivalry win, a tournament win, a tough loss, draft buzz) you get a question on Today and the Me tab with three answers. Humble answers please fans and teammates. Brash ones grow your following faster but cost locker-room goodwill. Your answers shape a persona: Fan favorite (wins lift the fan base more), Quiet pro, or Lightning rod (big games grow your following 20% faster).
 - **The ending**: drafted (with your pick) or, after four seasons, undrafted and overseas. You get a career summary with totals, your story, NIL earned and every school you played for.
 
 ## Install on your phone

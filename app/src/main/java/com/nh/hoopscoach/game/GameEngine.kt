@@ -542,6 +542,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         Fans.afterGame(lg, game)
         Brand.afterGame(lg, game)
         Moments.afterGame(lg, game, buzzerBeater, forcedOt)
+        if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
     }
 
     private fun lastTotals(side: Int): StatLine {

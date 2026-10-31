@@ -232,6 +232,8 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
+        if (lg.road?.press != null) item { PressCard(vm, lg) }
+        item { MediaPanel(lg) }
         item {
             val mins = Gameplan.plannedMinutes(t, h.id)
             Section("Your role")
@@ -317,7 +319,7 @@ fun DealPicker(vm: GameViewModel, lg: League) {
             }
         }
     }
-    Text("Your market value at this school is ${money(base)} a year. Richer programs pay more.", style = T.small, color = P.sub,
+    Text("Your market value at this school is ${money(base)} a year, ${money((lg.road?.followers ?: 0) / 1000)} of it from your ${Road.count(lg.road?.followers ?: 0)} followers. Richer programs pay more.", style = T.small, color = P.sub,
         modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
 }
 
@@ -344,6 +346,10 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
             Text("Last game: ${if (g.won) "W" else "L"} ${g.score} ${g.site} ${lg.team(g.oppId).abbr} · ${g.pts} pts, ${g.reb} reb, ${g.ast} ast in ${g.min} min",
                 style = T.small, color = P.ink)
         }
+        lg.road?.let { r ->
+            Spacer(Modifier.height(6.dp))
+            Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.sub)
+        }
         if (Road.needsDeal(lg)) {
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -352,6 +358,77 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
                 Text("Sign your NIL deal for the season.", style = T.small, color = P.ink, modifier = Modifier.weight(1f))
                 SmallButton("Pick a deal", primary = true) { vm.select(Tab.RECRUIT) }
             }
+        }
+    }
+}
+
+/** The postgame podium: one question, three ways to answer. */
+@Composable
+fun PressCard(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val q = r.press ?: return
+    Section("Postgame press · ${q.topic}")
+    Panel {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(P.accentSoft), contentAlignment = Alignment.Center) {
+                Text("?", style = T.head, color = P.accent)
+            }
+            Spacer(Modifier.width(10.dp))
+            Text("\u201c${q.prompt}\u201d", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(10.dp))
+        q.answers.forEachIndexed { i, a ->
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).background(P.surface2)
+                    .clickable {
+                        var d = 0
+                        vm.act { d = Road.answer(it, i) }
+                        vm.toast("${if (d >= 0) "+" else "−"}${Road.count(kotlin.math.abs(d))} followers")
+                    }.padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(a.text, style = T.body, color = P.ink)
+                val tags = listOfNotNull(
+                    if (a.persona < 0) "Humble" else if (a.persona > 0) "Brash" else "Even",
+                    if (a.fans > 0) "fans like it" else if (a.fans < 0) "fans won't" else null,
+                    if (a.teammates > 0) "teammates like it" else if (a.teammates < 0) "teammates won't" else null,
+                )
+                Text(tags.joinToString(" · "), style = T.small, color = if (a.persona > 0) P.warn else if (a.persona < 0) P.good else P.sub)
+            }
+        }
+        Text("Skip it and the next game brings new questions.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** Followers, persona, sponsors and recent press. */
+@Composable
+private fun MediaPanel(lg: League) {
+    val r = lg.road ?: return
+    Section("Media")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(Road.count(r.followers), style = T.hero.copy(fontSize = 40.sp, lineHeight = 42.sp), color = P.accent)
+                val d = r.followers - r.seasonStartFollowers
+                Text("FOLLOWERS · ${if (d >= 0) "+" else "−"}${Road.count(kotlin.math.abs(d))} THIS SEASON", style = T.label, color = P.sub)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(Road.personaLabel(r.persona), style = T.bodyB, color = P.ink)
+                Text("PERSONA", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(Road.personaBlurb(r.persona), style = T.small, color = P.sub)
+        Text("Every follower adds \$1 a year to your NIL value: ${money(r.followers / 1000)} right now.", style = T.small, color = P.good)
+        Road.nextMilestone(lg)?.let { (need, pay) ->
+            Spacer(Modifier.height(8.dp))
+            Bar(r.followers / need.toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
+            Spacer(Modifier.height(4.dp))
+            Text("Next sponsor at ${Road.count(need)} followers: ${money(pay)} for one post.", style = T.small, color = P.sub)
+        }
+        if (r.pressLog.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text("RECENT PRESS", style = T.label, color = P.sub)
+            for (line in r.pressLog.takeLast(3).reversed()) Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -388,6 +465,7 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
         item {
             if (r != null) Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career NIL earned: ${money(r.earned)}", style = T.bodyB, color = P.good)
+                Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
                 if (r.ended) Text(r.ending, style = T.small, color = P.sub)
             }
             Spacer(Modifier.height(24.dp))
@@ -542,6 +620,7 @@ fun RoadEnding(vm: GameViewModel, lg: League) {
         item {
             Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career NIL earned: ${money(r.earned)}", style = T.bodyB, color = P.good)
+                Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
                 Text("Schools: ${r.schools.joinToString(" → ") { lg.team(it).school }}", style = T.small, color = P.sub)
             }
             Spacer(Modifier.height(16.dp))

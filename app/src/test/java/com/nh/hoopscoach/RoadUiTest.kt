@@ -105,6 +105,12 @@ class RoadUiTest {
         walk(vm, lg)
         repeat(10) { Season.playDay(lg) }
         vm.install(lg); vm.select(Tab.TODAY); shot("Y10_today_midseason")
+        var tries = 0
+        while (lg.road!!.press == null && tries++ < 25 && lg.phase == Phase.REGULAR) Season.playDay(lg)
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        if (lg.road!!.press != null) { scrollTo(1); shot("Y10b_press") }
+        vm.select(Tab.RECRUIT); scrollTo(1); shot("Y10c_me_media"); vm.select(Tab.TODAY)
+        if (lg.road!!.press != null) { vm.act { Road.answer(it, 1) }; idle() }
         vm.startLive(); idle()
         vm.live?.let { lv -> lv.speed = 0; repeat(80) { lv.engine.step() }; lv.tick++ }
         shot("Y11_live"); vm.back(); idle()

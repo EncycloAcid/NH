@@ -41,6 +41,10 @@ class RoadTest {
 
         var seasons = 0
         var transferred = false
+        var presses = 0
+        val topics = mutableSetOf<String>()
+        val startFollowers = lg.road!!.followers
+        assertTrue("a four-star starts with a following", startFollowers in 40_000..80_000)
         while (!lg.road!!.ended && seasons < 6) {
             seasons++
             val deal = when (seasons % 3) { 1 -> NilDeal.STEADY; 2 -> NilDeal.PERFORMANCE; else -> NilDeal.BRAND }
@@ -49,7 +53,18 @@ class RoadTest {
             val h = lg.playerOrNull(lg.heroId)!!
             assertEquals(Road.guaranteed(deal, lg.road!!.dealBase), h.nil)
             var guard = 0
-            while (lg.phase != Phase.WRAP_UP && guard++ < 120) Season.playDay(lg)
+            while (lg.phase != Phase.WRAP_UP && guard++ < 120) {
+                Season.playDay(lg)
+                lg.road!!.press?.let { q ->
+                    presses++
+                    topics += q.topic
+                    val before = lg.road!!.followers
+                    Road.answer(lg, presses % 3)
+                    assertTrue("answering clears the question", lg.road!!.press == null)
+                    if (q.answers[presses % 3].followers > 0) assertTrue("followers grow", lg.road!!.followers >= before)
+                }
+            }
+            println("   media: ${Road.count(lg.road!!.followers)} followers, persona ${lg.road!!.persona} (${Road.personaLabel(lg.road!!.persona)}), milestones ${lg.road!!.milestone}, market ${Road.market(lg)}K")
             println("season ${lg.season} at ${lg.user.school}: ${h.cls} ovr ${h.ovr}, ${Road.role(lg)}, %.1f mpg %.1f ppg, team ${lg.user.record}".format(h.stats.mpg, h.stats.ppg))
             lg = SaveIO.decode(SaveIO.encode(lg))
             Offseason.begin(lg)
@@ -91,6 +106,11 @@ class RoadTest {
         assertTrue(r.ending.isNotEmpty())
         assertTrue("career kept", lg.hero != null && lg.alumni.any { it.id == lg.heroId })
         assertTrue(r.earned > 0)
+        println("press questions answered: $presses, topics $topics; followers ${Road.count(startFollowers)} -> ${Road.count(r.followers)}; log: ${r.pressLog.takeLast(2)}")
+        assertTrue("press questions come up", presses >= 10)
+        assertTrue("several kinds of questions", topics.size >= 3)
+        assertTrue("followers grow over a career", r.followers > startFollowers * 2)
+        assertTrue("sponsors pay at milestones", r.milestone >= 1)
         assertEquals(seasons, r.story.size)
     }
 }

@@ -69,7 +69,25 @@ object Road {
     }
 
     /** What a program offers the user's player a year in NIL, in thousands. */
-    fun nilFor(lg: League, t: Team, p: Player) = (Ratings.expectedNil(p) * (0.75 + 0.5 * budgetShare(lg, t))).roundToInt() / 5 * 5
+    fun nilFor(lg: League, t: Team, p: Player) =
+        ((Ratings.expectedNil(p) * (0.75 + 0.5 * budgetShare(lg, t))).roundToInt() + heroFollowers(lg, p) / 1000) / 5 * 5
+
+    /** The user's player's following: what he's built, or (before he signs) what his ranking brings. */
+    fun heroFollowers(lg: League, p: Player): Int {
+        val r = lg.road
+        return when {
+            r != null && p.id == lg.heroId -> r.followers
+            r == null && lg.heroId < 0 && p.teamId < 0 && p.recruitRank > 0 -> startFollowers(p)
+            else -> 0
+        }
+    }
+
+    /** A high schooler's following: the better the ranking, the bigger. */
+    fun startFollowers(p: Player) = when (p.stars) {
+        5 -> 180_000 - p.recruitRank * 4_000
+        4 -> 70_000 - (p.recruitRank - 40) * 500
+        else -> 15_000 - (p.recruitRank - 160) * 30
+    }.coerceAtLeast(5_000)
 
     /**
      * Schools that offer the user's player a scholarship: programs whose Recruiting Pull matches his level,
@@ -98,7 +116,7 @@ object Road {
         lg.mode = GameMode.PLAYER
         lg.addPlayer(hero)
         lg.heroId = hero.id
-        lg.road = RoadState(startSeason = lg.season)
+        lg.road = RoadState(startSeason = lg.season, followers = startFollowers(hero), seasonStartFollowers = startFollowers(hero))
         join(lg, hero, lg.team(teamId))
         sync(lg)
         lg.reindex()
@@ -192,7 +210,10 @@ object Road {
         val s = h.stats
         val honors = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
         r.story += "${lg.season} · ${t.school} · ${classLabel(h.year)} · %.1f ppg, %.1f rpg, %.1f apg · ${Awards.resultFor(lg, t.id)}".format(s.ppg, s.rpg, s.apg) +
-            (if (honors.isNotEmpty()) " · " + honors.joinToString(", ") else "") + (if (paid > 0) " · NIL ${dollars(paid)}" else "")
+            (if (honors.isNotEmpty()) " · " + honors.joinToString(", ") else "") + (if (paid > 0) " · NIL ${dollars(paid)}" else "") +
+            " · ${count(r.followers)} followers"
+        r.seasonStartFollowers = r.followers
+        r.press = null
     }
 
     /** Before Draft Night: the user's decision puts his player in the draft, or keeps him in school. */
@@ -272,6 +293,140 @@ object Road {
             }
         }
         sync(lg)
+    }
+
+    // ---------- media and followers ----------
+
+    /** Sponsor milestones: followers needed and the one-time payout (thousands of dollars). */
+    val MILESTONES = listOf(100_000 to 25, 250_000 to 60, 500_000 to 125, 1_000_000 to 250, 2_500_000 to 600, 5_000_000 to 1200)
+
+    fun count(n: Int) = when {
+        n >= 1_000_000 -> "%.1fM".format(n / 1_000_000.0).replace(".0M", "M")
+        n >= 1_000 -> "%.1fK".format(n / 1_000.0).replace(".0K", "K")
+        else -> "$n"
+    }
+
+    fun personaLabel(p: Int) = when {
+        p <= -4 -> "Fan favorite"
+        p >= 4 -> "Lightning rod"
+        else -> "Quiet pro"
+    }
+
+    fun personaBlurb(p: Int) = when {
+        p <= -4 -> "Humble and well liked. Wins lift the fan base a little more."
+        p >= 4 -> "Brash and box-office. Big games grow your following 20% faster, but teammates notice."
+        else -> "You let your game do the talking."
+    }
+
+    /** Next sponsor milestone, or null once they're all reached. */
+    fun nextMilestone(lg: League): Pair<Int, Int>? = lg.road?.let { MILESTONES.getOrNull(it.milestone) }
+
+    /** After every game: followers move with the performance and the stage, and the press may want a word. */
+    fun afterGame(lg: League, g: Game, buzzer: GameEngine.Clutch?) {
+        val r = lg.road ?: return
+        if (r.ended) return
+        val h = lg.playerOrNull(lg.heroId) ?: return
+        if (!g.involves(h.teamId)) return
+        val line = h.log.lastOrNull()?.takeIf { it.gameId == g.id } ?: return
+        val t = lg.team(h.teamId)
+        val opp = lg.team(g.opp(t.id))
+        val won = g.winner() == t.id
+        val rivalry = lg.rivalry(g) != null
+        val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
+            (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7)
+        val brand = 0.6 + Brand.pull(lg, t) / 100.0
+        val score = line.pts + 0.5 * line.reb + 0.7 * line.ast + line.stl + line.blk - 0.7 * line.tov
+        var gain = r.followers * 0.0015
+        if (line.min > 0) gain += (score - 10).coerceAtLeast(0.0).pow(1.5) * 60 * brand * stage
+        if (line.pts >= 30) gain += 5_000 * brand
+        val winner = buzzer != null && buzzer.name == h.name && won
+        if (winner) gain += 25_000 * stage + r.followers * 0.04
+        gain *= 1 + r.persona.coerceIn(-5, 5) * 0.04
+        r.followers += gain.roundToInt()
+        if (winner) lg.news += News(lg.season, lg.day, "${h.name}'s game-winner goes viral: ${count(r.followers)} followers and counting", true)
+        if (won && r.persona <= -4) t.fans = (t.fans + 0.6).coerceAtMost(100.0)
+        payMilestones(lg)
+        r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner)
+    }
+
+    private fun payMilestones(lg: League) {
+        val r = lg.road ?: return
+        while (true) {
+            val (need, pay) = MILESTONES.getOrNull(r.milestone) ?: return
+            if (r.followers < need) return
+            r.milestone++
+            r.earned += pay
+            lg.news += News(lg.season, lg.day, "${lg.hero?.name} hits ${count(need)} followers. A sponsor pays ${dollars(pay)} for one post", true)
+        }
+    }
+
+    private fun pressFor(
+        lg: League, g: Game, h: Player, line: GameLogEntry, t: Team, opp: Team,
+        won: Boolean, rivalry: Boolean, score: Double, winner: Boolean,
+    ): PressQuestion? {
+        fun q(topic: String, prompt: String, vararg a: PressAnswer) = PressQuestion(lg.season, g.id, topic, prompt, a.toList())
+        val tourney = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.NIT
+        val rank = if (h.stats.gp >= 15) Offseason.draftBoard(lg)[h.id] else null
+        return when {
+            winner -> q(
+                "Game-winner", "That shot is everywhere already. Walk us through it.",
+                PressAnswer("Coach drew it up and my guys trusted me.", 0.015, fans = 2, teammates = 4, persona = -1),
+                PressAnswer("I want the ball in that moment. Every time.", 0.05, teammates = -2, persona = 2),
+                PressAnswer("Just a good look. It went in.", 0.012),
+            )
+            tourney && won && Rng.chance(0.6) -> q(
+                "Moving on", "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
+                PressAnswer("Whoever's next. We'll be ready.", 0.012),
+                PressAnswer("Give us the best team in the country.", 0.04, persona = 2),
+                PressAnswer("All credit to our staff. They had us ready.", 0.012, fans = 1, teammates = 3, persona = -1),
+            )
+            rivalry && won && Rng.chance(0.8) -> q(
+                "Rivalry", "You beat ${opp.school}. What does this one mean?",
+                PressAnswer("This one's for our fans. They've waited all year.", 0.015, fans = 3, persona = -1),
+                PressAnswer("They're not on our level. Not even close.", 0.04, fans = 1, teammates = -2, persona = 2),
+                PressAnswer("It's one game. On to the next.", 0.006),
+            )
+            line.min > 0 && score >= 20 && Rng.chance(0.6) -> q(
+                "Big night", "${line.pts} points tonight. What was working?",
+                PressAnswer("My teammates found me in great spots.", 0.012, teammates = 4, persona = -1),
+                PressAnswer("Nobody in this conference can guard me.", 0.04, teammates = -5, persona = 2),
+                PressAnswer("Just taking what the defense gives me.", 0.006),
+            )
+            rank != null && rank <= 30 && Rng.chance(0.15) -> q(
+                "Draft", "There were scouts here tonight. Are you thinking about the draft?",
+                PressAnswer("Not until the season's over.", 0.006),
+                PressAnswer("I'm ready for the league. Everybody knows it.", 0.035, teammates = -4, persona = 2),
+                PressAnswer("I love it here at ${t.school}.", 0.012, fans = 2, persona = -1),
+            )
+            !won && line.min >= 12 && (rivalry || opp.ap > 0 || tourney || Rng.chance(0.2)) -> q(
+                "Tough loss", "Tough one against ${opp.school}. What went wrong?",
+                PressAnswer("That's on me. I'll be better.", 0.01, fans = 1, teammates = 2, persona = -1),
+                PressAnswer("Ask the refs. They decided that one.", 0.02, fans = -1, persona = 2),
+                PressAnswer("We'll watch the film and learn from it.", 0.003),
+            )
+            else -> null
+        }
+    }
+
+    /** The user answers the open press question. Returns the follower change. */
+    fun answer(lg: League, i: Int): Int {
+        val r = lg.road ?: return 0
+        val q = r.press ?: return 0
+        val a = q.answers.getOrNull(i) ?: return 0
+        val h = lg.playerOrNull(lg.heroId)
+        val delta = (r.followers * a.followers).roundToInt()
+        r.followers = (r.followers + delta).coerceAtLeast(0)
+        r.persona = (r.persona + a.persona).coerceIn(-10, 10)
+        if (h != null) {
+            val t = lg.team(h.teamId)
+            t.fans = (t.fans + a.fans).coerceIn(5.0, 100.0)
+            if (a.teammates != 0) for (p in lg.rosterOf(t)) if (p.id != h.id) p.happiness = (p.happiness + a.teammates).coerceIn(0, 100)
+        }
+        r.pressLog += "${q.topic}: \u201c${a.text}\u201d (${if (delta >= 0) "+" else ""}${count(delta)} followers)"
+        if (r.pressLog.size > 12) r.pressLog.removeAt(0)
+        r.press = null
+        payMilestones(lg)
+        return delta
     }
 
     /** Thousands of dollars as "$850K" or "$1.37M". */

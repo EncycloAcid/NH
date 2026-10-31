@@ -616,7 +616,33 @@ class RoadState(
     var ending: String = "",
     /** One line per finished season for the career story. */
     val story: MutableList<String> = mutableListOf(),
+    /** Social following. Every follower adds a dollar a year to his NIL value. */
+    var followers: Int = 0,
+    var seasonStartFollowers: Int = 0,
+    /** Media persona from press answers: negative humble, positive brash. */
+    var persona: Int = 0,
+    /** Follower milestones already paid out by sponsors. */
+    var milestone: Int = 0,
+    /** The open postgame press question, if any. */
+    var press: PressQuestion? = null,
+    val pressLog: MutableList<String> = mutableListOf(),
 )
+
+/** One answer at the postgame podium and what it does. */
+@Serializable
+class PressAnswer(
+    val text: String,
+    /** Follower change as a share of the current following (0.05 = +5%). */
+    val followers: Double,
+    /** Change to the school's fan mood. */
+    val fans: Int = 0,
+    /** Change to teammates' happiness. */
+    val teammates: Int = 0,
+    val persona: Int = 0,
+)
+
+@Serializable
+class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>)
 
 @Serializable
 class OffseasonState(
