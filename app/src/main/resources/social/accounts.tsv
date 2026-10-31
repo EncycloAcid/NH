@@ -1,0 +1,441 @@
+# type|name|handle|followers|verified|avatar (the user's social accounts pack; personal use)
+media|ESPN|espn|58648195|1|espn
+media|Bleacher Report|BleacherReport|20866015|1|bleacherreport
+media|House of Highlights|HoHighlights|312496|1|hohighlights
+media|The Athletic|TheAthletic|1706231|1|theathletic
+media|The Athletic NBA|TheAthleticNBA|186666|1|theathleticnba
+insider|Shams Charania|ShamsCharania|4121887|1|shamscharania
+insider|Adrian Wojnarowski|wojespn|6555371|1|wojespn
+insider|Marc Stein|TheSteinLine|1648068|1|thesteinline
+insider|Chris Haynes|ChrisBHaynes|669548|1|chrisbhaynes
+analyst|Zach Lowe|ZachLowe_NBA|987962|1|zachlowe_nba
+league|NBA|NBA|47064059|1|nba
+media|NBA on ESPN|ESPNNBA|9144558|1|espnnba
+media|NBA TV|NBATV|7370922|1|nbatv
+media|TNT Sports|tntsports|1213049|1|tntsports
+media|NBA on NBC|NBAonNBC|167968|1|nbaonnbc
+media|NBA on Prime|NBAonPrime|51097|1|nbaonprime
+media|NBA 2K|NBA2K|3704060|1|nba2k
+media|First Take|FirstTake|1858718|1|firsttake
+media|The Herd|TheHerd|486916|1|theherd
+league|NCAA|NCAA|1890773|1|ncaa
+league|NCAA March Madness|MarchMadnessMBB|1717382|1|marchmadnessmbb
+conference|Big Ten Conference|bigten|189967|1|bigten
+conference|SEC|SEC|800607|1|sec
+conference|Big 12 Conference|Big12Conference|285279|1|big12conference
+conference|BIG EAST Conference|BIGEAST|37908|1|bigeast
+media|ACC Network|accnetwork|151409|1|accnetwork
+media|CBS Sports CBB|CBSSportsCBB|177277|1|cbssportscbb
+media|FOX College Hoops|CBBonFOX|616319|1|cbbonfox
+media|FOX Sports|FOXSports|2864704|1|foxsports
+media|Yahoo Sports|YahooSports|577021|1|yahoosports
+media|NBC Sports|NBCSports|1792692|1|nbcsports
+media|The Ringer|ringer|530159|1|ringer
+media|Barstool Sports|barstoolsports|6946728|1|barstoolsports
+media|SLAM|SLAMonline|1307975|1|slamonline
+media|Overtime|overtime|1742461|1|overtime
+media|Ballislife|Ballislife|1709382|1|ballislife
+media|ClutchPoints|ClutchPoints|350097|1|clutchpoints
+media|StatMuse|statmuse|882643|1|statmuse
+recruiting|247Sports|247Sports|542786|1|247sports
+recruiting|On3|On3|428885|1|on3
+recruiting|Rivals|Rivals|314269|1|rivals
+cbb insider|Jon Rothstein|JonRothstein|451139|1|jonrothstein
+cbb insider|Jeff Goodman|GoodmanHoops|343772|1|goodmanhoops
+cbb insider|Pete Thamel|PeteThamel|415309|1|petethamel
+cbb analyst|Gary Parrish|GaryParrishCBS|179795|1|garyparrishcbs
+cbb analyst|Matt Norlander|MattNorlander|117993|1|mattnorlander
+bracketology|Joe Lunardi|ESPNLunardi|289947|1|espnlunardi
+cbb analyst|Jay Bilas|JayBilas|1823743|1|jaybilas
+cbb analyst|Dick Vitale|DickieV|905969|1|dickiev
+cbb analytics|Ken Pomeroy|kenpomeroy|184623|1|kenpomeroy
+nba team|Atlanta Hawks|ATLHawks|1480823|1|atlhawks
+nba team|Boston Celtics|celtics|3965875|1|celtics
+nba team|Brooklyn Nets|BrooklynNets|2298282|1|brooklynnets
+nba team|Charlotte Hornets|hornets|1147902|1|hornets
+nba team|Chicago Bulls|chicagobulls|4325442|1|chicagobulls
+nba team|Cleveland Cavaliers|cavs|3052969|1|cavs
+nba team|Dallas Mavericks|dallasmavs|2212313|1|dallasmavs
+nba team|Denver Nuggets|nuggets|1487317|1|nuggets
+nba team|Detroit Pistons|DetroitPistons|1092880|1|detroitpistons
+nba team|Golden State Warriors|warriors|8350143|1|warriors
+nba team|Houston Rockets|HoustonRockets|3045096|1|houstonrockets
+nba team|Indiana Pacers|Pacers|1409526|1|pacers
+nba team|LA Clippers|LAClippers|2112163|1|laclippers
+nba team|Los Angeles Lakers|Lakers|11877700|1|lakers
+nba team|Memphis Grizzlies|memgrizz|1576108|1|memgrizz
+nba team|Miami HEAT|MiamiHEAT|4454607|1|miamiheat
+nba team|Milwaukee Bucks|Bucks|1945320|1|bucks
+nba team|Minnesota Timberwolves|Timberwolves|1293751|1|timberwolves
+nba team|New Orleans Pelicans|PelicansNBA|1293638|1|pelicansnba
+nba team|NEW YORK KNICKS|nyknicks|2684652|1|nyknicks
+nba team|OKC THUNDER|okcthunder|2609955|1|okcthunder
+nba team|Orlando Magic|OrlandoMagic|1596043|1|orlandomagic
+nba team|Philadelphia 76ers|sixers|2253786|1|sixers
+nba team|Phoenix Suns|Suns|1708210|1|suns
+nba team|Portland Trail Blazers|trailblazers|1494843|1|trailblazers
+nba team|Sacramento Kings|SacramentoKings|1175351|1|sacramentokings
+nba team|San Antonio Spurs|spurs|3338834|1|spurs
+nba team|Toronto Raptors|Raptors|2353184|1|raptors
+nba team|Utah Jazz|utahjazz|1208650|1|utahjazz
+nba team|Washington Wizards|WashWizards|1212768|1|washwizards
+college mbb|Abilene Christian Wildcats|ACU_MBB|15715|1|acu_mbb
+college mbb|Air Force Falcons|AF_MBB|7494|1|af_mbb
+college mbb|Akron Zips|ZipsMBB|15158|1|zipsmbb
+college mbb|Alabama Crimson Tide|AlabamaMBB|194457|1|alabamambb
+college mbb|Alabama A&M Bulldogs|AAMUMBB|11232|1|aamumbb
+college mbb|Alabama State Hornets||0|0|
+college mbb|UAlbany Great Danes|UAlbanyMBB|10683|1|ualbanymbb
+college mbb|Alcorn State Braves|BRAVESMBB|10639|1|bravesmbb
+college mbb|American University Eagles||0|0|
+college mbb|App State Mountaineers|AppStateMBB|21120|1|appstatembb
+college mbb|Arizona Wildcats|ArizonaMBB|240627|1|arizonambb
+college mbb|Arizona State Sun Devils||0|0|
+college mbb|Arkansas Razorbacks|RazorbackMBB|292209|1|razorbackmbb
+college mbb|Arkansas State Red Wolves||0|0|
+college mbb|Arkansas-Pine Bluff Golden Lions||0|0|
+college mbb|Army Black Knights||0|0|
+college mbb|Auburn Tigers|AuburnMBB|166642|1|auburnmbb
+college mbb|Austin Peay Governors||0|0|
+college mbb|BYU Cougars|BYUMBB|62297|1|byumbb
+college mbb|Ball State Cardinals|BallStateMBB|16768|1|ballstatembb
+college mbb|Baylor Bears|BaylorMBB|81376|1|baylormbb
+college mbb|Bellarmine Knights||0|0|
+college mbb|Belmont Bruins|BelmontMBB|17352|1|belmontmbb
+college mbb|Bethune-Cookman Wildcats||0|0|
+college mbb|Binghamton Bearcats|BinghamtonMBB|10037|1|binghamtonmbb
+college mbb|Boise State Broncos||0|0|
+college mbb|Boston College Eagles|BCMBB|25992|1|bcmbb
+college mbb|Boston University Terriers||0|0|
+college mbb|Bowling Green Falcons|BGSUMBB|14191|1|bgsumbb
+college mbb|Bradley Braves|BradleyUMBB|11543|1|bradleyumbb
+college mbb|Brown Bears||0|0|
+college mbb|Bryant Bulldogs|BryantHoops|18263|1|bryanthoops
+college mbb|Bucknell Bison|Bucknell_MBB|8657|1|bucknell_mbb
+college mbb|Buffalo Bulls||0|0|
+college mbb|Butler Bulldogs|ButlerMBB|70128|1|butlermbb
+college mbb|Cal Poly Mustangs|calpolymbb|8196|1|calpolymbb
+college mbb|Cal State Bakersfield Roadrunners|CSUB_MBB|7186|1|csub_mbb
+college mbb|Cal State Fullerton Titans||0|0|
+college mbb|Cal State Northridge Matadors|CSUNMBB|5153|1|csunmbb
+college mbb|California Golden Bears||0|0|
+college mbb|California Baptist Lancers|CBUmbb|5544|1|cbumbb
+college mbb|Campbell Fighting Camels||0|0|
+college mbb|Canisius Golden Griffins||0|0|
+college mbb|Central Arkansas Bears||0|0|
+college mbb|Central Connecticut Blue Devils|CCSU_MBB|14178|1|ccsu_mbb
+college mbb|Central Michigan Chippewas||0|0|
+college mbb|Charleston Cougars|CofCBasketball|20156|1|cofcbasketball
+college mbb|Charleston Southern Buccaneers||0|0|
+college mbb|Charlotte 49ers|CharlotteMBB|17541|1|charlottembb
+college mbb|Chattanooga Mocs||0|0|
+college mbb|Chicago State Cougars|ChicagoStateMBB|10488|1|chicagostatembb
+college mbb|Cincinnati Bearcats|GoBearcatsMBB|54106|1|gobearcatsmbb
+college mbb|Clemson Tigers|ClemsonMBB|67391|1|clemsonmbb
+college mbb|Cleveland State Vikings||0|0|
+college mbb|Coastal Carolina Chanticleers||0|0|
+college mbb|Colgate Raiders|ColgateMBB|11723|1|colgatembb
+college mbb|Colorado Buffaloes||0|0|
+college mbb|Colorado State Rams||0|0|
+college mbb|Columbia Lions||0|0|
+college mbb|Coppin State Eagles||0|0|
+college mbb|Cornell Big Red||0|0|
+college mbb|Creighton Bluejays|BluejayMBB|87754|1|bluejaymbb
+college mbb|Dartmouth Big Green|DartmouthMBB|6422|1|dartmouthmbb
+college mbb|Davidson Wildcats|DavidsonMBB|19990|1|davidsonmbb
+college mbb|Dayton Flyers|DaytonMBB|71705|1|daytonmbb
+college mbb|DePaul Blue Demons|DePaulHoops|14741|1|depaulhoops
+college mbb|Delaware Blue Hens|DelawareMBB|10202|1|delawarembb
+college mbb|Delaware State Hornets|DSUMBB|8162|1|dsumbb
+college mbb|Denver Pioneers||0|0|
+college mbb|Detroit Mercy Titans||0|0|
+college mbb|Drake Bulldogs||0|0|
+college mbb|Drexel Dragons|DrexelMBB|7696|1|drexelmbb
+college mbb|Duke Blue Devils|DukeMBB|2053502|1|dukembb
+college mbb|Duquesne Dukes|DuqMBB|14376|1|duqmbb
+college mbb|East Carolina Pirates||0|0|
+college mbb|East Tennessee State Buccaneers|ETSU_MBB|14851|1|etsu_mbb
+college mbb|East Texas A&M Lions||0|0|
+college mbb|Eastern Illinois Panthers||0|0|
+college mbb|Eastern Kentucky Colonels||0|0|
+college mbb|Eastern Michigan Eagles|EMU_MBB|5364|1|emu_mbb
+college mbb|Eastern Washington Eagles|EWUMBB|9776|1|ewumbb
+college mbb|Elon Phoenix||0|0|
+college mbb|Evansville Purple Aces||0|0|
+college mbb|Florida International Panthers||0|0|
+college mbb|Fairfield Stags|FairfieldMBB|8330|1|fairfieldmbb
+college mbb|Fairleigh Dickinson Knights||0|0|
+college mbb|Florida Gators|GatorsMBK|143797|1|gatorsmbk
+college mbb|Florida A&M Rattlers|FAMU_MBB|11016|1|famu_mbb
+college mbb|Florida Atlantic Owls|FAUMBB|20121|1|faumbb
+college mbb|Florida Gulf Coast Eagles|FGCU_MBB|19406|1|fgcu_mbb
+college mbb|Florida State Seminoles|FSUHoops|91889|1|fsuhoops
+college mbb|Fordham Rams|FordhamMBB|10948|1|fordhammbb
+college mbb|Fresno State Bulldogs|FresnoStateMBB|15260|1|fresnostatembb
+college mbb|Furman Paladins|FurmanMBB|16515|1|furmanmbb
+college mbb|Gardner-Webb Runnin' Bulldogs||0|0|
+college mbb|George Mason Patriots||0|0|
+college mbb|George Washington Revolutionaries|GW_MBB|13670|1|gw_mbb
+college mbb|Georgetown Hoyas|GeorgetownHoops|34210|1|georgetownhoops
+college mbb|Georgia Bulldogs||0|0|
+college mbb|Georgia Southern Eagles||0|0|
+college mbb|Georgia State Panthers||0|0|
+college mbb|Georgia Tech Yellow Jackets|GTMBB|34450|1|gtmbb
+college mbb|Gonzaga Bulldogs|ZagMBB|215555|1|zagmbb
+college mbb|Grambling Tigers||0|0|
+college mbb|Grand Canyon Lopes|GCU_MBB|25629|1|gcu_mbb
+college mbb|Green Bay Phoenix||0|0|
+college mbb|Hampton Pirates||0|0|
+college mbb|Harvard Crimson|HarvardMBB|14342|1|harvardmbb
+college mbb|Hawai'i Rainbow Warriors|HawaiiMBB|17049|1|hawaiimbb
+college mbb|High Point Panthers|HPUMBB|12834|1|hpumbb
+college mbb|Hofstra Pride|HofstraMBB|10767|1|hofstrambb
+college mbb|Holy Cross Crusaders||0|0|
+college mbb|Houston Cougars|UHCougarMBK|64865|1|uhcougarmbk
+college mbb|Houston Christian Huskies||0|0|
+college mbb|Howard Bison||0|0|
+college mbb|IU Indianapolis Jaguars||0|0|
+college mbb|Idaho Vandals||0|0|
+college mbb|Idaho State Bengals|IdahoStateMBB|9428|1|idahostatembb
+college mbb|Illinois Fighting Illini|IlliniMBB|183627|1|illinimbb
+college mbb|Illinois State Redbirds||0|0|
+college mbb|Incarnate Word Cardinals|UIWMBB|9803|1|uiwmbb
+college mbb|Indiana Hoosiers|IndianaMBB|982836|1|indianambb
+college mbb|Indiana State Sycamores||0|0|
+college mbb|Iona Gaels|IonaGaelsMBB|15297|1|ionagaelsmbb
+college mbb|Iowa Hawkeyes|IowaHoops|199442|1|iowahoops
+college mbb|Iowa State Cyclones|CycloneMBB|294279|1|cyclonembb
+college mbb|Jackson State Tigers||0|0|
+college mbb|Jacksonville Dolphins|JAX_MBB|14039|1|jax_mbb
+college mbb|Jacksonville State Gamecocks||0|0|
+college mbb|James Madison Dukes||0|0|
+college mbb|Kansas Jayhawks|KUHoops|873115|1|kuhoops
+college mbb|Kansas City Roos||0|0|
+college mbb|Kansas State Wildcats||0|0|
+college mbb|Kennesaw State Owls||0|0|
+college mbb|Kent State Golden Flashes||0|0|
+college mbb|Kentucky Wildcats|KentuckyMBB|837903|1|kentuckymbb
+college mbb|Long Island University Sharks||0|0|
+college mbb|LSU Tigers|LSUBasketball|143174|1|lsubasketball
+college mbb|La Salle Explorers||0|0|
+college mbb|Lafayette Leopards|LafayetteMBB|8298|1|lafayettembb
+college mbb|Lamar Cardinals|LamarMBB|14622|1|lamarmbb
+college mbb|Le Moyne Dolphins|LeMoyneMBB|3781|1|lemoynembb
+college mbb|Lehigh Mountain Hawks|LehighMBB|9862|1|lehighmbb
+college mbb|Liberty Flames|LibertyMBB|18983|1|libertymbb
+college mbb|Lipscomb Bisons|LipscombMBB|15796|1|lipscombmbb
+college mbb|Little Rock Trojans|LittleRockMBB|7545|1|littlerockmbb
+college mbb|Long Beach State Beach|LBSUMBB|7674|1|lbsumbb
+college mbb|Longwood Lancers|LongwoodMBB|11451|1|longwoodmbb
+college mbb|Louisiana Ragin' Cajuns|RaginCajunsMBB|16145|1|ragincajunsmbb
+college mbb|Louisiana Tech Bulldogs||0|0|
+college mbb|UL Monroe Warhawks|ULM_MBB|9103|1|ulm_mbb
+college mbb|Louisville Cardinals|LouisvilleMBB|108954|1|louisvillembb
+college mbb|Loyola Chicago Ramblers||0|0|
+college mbb|Loyola Maryland Greyhounds||0|0|
+college mbb|Loyola Marymount Lions||0|0|
+college mbb|Maine Black Bears|MaineMBB|9100|1|mainembb
+college mbb|Manhattan Jaspers||0|0|
+college mbb|Marist Red Foxes|MaristMBB|9345|1|maristmbb
+college mbb|Marquette Golden Eagles|MarquetteMBB|49988|1|marquettembb
+college mbb|Marshall Thundering Herd|HerdMBB|16956|1|herdmbb
+college mbb|Maryland Terrapins|TerrapinHoops|241104|1|terrapinhoops
+college mbb|Maryland Eastern Shore Hawks||0|0|
+college mbb|McNeese Cowboys|McNeeseMBB|15511|1|mcneesembb
+college mbb|Memphis Tigers||0|0|
+college mbb|Mercer Bears|MercerMBB|13144|1|mercermbb
+college mbb|Mercyhurst Lakers||0|0|
+college mbb|Merrimack Warriors|MerrimackMBB|6361|1|merrimackmbb
+college mbb|Miami Hurricanes||0|0|
+college mbb|Miami (OH) RedHawks||0|0|
+college mbb|Michigan Wolverines|umichbball|357123|1|umichbball
+college mbb|Michigan State Spartans|MSU_Basketball|452997|1|msu_basketball
+college mbb|Middle Tennessee Blue Raiders||0|0|
+college mbb|Milwaukee Panthers|MKE_MBB|11231|1|mke_mbb
+college mbb|Minnesota Golden Gophers|GopherMBB|62309|1|gophermbb
+college mbb|Mississippi State Bulldogs|HailStateMBK|88968|1|hailstatembk
+college mbb|Mississippi Valley State Delta Devils||0|0|
+college mbb|Missouri Tigers|MizzouHoops|135767|1|mizzouhoops
+college mbb|Missouri State Bears||0|0|
+college mbb|Monmouth Hawks|MonmouthBBall|11314|1|monmouthbball
+college mbb|Montana Grizzlies||0|0|
+college mbb|Montana State Bobcats|MSUBobcatsMBB|14007|1|msubobcatsmbb
+college mbb|Morehead State Eagles||0|0|
+college mbb|Morgan State Bears||0|0|
+college mbb|Mount St. Mary's Mountaineers||0|0|
+college mbb|Murray State Racers|RacersHoops|26017|1|racershoops
+college mbb|NC State Wolfpack|PackMensBball|121171|1|packmensbball
+college mbb|NJIT Highlanders|NJITHoops|9745|1|njithoops
+college mbb|Navy Midshipmen||0|0|
+college mbb|Nebraska Cornhuskers||0|0|
+college mbb|Nevada Wolf Pack|NevadaHoops|34503|1|nevadahoops
+college mbb|New Hampshire Wildcats|UNHMBB|9243|1|unhmbb
+college mbb|New Haven Chargers||0|0|
+college mbb|New Mexico Lobos||0|0|
+college mbb|New Mexico State Aggies||0|0|
+college mbb|LSU New Orleans Privateers||0|0|
+college mbb|Niagara Purple Eagles|NiagaraMBB|9238|1|niagarambb
+college mbb|Nicholls Colonels||0|0|
+college mbb|Norfolk State Spartans|NSU_BBALL|9960|1|nsu_bball
+college mbb|North Alabama Lions||0|0|
+college mbb|North Carolina Tar Heels||0|0|
+college mbb|North Carolina A&T Aggies|ncatmbb|7630|1|ncatmbb
+college mbb|North Carolina Central Eagles|NCCU_MBB|12904|1|nccu_mbb
+college mbb|North Dakota Fighting Hawks||0|0|
+college mbb|North Dakota State Bison|NDSUmbb|21511|1|ndsumbb
+college mbb|North Florida Ospreys||0|0|
+college mbb|North Texas Mean Green|MeanGreenMBB|21785|1|meangreenmbb
+college mbb|Northeastern Huskies||0|0|
+college mbb|Northern Arizona Lumberjacks||0|0|
+college mbb|Northern Colorado Bears||0|0|
+college mbb|Northern Illinois Huskies||0|0|
+college mbb|Northern Iowa Panthers|UNImbb|20139|1|unimbb
+college mbb|Northern Kentucky Norse|NKUNorseMBB|10751|1|nkunorsembb
+college mbb|Northwestern Wildcats||0|0|
+college mbb|Northwestern State Demons||0|0|
+college mbb|Notre Dame Fighting Irish|NDmbb|476352|1|ndmbb
+college mbb|Oakland Golden Grizzlies|OaklandMBB|12960|1|oaklandmbb
+college mbb|Ohio Bobcats||0|0|
+college mbb|Ohio State Buckeyes|OhioStateHoops|172027|1|ohiostatehoops
+college mbb|Oklahoma Sooners|OU_MBBall|537631|1|ou_mbball
+college mbb|Oklahoma State Cowboys||0|0|
+college mbb|Old Dominion Monarchs|ODU_MBB|8291|1|odu_mbb
+college mbb|Ole Miss Rebels|OleMissMBB|65799|1|olemissmbb
+college mbb|Omaha Mavericks|OmahaMBB|11718|1|omahambb
+college mbb|Oral Roberts Golden Eagles|ORUMBB|16520|1|orumbb
+college mbb|Oregon Ducks|OregonMBB|130363|1|oregonmbb
+college mbb|Oregon State Beavers||0|0|
+college mbb|Pacific Tigers||0|0|
+college mbb|Pennsylvania Quakers|PennMBB|15427|1|pennmbb
+college mbb|Penn State Nittany Lions|PennStateMBB|57381|1|pennstatembb
+college mbb|Pepperdine Waves|PepperdineMBB|9021|1|pepperdinembb
+college mbb|Pittsburgh Panthers|Pitt_MBB|58207|1|pitt_mbb
+college mbb|Portland Pilots|PortlandMBB|7399|1|portlandmbb
+college mbb|Portland State Vikings||0|0|
+college mbb|Prairie View A&M Panthers||0|0|
+college mbb|Presbyterian Blue Hose||0|0|
+college mbb|Princeton Tigers|PrincetonMBB|15605|1|princetonmbb
+college mbb|Providence Friars|PCFriarsmbb|34400|1|pcfriarsmbb
+college mbb|Purdue Boilermakers|BoilerBall|168470|1|boilerball
+college mbb|Purdue Fort Wayne Mastodons||0|0|
+college mbb|Quinnipiac Bobcats||0|0|
+college mbb|Radford Highlanders|RadfordHoops|6687|1|radfordhoops
+college mbb|Rhode Island Rams||0|0|
+college mbb|Rice Owls|RiceMBB|10417|1|ricembb
+college mbb|Richmond Spiders|SpiderMBB|15865|1|spidermbb
+college mbb|Rider Broncs|RiderMBB|8593|1|ridermbb
+college mbb|Robert Morris Colonials||0|0|
+college mbb|Rutgers Scarlet Knights|RutgersMBB|46702|1|rutgersmbb
+college mbb|SIU Edwardsville Cougars|SIUEMBB|8688|1|siuembb
+college mbb|SMU Mustangs|SMUBasketball|24612|1|smubasketball
+college mbb|Sacramento State Hornets||0|0|
+college mbb|Sacred Heart Pioneers||0|0|
+college mbb|Saint Joseph's Hawks||0|0|
+college mbb|Saint Louis Billikens|SaintLouisMBB|29970|1|saintlouismbb
+college mbb|Saint Mary's Gaels|saintmaryshoops|10989|1|saintmaryshoops
+college mbb|Saint Peter's Peacocks|PeacocksMBB|28412|1|peacocksmbb
+college mbb|Sam Houston Bearkats|BearkatsMBB|18373|1|bearkatsmbb
+college mbb|Samford Bulldogs|SamfordMBB|13180|1|samfordmbb
+college mbb|San Diego Toreros|usdmbb|10340|1|usdmbb
+college mbb|San Diego State Aztecs|Aztec_MBB|33960|1|aztec_mbb
+college mbb|San Francisco Dons|USFDonsMBB|9365|1|usfdonsmbb
+college mbb|San José State Spartans||0|0|
+college mbb|Santa Clara Broncos|SantaClaraHoops|8822|1|santaclarahoops
+college mbb|Seattle U Redhawks|seattleumbb|7810|1|seattleumbb
+college mbb|Seton Hall Pirates|SetonHallMBB|31366|1|setonhallmbb
+college mbb|Siena Saints|SienaMBB|15093|1|sienambb
+college mbb|South Alabama Jaguars|SouthAlabamaMBB|13385|1|southalabamambb
+college mbb|South Carolina Gamecocks|GamecockMBB|85198|1|gamecockmbb
+college mbb|South Carolina State Bulldogs||0|0|
+college mbb|South Dakota Coyotes||0|0|
+college mbb|South Dakota State Jackrabbits||0|0|
+college mbb|South Florida Bulls|USFMBB|24753|1|usfmbb
+college mbb|Southeast Missouri State Redhawks|SEMOMBB|9767|1|semombb
+college mbb|SE Louisiana Lions||0|0|
+college mbb|Southern Jaguars||0|0|
+college mbb|Southern Illinois Salukis||0|0|
+college mbb|Southern Miss Golden Eagles|SouthernMissMBB|19958|1|southernmissmbb
+college mbb|Southern Utah Thunderbirds||0|0|
+college mbb|St. Bonaventure Bonnies|BonniesMBB|20536|1|bonniesmbb
+college mbb|St. John's Red Storm|StJohnsBBall|50973|1|stjohnsbball
+college mbb|St. Thomas Tommies||0|0|
+college mbb|Stanford Cardinal|StanfordMBB|20923|1|stanfordmbb
+college mbb|Stephen F. Austin Lumberjacks|SFA_MBB|24317|1|sfa_mbb
+college mbb|Stetson Hatters|StetsonMBB|15207|1|stetsonmbb
+college mbb|Stonehill Skyhawks|StonehillMBB|5605|1|stonehillmbb
+college mbb|Stony Brook Seawolves|StonyBrookMBB|10288|1|stonybrookmbb
+college mbb|Syracuse Orange|Cuse_MBB|278653|1|cuse_mbb
+college mbb|TCU Horned Frogs|TCUBasketball|46181|1|tcubasketball
+college mbb|Tarleton State Texans||0|0|
+college mbb|Temple Owls|TUMBBHoops|26777|1|tumbbhoops
+college mbb|Tennessee Volunteers||0|0|
+college mbb|Tennessee State Tigers||0|0|
+college mbb|Tennessee Tech Golden Eagles||0|0|
+college mbb|Texas Longhorns|TexasMBB|156034|1|texasmbb
+college mbb|Texas A&M Aggies|aggiembk|77682|1|aggiembk
+college mbb|Texas A&M-Corpus Christi Islanders||0|0|
+college mbb|Texas Southern Tigers||0|0|
+college mbb|Texas State Bobcats|TXStateMBB|16373|1|txstatembb
+college mbb|Texas Tech Red Raiders|TexasTechMBB|139134|1|texastechmbb
+college mbb|The Citadel Bulldogs||0|0|
+college mbb|Toledo Rockets||0|0|
+college mbb|Towson Tigers||0|0|
+college mbb|Troy Trojans||0|0|
+college mbb|Tulane Green Wave|GreenWaveMBB|12096|1|greenwavembb
+college mbb|Tulsa Golden Hurricane|TulsaMBB|15713|1|tulsambb
+college mbb|UAB Blazers|UAB_MBB|23943|1|uab_mbb
+college mbb|UC Davis Aggies|ucdavismbb|6602|1|ucdavismbb
+college mbb|UC Irvine Anteaters|UCImbb|9622|1|ucimbb
+college mbb|UC Riverside Highlanders|UCRMBB|6861|1|ucrmbb
+college mbb|UC San Diego Tritons|UCSDmbb|7349|1|ucsdmbb
+college mbb|UC Santa Barbara Gauchos||0|0|
+college mbb|UCF Knights|UCF_MBB|49007|1|ucf_mbb
+college mbb|UCLA Bruins|UCLAMBB|112501|1|uclambb
+college mbb|UConn Huskies|UConnMBB|131766|1|uconnmbb
+college mbb|UIC Flames|UIC_MBB|8274|1|uic_mbb
+college mbb|UMBC Retrievers|UMBC_MBB|16775|1|umbc_mbb
+college mbb|Massachusetts Minutemen||0|0|
+college mbb|UMass Lowell River Hawks||0|0|
+college mbb|UNC Asheville Bulldogs||0|0|
+college mbb|UNC Greensboro Spartans|UNCGBasketball|14435|1|uncgbasketball
+college mbb|UNLV Rebels||0|0|
+college mbb|USC Trojans|USC_Hoops|41975|1|usc_hoops
+college mbb|South Carolina Upstate Spartans||0|0|
+college mbb|UT Arlington Mavericks||0|0|
+college mbb|UT Martin Skyhawks||0|0|
+college mbb|UT Rio Grande Valley Vaqueros||0|0|
+college mbb|UTEP Miners|UTEPMBB|15564|1|utepmbb
+college mbb|UTSA Roadrunners|UTSAMBB|11711|1|utsambb
+college mbb|Utah Utes|UtahMBB|58315|1|utahmbb
+college mbb|Utah State Aggies|USUBasketball|20937|1|usubasketball
+college mbb|Utah Tech Trailblazers|UtahTechMBB|4796|1|utahtechmbb
+college mbb|Utah Valley Wolverines|UVUmbb|8443|1|uvumbb
+college mbb|VCU Rams|VCU_Hoops|30473|1|vcu_hoops
+college mbb|VMI Keydets||0|0|
+college mbb|Valparaiso Beacons|ValpoBasketball|11064|1|valpobasketball
+college mbb|Vanderbilt Commodores||0|0|
+college mbb|Vermont Catamounts|UVMmbb|12968|1|uvmmbb
+college mbb|Villanova Wildcats|NovaMBB|195282|1|novambb
+college mbb|Virginia Cavaliers|UVAMensHoops|182768|1|uvamenshoops
+college mbb|Virginia Tech Hokies|HokiesMBB|72649|1|hokiesmbb
+college mbb|Wagner Seahawks||0|0|
+college mbb|Wake Forest Demon Deacons|WakeMBB|38885|1|wakembb
+college mbb|Washington Huskies|UW_MBB|62046|1|uw_mbb
+college mbb|Washington State Cougars||0|0|
+college mbb|Weber State Wildcats|WeberStateMBB|10871|1|weberstatembb
+college mbb|West Georgia Wolves||0|0|
+college mbb|West Virginia Mountaineers|WVUhoops|330633|1|wvuhoops
+college mbb|Western Carolina Catamounts||0|0|
+college mbb|Western Illinois Leathernecks|WIUMBB|6947|1|wiumbb
+college mbb|Western Kentucky Hilltoppers||0|0|
+college mbb|Western Michigan Broncos|WMUMBB|11666|1|wmumbb
+college mbb|Wichita State Shockers|GoShockersMBB|23244|1|goshockersmbb
+college mbb|William & Mary Tribe||0|0|
+college mbb|Winthrop Eagles||0|0|
+college mbb|Wisconsin Badgers|BadgerMBB|307944|1|badgermbb
+college mbb|Wofford Terriers|WoffordMBB|115054|1|woffordmbb
+college mbb|Wright State Raiders|WSU_MBB|9106|1|wsu_mbb
+college mbb|Wyoming Cowboys|wyo_mbb|22715|1|wyo_mbb
+college mbb|Xavier Musketeers|XavierMBB|54606|1|xaviermbb
+college mbb|Yale Bulldogs||0|0|
+college mbb|Youngstown State Penguins||0|0|

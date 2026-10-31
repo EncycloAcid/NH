@@ -57,8 +57,12 @@ private fun kindLabel(kind: String) = when (kind) {
 fun PostRow(p: Post) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
         val initials = p.name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }
+        // A real account shows its avatar; everyone else their initials.
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val img = androidx.compose.runtime.remember(p.avatar) { if (p.avatar.isEmpty()) null else Logos.asset(ctx, "social/${p.avatar}.webp") }
         Box(Modifier.size(36.dp).clip(CircleShape).background(kindColor(p.kind).copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-            Text(initials, style = T.label, color = kindColor(p.kind))
+            if (img != null) androidx.compose.foundation.Image(img, p.name, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            else Text(initials, style = T.label, color = kindColor(p.kind))
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {

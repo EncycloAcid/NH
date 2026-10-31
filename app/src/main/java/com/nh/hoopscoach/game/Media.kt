@@ -28,7 +28,13 @@ object Media {
 
     fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1) {
         val r = lg.road ?: return
-        r.feed += Post(lg.season, lg.day, name, handle, kind, text, max(likes, 3), verified, gameId)
+        // Real accounts where the pack has one: the team's own, highlight and media accounts, analysts and insiders, the league.
+        val acct = if (name == "NBA") SocialAccounts.league(lg) else when (kind) {
+            "team" -> SocialAccounts.forTeam(lg, name)
+            "media", "analyst", "insider" -> SocialAccounts.pick(lg, kind)
+            else -> null
+        }
+        r.feed += Post(lg.season, lg.day, acct?.name ?: name, acct?.handle ?: handle, kind, text, max(likes, 3), acct?.verified ?: verified, gameId, acct?.avatar ?: "")
         if (r.feed.size > 80) r.feed.subList(0, r.feed.size - 80).clear()
     }
 

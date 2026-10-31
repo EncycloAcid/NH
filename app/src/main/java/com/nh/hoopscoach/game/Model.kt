@@ -1005,6 +1005,8 @@ class PressQuestion(val season: Int, val gameId: Int, val topic: String, val pro
 class Post(
     val season: Int, val day: Int, val name: String, val handle: String, val kind: String, val text: String,
     val likes: Int, val verified: Boolean = false, val gameId: Int = -1,
+    /** A real account's avatar (assets/social/<avatar>.webp), or empty. */
+    val avatar: String = "",
 )
 
 @Serializable
