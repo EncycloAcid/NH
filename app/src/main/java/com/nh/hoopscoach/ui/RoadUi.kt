@@ -350,7 +350,7 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(h.name, style = T.bodyB, color = P.ink)
-                Text("${Road.role(lg)} · ${Gameplan.plannedMinutes(t, h.id)} min · ${h.cls}", style = T.small, color = P.accent)
+                Text("${Road.role(lg)} · ${planMin(lg, t, h.id)} min · ${if (lg.pro) "age ${h.age}" else h.cls}", style = T.small, color = P.accent)
                 if (h.stats.gp > 0) Text(statLine(h), style = T.small, color = P.sub)
             }
             Ring(h.ovr, 44.dp)
@@ -362,7 +362,7 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
         }
         lg.road?.let { r ->
             Spacer(Modifier.height(6.dp))
-            val race = if (r.raceRank in 1..100) "POY race No. ${r.raceRank} · " else ""
+            val race = if (r.raceRank in 1..100) "${if (lg.pro) "MVP" else "POY"} race No. ${r.raceRank} · " else ""
             Text("$race${Road.fatigueLabel(r.fatigue)} · ${r.practice.label} · ${Road.count(r.followers)} followers", style = T.small, color = P.sub)
         }
         val today = com.nh.hoopscoach.game.Season.userGameToday(lg)
@@ -427,7 +427,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
 /** Player of the Year ladder, All-America pace, and the conference and freshman races. */
 /** The class rival, side by side with you: overall, scoring, the races and the big board, plus the head-to-head. */
 @Composable
-private fun RivalPanel(vm: GameViewModel, lg: League) {
+internal fun RivalPanel(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val rv = Rival.player(lg) ?: return
     val h = lg.playerOrNull(lg.heroId) ?: return
@@ -441,7 +441,12 @@ private fun RivalPanel(vm: GameViewModel, lg: League) {
             Column(Modifier.weight(1f)) {
                 Text(rv.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    if (active != null) "${lg.team(rv.teamId).school} · ${rv.pos} · ${rv.cls} · was the No. ${rv.recruitRank} recruit" else "Your rival ${r.rivalLeft}.",
+                    when {
+                        active != null && lg.pro -> "${lg.team(rv.teamId).name} · ${rv.pos} · age ${rv.age}"
+                        active != null -> "${lg.team(rv.teamId).school} · ${rv.pos} · ${rv.cls} · was the No. ${rv.recruitRank} recruit"
+                        lg.pro && r.rivalLeft.isEmpty() -> "Still in college. He enters next year's draft."
+                        else -> "Your rival ${r.rivalLeft}."
+                    },
                     style = T.small, color = P.sub, maxLines = 2,
                 )
             }
@@ -463,20 +468,31 @@ private fun RivalPanel(vm: GameViewModel, lg: League) {
             val myRace = Rival.raceRank(lg, h)
             val hisRace = Rival.raceRank(lg, rv)
             if (myRace in 1..100 || hisRace in 1..100) RivalRow("Player of the Year race", rankText(myRace), rankText(hisRace), rankCompare(myRace, hisRace))
-            val mb = board[h.id] ?: 0
-            val hb = board[rv.id] ?: 0
-            RivalRow("Big board", rankText(mb), rankText(hb), rankCompare(mb, hb))
+            if (lg.pro) {
+                val ms = h.awards.count { it.endsWith(" All-Star") }
+                val hs = rv.awards.count { it.endsWith(" All-Star") }
+                RivalRow("All-Star selections", "$ms", "$hs", ms.compareTo(hs))
+                val mr = h.awards.count { it.endsWith(" Champion") }
+                val hr = rv.awards.count { it.endsWith(" Champion") }
+                RivalRow("Rings", "$mr", "$hr", mr.compareTo(hr))
+            } else {
+                val mb = board[h.id] ?: 0
+                val hb = board[rv.id] ?: 0
+                RivalRow("Big board", rankText(mb), rankText(hb), rankCompare(mb, hb))
+            }
         }
         r.duels.lastOrNull()?.let { d ->
             Spacer(Modifier.height(8.dp))
-            Text("Last meeting: ${if (d.won) "W" else "L"} against ${lg.team(d.opp).school}, you ${d.me} points, ${rv.last} ${d.him}", style = T.small, color = P.ink)
+            val where = if (lg.pro && d.season < r.proStart) "in college" else "against ${if (lg.pro) lg.team(d.opp).name else lg.team(d.opp).school}"
+            Text("Last meeting: ${if (d.won) "W" else "L"} $where, you ${d.me} points, ${rv.last} ${d.him}", style = T.small, color = P.ink)
         }
         val next = if (active != null) Rival.nextDuel(lg) else null
         Spacer(Modifier.height(4.dp))
         Text(
             when {
-                next != null -> "Next meeting: ${if (next.home == h.teamId) "vs" else "at"} ${lg.team(rv.teamId).school}. Win the duel and your following grows faster."
+                next != null -> "Next meeting: ${if (next.home == h.teamId) "vs" else "at"} ${if (lg.pro) lg.team(rv.teamId).name else lg.team(rv.teamId).school}. Win the duel and your following grows faster."
                 active != null -> "No meeting on the schedule. You may still cross paths in March."
+                lg.pro -> if (r.rivalLeft.isEmpty()) "He's still in college. He'll be in the league next year." else "His career is over. Yours isn't."
                 else -> "He's gone pro. Now it's your turn."
             },
             style = T.small, color = P.sub,
@@ -506,7 +522,7 @@ private fun RivalRow(label: String, mine: String, his: String, better: Int) {
 }
 
 @Composable
-private fun RacePanel(vm: GameViewModel, lg: League) {
+internal fun RacePanel(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val h = lg.playerOrNull(lg.heroId) ?: return
     if (h.teamId < 0) return
@@ -520,9 +536,9 @@ private fun RacePanel(vm: GameViewModel, lg: League) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("PLAYER OF THE YEAR", style = T.label, color = P.sub)
+                Text(if (lg.pro) "MVP RACE" else "PLAYER OF THE YEAR", style = T.label, color = P.sub)
                 Text(if (rank <= 100) "No. $rank" else "Outside the top 100", style = T.title.copy(fontSize = if (rank <= 100) 30.sp else 22.sp), color = P.accent)
-                Text(Road.allAmericaPace(rank), style = T.small, color = P.ink)
+                Text(if (lg.pro) proPace(rank) else Road.allAmericaPace(rank), style = T.small, color = P.ink)
             }
             if (r.lastRaceRank in 1..100 && r.raceRank in 1..100 && r.raceRank != r.lastRaceRank) {
                 val up = r.raceRank < r.lastRaceRank
@@ -531,11 +547,11 @@ private fun RacePanel(vm: GameViewModel, lg: League) {
         }
         val t = lg.team(h.teamId)
         val conf = Road.rankAmong(lg) { _, pt -> pt.confId == t.confId }
-        val fr = if (h.year == 1) Road.rankAmong(lg) { p, _ -> p.year == 1 } else 0
+        val fr = if (lg.pro) (if (h.proYears == 0) Road.rankAmong(lg) { p, _ -> p.proYears == 0 } else 0) else if (h.year == 1) Road.rankAmong(lg) { p, _ -> p.year == 1 } else 0
         Spacer(Modifier.height(6.dp))
         Text(listOfNotNull(
-            if (conf > 0) "No. $conf in the ${lg.conf(t.confId).abbr} Player of the Year race" else null,
-            if (fr > 0) "No. $fr among freshmen" else null,
+            if (conf > 0) (if (lg.pro) "No. $conf in the ${lg.conf(t.confId).name}" else "No. $conf in the ${lg.conf(t.confId).abbr} Player of the Year race") else null,
+            if (fr > 0) (if (lg.pro) "No. $fr in the Rookie of the Year race" else "No. $fr among freshmen") else null,
         ).joinToString(" · "), style = T.small, color = P.sub)
         Spacer(Modifier.height(10.dp))
         val top = ladder.take(5)
@@ -545,7 +561,7 @@ private fun RacePanel(vm: GameViewModel, lg: League) {
             RaceRow(rank, h, t, true)
         }
         Text("The ladder uses the same formula as the end-of-season awards: production, efficiency and winning.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
-        if (h.stats.gp < (t.gp * 0.6)) Text("Play in 60% of games to qualify for national awards.", style = T.small, color = P.warn, modifier = Modifier.padding(top = 6.dp))
+        if (h.stats.gp < (t.gp * 0.6)) Text("Play in 60% of games to qualify for ${if (lg.pro) "league" else "national"} awards.", style = T.small, color = P.warn, modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -568,7 +584,7 @@ private fun RaceRow(rank: Int, p: Player, t: Team, you: Boolean) {
 
 /** Your own staff, paid out of your NIL money one season at a time. */
 @Composable
-private fun StaffPanel(vm: GameViewModel, lg: League) {
+internal fun StaffPanel(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val bank = Road.bank(lg)
     Section("Your team")
@@ -583,7 +599,7 @@ private fun StaffPanel(vm: GameViewModel, lg: League) {
                 Text("HIRED THIS SEASON", style = T.label.copy(fontSize = 9.sp), color = P.sub)
             }
         }
-        Text("Your NIL money pays for people who make you better. Contracts run through the season.", style = T.small, color = P.sub)
+        Text("Your ${if (lg.pro) "" else "NIL "}money pays for people who make you better. Contracts run through the season.", style = T.small, color = P.sub)
         Spacer(Modifier.height(10.dp))
         for (s in com.nh.hoopscoach.game.Staff.entries) {
             val on = Road.has(lg, s)
@@ -613,7 +629,7 @@ private fun StaffPanel(vm: GameViewModel, lg: League) {
 
 /** This week's practice plan, and what it's costing. */
 @Composable
-private fun PracticePanel(vm: GameViewModel, lg: League) {
+internal fun PracticePanel(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     Section("Practice this week")
     Panel {
@@ -647,7 +663,7 @@ private fun PracticePanel(vm: GameViewModel, lg: League) {
 
 /** Followers, persona, sponsors and recent press. */
 @Composable
-private fun MediaPanel(lg: League) {
+internal fun MediaPanel(lg: League) {
     val r = lg.road ?: return
     Section("Media")
     Panel {
@@ -664,7 +680,11 @@ private fun MediaPanel(lg: League) {
         }
         Spacer(Modifier.height(8.dp))
         Text(Road.personaBlurb(r.persona), style = T.small, color = P.sub)
-        Text("Every follower adds \$1 a year to your NIL value: ${money(r.followers / 1000)} right now.", style = T.small, color = P.good)
+        Text(
+            if (lg.pro) "Endorsements pay about \$2 a follower for the first two million, 50 cents after that: ${money(com.nh.hoopscoach.game.ProCareer.endorsements(lg))} a year right now."
+            else "Every follower adds \$1 a year to your NIL value: ${money(r.followers / 1000)} right now.",
+            style = T.small, color = P.good,
+        )
         Road.nextMilestone(lg)?.let { (need, pay) ->
             Spacer(Modifier.height(8.dp))
             Bar(r.followers / need.toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
@@ -685,7 +705,7 @@ private fun MediaPanel(lg: League) {
 
 /** Season by season, as written at the end of each one. */
 @Composable
-private fun CareerStory(lg: League) {
+internal fun CareerStory(lg: League) {
     val r = lg.road ?: return
     if (r.story.isEmpty()) return
     Section("Your story")
@@ -746,6 +766,7 @@ fun RoadOffseasonFlow(vm: GameViewModel, lg: League) {
     val os = lg.offseason ?: return
     val r = lg.road ?: return
     if (Road.inGreenRoom(lg)) { GreenRoom(vm, lg); return }
+    if (r.goingPro) { GoProScreen(vm, lg); return }
     if (r.ended) { RoadEnding(vm, lg); return }
     val h = lg.playerOrNull(lg.heroId) ?: return
     val t = lg.team(h.teamId)
@@ -835,12 +856,12 @@ private fun LazyListScope.draftResultStep(vm: GameViewModel, lg: League, h: Play
 }
 
 @Composable
-private fun SummerCard(lg: League, ev: SummerEvent, onGo: () -> Unit) {
-    val u19 = ev == SummerEvent.U19
+internal fun SummerCard(lg: League, ev: SummerEvent, onGo: () -> Unit) {
+    val u19 = ev == SummerEvent.U19 || ev == SummerEvent.NATIONAL_TEAM
     Panel(color = if (u19) P.hero else P.surface, onClick = onGo) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                if (u19) Text("NATIONAL TEAM INVITE", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                if (u19) Text("NATIONAL TEAM INVITE" + (Summer.proTournament(lg.season)?.takeIf { lg.pro }?.let { " · ${it.uppercase()}" } ?: ""), style = T.label, color = P.onHero.copy(alpha = 0.8f))
                 Text(ev.label, style = T.bodyB, color = if (u19) P.onHero else P.ink)
                 Text(ev.blurb, style = T.small, color = if (u19) P.onHero.copy(alpha = 0.85f) else P.sub)
                 Spacer(Modifier.height(4.dp))
@@ -918,12 +939,13 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                                 myPick.pick >= r.draftRank + 8 -> " A longer wait than the mock drafts said, but you're in."
                                 else -> " Right about where the mock drafts had you."
                             }
-                            Text("${h.name} hugs his family and walks to the stage.$verdict", style = T.small, color = onHero.copy(alpha = 0.9f))
+                            Text((if (myPick.proTeam.isNotEmpty()) "The ${myPick.proTeam} take you. " else "") + "${h.name} hugs his family and walks to the stage.$verdict", style = T.small, color = onHero.copy(alpha = 0.9f))
                         }
                         done -> {
                             Text("THE DRAFT IS OVER", style = T.label, color = onHero.copy(alpha = 0.8f))
                             Text("UNDRAFTED", style = T.hero, color = onHero)
-                            val next = if (r.ended) "Your agent already has calls in from overseas."
+                            val next = if (r.goingPro) "Your agent gets you a two-way deal. Make a roster and prove them wrong."
+                                else if (r.ended) "Your agent already has calls in from overseas."
                                 else "You head back to ${lg.team(school).school} for your ${classLong(h.year + 1).lowercase()} season."
                             Text("${picks.size} names called, none of them yours. $next", style = T.small, color = onHero.copy(alpha = 0.9f))
                         }
@@ -956,6 +978,7 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
         }
         when {
             !done -> FlowFooter(null, "Skip ahead") { vm.revealSeason = lg.season; vm.reveal = stop }
+            r.goingPro -> FlowFooter(null, "Start your pro career") { vm.act { Road.watchedDraft(it) }; vm.goPro() }
             r.ended -> FlowFooter(null, "Continue") { vm.act { Road.watchedDraft(it) } }
             else -> FlowFooter(null, "Next: the summer") { vm.roadNext() }
         }
@@ -987,7 +1010,8 @@ private fun DraftRow(vm: GameViewModel, lg: League, d: DraftPick, me: Boolean, f
                 else if (rival) { Spacer(Modifier.width(6.dp)); Tag("RIVAL", P.bad) }
                 else if (fresh) { Spacer(Modifier.width(6.dp)); Tag("JUST IN", P.good) }
             }
-            Text("${t.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (d.proTeam.isNotEmpty()) Text("${d.proTeam} · ${t.abbr} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else Text("${t.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text("${d.ovr}", style = T.numSm, color = tier(d.ovr))
     }

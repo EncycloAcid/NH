@@ -531,5 +531,6 @@ object Season {
         }
         Phase.WRAP_UP -> "Season Complete"
         Phase.OFFSEASON -> "Offseason"
+        Phase.PLAYOFFS -> "Playoffs"
     }
 }

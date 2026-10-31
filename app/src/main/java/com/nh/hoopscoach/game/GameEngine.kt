@@ -30,9 +30,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
     val score = IntArray(2)
+    /** Seconds in a half: 20 minutes in college, 24 in the pros (a 48-minute game). */
+    val half = if (lg.pro) 1440.0 else 1200.0
     var period = 1
         private set
-    var clock = 1200.0
+    var clock = half
         private set
     private var poss = if (Rng.chance(0.5)) 0 else 1
     private val firstPoss = poss
@@ -295,15 +297,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val t = teams[side]
         val roster = rosters[side]
         val lookup = byId[side]
-        val elapsed = if (period <= 2) 1200 - clock else 0.0
+        val elapsed = if (period <= 2) half - clock else 0.0
         val late = period >= 2 && clock < 240
         val margin = score[side] - score[1 - side]
         val garbage = period == 2 && clock < 270 && abs(margin) >= 18
         val chosen = ArrayList<Player>(5)
         for ((i, s) in t.plan.slots.withIndex()) {
             if (i >= 5) break
-            val starterSec = s.starterMin * 30.0
-            val reserveSec = 1200 - starterSec
+            val starterSec = s.starterMin * 30.0 * half / 1200.0
+            val reserveSec = half - starterSec
             val a = starterSec * 0.55
             var useStarter = elapsed < a || elapsed >= a + reserveSec
             if (period > 2 || (late && abs(margin) <= 12)) useStarter = true
@@ -349,6 +351,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Offense.UPTEMPO -> 14.0; Offense.GRIND -> 21.0; Offense.PERIMETER -> 16.6; Offense.INSIDE -> 17.6; else -> 17.2
         }
         when (def(1 - o)) { Defense.PRESS -> base -= 2.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
+        // The pro game is faster: a shorter shot clock and about 100 possessions a game.
+        if (lg.pro) base *= 0.84
         return base * (0.6 + Rng.d() * 0.8)
     }
 
@@ -357,7 +361,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (s.starter == p.id) return s.starterUsg.toDouble()
             if (s.reserve == p.id) return s.reserveUsg.toDouble()
         }
-        return Gameplan.usageFor(p).toDouble() * 0.8
+        return Gameplan.usageFor(p, lg.pro).toDouble() * 0.8
     }
 
     private fun ft(p: Player): Double = (0.69 + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
@@ -658,7 +662,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         periodScores.last().let { it[0] = score[0] - periodScores.dropLast(1).sumOf { s -> s[0] }; it[1] = score[1] - periodScores.dropLast(1).sumOf { s -> s[1] } }
         if (period == 1) {
             log(-1, "Halftime: ${teams[1].abbr} ${score[1]}, ${teams[0].abbr} ${score[0]}", 0)
-            period = 2; clock = 1200.0; teamFouls[0] = 0; teamFouls[1] = 0
+            period = 2; clock = half; teamFouls[0] = 0; teamFouls[1] = 0
             poss = 1 - firstPoss
             periodScores += IntArray(2)
             return
@@ -702,11 +706,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             game.box = boxScore()
         }
         val hw = score[0] > score[1]
+        // Pro playoff games count in their own stat line, not the standings or the season's averages.
+        val playoff = game.type == GameType.PLAYOFF
         for (side in 0..1) {
             val t = teams[side]
             val won = if (side == 0) hw else !hw
-            if (won) { t.w++; t.streak = if (t.streak > 0) t.streak + 1 else 1 } else { t.l++; t.streak = if (t.streak < 0) t.streak - 1 else -1 }
-            if (game.type == GameType.CONF) { if (won) t.cw++ else t.cl++ }
+            if (!playoff) {
+                if (won) { t.w++; t.streak = if (t.streak > 0) t.streak + 1 else 1 } else { t.l++; t.streak = if (t.streak < 0) t.streak - 1 else -1 }
+                if (game.type == GameType.CONF) { if (won) t.cw++ else t.cl++ }
+            }
             val c = coaches[side]
             if (won) c.w++ else c.l++
             val tot = StatLine(gp = 1)
@@ -715,8 +723,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 if (st.sec <= 0 && st.fga == 0 && st.fta == 0) continue
                 st.gp = 1
                 if (id in starters[side]) st.gs = 1
-                p.stats.add(st)
-                if (game.type == GameType.NCAA) p.tourney.add(st)
+                if (!playoff) p.stats.add(st)
+                if (game.type == GameType.NCAA || playoff) p.tourney.add(st)
                 tot.add(st.copy().also { it.gp = 0; it.gs = 0 })
                 if (t.id == lg.userTeamId) {
                     val oppSide = 1 - side
@@ -726,22 +734,28 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     )
                 }
                 // Development: playing time and production earn XP.
+                // Pros grow slower in season, and not past their ceiling, so the league's ratings hold steady.
+                val proRate = if (!lg.pro) 1.0 else if (p.ovr >= p.pot) 0.0 else 0.35
                 val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side])) *
-                    (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0)
+                    (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0) * proRate
                 Ratings.addXp(p, xp.roundToInt())
                 Records.checkGame(lg, p, t, st)
                 Careers.track(lg, p, st, game, t.id)
             }
             tot.gp = 1
-            t.totals.add(tot)
+            if (!playoff) t.totals.add(tot)
         }
-        teams[0].opp.add(lastTotals(1))
-        teams[1].opp.add(lastTotals(0))
+        if (!playoff) {
+            teams[0].opp.add(lastTotals(1))
+            teams[1].opp.add(lastTotals(0))
+        }
         Rankings.updateElo(lg, game)
-        Rivalries.afterGame(lg, game)
-        Fans.afterGame(lg, game)
-        Brand.afterGame(lg, game)
-        Moments.afterGame(lg, game, buzzerBeater, forcedOt)
+        if (!lg.pro) {
+            Rivalries.afterGame(lg, game)
+            Fans.afterGame(lg, game)
+            Brand.afterGame(lg, game)
+            Moments.afterGame(lg, game, buzzerBeater, forcedOt)
+        }
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
     }
 

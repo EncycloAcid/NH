@@ -420,7 +420,13 @@ private fun Sparkline(values: List<Int>, pot: Int, modifier: Modifier) {
 private fun BioTab(lg: League, p: Player) {
     Section("Background")
     GroupList(
-        listOfNotNull(
+        if (lg.pro) listOfNotNull(
+            "Age" to "${p.age}",
+            "Pro seasons" to "${p.proYears}",
+            "Hometown" to p.hometown,
+            p.awards.lastOrNull { it.contains("Draft #") }?.let { "Drafted" to "No. ${it.substringAfter("#")} in ${it.substringBefore(" ")}" },
+            if (p.recruitRank > 0) "Recruit rating" to "${p.stars}★ · No. ${p.recruitRank} overall" else null,
+        ) else listOfNotNull(
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
             "Recruit rating" to when {

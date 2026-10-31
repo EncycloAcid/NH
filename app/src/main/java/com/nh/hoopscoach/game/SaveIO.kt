@@ -47,9 +47,11 @@ object SaveIO {
         val lg = json.decodeFromString(League.serializer(), text)
         lg.reindex()
         repair(lg)
-        Rivalries.ensure(lg)
-        Brand.ensure(lg)
-        Recruiting.ensure(lg)
+        if (!lg.pro) {
+            Rivalries.ensure(lg)
+            Brand.ensure(lg)
+            Recruiting.ensure(lg)
+        }
         return lg
     }
 }

@@ -241,6 +241,39 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** One step of the player-mode offseason. */
+    /** Draft Night is over: build the pro league and move the career into it. */
+    fun goPro() {
+        val lg = league ?: return
+        if (busy != null || !(lg.road?.goingPro ?: false)) return
+        busy = "Welcome to the league"
+        viewModelScope.launch {
+            delay(60)
+            val pro = mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.ProLeague.create(lg) } }
+            stack.clear()
+            sheet = null
+            live = null
+            tab = Tab.TODAY
+            league = pro
+            busy = null
+            bump()
+        }
+    }
+
+    /** One step through the pro offseason. */
+    fun proNext() {
+        val ps = league?.proState ?: return
+        val label = when (ps.step) {
+            com.nh.hoopscoach.game.ProStep.REVIEW -> "Draft night"
+            com.nh.hoopscoach.game.ProStep.DRAFT -> "Free agency opens"
+            com.nh.hoopscoach.game.ProStep.FREE_AGENCY -> "Summer"
+            com.nh.hoopscoach.game.ProStep.SUMMER -> "Opening night"
+        }
+        heavy(label) {
+            com.nh.hoopscoach.game.ProCareer.next(it)
+            if (it.phase == Phase.REGULAR) tab = Tab.TODAY
+        }
+    }
+
     fun roadNext() {
         val os = league?.offseason ?: return
         val label = when (os.step) {
@@ -325,13 +358,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun simDay() {
         val lg = league ?: return
         if (Season.seasonOver(lg)) return
-        heavy("Simulating") { Season.playDay(it) }
+        heavy("Simulating") { com.nh.hoopscoach.game.Sim.playDay(it) }
     }
 
     fun simUntil(label: String, stop: (League) -> Boolean) = heavy(label) { lg ->
         var guard = 0
-        while (!Season.seasonOver(lg) && guard++ < 80) {
-            Season.playDay(lg)
+        while (!Season.seasonOver(lg) && guard++ < 200) {
+            com.nh.hoopscoach.game.Sim.playDay(lg)
             if (stop(lg)) break
         }
     }
@@ -387,7 +420,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 lv.engine.simToEnd()
                 lv.engine.commit()
                 lv.tick++
-                Season.playDay(lg)
+                com.nh.hoopscoach.game.Sim.playDay(lg)
             }
             lv.done = true
             bump()

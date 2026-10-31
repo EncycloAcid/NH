@@ -118,7 +118,7 @@ class RoadExtrasTest {
         var rivalPresses = 0
         var summers = 0
         val notes = mutableListOf<String>()
-        while (!r.ended && seasons < 5) {
+        while (!r.ended && !r.goingPro && seasons < 5) {
             seasons++
             if (Road.needsDeal(lg)) Road.chooseDeal(lg, NilDeal.STEADY)
             var guard = 0
@@ -135,7 +135,7 @@ class RoadExtrasTest {
             val rank = Offseason.draftBoard(lg)[me.id]
             lg.road!!.declared = me.year < 4 && rank != null && rank <= 10
             Road.next(lg)
-            if (lg.road!!.ended) break
+            if (lg.road!!.ended || lg.road!!.goingPro) break
             assertEquals(OffStep.DRAFT, lg.offseason!!.step)
             assertTrue("no summer events before the draft is over", !Summer.open(lg))
             Road.next(lg)
@@ -166,7 +166,7 @@ class RoadExtrasTest {
         println("career: ${rr.ending}")
         println("duels: ${rr.duels.joinToString { "${it.season} ${if (it.won) "W" else "L"} ${it.me}-${it.him}" }}; rival press questions $rivalPresses; rival ${rr.rivalLeft.ifEmpty { "still in college" }}")
         rr.story.forEach { println("  $it") }
-        assertTrue("career ended", rr.ended)
+        assertTrue("college career over", rr.ended || rr.goingPro)
         assertTrue("they played each other", w + l >= 2)
         assertTrue("the press asks about the rival", rivalPresses >= 1)
         assertTrue("the ending mentions the rival", rr.ending.contains("rival"))

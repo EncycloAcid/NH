@@ -45,7 +45,7 @@ object Rival {
     }
 
     /** The rival, current or former. */
-    fun player(lg: League): Player? = lg.road?.rivalId?.takeIf { it >= 0 }?.let { lg.anyPlayer(it) }
+    fun player(lg: League): Player? = lg.road?.rivalId?.takeIf { it >= 0 }?.let { id -> lg.anyPlayer(id) ?: lg.proState?.pendingRival?.takeIf { it.id == id } }
 
     /** The rival while he's still playing college ball. */
     fun active(lg: League): Player? = lg.road?.rivalId?.takeIf { it >= 0 }?.let { lg.playerOrNull(it) }?.takeIf { it.teamId >= 0 }
@@ -142,6 +142,16 @@ object Summer {
         return (rank != null && rank <= 40) || h.ovr >= 84
     }
 
+    /** Pro summers: the Olympics every fourth year, the World Cup the year before. */
+    fun proTournament(season: Int): String? = when (season % 4) { 0 -> "Olympics"; 3 -> "World Cup"; else -> null }
+
+    /** Team USA wants the league's best: an MVP-race top 20 or a 95 overall, in an Olympic or World Cup summer. */
+    fun nationalEligible(lg: League, h: Player): Boolean {
+        if (proTournament(lg.season) == null) return false
+        val rank = Rival.raceRank(lg, h)
+        return h.ovr >= 95 || rank in 1..20
+    }
+
     /** This summer's invitations; he can take one. */
     fun invites(lg: League): List<SummerEvent> {
         val r = lg.road ?: return emptyList()
@@ -149,7 +159,8 @@ object Summer {
         if (r.ended || h.teamId < 0 || lg.phase != Phase.OFFSEASON) return emptyList()
         val camp = when (h.pos) { Pos.PG, Pos.SG -> SummerEvent.GUARD_CAMP; Pos.SF -> SummerEvent.WING_CAMP; else -> SummerEvent.BIGS_CAMP }
         val out = mutableListOf<SummerEvent>()
-        if (u19Eligible(lg, h)) out += SummerEvent.U19
+        if (lg.pro) { if (nationalEligible(lg, h)) out += SummerEvent.NATIONAL_TEAM }
+        else if (u19Eligible(lg, h)) out += SummerEvent.U19
         out += camp
         out += SummerEvent.SHOOTING_CAMP
         out += SummerEvent.LOCKDOWN_CAMP
@@ -159,6 +170,7 @@ object Summer {
     /** Summer events are open after the draft, before the new season, once a summer. */
     fun open(lg: League): Boolean {
         val r = lg.road ?: return false
+        if (lg.pro) return r.summer != lg.season && lg.proState?.step == ProStep.SUMMER && invites(lg).isNotEmpty()
         val os = lg.offseason ?: return false
         return r.summer != lg.season && os.step != OffStep.ROSTER && os.step != OffStep.DRAFT && invites(lg).isNotEmpty()
     }
@@ -166,7 +178,8 @@ object Summer {
     /** Followers a camp or the U19 team should bring, for the invitation card. */
     fun followerRange(lg: League, ev: SummerEvent): String {
         val f = lg.road?.followers ?: 0
-        return if (ev == SummerEvent.U19) "+${Road.count((35_000 + f * 0.05).roundToInt())} to +${Road.count((120_000 + f * 0.05).roundToInt())} followers"
+        return if (ev == SummerEvent.NATIONAL_TEAM) "+${Road.count((150_000 + f * 0.04).roundToInt())} to +${Road.count((600_000 + f * 0.04).roundToInt())} followers"
+        else if (ev == SummerEvent.U19) "+${Road.count((35_000 + f * 0.05).roundToInt())} to +${Road.count((120_000 + f * 0.05).roundToInt())} followers"
         else "+${Road.count((8_000 + f * 0.03).roundToInt())} to +${Road.count((35_000 + f * 0.03).roundToInt())} followers"
     }
 
@@ -177,7 +190,18 @@ object Summer {
         if (!open(lg) || ev !in invites(lg)) return ""
         val before = h.ovr
         val note: String
-        if (ev == SummerEvent.U19) {
+        if (ev == SummerEvent.NATIONAL_TEAM) {
+            for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99)
+            val event = proTournament(lg.season) ?: "World Cup"
+            val roll = Rng.d()
+            val (medal, fans) = when { roll < 0.6 -> "gold" to 600_000; roll < 0.82 -> "silver" to 300_000; roll < 0.94 -> "bronze" to 220_000; else -> "fourth place" to 150_000 }
+            val ppg = ((h.ovr - 88) * 0.9 + 6 + Rng.gauss() * 2.5).coerceIn(2.0, 26.0)
+            val gain = (fans + r.followers * 0.04 * Road.damp(r.followers)).roundToInt()
+            r.followers += gain
+            if (medal != "fourth place") h.awards += "${lg.season} $event ${medal.replaceFirstChar { it.uppercase() }}"
+            note = "$event: Team USA wins $medal. You average %.1f points. Every rating +1, +${Road.count(gain)} followers.".format(ppg)
+            lg.news += News(lg.season, lg.day, "${h.name} and Team USA take $medal at the $event", true)
+        } else if (ev == SummerEvent.U19) {
             for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99)
             val roll = Rng.d()
             val (medal, fans) = when {
@@ -187,7 +211,7 @@ object Summer {
                 else -> "fifth place" to 35_000
             }
             val ppg = ((h.ovr - 72) * 0.55 + 7 + Rng.gauss() * 2).coerceIn(3.0, 24.0)
-            val gain = (fans + r.followers * 0.05).roundToInt()
+            val gain = (fans + r.followers * 0.05 * Road.damp(r.followers)).roundToInt()
             r.followers += gain
             if (medal != "fifth place") h.awards += "${lg.season} U19 World Cup ${medal.replaceFirstChar { it.uppercase() }}"
             val rv = Rival.active(lg)
@@ -199,7 +223,7 @@ object Summer {
         } else {
             for (a in ev.boosts) h.attrs[a.ordinal] = (h.attrs[a.ordinal] + 2).coerceAtMost(99)
             val mvp = Rng.chance(((h.ovr - 70) / 40.0).coerceIn(0.1, 0.6))
-            val gain = (Rng.range(8_000, 20_000) + r.followers * 0.03 + if (mvp) 15_000 else 0).roundToInt()
+            val gain = (Rng.range(8_000, 20_000) + r.followers * 0.03 * Road.damp(r.followers) + if (mvp) 15_000 else 0).roundToInt()
             r.followers += gain
             note = "${ev.label}: ${ev.boosts.joinToString(", ") { "${it.label} +2" }}" +
                 (if (mvp) ". Named camp MVP" else "") + ". +${Road.count(gain)} followers."
@@ -207,7 +231,9 @@ object Summer {
         if (h.ovr > h.pot) h.pot = h.ovr
         r.summer = lg.season
         r.summerNote = note + if (h.ovr > before) " Overall $before → ${h.ovr}." else ""
-        if (r.story.isNotEmpty()) r.story[r.story.size - 1] = r.story.last() + " · Summer: " + if (ev == SummerEvent.U19) "U19 Team USA" else ev.label
+        val tag = when (ev) { SummerEvent.U19 -> "U19 Team USA"; SummerEvent.NATIONAL_TEAM -> "Team USA, ${proTournament(lg.season)}"; else -> ev.label }
+        val story = if (lg.pro) r.proStory else r.story
+        if (story.isNotEmpty()) story[story.size - 1] = story.last() + " · Summer: " + tag
         Road.payMilestonesNow(lg)
         return r.summerNote
     }

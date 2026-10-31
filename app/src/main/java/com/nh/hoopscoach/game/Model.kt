@@ -80,9 +80,12 @@ enum class Defense(val label: String, val blurb: String) {
     PACKLINE("Pack Line", "Walls off the rim, lowers turnovers forced."),
 }
 
-enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON }
+enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON, PLAYOFFS }
 
-enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT") }
+/** College basketball, or (once the user's player is drafted) the pro league. */
+enum class Level { COLLEGE, PRO }
+
+enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT"), PLAYOFF("PO") }
 
 @Serializable
 class StatLine(
@@ -177,6 +180,9 @@ class Player(
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
+    /** Pro league: age, and pro seasons finished (0 for a rookie). */
+    var age: Int = 0,
+    var proYears: Int = 0,
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"
@@ -186,7 +192,10 @@ class Player(
     val cls get() = classLabel(year)
 }
 
-fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; else -> "GR" }
+fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; PRO_YEAR -> "PRO"; else -> "GR" }
+
+/** The class year every pro player carries. */
+const val PRO_YEAR = 9
 
 @Serializable
 class Slot(var starter: Int, var reserve: Int, var starterMin: Int, var starterUsg: Int, var reserveUsg: Int)
@@ -469,7 +478,7 @@ class Rivalry(
 }
 
 @Serializable
-class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1)
+class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1, var proTeam: String = "")
 
 @Serializable
 class HofEntry(val season: Int, val name: String, val pos: Pos, val school: String, val summary: String, val isCoach: Boolean = false)
@@ -672,6 +681,74 @@ class RoadState(
     /** Summer events: the offseason (by season) whose summer is already booked, and what happened. */
     var summer: Int = -1,
     var summerNote: String = "",
+    /** Pro career: drafted (or signed undrafted) and headed to the pros, and everything after. */
+    var goingPro: Boolean = false,
+    var undrafted: Boolean = false,
+    var proStart: Int = 0,
+    var contract: Contract? = null,
+    val proTeams: MutableList<Int> = mutableListOf(),
+    val proStory: MutableList<String> = mutableListOf(),
+    val proOffers: MutableList<ProOffer> = mutableListOf(),
+    var rings: Int = 0,
+    var allStars: Int = 0,
+    var mvps: Int = 0,
+    var retired: Boolean = false,
+    /** College numbers, kept when he turns pro. */
+    var collegeTotals: StatLine? = null,
+    var collegeSeasons: Int = 0,
+    var collegeSchools: String = "",
+    /** Season his salary for that season was paid. */
+    var salarySeason: Int = 0,
+    /** The order pro teams pick in on his Draft Night (franchise indexes). */
+    val proOrder: MutableList<Int> = mutableListOf(),
+)
+
+/** A pro contract. Salary in thousands of dollars a season. */
+@Serializable
+class Contract(val teamId: Int, val salary: Int, var years: Int, val kind: String, val signed: Int = 0)
+
+/** A free-agent offer. */
+@Serializable
+class ProOffer(val teamId: Int, val salary: Int, val years: Int, val role: String, val ahead: Int, val winPct: Double)
+
+/** A best-of-seven playoff series. [conf] is -1 for the Finals; [slot] orders the bracket. */
+@Serializable
+class Series(
+    val round: Int, val conf: Int, val slot: Int, val hi: Int, val lo: Int,
+    var hiWins: Int = 0, var loWins: Int = 0, val gameIds: MutableList<Int> = mutableListOf(),
+) {
+    val done get() = hiWins == 4 || loWins == 4
+    val winner get() = if (hiWins == 4) hi else if (loWins == 4) lo else -1
+    fun involves(t: Int) = hi == t || lo == t
+}
+
+/** One finished pro season, for the history page. */
+@Serializable
+class ProSeasonSummary(
+    val season: Int, val champion: Int, val runnerUp: Int, val mvp: String, val finalsMvp: String, val roy: String,
+    val heroResult: String = "",
+)
+
+enum class ProStep { REVIEW, DRAFT, FREE_AGENCY, SUMMER }
+
+/** Pro league state that the college game doesn't have. */
+@Serializable
+class ProState(
+    val series: MutableList<Series> = mutableListOf(),
+    val seeds: MutableMap<Int, Int> = mutableMapOf(),
+    val allStars: MutableList<Int> = mutableListOf(),
+    var allStarSeason: Int = 0,
+    var allStarNote: String = "",
+    var champion: Int = -1,
+    val history: MutableList<ProSeasonSummary> = mutableListOf(),
+    var step: ProStep = ProStep.FREE_AGENCY,
+    /** Rookies the user's team drafted this summer, and the order the lottery set. */
+    val draftedByUser: MutableList<Int> = mutableListOf(),
+    val retiredThisSummer: MutableList<String> = mutableListOf(),
+    /** The rival, if he was still in college when the user turned pro: he enters next year's draft. */
+    var pendingRival: Player? = null,
+    /** Growth over the last summer: player id to overall before. */
+    val before: MutableMap<Int, Int> = mutableMapOf(),
 )
 
 /** One head-to-head game against the class rival. */
@@ -686,6 +763,7 @@ enum class SummerEvent(val label: String, val blurb: String, val boosts: List<At
     BIGS_CAMP("Elite Bigs Camp", "Footwork, post counters and rim protection with former pros.", listOf(Attr.INS, Attr.REB, Attr.IDF)),
     LOCKDOWN_CAMP("Lockdown Defense Camp", "Slides, deflections and contests until your legs give out.", listOf(Attr.PER, Attr.STL, Attr.BLK)),
     U19("U19 National Team", "Represent the USA at the U19 World Cup against the best teenagers on the planet.", emptyList()),
+    NATIONAL_TEAM("Team USA", "The best players in the country, one summer, one gold medal to chase.", emptyList()),
 }
 
 /** People the user's player can pay out of his NIL money, one season at a time. Costs in thousands. */
@@ -801,6 +879,8 @@ class League(
     /** In player mode, the user's player. */
     var heroId: Int = -1,
     var road: RoadState? = null,
+    var level: Level = Level.COLLEGE,
+    var proState: ProState? = null,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()
@@ -835,6 +915,7 @@ class League(
     val userCoach get() = coach(userCoachId)
 
     val playerMode get() = mode == GameMode.PLAYER
+    val pro get() = level == Level.PRO
     /** True when the user runs this team's bench. In player mode every team is coached by the AI. */
     fun humanCoach(t: Team) = mode == GameMode.COACH && t.id == userTeamId
     fun humanCoach(teamId: Int) = mode == GameMode.COACH && teamId == userTeamId

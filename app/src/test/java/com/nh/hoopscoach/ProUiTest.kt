@@ -1,0 +1,143 @@
+package com.nh.hoopscoach
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
+import androidx.test.core.app.ApplicationProvider
+import com.nh.hoopscoach.game.League
+import com.nh.hoopscoach.game.Phase
+import com.nh.hoopscoach.game.ProCareer
+import com.nh.hoopscoach.game.ProLeague
+import com.nh.hoopscoach.game.ProStep
+import com.nh.hoopscoach.game.Road
+import com.nh.hoopscoach.game.Season
+import com.nh.hoopscoach.game.Sim
+import com.nh.hoopscoach.game.Summer
+import com.nh.hoopscoach.ui.App
+import com.nh.hoopscoach.ui.GameViewModel
+import com.nh.hoopscoach.ui.Route
+import com.nh.hoopscoach.ui.Tab
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.io.FileOutputStream
+
+/** The pro career through the real screens, from Draft Night to retirement. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w400dp-h880dp-xhdpi")
+class ProUiTest {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val out = File(System.getProperty("screenshots.dir") ?: "build/screenshots").apply { mkdirs() }
+
+    private fun idle() = rule.waitForIdle()
+    private fun shot(name: String) {
+        idle()
+        val view = rule.activity.window.decorView.rootView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        FileOutputStream(File(out, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+    private fun scrollTo(i: Int) { rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(i); idle() }
+    private fun scrollToText(t: String) { rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText(t)); idle() }
+
+    /** Every tab, sub-tab, route and the player sheet, so nothing crashes on pro data. */
+    private fun walk(vm: GameViewModel, lg: League) {
+        vm.install(lg); idle()
+        for (t in Tab.entries) {
+            vm.select(t); idle()
+            if (t == Tab.TEAM) for (i in 0..1) { vm.teamTab = i; idle() }
+            if (t == Tab.LEAGUE) for (i in 0..3) { vm.leagueTab = i; idle() }
+        }
+        val routes = mutableListOf<Route>(Route.Settings)
+        lg.playerOrNull(lg.heroId)?.let { routes += Route.Focus(it.id) }
+        lg.games.lastOrNull { it.played && it.involves(lg.userTeamId) }?.let { routes += Route.Box(it.id) }
+        for (r in routes) { vm.push(r); idle(); vm.back(); idle() }
+        lg.hero?.let { vm.openPlayer(it.id); idle(); vm.sheet = null; idle() }
+        lg.user.roster.firstOrNull { it != lg.heroId }?.let { vm.openPlayer(it); idle(); vm.sheet = null; idle() }
+        vm.leagueTab = 0; vm.teamTab = 0
+        vm.select(Tab.TODAY); idle()
+    }
+
+    @Test
+    fun proCareer() {
+        GameViewModel.autoLoad = false
+        val college = ProTest().toDraft(21)
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        rule.setContent { App(vm) }
+        // Draft Night with pro teams on the board, then the hand-off.
+        vm.install(college); vm.select(Tab.TODAY); idle()
+        vm.revealSeason = college.season; vm.reveal = 60; idle()
+        shot("P00_green_room_pro")
+        Road.watchedDraft(college); vm.install(college); idle()
+        shot("P01_going_pro")
+
+        var lg = ProLeague.create(college)
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        shot("P02_rookie_contract"); scrollTo(1); shot("P02b_new_team")
+        walk(vm, lg)
+        ProCareer.next(lg); vm.install(lg)
+        shot("P03_rookie_summer")
+        Summer.invites(lg).firstOrNull()?.let { Summer.attend(lg, it) }
+        ProCareer.next(lg); vm.install(lg)
+        assertTrue(lg.phase == Phase.REGULAR)
+        shot("P04_opening_night")
+        repeat(8) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        vm.install(lg); vm.select(Tab.TODAY)
+        shot("P05_today")
+        scrollTo(3); shot("P05b_today_more")
+        vm.select(Tab.RECRUIT); shot("P06_me"); scrollTo(2); shot("P06b_me_races"); scrollToText("YOUR RIVAL"); shot("P06c_me_rival")
+        vm.select(Tab.TEAM); vm.teamTab = 0; shot("P07_roster"); vm.teamTab = 1; shot("P07b_schedule")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 0; shot("P08_standings"); vm.leagueTab = 2; shot("P08b_leaders"); vm.leagueTab = 0
+        walk(vm, lg)
+        vm.select(Tab.TODAY); idle()
+        if (Season.userGameToday(lg) == null) Sim.playDay(lg)
+        vm.install(lg); idle()
+        vm.startLive(); idle()
+        vm.live?.let { lv -> lv.speed = 0; repeat(6) { lv.engine.stepToHero() }; lv.tick++ }
+        shot("P09_live_spotlight"); vm.live?.done = true; vm.back(); idle()
+        vm.live = null
+        while (lg.day < ProLeague.ALL_STAR_DAY && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star")
+        var guard = 0
+        while (lg.phase == Phase.REGULAR && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        repeat(3) { Sim.playDay(lg) }
+        vm.install(lg); vm.select(Tab.TODAY); shot("P11_playoffs")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); vm.leagueTab = 3; shot("P11c_awards"); vm.leagueTab = 0
+        walk(vm, lg)
+        guard = 0
+        while (lg.phase != Phase.OFFSEASON && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        vm.install(lg); vm.select(Tab.TODAY); shot("P12_review")
+        walk(vm, lg)
+        ProCareer.next(lg); vm.install(lg); shot("P13_draft")
+        lg.road!!.contract!!.years = 0
+        ProCareer.next(lg); vm.install(lg); shot("P14_free_agency")
+        assertTrue("offers come in", lg.road!!.proOffers.isNotEmpty())
+        ProCareer.sign(lg, lg.road!!.proOffers.first())
+        ProCareer.next(lg); vm.install(lg); shot("P15_summer")
+        vm.select(Tab.CAREER); shot("P16_career"); scrollTo(3); shot("P16b_career_story")
+        // Skip ahead to the end of a career.
+        ProCareer.next(lg)
+        lg.hero!!.age = 34
+        guard = 0
+        while (lg.phase != Phase.OFFSEASON && guard++ < 120) Sim.playDay(lg)
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        assertTrue(lg.proState!!.step == ProStep.REVIEW && ProCareer.canRetire(lg))
+        scrollToText("Retire"); shot("P17_retire_option")
+        ProCareer.retire(lg); vm.install(lg); vm.select(Tab.TODAY)
+        shot("P18_ending"); scrollTo(3); shot("P18b_ending_story")
+        walk(vm, lg)
+        println("ending: ${lg.road!!.ending}")
+    }
+}

@@ -58,11 +58,11 @@ import kotlin.math.sqrt
 private fun clock(sec: Int) = "%d:%02d".format(sec / 60, sec % 60)
 
 /** Seconds elapsed in the game for a period/clock pair (two 20-minute halves, 5-minute overtimes). */
-private fun elapsed(period: Int, clock: Int) = if (period <= 2) (period - 1) * 1200 + (1200 - clock) else 2400 + (period - 3) * 300 + (300 - clock)
+private fun elapsed(period: Int, clock: Int, half: Int = 1200) = if (period <= 2) (period - 1) * half + (half - clock) else 2 * half + (period - 3) * 300 + (300 - clock)
 
 /** Home win probability given the score margin, time left and the pregame edge. */
-private fun winProb(margin: Int, secLeft: Int, pregameEdge: Double): Double {
-    val f = (secLeft / 2400.0).coerceIn(0.0, 1.0)
+private fun winProb(margin: Int, secLeft: Int, pregameEdge: Double, game: Int = 2400): Double {
+    val f = (secLeft / game.toDouble()).coerceIn(0.0, 1.0)
     if (secLeft <= 0) return if (margin > 0) 1.0 else if (margin < 0) 0.0 else 0.5
     val z = (margin + pregameEdge * f) / (11.0 * sqrt(f) + 0.6)
     return 1.0 / (1.0 + exp(-1.7 * z))
@@ -116,8 +116,9 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Spacer(Modifier.height(8.dp))
         Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
             val pts = remember(lv.tick) {
-                val list = mutableListOf(0f to winProb(0, 2400, edge).toFloat())
-                for (ev in e.events) list += elapsed(ev.period, ev.clock).toFloat() to winProb(ev.hs - ev.aws, (2400 - elapsed(ev.period, ev.clock)).coerceAtLeast(0), edge).toFloat()
+                val half = e.half.toInt()
+                val list = mutableListOf(0f to winProb(0, 2 * half, edge, 2 * half).toFloat())
+                for (ev in e.events) list += elapsed(ev.period, ev.clock, half).toFloat() to winProb(ev.hs - ev.aws, (2 * half - elapsed(ev.period, ev.clock, half)).coerceAtLeast(0), edge, 2 * half).toFloat()
                 list
             }
             val now = pts.last().second
@@ -127,7 +128,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 Text("  ${lg.user.abbr} win probability", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 3.dp))
             }
             Spacer(Modifier.height(6.dp))
-            WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(96.dp))
+            WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(96.dp), e.half.toFloat())
         }
         Spacer(Modifier.height(10.dp))
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
@@ -189,15 +190,15 @@ private fun PlayRow(ev: PlayEvent, home: Team, away: Team) {
 }
 
 @Composable
-private fun WinChart(points: List<Pair<Float, Float>>, oppColor: Color, myColor: Color, userHome: Boolean, modifier: Modifier) {
+private fun WinChart(points: List<Pair<Float, Float>>, oppColor: Color, myColor: Color, userHome: Boolean, modifier: Modifier, half: Float = 1200f) {
     val line = P.line
     val grid = P.faint
     Canvas(modifier) {
         val w = size.width
         val h = size.height
-        val total = maxOf(2400f, points.lastOrNull()?.first ?: 2400f)
+        val total = maxOf(2 * half, points.lastOrNull()?.first ?: 2 * half)
         drawLine(line, Offset(0f, h / 2), Offset(w, h / 2), strokeWidth = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
-        drawLine(grid.copy(alpha = 0.4f), Offset(w * 1200f / total, 0f), Offset(w * 1200f / total, h), strokeWidth = 2f)
+        drawLine(grid.copy(alpha = 0.4f), Offset(w * half / total, 0f), Offset(w * half / total, h), strokeWidth = 2f)
         if (points.size < 2) return@Canvas
         // y: 0 = my team certain to win, h = opponent certain to win
         fun y(p: Float) = (if (userHome) 1 - p else p) * h

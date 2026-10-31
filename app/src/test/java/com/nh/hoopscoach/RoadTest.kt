@@ -45,7 +45,7 @@ class RoadTest {
         val topics = mutableSetOf<String>()
         val startFollowers = lg.road!!.followers
         assertTrue("a four-star starts with a following", startFollowers in 40_000..80_000)
-        while (!lg.road!!.ended && seasons < 6) {
+        while (!lg.road!!.ended && !lg.road!!.goingPro && seasons < 6) {
             seasons++
             val deal = when (seasons % 3) { 1 -> NilDeal.STEADY; 2 -> NilDeal.PERFORMANCE; else -> NilDeal.BRAND }
             Road.chooseDeal(lg, deal)
@@ -81,7 +81,7 @@ class RoadTest {
             // Draft Night: only a player who was in the draft waits in the green room, and his board rank is kept.
             assertEquals(inDraft, Road.inGreenRoom(lg))
             if (inDraft) assertTrue("mock draft rank is within his board rank", lg.road!!.draftRank in 1..(rank ?: 9999))
-            if (lg.road!!.ended) break
+            if (lg.road!!.ended || lg.road!!.goingPro) break
             assertEquals(OffStep.DRAFT, os.step)
             Road.next(lg)
             assertTrue("green room closes after the draft", !Road.inGreenRoom(lg))
@@ -107,7 +107,7 @@ class RoadTest {
             " · seniors drafted ${d.count { it.cls >= 4 }}, min senior ovr ${d.filter { it.cls >= 4 }.minOfOrNull { it.ovr }}")
         println("ended after $seasons seasons: ${r.ending} · NIL earned ${r.earned}K · schools ${r.schools.map { lg.team(it).abbr }}")
         r.story.forEach { println("  $it") }
-        assertTrue(r.ended)
+        assertTrue("drafted and headed to the pros, or done", r.ended || r.goingPro)
         assertTrue(r.ending.isNotEmpty())
         assertTrue("the ending waits for the green room", Road.inGreenRoom(lg))
         Road.watchedDraft(lg)

@@ -105,7 +105,13 @@ private fun Shell(vm: GameViewModel, lg: League) {
         val route = vm.stack.lastOrNull()
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (route == null) {
-                when (vm.tab) {
+                if (lg.pro) when (vm.tab) {
+                    Tab.TODAY -> TodayScreen(vm, lg)
+                    Tab.TEAM -> ProTeamScreen(vm, lg)
+                    Tab.RECRUIT -> ProHeroScreen(vm, lg)
+                    Tab.LEAGUE -> ProLeagueScreen(vm, lg)
+                    Tab.CAREER -> ProCareerScreen(vm, lg)
+                } else when (vm.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> TeamScreen(vm, lg)
                     Tab.RECRUIT -> if (lg.playerMode) HeroScreen(vm, lg) else RecruitScreen(vm, lg)
@@ -116,7 +122,7 @@ private fun Shell(vm: GameViewModel, lg: League) {
         }
         if (route == null) {
             val flowOnScreen = vm.tab == Tab.TODAY && (lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON)
-            if (!flowOnScreen) ContinueBar(vm, lg)
+            if (!flowOnScreen) { if (lg.pro) ProContinueBar(vm, lg) else ContinueBar(vm, lg) }
             NavBar(vm)
         } else Spacer(Modifier.navigationBarsPadding())
     }

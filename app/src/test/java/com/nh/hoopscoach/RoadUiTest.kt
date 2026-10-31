@@ -150,7 +150,7 @@ class RoadUiTest {
         shot("Y11_live"); vm.back(); idle()
 
         var seasons = 0
-        while (!lg.road!!.ended && seasons < 5) {
+        while (!lg.road!!.ended && !lg.road!!.goingPro && seasons < 5) {
             seasons++
             if (Road.needsDeal(lg)) Road.chooseDeal(lg, NilDeal.STEADY)
             var guard = 0
@@ -164,7 +164,7 @@ class RoadUiTest {
             vm.install(lg); vm.select(Tab.TODAY)
             if (seasons == 1) shot("Y13_decision")
             Road.next(lg); vm.install(lg)
-            if (lg.road!!.ended) break
+            if (lg.road!!.ended || lg.road!!.goingPro) break
             if (seasons == 1) shot("Y14_draft_back")
             Road.next(lg); vm.install(lg)
             if (seasons == 1) shot("Y15_summer_portal")
@@ -174,7 +174,7 @@ class RoadUiTest {
             Road.next(lg); vm.install(lg)
             if (seasons == 1) { shot("Y16_today_year2"); walk(vm, lg) }
         }
-        assertTrue(lg.road!!.ended)
+        assertTrue(lg.road!!.ended || lg.road!!.goingPro)
         // Draft Night: the green room fills in pick by pick, then the ending.
         assertTrue(Road.inGreenRoom(lg))
         vm.install(lg); vm.select(Tab.TODAY); idle()
@@ -184,9 +184,10 @@ class RoadUiTest {
         vm.select(Tab.RECRUIT); idle(); shot("Y16d_me_green_room"); vm.select(Tab.TODAY); idle()
         if (rule.onAllNodesWithText("Skip ahead").fetchSemanticsNodes().isNotEmpty()) { rule.onNodeWithText("Skip ahead").performClick(); idle() }
         shot("Y16c_draft_called")
-        rule.onNodeWithText("Continue").performClick(); idle()
+        if (lg.road!!.goingPro) { Road.watchedDraft(lg); vm.install(lg); idle() }
+        else { rule.onNodeWithText("Continue").performClick(); idle() }
         assertTrue(!Road.inGreenRoom(lg))
-        vm.install(lg); vm.select(Tab.TODAY); shot("Y17_ending"); scrollTo(2); shot("Y18_ending_story")
+        vm.install(lg); vm.select(Tab.TODAY); shot("Y17_ending"); swipe(); shot("Y18_ending_story")
         vm.select(Tab.CAREER); shot("Y19_career")
         vm.select(Tab.RECRUIT); shot("Y20_me_after")
         walk(vm, lg)

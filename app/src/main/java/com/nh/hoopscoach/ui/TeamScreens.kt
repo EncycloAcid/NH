@@ -473,6 +473,7 @@ fun GameRow(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game.Game, me: I
 }
 
 fun gameKind(lg: League, g: com.nh.hoopscoach.game.Game): String {
+    if (lg.pro) return g.label.ifEmpty { "Regular season" }
     val base = when (g.type) {
         com.nh.hoopscoach.game.GameType.CONF -> "Conference"
         com.nh.hoopscoach.game.GameType.NONCONF -> "Non-conference"

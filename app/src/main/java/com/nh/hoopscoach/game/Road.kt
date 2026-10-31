@@ -152,6 +152,7 @@ object Road {
     // ---------- NIL deals ----------
 
     fun needsDeal(lg: League): Boolean {
+        if (lg.pro) return false
         val r = lg.road ?: return false
         return lg.playerMode && !r.ended && lg.phase != Phase.OFFSEASON && r.dealSeason != lg.season && lg.playerOrNull(lg.heroId) != null
     }
@@ -235,8 +236,10 @@ object Road {
     /** Fatigue added by a game and its practice. */
     fun fatigueGain(lg: League, plan: Practice, minutes: Int): Int {
         val nutrition = has(lg, Staff.NUTRITIONIST)
-        val work = (plan.tiring.coerceAtLeast(0) + minutes / 8) * (if (nutrition) 0.75 else 1.0)
-        val rest = (if (plan.tiring < 0) -plan.tiring else 0) + 5 + (if (nutrition) 2 else 0)
+        // Pro minutes come out of 48, and pros get more recovery between games (charters, trainers, off days).
+        val mins = if (lg.pro) minutes * 40 / 48 else minutes
+        val work = (plan.tiring.coerceAtLeast(0) + mins / 8) * (if (nutrition) 0.75 else 1.0)
+        val rest = (if (plan.tiring < 0) -plan.tiring else 0) + (if (lg.pro) 6 else 5) + (if (nutrition) 2 else 0)
         return (work - rest).roundToInt()
     }
 
@@ -296,12 +299,18 @@ object Road {
         Rival.afterDraft(lg)
         val h = lg.playerOrNull(lg.heroId)
         val pick = lg.draftHistory.lastOrNull { it.season == lg.season && it.pid == lg.heroId }
+        if (r.draftSeason == lg.season) ProLeague.planDraft(lg)
         if (h == null) {
-            r.ended = true
+            val me0 = lg.hero
+            // Drafted, or undrafted but good enough for a two-way deal: the career goes on in the pros.
+            r.goingPro = pick != null || (me0 != null && me0.ovr >= 86)
+            r.undrafted = pick == null
+            r.ended = !r.goingPro
             r.portal = false
             r.draftPick = pick?.pick ?: 0
             val me = lg.hero
             r.ending = when {
+                pick == null && r.goingPro -> "${me?.name ?: "He"} goes undrafted, then signs a two-way deal to chase a pro roster spot."
                 pick == null -> "${me?.name ?: "He"} went undrafted after four seasons and signs to play overseas."
                 pick.pick <= 14 -> "Lottery pick! ${me?.name} goes No. ${pick.pick} overall in the ${lg.season} draft."
                 pick.pick <= 30 -> "${me?.name} goes No. ${pick.pick} overall, a first-round pick in the ${lg.season} draft."
@@ -349,7 +358,7 @@ object Road {
     fun next(lg: League) {
         val os = lg.offseason ?: return
         val r = lg.road ?: return
-        if (r.ended) return
+        if (r.ended || r.goingPro || lg.pro) return
         when (os.step) {
             OffStep.ROSTER -> Offseason.advance(lg)
             OffStep.DRAFT -> { watchedDraft(lg); Offseason.advance(lg); if (os.step == OffStep.CAREER) Offseason.advance(lg) }
@@ -368,7 +377,8 @@ object Road {
     // ---------- media and followers ----------
 
     /** Sponsor milestones: followers needed and the one-time payout (thousands of dollars). */
-    val MILESTONES = listOf(100_000 to 25, 250_000 to 60, 500_000 to 125, 1_000_000 to 250, 2_500_000 to 600, 5_000_000 to 1200)
+    val MILESTONES = listOf(100_000 to 25, 250_000 to 60, 500_000 to 125, 1_000_000 to 250, 2_500_000 to 600, 5_000_000 to 1200,
+        10_000_000 to 2500, 25_000_000 to 6000, 50_000_000 to 12000)
 
     fun count(n: Int) = when {
         n >= 1_000_000 -> "%.1fM".format(n / 1_000_000.0).replace(".0M", "M")
@@ -405,16 +415,16 @@ object Road {
         val won = g.winner() == t.id
         val rivalry = lg.rivalry(g) != null
         val duel = Rival.afterGame(lg, g, line, won)
-        val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
+        val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.PLAYOFF -> 2.2; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
             (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7) *
             (if (duel != null) (if (duel.won && duel.me > duel.him) 1.8 else 1.3) else 1.0)
         val brand = 0.6 + Brand.pull(lg, t) / 100.0
         val score = line.pts + 0.5 * line.reb + 0.7 * line.ast + line.stl + line.blk - 0.7 * line.tov
-        var gain = r.followers * 0.0015
+        var gain = r.followers * 0.0015 * damp(r.followers)
         if (line.min > 0) gain += (score - 10).coerceAtLeast(0.0).pow(1.5) * 60 * brand * stage
         if (line.pts >= 30) gain += 5_000 * brand
         val winner = buzzer != null && buzzer.name == h.name && won
-        if (winner) gain += 25_000 * stage + r.followers * 0.04
+        if (winner) gain += 25_000 * stage + r.followers * 0.04 * damp(r.followers)
         gain *= 1 + r.persona.coerceIn(-5, 5) * 0.04
         r.followers += gain.roundToInt()
         if (winner) lg.news += News(lg.season, lg.day, "${h.name}'s game-winner goes viral: ${count(r.followers)} followers and counting", true)
@@ -424,6 +434,9 @@ object Road {
     }
 
     fun payMilestonesNow(lg: League) = payMilestones(lg)
+
+    /** Percentage growth slows as the following gets huge: half speed at 3M, a tenth at 27M. */
+    fun damp(followers: Int) = 1.0 / (1.0 + followers / 3_000_000.0)
 
     private fun payMilestones(lg: League) {
         val r = lg.road ?: return
@@ -441,8 +454,8 @@ object Road {
         won: Boolean, rivalry: Boolean, score: Double, winner: Boolean, duel: Duel? = null,
     ): PressQuestion? {
         fun q(topic: String, prompt: String, vararg a: PressAnswer) = PressQuestion(lg.season, g.id, topic, prompt, a.toList())
-        val tourney = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.NIT
-        val rank = if (h.stats.gp >= 15) Offseason.draftBoard(lg)[h.id] else null
+        val tourney = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.NIT || g.type == GameType.PLAYOFF
+        val rank = if (h.stats.gp >= 15 && !lg.pro) Offseason.draftBoard(lg)[h.id] else null
         return when {
             winner -> q(
                 "Game-winner", "That shot is everywhere already. Walk us through it.",
@@ -465,7 +478,8 @@ object Road {
                 )
             }
             tourney && won && Rng.chance(0.6) -> q(
-                "Moving on", "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
+                "Moving on", if (g.type == GameType.PLAYOFF) "${g.label.substringAfter("· ")} goes your way. How do you close out this series?"
+                    else "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
                 PressAnswer("Whoever's next. We'll be ready.", 0.012),
                 PressAnswer("Give us the best team in the country.", 0.04, persona = 2),
                 PressAnswer("All credit to our staff. They had us ready.", 0.012, fans = 1, teammates = 3, persona = -1),
@@ -479,7 +493,7 @@ object Road {
             line.min > 0 && score >= 20 && Rng.chance(0.6) -> q(
                 "Big night", "${line.pts} points tonight. What was working?",
                 PressAnswer("My teammates found me in great spots.", 0.012, teammates = 4, persona = -1),
-                PressAnswer("Nobody in this conference can guard me.", 0.04, teammates = -5, persona = 2),
+                PressAnswer(if (lg.pro) "Nobody in this league can guard me." else "Nobody in this conference can guard me.", 0.04, teammates = -5, persona = 2),
                 PressAnswer("Just taking what the defense gives me.", 0.006),
             )
             rank != null && rank <= 30 && Rng.chance(0.15) -> q(
@@ -504,7 +518,7 @@ object Road {
         val q = r.press ?: return 0
         val a = q.answers.getOrNull(i) ?: return 0
         val h = lg.playerOrNull(lg.heroId)
-        val delta = (r.followers * a.followers).roundToInt()
+        val delta = (r.followers * a.followers * damp(r.followers)).roundToInt()
         r.followers = (r.followers + delta).coerceAtLeast(0)
         r.persona = (r.persona + a.persona).coerceIn(-10, 10)
         if (h != null) {

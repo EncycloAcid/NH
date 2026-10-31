@@ -12,7 +12,10 @@ object Gameplan {
         Pos.C to listOf(Pos.C, Pos.PF, Pos.SF, Pos.SG, Pos.PG),
     )
 
-    fun usageFor(p: Player): Int = (Ratings.offense(p) * 1.3 - 30).roundToInt().coerceIn(10, 99)
+    fun usageFor(p: Player, pro: Boolean = false): Int =
+        // Pro ratings sit close together, so usage is stretched there or stars would share the ball like role players.
+        if (pro) ((Ratings.offense(p) - 84) * 5.0 + 22).roundToInt().coerceIn(10, 99)
+        else (Ratings.offense(p) * 1.3 - 30).roundToInt().coerceIn(10, 99)
 
     /** Picks starters and backups by position and splits the minutes. */
     fun autoAllocate(lg: League, t: Team) {
@@ -41,7 +44,7 @@ object Gameplan {
                 r == null -> 40
                 else -> (28 + (s.ovr - r.ovr) * 0.6).roundToInt().coerceIn(22, 36)
             }
-            Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it) } ?: 50, r?.let { usageFor(it) } ?: 40)
+            Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it, lg.pro) } ?: 50, r?.let { usageFor(it, lg.pro) } ?: 40)
         }
     }
 
@@ -91,12 +94,12 @@ object Gameplan {
         val target = slots[slotIndex]
         val old = if (starter) target.starter else target.reserve
         for ((i, s) in slots.withIndex()) {
-            if (s.starter == pid) { s.starter = old; if (old >= 0) s.starterUsg = usageFor(lg.player(old)) }
-            if (s.reserve == pid) { s.reserve = old; if (old >= 0) s.reserveUsg = usageFor(lg.player(old)) }
+            if (s.starter == pid) { s.starter = old; if (old >= 0) s.starterUsg = usageFor(lg.player(old), lg.pro) }
+            if (s.reserve == pid) { s.reserve = old; if (old >= 0) s.reserveUsg = usageFor(lg.player(old), lg.pro) }
             if (i == slotIndex) Unit
         }
-        if (starter) { target.starter = pid; target.starterUsg = usageFor(lg.player(pid)) }
-        else { target.reserve = pid; target.reserveUsg = usageFor(lg.player(pid)) }
+        if (starter) { target.starter = pid; target.starterUsg = usageFor(lg.player(pid), lg.pro) }
+        else { target.reserve = pid; target.reserveUsg = usageFor(lg.player(pid), lg.pro) }
         if (target.reserve == -1) target.starterMin = 40
         t.plan.auto = false
     }

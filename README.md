@@ -8,7 +8,20 @@ You can coach any of the 364 Division I schools, in their real 2026-27 conferenc
 
 The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
 
-## This branch: Road to the League (experiment)
+## This branch: Pro career (experiment)
+
+The `pro-career` branch grows out of Road to the League: when your player is drafted, his career keeps going in a pro league. It builds as its own app, **Hoops Dynasty Pro** (`com.nh.hoopscoach.pro`), so it installs next to the main game and the Road app without touching their saves. Everything below about Road to the League still applies up to Draft Night.
+
+- **Draft Night to the pros**: the board shows which pro team took each player. After your name is called, "Start your pro career" builds the league. An undrafted senior rated 86 or better gets a two-way deal instead of going overseas.
+- **The league**: 30 fictional franchises in two conferences, East and West. Your draft class (your college classmates, and your rival if he's been drafted) arrives as rookies; weaker teams pick first, and the league is built so that holds. Pro games are 48 minutes (two 24-minute halves) at a faster pace, and the best players get the ball more, so stars score like stars.
+- **The season**: 58 games (everyone plays everyone twice), an All-Star break on day 30 (twelve per conference; your followers count as fan votes; a quick game with an MVP), then best-of-seven playoffs for the top eight in each conference, through the Finals. Live games, Spotlight, big moments, the press, practice, staff and award races all carry over. Playoff stats are kept apart from the regular season.
+- **Awards**: MVP, Rookie of the Year, Defensive Player of the Year, Sixth Man, three All-League teams, All-Star selections and Finals MVP.
+- **Money**: a rookie-scale deal by draft slot (four years in the first round, two in the second, a two-way deal undrafted). Salary lands at the start of each season. Endorsements pay about $2 a follower for the first two million and 50 cents after that. Follower growth slows as the count gets huge.
+- **The offseason**: Review (your season, the awards, the champion, and from age 30 an option to retire), Draft (60 generated rookies, worst teams first with a four-team lottery; your rival enters here if he stayed in college), Free agency (when your deal is up: offers with salary, years, team record and your projected role; your team always bids), and Summer (growth or decline, plus one invitation: a skills camp or, in Olympic and World Cup summers, Team USA).
+- **Aging**: players climb toward their potential until about 26, hold until 29, and slip from 30 (a personal trainer slows it). League ratings stay steady from year to year.
+- **The end**: retire when you choose from 30 on, or when nobody offers a contract (at 40 at the latest). The ending shows your pro and college totals, rings, MVPs, All-Star selections, earnings, a Hall of Fame verdict and how your rival's career went.
+
+## Road to the League (experiment)
 
 The `road-to-the-league` branch adds a second way to play: instead of coaching a program, you play one player's college career. It builds as a separate app, **Hoops Dynasty Road** (`com.nh.hoopscoach.road`), so it installs next to the main game and never touches its save. The main game keeps going on its own branch.
 
@@ -42,7 +55,7 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
 - **Your class rival**: when your career starts (or, for a career saved before this update, when your next season starts), a five-star at your position (a top-five recruit in your class) signs with one of the best programs in your conference, so you meet at least twice a season. The Me tab puts him side by side with you: overall, scoring, the Player of the Year race and the big board, plus your head-to-head record and the next meeting. Today flags rival games, live games show both of your point totals, winning the duel grows your following faster, and the press asks about him. On Draft Night the room calls out his pick, and your ending says how you came out against him.
 - **Summer events**: each summer after the draft, pick one invitation. Elite camps (a guard, wing or bigs camp for your position, a shooting camp and a lockdown defense camp) add +2 to three ratings and some followers, with a chance at camp MVP. After your first two seasons, a top-40 big-board rank or an 84 overall gets you a U19 National Team invite: every rating +1, a medal and a big jump in followers. Your summers show up in your story.
 - **Award races**: a Player of the Year ladder on the Me tab, scored the same way as the end-of-season awards. It shows your rank, your All-America pace, a weekly up or down arrow, your conference race and the freshman race.
-- **The ending**: drafted (with your pick) or, after four seasons, undrafted and overseas. You get a career summary with totals, your story, NIL earned and every school you played for.
+- **The ending** (on the Road branch): drafted (with your pick) or, after four seasons, undrafted and overseas. On this branch the draft leads to the pros instead. You get a career summary with totals, your story, NIL earned and every school you played for.
 
 ## Install on your phone
 

@@ -45,9 +45,10 @@ import com.nh.hoopscoach.game.Team
 
 @Composable
 fun TodayScreen(vm: GameViewModel, lg: League) {
+    if (lg.pro) { ProTodayScreen(vm, lg); return }
     when (lg.phase) {
         Phase.REGULAR -> SeasonToday(vm, lg)
-        Phase.CONF_TOURNEY, Phase.NCAA -> TourneyToday(vm, lg)
+        Phase.CONF_TOURNEY, Phase.NCAA, Phase.PLAYOFFS -> TourneyToday(vm, lg)
         Phase.WRAP_UP -> WrapUpFlow(vm, lg)
         Phase.OFFSEASON -> if (lg.playerMode) RoadOffseasonFlow(vm, lg) else OffseasonFlow(vm, lg)
     }
