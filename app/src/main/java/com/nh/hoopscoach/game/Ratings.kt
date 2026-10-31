@@ -166,6 +166,8 @@ object Ratings {
         if (a >= 90 && !Rng.chance((99 - a) / 10.0)) return false
         p.attrs[i] = a + 1
         p.seasonGains[i] += 1
+        // He grew past his ceiling: the ceiling was wrong, not the growth.
+        if (p.pot < p.ovr) p.pot = p.ovr
         return true
     }
 
@@ -242,6 +244,7 @@ object Ratings {
                 p.attrs[i] = max(20, p.attrs[i] - 1)
             }
         }
+        if (p.pot < p.ovr) p.pot = p.ovr
         return p.ovr - before
     }
 }
