@@ -14,10 +14,41 @@ object Trades {
     // ---------- value ----------
 
     /** What a player is worth in a trade: overall counts most and climbs steeply; youth and upside add, age takes away. */
+    /**
+     * What a player is worth in a trade: his overall (steeply: one star is worth several starters),
+     * his age (prime years count most, value falls fast after 30), his upside while young, and what
+     * he's producing this season against what his rating predicts.
+     */
     fun value(p: Player): Double {
-        val age = when { p.age <= 22 -> 1.25; p.age <= 25 -> 1.12; p.age <= 28 -> 1.0; p.age <= 31 -> 0.8; p.age <= 33 -> 0.6; else -> 0.4 }
-        val upside = if (p.age <= 24) (p.pot - p.ovr).coerceAtLeast(0) * 0.15 else 0.0
-        return exp((p.ovr - 82) / 3.5 + upside) * age
+        val age = when { p.age <= 21 -> 1.3; p.age <= 23 -> 1.2; p.age <= 25 -> 1.1; p.age <= 28 -> 1.0; p.age <= 30 -> 0.85; p.age <= 32 -> 0.68; p.age <= 34 -> 0.5; else -> 0.35 }
+        val upside = if (p.age <= 25) (p.pot - p.ovr).coerceAtLeast(0) * (if (p.age <= 22) 0.15 else 0.11) else 0.0
+        val s = p.stats
+        val prod = if (s.gp >= 15 && s.mpg >= 10) {
+            val per36 = (s.ppg + 1.1 * s.rpg + 1.4 * s.apg + 1.8 * (s.spg + s.bpg) - s.per(s.tov)) * 36.0 / s.mpg
+            (per36 - (15 + (p.ovr - 85) * 0.55)).coerceIn(-6.0, 8.0) * 0.04
+        } else 0.0
+        return exp((p.ovr - 82) / 3.5 + upside + prod) * age
+    }
+
+    /** How [t] sees him: a rebuilding team pays more for youth and less for veterans; a contender the other way. */
+    fun valueFor(lg: League, t: Team, p: Player): Double {
+        val v = value(p)
+        val rebuilding = t.w + t.l >= 10 && t.winPct < 0.42
+        val contending = t.w + t.l >= 10 && t.winPct >= 0.58
+        return v * when {
+            rebuilding && p.age <= 24 -> 1.2
+            rebuilding && p.age >= 30 -> 0.75
+            contending && p.age >= 27 && p.age <= 33 -> 1.15
+            contending && p.age <= 22 -> 0.9
+            else -> 1.0
+        }
+    }
+
+    /** A deal in a word, by what each side gives up: "Fair", "They're overpaying", "Lowball". */
+    fun verdict(lg: League, sends: List<Player>, gets: Player): String {
+        val give = sends.sumOf { value(it) }
+        val r = give / value(gets).coerceAtLeast(0.01)
+        return when { r >= 1.15 -> "They're overpaying"; r >= 0.9 -> "Fair deal"; r >= 0.75 -> "A little light"; else -> "Lowball" }
     }
 
     /** Up to three players from [t] worth [lo] to [hi] times [target], best first. Null if nothing fits. */
@@ -92,9 +123,10 @@ object Trades {
     /** Teams that would trade for him, contenders first. [lo] and [hi] bound what they'd give up. */
     fun suitors(lg: League, count: Int, lo: Double, hi: Double): List<Suitor> {
         val h = lg.playerOrNull(lg.heroId) ?: return emptyList()
-        val target = value(h)
         val out = mutableListOf<Suitor>()
         for (t in lg.teams.filter { it.id != h.teamId }.shuffled(Rng.r)) {
+            // Each team values him its own way (rebuilders want youth, contenders want help now).
+            val target = valueFor(lg, t, h)
             // A team keeps its best player unless it's sending him for someone better.
             val best = lg.rosterOf(t).maxByOrNull { value(it) }
             val keep = if (best != null && value(best) < target * 0.9) emptySet() else setOfNotNull(best?.id)
@@ -203,7 +235,8 @@ object Trades {
             val vet = lg.rosterOf(seller).filter {
                 it.id != lg.heroId && it.age >= 28 && it.ovr >= 87 && it.id !in lg.proState!!.moved
             }.maxByOrNull { it.ovr } ?: continue
-            val target = value(vet)
+            // A contender pays up for a veteran who helps now.
+            val target = valueFor(lg, buyer, vet)
             val keep = lg.rosterOf(buyer).sortedByDescending { value(it) }.take(2).map { it.id }.toSet()
             val pack = bundle(lg, buyer, target, 0.75, 1.3, keep) ?: continue
             val trade = execute(lg, seller, buyer, listOf(vet), pack)

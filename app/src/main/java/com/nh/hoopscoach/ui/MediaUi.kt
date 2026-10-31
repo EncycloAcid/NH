@@ -83,7 +83,7 @@ fun PostRow(p: Post) {
 @Composable
 fun SocialStrip(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
-    val posts = r.feed.filter { it.season == lg.season }.takeLast(3).reversed()
+    val posts = r.feed.filter { it.season == lg.season }.takeLast(2).reversed()
     if (posts.isEmpty()) return
     Section("Social · ${Road.count(r.followers)} followers", action = "See all", onAction = { vm.push(Route.Social) })
     GroupList(posts, inset = 60.dp) { p -> PostRow(p) }

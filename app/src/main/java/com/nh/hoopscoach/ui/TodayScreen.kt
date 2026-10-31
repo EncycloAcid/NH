@@ -71,7 +71,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg); SocialStrip(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
@@ -80,6 +80,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         if (u.gp >= 8) item { Outlook(vm, lg) }
         item { ConfSnapshot(vm, lg, u) }
         item { TopPlayers(vm, lg, u) }
+        if (lg.playerMode) item { SocialStrip(vm, lg) }
         item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }
@@ -279,7 +280,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg); SocialStrip(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         when {
@@ -320,6 +321,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             GroupList(shown.take(8)) { g -> MatchRow(vm, lg, b, g) }
         }
         if (post) item { OtherEvents(vm, lg, b) }
+        if (lg.playerMode) item { SocialStrip(vm, lg) }
         item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }

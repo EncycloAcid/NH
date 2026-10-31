@@ -185,8 +185,6 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (r.press != null) item { PressCard(vm, lg) }
-        if (r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
-        item { HonorsStrip(vm, lg) }
         if (r.suitors.isNotEmpty()) item {
             Section("Trade request")
             Panel(onClick = { vm.select(Tab.RECRUIT) }) {
@@ -252,6 +250,9 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             val show = (st.take(6) + listOfNotNull(st.getOrNull(idx))).distinct()
             GroupList(show) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
+        // Lower down: league honors and what people are saying, then the news.
+        item { HonorsStrip(vm, lg) }
+        if (r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
         val news = lg.news.filter { it.season >= lg.season - 1 }.takeLast(6).reversed()
         if (news.isNotEmpty()) item {
             Section("Around the league")
@@ -1058,6 +1059,7 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
                         Text("${st.w}-${st.l} · ${s.role} there", style = T.small, color = P.sub, maxLines = 1)
                         val sc = LocalRatingScale.current
                         Text("They'd send ${back.joinToString(", ") { "${it.name} (${sc(it.ovr)})" }}", style = T.small, color = P.ink, maxLines = 2)
+                        lg.playerOrNull(lg.heroId)?.let { me -> if (back.isNotEmpty()) Text(com.nh.hoopscoach.game.Trades.verdict(lg, back, me), style = T.label, color = P.accent) }
                     }
                     Spacer(Modifier.width(8.dp))
                     SmallButton("Go", primary = true) { vm.act { trades.accept(it, i) }; vm.toast("You're headed to the ${st.name}") }
@@ -1124,9 +1126,6 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { TotalsRow("Pro career", proTotals(h)) }
-        allTimeList(vm, lg)
-        reelSection(lg, null)
-        recordsBook(lg)
         item { r.collegeTotals?.let { TotalsRow("College · ${r.collegeSeasons} ${if (r.collegeSeasons == 1) "season" else "seasons"}", it) } }
         if (r.proStory.isNotEmpty()) item {
             Section("The pro years")
@@ -1134,6 +1133,9 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
         }
         item { CareerStory(lg) }
         if (h.awards.isNotEmpty()) item { TrophyCase(h, limit = 40) }
+        reelSection(lg, null)
+        recordsBook(lg)
+        allTimeList(vm, lg)
         item {
             Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career earnings: ${money(r.earned)}", style = T.bodyB, color = P.good)
@@ -1358,7 +1360,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
     val order = r.proOffers.indices.sortedWith(when (vm.faSort) {
         1 -> compareBy<Int> { r.proOffers[it].ahead }.thenByDescending { r.proOffers[it].salary }
         2 -> compareByDescending<Int> { r.proOffers[it].winPct }.thenByDescending { r.proOffers[it].salary }
-        else -> compareByDescending { r.proOffers[it].salary }
+        else -> compareByDescending<Int> { r.proOffers[it].salary }.thenBy { r.proOffers[it].ahead }.thenByDescending { r.proOffers[it].winPct }
     })
     for (i in order) item(key = "offer-${r.proOffers[i].teamId}") {
         Spacer(Modifier.height(8.dp))
