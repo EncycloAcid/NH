@@ -178,9 +178,21 @@ object Trades {
     /** Sellers move a good veteran to a contender for younger pieces. */
     fun aiTrades(lg: League, count: Int) {
         val ranked = lg.teams.sortedBy { it.winPct + it.elo / 10_000.0 }
-        val sellers = ranked.take(12)
-        val buyers = ranked.takeLast(12)
+        // A team with a star (the user's player at 90 or better) builds around him: it buys, it never sells.
+        val starTeam = lg.playerOrNull(lg.heroId)?.takeIf { it.teamId >= 0 && it.ovr >= 90 }?.let { lg.team(it.teamId) }
+        val sellers = ranked.take(12).filter { it.id != starTeam?.id }
+        val buyers = (ranked.takeLast(12) + listOfNotNull(starTeam)).distinctBy { it.id }
         var made = 0
+        if (starTeam != null) for (seller in sellers.shuffled(Rng.r)) {
+            // First call: the star's team goes after the best veteran it can afford.
+            val vet = lg.rosterOf(seller).filter { it.id != lg.heroId && it.age >= 27 && it.ovr >= 87 && it.id !in lg.proState!!.moved }.maxByOrNull { it.ovr } ?: continue
+            val keep = (listOf(lg.heroId) + lg.rosterOf(starTeam).filter { it.id != lg.heroId }.sortedByDescending { value(it) }.take(1).map { it.id }).toSet()
+            val pack = bundle(lg, starTeam, value(vet), 0.7, 1.35, keep) ?: continue
+            val trade = execute(lg, seller, starTeam, listOf(vet), pack)
+            lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
+            made++
+            break
+        }
         var tries = 0
         while (made < count && tries++ < count * 6) {
             val seller = Rng.pick(sellers)

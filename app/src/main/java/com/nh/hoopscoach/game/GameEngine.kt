@@ -131,11 +131,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** Chance a shot of [type] goes in (0 inside, 1 mid-range, 2 three), as the regular possession figures it. */
     private fun makeChance(o: Int, d: Int, shooter: Player, type: Int, ds: DefStats, trail: Int): Double {
         var p = when (type) {
-            0 -> 0.522 + (shooter[Attr.INS] - n[0]) * 0.0055 - (ds.intD - n[5]) * 0.0038
-            1 -> 0.365 + (shooter[Attr.MID] - n[1]) * 0.0047 - (ds.perD - n[6]) * 0.003
-            else -> 0.312 + (shooter[Attr.OUT] - n[2]) * 0.0043 - (ds.perD - n[6]) * 0.0026
+            0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (ds.intD - n[5]) * 0.0038) * talent
+            1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (ds.perD - n[6]) * 0.003) * talent
+            else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (ds.perD - n[6]) * 0.0026) * talent
         }
-        p += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
+        p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
@@ -263,6 +263,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         poss = if (reb.first == o) o else d
     }
 
+    /**
+     * How much ratings matter. Pro ratings sit close together, so the same rating gap has to count for more
+     * there, or the best teams barely win more than the rest. Coaches matter less than players in the pros.
+     */
+    private val talent = if (lg.pro) PRO_TALENT else 1.0
+    private val coaching = if (lg.pro) 0.5 else 1.0
+
     /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
     private val era = if (lg.pro) Eras.of(lg) else Era.TODAY
 
@@ -278,6 +285,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         private val OFFSET = doubleArrayOf(-1.31, -2.63, 0.48, -0.41, -3.43, -2.8, -1.45, -3.92, -2.93)
 
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
+        /** Rating sensitivity in the pros (see [talent]). */
+        var PRO_TALENT = 1.8
         const val NON_SHOOTING_PRO = 0.08
         const val NON_SHOOTING_COLLEGE = 0.13
         const val SHOOTING_FOUL_PRO = 1.0
@@ -532,10 +541,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val pasAvg = offense.map { it[Attr.PAS] }.average()
 
         // Turnover
-        var pTo = 0.168 + (stealD - n[7]) * 0.0018 - (handler[Attr.HND] - n[3]) * 0.0018 - (pasAvg - n[4]) * 0.0008
+        var pTo = 0.168 + ((stealD - n[7]) * 0.0018 - (handler[Attr.HND] - n[3]) * 0.0018 - (pasAvg - n[4]) * 0.0008) * talent
         when (def(d)) { Defense.PRESS -> pTo += 0.035; Defense.PACKLINE -> pTo -= 0.012; Defense.ZONE -> pTo -= 0.006; else -> {} }
         when (off(o)) { Offense.UPTEMPO -> pTo += 0.01; Offense.GRIND -> pTo -= 0.012; else -> {} }
-        pTo -= (coaches[o].off - 70) * 0.0004
+        pTo -= (coaches[o].off - 70) * 0.0004 * coaching
         if (lg.pro) pTo *= 0.9
         pTo = pTo.coerceIn(0.07, 0.3)
         if (Rng.chance(pTo)) {
@@ -587,14 +596,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
             val type = if (putback != null) 0 else shotType(o, d, shooter, trail)
             var pMake = when (type) {
-                0 -> 0.522 + (shooter[Attr.INS] - n[0]) * 0.0055 - (intD - n[5]) * 0.0038
-                1 -> 0.365 + (shooter[Attr.MID] - n[1]) * 0.0047 - (perD - n[6]) * 0.003
-                else -> 0.312 + (shooter[Attr.OUT] - n[2]) * 0.0043 - (perD - n[6]) * 0.0026
+                0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (intD - n[5]) * 0.0038) * talent
+                1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (perD - n[6]) * 0.003) * talent
+                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (perD - n[6]) * 0.0026) * talent
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.
-            if (lg.pro) pMake += if (type == 2) 0.014 else 0.028 + era.fg
-            pMake += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
+            if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + era.fg
+            pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
@@ -708,7 +717,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> .95; Pos.PF -> .66; Pos.C -> .34 }
         var wi = (p[Attr.INS] / 70.0).pow(3) * posIns
         var wm = (p[Attr.MID] / 70.0).pow(3) * 0.5
-        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 2.5 else 4.0) * pos3 * (if (lg.pro) 1.38 * era.threes else 1.2)
+        // In the pros nearly everyone can shoot it, so volume leans on the rating less than in college.
+        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 1.5 else 4.0) * pos3 * (if (lg.pro) 1.62 * era.threes else 1.2)
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }
@@ -730,7 +740,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val d = 1 - o
         val oR = offense.map { it[Attr.REB] }.average()
         val dR = defense.map { it[Attr.REB] }.average()
-        var pOff = (if (lg.pro) 0.25 else 0.285) + (oR - dR) * 0.004
+        var pOff = (if (lg.pro) 0.25 else 0.285) + (oR - dR) * 0.004 * talent
         if (off(o) == Offense.INSIDE) pOff += 0.02
         if (off(o) == Offense.UPTEMPO) pOff -= 0.02
         if (def(d) == Defense.ZONE) pOff += 0.02

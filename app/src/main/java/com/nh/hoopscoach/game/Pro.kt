@@ -902,6 +902,7 @@ object ProCareer {
                 if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, matchOfferSheet(lg, it)) }
                 // The rosters start out current, so the league skips a summer of aging before its first season.
                 if (ps.history.isNotEmpty()) summer(lg)
+                buildAroundStar(lg)
                 ps.step = ProStep.SUMMER
             }
             ProStep.SUMMER -> {
@@ -1138,6 +1139,27 @@ object ProCareer {
         lg.news += News(lg.season, 0,
             if (from.id == to.id) "${h.name} re-signs with the ${to.name}: ${o.years} years, ${Road.dollars(o.salary)} a season"
             else "${h.name} signs with the ${to.name}: ${o.years} years, ${Road.dollars(o.salary)} a season", true)
+    }
+
+    /**
+     * A team with a star builds around him: if the rest of the roster lags the league, the front office
+     * signs a good veteran for the weakest starting spot. Once a summer, from 90 overall.
+     */
+    fun buildAroundStar(lg: League) {
+        val h = lg.playerOrNull(lg.heroId) ?: return
+        if (h.teamId < 0 || h.ovr < 90 || lg.road?.retired == true) return
+        val t = lg.team(h.teamId)
+        fun cast(team: Team) = lg.rosterOf(team).filter { it.id != lg.heroId }.map { it.ovr }.sortedDescending().take(7).average()
+        val all = lg.teams.map { cast(it) }.sorted()
+        val median = all[all.size / 2]
+        if (cast(t) >= median) return
+        val weak = t.plan.slots.mapNotNull { lg.playerOrNull(it.starter) }.filter { it.id != h.id }.minByOrNull { it.ovr }?.pos ?: Rng.pick(Pos.entries)
+        val ovr = (median + 3 + (h.ovr - 90) * 0.4).roundToInt().coerceIn(87, 93)
+        val add = ProLeague.makePro(lg, weak, ovr, Rng.range(27, 31), t)
+        ProLeague.trim(lg, t)
+        Gameplan.autoAllocate(lg, t)
+        lg.reindex()
+        lg.news += News(lg.season, 0, "Building around ${h.name}: the ${t.name} sign ${add.name}, a ${add.ovr}-rated ${add.pos}", true)
     }
 
     /** Everyone grows or ages over the summer. Young players climb toward their ceiling; from 31 on, they slowly slip. */
