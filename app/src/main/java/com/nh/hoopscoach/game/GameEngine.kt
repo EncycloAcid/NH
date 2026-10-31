@@ -14,6 +14,8 @@ class PlayEvent(
     val hs: Int,
     val aws: Int,
     val points: Int,
+    /** Player mode: the user's player is in this play. */
+    val hero: Boolean = false,
 )
 
 /**
@@ -72,6 +74,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         rosters[1].any { it.id == heroId } -> 1
         else -> -1
     }
+    private val heroShort = if (heroSide >= 0) lg.playerOrNull(heroId)?.short else null
     /** Fatigue costs the user's player up to 9 points of shooting percentage. */
     private val heroTired = ((lg.road?.fatigue ?: 0) - 40).coerceAtLeast(0) * 0.0015
     /** A shooting coach helps the user's player's jump shots, and his big shots most. */
@@ -363,7 +366,24 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     private fun log(side: Int, text: String, pts: Int) {
         if (!pbp) return
-        events += PlayEvent(period, clock.roundToInt().coerceAtLeast(0), side, text, score[0], score[1], pts)
+        events += PlayEvent(period, clock.roundToInt().coerceAtLeast(0), side, text, score[0], score[1], pts, heroShort != null && text.contains(heroShort))
+    }
+
+    /**
+     * Spotlight: play on until the user's player is in a play, a big moment comes up, or the game ends.
+     * Returns how many possessions went by.
+     */
+    fun stepToHero(limit: Int = 400): Int {
+        if (heroSide < 0) { step(); return 1 }
+        val before = events.size
+        var n = 0
+        while (!finished && n < limit) {
+            if (pendingMoment() != null) break
+            step(); n++
+            var i = before
+            while (i < events.size) { if (events[i].hero) return n; i++ }
+        }
+        return n
     }
 
     // ---------- the possession ----------

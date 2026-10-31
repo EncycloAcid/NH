@@ -40,7 +40,17 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     RIM_RUNNER("Rim Runner", "RUN", listOf(Attr.INS, Attr.REB, Attr.BLK), "Sprints the floor and finishes lobs and putbacks above the rim"),
     POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
     STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
-    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends");
+    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
+    TWO_WAY_GUARD("Two-Way Guard", "2WG", listOf(Attr.OUT, Attr.HND, Attr.PER), "Hits threes off the bounce and picks up the ball full court"),
+    PEST("Pest", "PES", listOf(Attr.PAS, Attr.PER, Attr.STL), "Hounds the ball for 94 feet and makes the simple pass"),
+    MICROWAVE("Microwave", "MIC", listOf(Attr.INS, Attr.OUT, Attr.HND), "Instant offense: gets to the rim or pulls up from deep the moment he checks in"),
+    MOVEMENT_SHOOTER("Movement Shooter", "MOV", listOf(Attr.MID, Attr.OUT, Attr.PAS), "Never stops running off screens, and the defense bends to find him"),
+    BULLY_GUARD("Bully Guard", "BLY", listOf(Attr.INS, Attr.REB, Attr.PER), "Big guard who backs down smaller defenders and crashes the glass"),
+    HIGH_FLYER("High Flyer", "FLY", listOf(Attr.INS, Attr.PER, Attr.BLK), "Finishes above the rim and chases down blocks in transition"),
+    FACE_UP_FOUR("Face-Up Four", "FUP", listOf(Attr.MID, Attr.HND, Attr.REB), "Faces up from the elbow, drives past slower bigs and cleans the glass"),
+    SWITCHABLE_BIG("Switchable Big", "SWB", listOf(Attr.PER, Attr.IDF, Attr.BLK), "Big who can guard all five spots and still protect the rim"),
+    PICK_AND_POP("Pick-and-Pop Big", "PNP", listOf(Attr.MID, Attr.OUT, Attr.IDF), "Sets the screen, pops to the arc and holds his own in the paint"),
+    HUSTLE_BIG("Hustle Big", "HUS", listOf(Attr.REB, Attr.STL, Attr.BLK), "All energy: tips, deflections, loose balls and second chances");
 }
 
 enum class Trait(val label: String, val good: Boolean) {
@@ -649,7 +659,34 @@ class RoadState(
     var draftSeason: Int = -1,
     var draftRank: Int = 0,
     var draftWatched: Int = -1,
+    /** Live games jump straight to his plays. */
+    var spotlight: Boolean = true,
+    /** The class rival: a top recruit from the same class who follows him all career. */
+    var rivalId: Int = -1,
+    var rivalName: String = "",
+    val duels: MutableList<Duel> = mutableListOf(),
+    /** How the rival's college career ended ("went No. 4 in the 2027 draft"), once it has. */
+    var rivalLeft: String = "",
+    var rivalPick: Int = 0,
+    var rivalDraft: Int = 0,
+    /** Summer events: the offseason (by season) whose summer is already booked, and what happened. */
+    var summer: Int = -1,
+    var summerNote: String = "",
 )
+
+/** One head-to-head game against the class rival. */
+@Serializable
+class Duel(val season: Int, val gameId: Int, val opp: Int, val me: Int, val him: Int, val won: Boolean)
+
+/** Summer invitations: camps sharpen three ratings; the U19 national team raises everything a little and the profile a lot. */
+enum class SummerEvent(val label: String, val blurb: String, val boosts: List<Attr>) {
+    SHOOTING_CAMP("Elite Shooting Camp", "A week of game-speed reps with pro shooting coaches.", listOf(Attr.OUT, Attr.MID, Attr.INS)),
+    GUARD_CAMP("Elite Guard Camp", "Pick-and-roll reads, ball pressure and a handle that holds up against the best guards in the country.", listOf(Attr.HND, Attr.PAS, Attr.PER)),
+    WING_CAMP("Elite Wing Camp", "Attack closeouts, finish through contact and guard the other team's best scorer.", listOf(Attr.INS, Attr.PER, Attr.STL)),
+    BIGS_CAMP("Elite Bigs Camp", "Footwork, post counters and rim protection with former pros.", listOf(Attr.INS, Attr.REB, Attr.IDF)),
+    LOCKDOWN_CAMP("Lockdown Defense Camp", "Slides, deflections and contests until your legs give out.", listOf(Attr.PER, Attr.STL, Attr.BLK)),
+    U19("U19 National Team", "Represent the USA at the U19 World Cup against the best teenagers on the planet.", emptyList()),
+}
 
 /** People the user's player can pay out of his NIL money, one season at a time. Costs in thousands. */
 enum class Staff(val label: String, val blurb: String, val cost: Int) {

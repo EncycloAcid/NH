@@ -76,12 +76,17 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     LaunchedEffect(lv) {
         while (!e.finished) {
             // In player mode the game stops for big moments until the user picks a play.
+            // Spotlight jumps from one of his plays to the next, so a game takes about a minute.
+            val spot = lg.road?.spotlight == true && lg.playerMode
             if (lv.speed > 0 && lv.moment == null) {
                 val m = e.pendingMoment()
-                if (m != null) lv.moment = m else e.step()
+                if (m != null) lv.moment = m else if (spot) e.stepToHero() else e.step()
                 lv.tick++
             }
-            delay(when (lv.speed) { 0 -> 150L; 1 -> 650L; 2 -> 260L; else -> 70L })
+            delay(
+                if (spot) when (lv.speed) { 0 -> 150L; 1 -> 4500L; 2 -> 3000L; else -> 1300L }
+                else when (lv.speed) { 0 -> 150L; 1 -> 650L; 2 -> 260L; else -> 70L },
+            )
         }
         vm.completeLive()
     }
@@ -95,6 +100,19 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)
+        if (lg.playerMode && com.nh.hoopscoach.game.Rival.isDuel(lg, e.game)) {
+            val rv = com.nh.hoopscoach.game.Rival.active(lg)
+            val me = lg.playerOrNull(lg.heroId)
+            if (rv != null && me != null) {
+                fun pts(id: Int) = (e.lines[0][id] ?: e.lines[1][id])?.pts ?: 0
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Tag("RIVAL", P.bad)
+                    Spacer(Modifier.width(8.dp))
+                    Text("You ${pts(me.id)} pts · ${rv.last} ${pts(rv.id)} pts", style = T.bodyB, color = P.ink)
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
             val pts = remember(lv.tick) {
@@ -126,8 +144,14 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(8.dp))
                 val t = e.teams[if (userHome) 0 else 1]
                 if (lg.playerMode) {
-                    Text("Coach ${lg.coachOf(t).last} calls it: ${t.plan.offense.label} offense, ${t.plan.defense.label} defense.", style = T.small, color = P.sub,
-                        modifier = Modifier.padding(horizontal = Gutter + 4.dp))
+                    val spot = lg.road?.spotlight == true
+                    Chips(listOf("Spotlight", "Every play"), if (spot) 0 else 1, { i -> vm.act { it.road?.spotlight = i == 0 }; lv.tick++ })
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        (if (spot) "Spotlight: the game jumps to your plays. " else "") +
+                            "Coach ${lg.coachOf(t).last} calls it: ${t.plan.offense.label} offense, ${t.plan.defense.label} defense.",
+                        style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp),
+                    )
                 } else Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.offense = Offense.entries[i]; lv.tick++ }
                     Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> t.plan.defense = Defense.entries[i]; lv.tick++ }
@@ -155,7 +179,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
 @Composable
 private fun PlayRow(ev: PlayEvent, home: Team, away: Team) {
     val color = when (ev.side) { 0 -> teamInk(home); 1 -> teamInk(away); else -> P.line }
-    Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().then(if (ev.hero) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = Gutter + 4.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(clock(ev.clock), style = T.small.copy(fontSize = 12.sp), color = P.faint, modifier = Modifier.width(44.dp))
         Box(Modifier.size(width = 3.dp, height = 22.dp).clip(RoundedCornerShape(2.dp)).background(color))
         Spacer(Modifier.width(10.dp))

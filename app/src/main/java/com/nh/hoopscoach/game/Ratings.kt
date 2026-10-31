@@ -75,11 +75,16 @@ object Ratings {
     fun shooting(p: Player) = group(p.pos, p.attrs, SHOOT)
 
     fun styles(pos: Pos): List<Arch> = when (pos) {
-        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.SLASHER, Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.SHOT_CREATOR)
-        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.SLASHER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.PLAYMAKER, Arch.THREE_AND_D, Arch.SHOT_CREATOR, Arch.BALL_HAWK)
-        Pos.SF -> listOf(Arch.SLASHER, Arch.POINT_FORWARD, Arch.SHARPSHOOTER, Arch.LOCKDOWN, Arch.STRETCH, Arch.THREE_AND_D, Arch.GLUE_GUY, Arch.SHOT_CREATOR)
-        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.POST_SCORER, Arch.POINT_FORWARD, Arch.RIM_PROTECTOR, Arch.GLUE_GUY, Arch.RIM_RUNNER, Arch.ENFORCER)
-        Pos.C -> listOf(Arch.REBOUNDER, Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.STRETCH, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER)
+        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.SLASHER, Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.SHOT_CREATOR,
+            Arch.TWO_WAY_GUARD, Arch.PEST, Arch.MICROWAVE)
+        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.SLASHER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.PLAYMAKER, Arch.THREE_AND_D, Arch.SHOT_CREATOR, Arch.BALL_HAWK,
+            Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD, Arch.HIGH_FLYER)
+        Pos.SF -> listOf(Arch.SLASHER, Arch.POINT_FORWARD, Arch.SHARPSHOOTER, Arch.LOCKDOWN, Arch.STRETCH, Arch.THREE_AND_D, Arch.GLUE_GUY, Arch.SHOT_CREATOR,
+            Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD, Arch.HIGH_FLYER, Arch.FACE_UP_FOUR)
+        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.POST_SCORER, Arch.POINT_FORWARD, Arch.RIM_PROTECTOR, Arch.GLUE_GUY, Arch.RIM_RUNNER, Arch.ENFORCER,
+            Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG)
+        Pos.C -> listOf(Arch.REBOUNDER, Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.STRETCH, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER,
+            Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG)
     }
 
     /** Build an attribute set whose overall lands near [target]. */

@@ -175,7 +175,7 @@ object Offseason {
         for (t in lg.teams) {
             for (pid in t.roster.toList()) {
                 val p = lg.player(pid)
-                if (pid in entrants || pid == lg.heroId || !Rng.chance(transferChance(lg, p))) continue
+                if (pid in entrants || pid == lg.heroId || pid == lg.road?.rivalId || !Rng.chance(transferChance(lg, p))) continue
                 t.roster.remove(pid)
                 if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
                 toPortal(lg, p, t.id)

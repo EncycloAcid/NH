@@ -120,6 +120,8 @@ class RoadUiTest {
         vm.act { Road.hire(it, com.nh.hoopscoach.game.Staff.TRAINER); Road.hire(it, com.nh.hoopscoach.game.Staff.AGENT) }; idle()
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR TEAM")); idle()
         shot("Y10f_me_staff")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR RIVAL")); idle()
+        shot("Y10g_me_rival")
         // Play live games until one comes down to a big moment.
         var found = false
         var tries2 = 0
@@ -166,6 +168,8 @@ class RoadUiTest {
             if (seasons == 1) shot("Y14_draft_back")
             Road.next(lg); vm.install(lg)
             if (seasons == 1) shot("Y15_summer_portal")
+            com.nh.hoopscoach.game.Summer.invites(lg).firstOrNull()?.let { com.nh.hoopscoach.game.Summer.attend(lg, it) }
+            if (seasons == 1) { vm.install(lg); shot("Y15b_summer_done") }
             assertTrue(lg.offseason!!.step == OffStep.DEVELOPMENT)
             Road.next(lg); vm.install(lg)
             if (seasons == 1) { shot("Y16_today_year2"); walk(vm, lg) }

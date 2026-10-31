@@ -118,6 +118,7 @@ object Road {
         lg.heroId = hero.id
         lg.road = RoadState(startSeason = lg.season, followers = startFollowers(hero), seasonStartFollowers = startFollowers(hero))
         join(lg, hero, lg.team(teamId))
+        Rival.create(lg)
         sync(lg)
         lg.reindex()
         Offseason.setupSeason(lg, carryElo = false)
@@ -255,7 +256,8 @@ object Road {
         val honors = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
         r.story += "${lg.season} · ${t.school} · ${classLabel(h.year)} · %.1f ppg, %.1f rpg, %.1f apg · ${Awards.resultFor(lg, t.id)}".format(s.ppg, s.rpg, s.apg) +
             (if (honors.isNotEmpty()) " · " + honors.joinToString(", ") else "") + (if (paid > 0) " · NIL ${dollars(paid)}" else "") +
-            " · ${count(r.followers)} followers"
+            " · ${count(r.followers)} followers" +
+            r.duels.filter { it.season == lg.season }.let { d -> if (d.isEmpty()) "" else " · ${d.count { it.won }}-${d.count { !it.won }} vs rival ${Rival.player(lg)?.last ?: ""}" }
         r.seasonStartFollowers = r.followers
         r.press = null
         r.fatigue = 0
@@ -271,8 +273,12 @@ object Road {
         os.entrants.remove(h.id)
         if (r.declared && h.year < 4) os.entrants += h.id
         if (r.declared || h.year >= 4) {
+            // Mock draft: his place on the big board among the players actually in tonight's draft.
+            val board = Offseason.draftBoard(lg)
+            val pool = lg.players.filter { it.teamId >= 0 && (it.year >= 4 || it.id in os.entrants) }.mapNotNull { board[it.id] }
+            val mine = board[h.id]
             r.draftSeason = lg.season
-            r.draftRank = Offseason.draftBoard(lg)[h.id] ?: 0
+            r.draftRank = if (mine == null) 0 else pool.count { it < mine } + 1
         }
     }
 
@@ -287,6 +293,7 @@ object Road {
     /** After Draft Night: a drafted player (or a senior) is done; an undrafted underclassman goes back to school. */
     fun afterDraft(lg: League) {
         val r = lg.road ?: return
+        Rival.afterDraft(lg)
         val h = lg.playerOrNull(lg.heroId)
         val pick = lg.draftHistory.lastOrNull { it.season == lg.season && it.pid == lg.heroId }
         if (h == null) {
@@ -301,6 +308,7 @@ object Road {
                 else -> "${me?.name} goes No. ${pick.pick} overall in the second round of the ${lg.season} draft."
             }
             lg.news += News(lg.season, lg.day, r.ending, true)
+            Rival.ending(lg, pick?.pick ?: 0).takeIf { it.isNotEmpty() }?.let { r.ending += " $it" }
             return
         }
         if (r.declared) lg.news += News(lg.season, lg.day, "${h.name} went undrafted and returns to ${lg.team(h.teamId).school}", true)
@@ -394,8 +402,10 @@ object Road {
         val opp = lg.team(g.opp(t.id))
         val won = g.winner() == t.id
         val rivalry = lg.rivalry(g) != null
+        val duel = Rival.afterGame(lg, g, line, won)
         val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
-            (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7)
+            (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7) *
+            (if (duel != null) (if (duel.won && duel.me > duel.him) 1.8 else 1.3) else 1.0)
         val brand = 0.6 + Brand.pull(lg, t) / 100.0
         val score = line.pts + 0.5 * line.reb + 0.7 * line.ast + line.stl + line.blk - 0.7 * line.tov
         var gain = r.followers * 0.0015
@@ -408,8 +418,10 @@ object Road {
         if (winner) lg.news += News(lg.season, lg.day, "${h.name}'s game-winner goes viral: ${count(r.followers)} followers and counting", true)
         if (won && r.persona <= -4) t.fans = (t.fans + 0.6).coerceAtMost(100.0)
         payMilestones(lg)
-        r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner)
+        r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner, duel)
     }
+
+    fun payMilestonesNow(lg: League) = payMilestones(lg)
 
     private fun payMilestones(lg: League) {
         val r = lg.road ?: return
@@ -424,7 +436,7 @@ object Road {
 
     private fun pressFor(
         lg: League, g: Game, h: Player, line: GameLogEntry, t: Team, opp: Team,
-        won: Boolean, rivalry: Boolean, score: Double, winner: Boolean,
+        won: Boolean, rivalry: Boolean, score: Double, winner: Boolean, duel: Duel? = null,
     ): PressQuestion? {
         fun q(topic: String, prompt: String, vararg a: PressAnswer) = PressQuestion(lg.season, g.id, topic, prompt, a.toList())
         val tourney = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.NIT
@@ -436,6 +448,20 @@ object Road {
                 PressAnswer("I want the ball in that moment. Every time.", 0.05, teammates = -2, persona = 2),
                 PressAnswer("Just a good look. It went in.", 0.012),
             )
+            duel != null && Rng.chance(0.85) -> {
+                val rv = Rival.player(lg)?.last ?: "your rival"
+                if (duel.won) q(
+                    "Rival", "You got the better of $rv tonight, ${duel.me} to ${duel.him}. Is he the best player in your class?",
+                    PressAnswer("He's great. He makes me better every time we play.", 0.012, fans = 1, teammates = 2, persona = -1),
+                    PressAnswer("There's one best player in this class. It isn't him.", 0.05, teammates = -1, persona = 2),
+                    PressAnswer("It's not about him. We got the win.", 0.008, teammates = 1),
+                ) else q(
+                    "Rival", "$rv had the last word tonight. What happened out there?",
+                    PressAnswer("He made plays. Credit to him.", 0.008, fans = 1, persona = -1),
+                    PressAnswer("Enjoy it. It won't happen again.", 0.035, teammates = -1, persona = 2),
+                    PressAnswer("We'll see them again. I'll be ready.", 0.006),
+                )
+            }
             tourney && won && Rng.chance(0.6) -> q(
                 "Moving on", "You're moving on in the ${if (g.type == GameType.NCAA) "NCAA Tournament" else "tournament"}. Who do you want next?",
                 PressAnswer("Whoever's next. We'll be ready.", 0.012),
