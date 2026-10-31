@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Post
@@ -123,16 +124,32 @@ fun newsClick(vm: GameViewModel, lg: League, n: News): (() -> Unit)? {
 @Composable
 fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     val n = lg.news.getOrNull(index) ?: run { vm.back(); return }
+    // A newspaper page: paper, serif type, the outlet's nameplate, the headline, then the story.
+    val paper = if (P.dark) Color(0xFF221F1A) else Color(0xFFF6F1E5)
+    val ink = if (P.dark) Color(0xFFEFE8D8) else Color(0xFF1B1915)
+    val faded = ink.copy(alpha = 0.6f)
+    val serif = androidx.compose.ui.text.font.FontFamily.Serif
+    val outlet = n.source.substringAfter(" · ", n.source).ifEmpty { "The Daily" }
+    val byline = n.source.substringBefore(" · ", "").takeIf { it.isNotEmpty() && n.source.contains(" · ") }
     Column(Modifier.fillMaxSize()) {
-        BackBar(n.source.ifEmpty { "News" }, "${n.season} season · day ${n.day}", onBack = { vm.back() })
-        LazyColumn(Modifier.weight(1f).padding(horizontal = Gutter + 4.dp)) {
+        BackBar(outlet, "${n.season} season · day ${n.day}", onBack = { vm.back() })
+        LazyColumn(Modifier.weight(1f)) {
             item {
-                Spacer(Modifier.height(12.dp))
-                Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; else -> "GAME STORY" }, style = T.label, color = P.accent)
-                Text(n.text, style = T.title, color = P.ink, modifier = Modifier.padding(top = 4.dp))
-                Spacer(Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    for (para in n.body.split("\n\n")) Text(para, style = T.body, color = P.ink)
+                Column(Modifier.padding(horizontal = Gutter, vertical = 10.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(paper).padding(16.dp)) {
+                    Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
+                        color = ink, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
+                    Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
+                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
+                        style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
+                    Text(n.text, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
+                        color = ink, modifier = Modifier.padding(top = 6.dp))
+                    if (byline != null) Text("By $byline", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
+                        color = faded, modifier = Modifier.padding(top = 6.dp))
+                    Spacer(Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
+                    }
                 }
                 if (n.gameId >= 0 && lg.games.any { it.id == n.gameId && it.box != null }) {
                     Spacer(Modifier.height(16.dp))
