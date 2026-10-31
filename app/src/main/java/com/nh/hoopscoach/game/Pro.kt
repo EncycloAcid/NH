@@ -31,11 +31,11 @@ object ProLeague {
 
     fun teamName(i: Int) = TEAMS[i].let { "${it.city} ${it.name}" }
 
-    /**
-     * Pro overalls from the roster data, on this game's scale. College prospects rate high here,
-     * so the lower end of the pro scale is lifted a little; stars stay where they are.
-     */
-    fun proOverall(ovr: Int) = (ovr + (94 - ovr).coerceAtLeast(0) * 0.35).roundToInt().coerceIn(70, 99)
+    /** Pro overalls from the roster data, as estimated. College players drop [STEP_UP] when they arrive instead. */
+    fun proOverall(ovr: Int) = ovr.coerceIn(70, 99)
+
+    /** The pros are a step up: every rating drops this much when a college player arrives (his ceiling doesn't). */
+    const val STEP_UP = 5
 
     /** How strong each team's real roster is: its best eight count most. */
     private fun strength(team: Int): Double {
@@ -166,6 +166,12 @@ object ProLeague {
 
     /** A college player arrives in the pros. */
     fun joinPro(lg: League, p: Player, t: Team, collegeYears: Int) {
+        // The league is a step up: a college star starts over as a pro rookie, with room to grow.
+        if (p.year != PRO_YEAR) {
+            if (p.id == lg.heroId) lg.road?.collegeOvr = p.ovr
+            for (i in p.attrs.indices) p.attrs[i] = (p.attrs[i] - STEP_UP).coerceAtLeast(25)
+            p.ovrHistory += p.ovr
+        }
         p.teamId = t.id
         p.age = 18 + collegeYears.coerceIn(1, 5)
         p.year = PRO_YEAR
@@ -656,7 +662,7 @@ object ProCareer {
         val lottery = order.take(4).shuffled(Rng.r)
         for (i in 0 until 4) order[i] = lottery[i]
         val rookies = mutableListOf<Pair<Pos, Int>>()
-        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (90 - i * 0.15 + Rng.gauss() * 2).roundToInt().coerceIn(78, 95)
+        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (84 - i * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(74, 90)
         rookies.sortByDescending { it.second }
         val rival = ps.pendingRival
         var rivalSlot = -1
@@ -677,7 +683,12 @@ object ProCareer {
                 rival
             } else {
                 val (pos, target) = rookies[i]
-                ProLeague.makePro(lg, pos, target, Rng.range(19, 22), t).also { it.proYears = 0; it.awards += "${lg.season} Draft #${i + 1}" }
+                ProLeague.makePro(lg, pos, target, Rng.range(19, 22), t).also {
+                    it.proYears = 0
+                    it.awards += "${lg.season} Draft #${i + 1}"
+                    // Rookies come in raw, with real upside.
+                    it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
+                }
             }
             if (t.id == lg.userTeamId) ps.draftedByUser += p.id
         }

@@ -725,6 +725,8 @@ class RoadState(
     /** After he retires: the numbers hung in the rafters, and his Hall of Fame class (0 if not in). */
     val jerseys: MutableList<String> = mutableListOf(),
     var hofClass: Int = 0,
+    /** His overall the day he left college, before the step up to the pros. */
+    var collegeOvr: Int = 0,
     /** The all-time list: his rank (0 until he's on it), the names below him, and the last time he passed someone. */
     var allTimeRank: Int = 0,
     val allTimePassed: MutableList<String> = mutableListOf(),

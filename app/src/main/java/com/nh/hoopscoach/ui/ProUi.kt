@@ -1027,6 +1027,11 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                 Text("WELCOME TO THE LEAGUE", style = T.label, color = P.onHero.copy(alpha = 0.8f))
                 Text(t.name.uppercase(), style = T.hero.copy(fontSize = 28.sp), color = P.onHero)
                 Text("${c.kind} deal: ${c.years} years, ${money(c.salary)} a season. It lands in your bank when each season starts.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                val r0 = lg.road
+                if (r0 != null && r0.collegeOvr > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("The league is a step up: ${r0.collegeOvr} in college, ${h.ovr} here. Your ceiling is still ${h.pot}. Grow into it.", style = T.bodyB, color = P.onHero)
+                }
             }
             Section("Your new team")
             GroupList(lg.rosterOf(t).sortedByDescending { it.ovr }.take(8), inset = 64.dp) { p ->
@@ -1261,7 +1266,7 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 Panel(color = P.hero) {
                     Text(if (pick != null) "NO. ${pick.pick} OVERALL" else "UNDRAFTED FREE AGENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
                     Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
-                    Text("${h.name} · ${h.ovr} overall. Your college career is in the books; your pro career starts now.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start around ${h.ovr - com.nh.hoopscoach.game.ProLeague.STEP_UP} and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }
             item { CareerStory(lg) }
