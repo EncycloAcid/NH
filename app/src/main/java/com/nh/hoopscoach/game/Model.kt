@@ -709,6 +709,14 @@ class RoadState(
     var tradedSeason: Int = 0,
     var tradedDay: Int = -1,
     var tradeNote: String = "",
+    /** The all-time list: his rank (0 until he's on it), the names below him, and the last time he passed someone. */
+    var allTimeRank: Int = 0,
+    val allTimePassed: MutableList<String> = mutableListOf(),
+    /** Names already announced as passed, so a back-and-forth with an active player isn't news twice. */
+    val allTimeNamed: MutableList<String> = mutableListOf(),
+    var allTimeNote: String = "",
+    var allTimeSeason: Int = 0,
+    var allTimeDay: Int = -1,
 )
 
 /** A team that would trade for him, and the players it would send back. */
@@ -771,6 +779,8 @@ class ProState(
     /** Every trade, newest last, and the players already moved this season (nobody is traded twice in one). */
     val trades: MutableList<Trade> = mutableListOf(),
     val moved: MutableList<Int> = mutableListOf(),
+    /** All-time list scores of players who retired in this league, by name. */
+    val frozen: MutableMap<String, Double> = mutableMapOf(),
 )
 
 /** One head-to-head game against the class rival. */

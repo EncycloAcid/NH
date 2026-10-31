@@ -266,6 +266,7 @@ object ProSeason {
         prepareDay(lg)
         for (g in Season.gamesOn(lg, lg.day)) if (!g.played) GameEngine(lg, g, false).commit()
         endOfDay(lg)
+        AllTime.check(lg)
     }
 
     /** Playoff games are made a day at a time, since each depends on the series so far. */
@@ -626,6 +627,7 @@ object ProCareer {
             if (p.id == lg.heroId) continue
             val go = p.age >= 38 || (p.age >= 34 && Rng.chance((p.age - 33) * 0.18)) || (p.age >= 31 && p.ovr < 82)
             if (!go) continue
+            AllTime.freeze(lg, p)
             t.roster.remove(pid)
             lg.removePlayer(p)
             if (p.id == r.rivalId) {
@@ -796,7 +798,8 @@ object ProCareer {
             (if (r.rings > 0) ", ${r.rings} ${if (r.rings == 1) "ring" else "rings"}" else "") +
             (if (r.mvps > 0) ", ${r.mvps} MVP${if (r.mvps == 1) "" else "s"}" else "") +
             (if (r.allStars > 0) ", ${r.allStars} All-Star ${if (r.allStars == 1) "selection" else "selections"}" else "") +
-            ". ${hofVerdict(lg)}."
+            ". ${hofVerdict(lg)}." +
+            AllTime.rank(lg).let { if (it > 0) " He retires No. $it on the all-time list." else "" }
         Rival.player(lg)?.let { rv ->
             val rings = rv.awards.count { it.endsWith(" Champion") }
             val stars = rv.awards.count { it.endsWith(" All-Star") }

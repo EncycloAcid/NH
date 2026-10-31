@@ -235,6 +235,7 @@ object Summer {
         val story = if (lg.pro) r.proStory else r.story
         if (story.isNotEmpty()) story[story.size - 1] = story.last() + " · Summer: " + tag
         Road.payMilestonesNow(lg)
+        if (lg.pro) AllTime.check(lg)
         return r.summerNote
     }
 }

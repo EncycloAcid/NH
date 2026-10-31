@@ -126,6 +126,14 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { HeroTodayCard(vm, lg) }
+        if (r.allTimeNote.isNotEmpty() && r.allTimeSeason == lg.season && lg.day - r.allTimeDay in 0..5 && lg.phase != Phase.OFFSEASON) item {
+            Section("All-time list", action = "See it", onAction = { vm.select(Tab.CAREER) })
+            Panel(color = P.hero) {
+                Text("ALL-TIME LIST", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                Text("NO. ${r.allTimeRank}", style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+                Text(r.allTimeNote, style = T.small, color = P.onHero.copy(alpha = 0.9f))
+            }
+        }
         if (r.press != null) item { PressCard(vm, lg) }
         if (r.suitors.isNotEmpty()) item {
             Section("Trade request")
@@ -525,6 +533,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         if (r.press != null) item { PressCard(vm, lg) }
         item { SituationPanel(vm, lg) }
         item { RacePanel(vm, lg) }
+        item { AllTimePanel(vm, lg) }
         item { RivalPanel(vm, lg) }
         item {
             val mins = com.nh.hoopscoach.game.Gameplan.plannedMinutes(t, h.id)
@@ -572,6 +581,75 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
             }
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+// ---------- the all-time list ----------
+
+/** Where he stands among the greats, and who's next. */
+@Composable
+internal fun AllTimePanel(vm: GameViewModel, lg: League) {
+    val h = lg.hero ?: return
+    val at = com.nh.hoopscoach.game.AllTime
+    val score = remember(vm.rev, lg) { at.heroScore(lg) }
+    val rank = remember(vm.rev, lg) { at.rank(lg) }
+    val next = remember(vm.rev, lg) { at.next(lg) }
+    Section("All-time list", action = "See it", onAction = { vm.select(Tab.CAREER) })
+    Panel(onClick = { vm.select(Tab.CAREER) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("ALL-TIME RANK", style = T.label, color = P.sub)
+                Text(if (rank > 0) "No. $rank" else "Not on the list yet", style = T.title.copy(fontSize = if (rank > 0) 30.sp else 22.sp), color = P.accent)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${at.points(score)}", style = T.num, color = P.ink)
+                Text("LEGACY POINTS", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            when {
+                rank == 0 -> "${at.points(at.FLOOR - score)} more points to crack the list."
+                next != null -> "Next: ${next.name} (${at.points(next.score)}), ${at.points(next.score - score)} points away."
+                else -> "Nobody is above you. The greatest of all time."
+            },
+            style = T.small, color = P.ink,
+        )
+        val count = { a: String -> h.awards.count { it.substringAfter(" ") == a } }
+        Text(
+            "Rings ${count("Champion")} · MVP ${count("MVP")} · Finals MVP ${count("Finals MVP")} · All-League ${count("All-League 1st") + count("All-League 2nd") + count("All-League 3rd")} · All-Star ${count("All-Star")}",
+            style = T.small, color = P.sub,
+        )
+        Text("MVP 8 · Finals MVP 6 · ring 5 · All-League 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+    }
+}
+
+/** The list itself: the top 15, and the names around him. */
+private fun LazyListScope.allTimeList(vm: GameViewModel, lg: League) {
+    val l = com.nh.hoopscoach.game.AllTime.list(lg)
+    val me = l.indexOfFirst { it.status == "You" }
+    val onList = com.nh.hoopscoach.game.AllTime.heroScore(lg) >= com.nh.hoopscoach.game.AllTime.FLOOR
+    val show = (l.indices.take(15) + (if (me >= 0) ((me - 2).coerceAtLeast(0)..(me + 2).coerceAtMost(l.size - 1)).toList() else emptyList())).distinct().sorted()
+    item {
+        Section("All-time list")
+        GroupList(show) { i ->
+            val e = l[i]
+            val you = e.status == "You"
+            val gap = i > 0 && i - 1 !in show
+            Column {
+                if (gap) Text("···", style = T.small, color = P.faint, modifier = Modifier.padding(start = 18.dp, top = 4.dp))
+                ListRow(onClick = if (e.pid >= 0 && lg.anyPlayer(e.pid) != null) ({ vm.openPlayer(e.pid) }) else null, modifier = if (you) Modifier.background(P.accentSoft) else Modifier) {
+                    Text(if (you && !onList) "–" else "${i + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(36.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (you) "${e.name} (you)" else e.name, style = T.bodyB, color = if (you) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val team = lg.playerOrNull(e.pid)?.takeIf { it.teamId >= 0 }?.let { lg.team(it.teamId).name }
+                        Text(if (you && !onList) "Not on the list yet" else listOfNotNull(e.status, team).joinToString(" · "), style = T.small, color = P.sub, maxLines = 1)
+                    }
+                    Text("${com.nh.hoopscoach.game.AllTime.points(e.score)}", style = T.numSm, color = P.ink)
+                }
+            }
+        }
+        Text("Scores: MVP 8 · Finals MVP 6 · ring 5 · All-League 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points. Today's stars carry their real careers and keep adding.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 }
 
@@ -695,6 +773,7 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { TotalsRow("Pro career", proTotals(h)) }
+        allTimeList(vm, lg)
         item { r.collegeTotals?.let { TotalsRow("College · ${r.collegeSeasons} ${if (r.collegeSeasons == 1) "season" else "seasons"}", it) } }
         if (r.proStory.isNotEmpty()) item {
             Section("The pro years")
@@ -760,8 +839,15 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
             Text("${t.w}-${t.l} · ${f1(s.ppg)} ppg, ${f1(s.rpg)} rpg, ${f1(s.apg)} apg", style = T.small, color = P.onHero.copy(alpha = 0.9f))
         }
         val mine = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
-        if (mine.isNotEmpty()) {
+        val atr = com.nh.hoopscoach.game.AllTime.rank(lg)
+        if (mine.isNotEmpty() || atr > 0) {
             Section("Your honors")
+            if (atr > 0) Panel(Modifier.padding(bottom = 8.dp)) {
+                Text("No. $atr on the all-time list", style = T.bodyB, color = P.accent)
+                com.nh.hoopscoach.game.AllTime.next(lg)?.let { n -> Text("Next up: ${n.name}, ${com.nh.hoopscoach.game.AllTime.points(n.score - com.nh.hoopscoach.game.AllTime.heroScore(lg))} points away", style = T.small, color = P.sub) }
+            }
+        }
+        if (mine.isNotEmpty()) {
             Panel { mine.forEach { Text("★ $it", style = T.bodyB, color = P.ink) } }
         }
         ps.history.lastOrNull { it.season == lg.season }?.let { s ->

@@ -133,6 +133,12 @@ class ProUiTest {
         ProCareer.sign(lg, lg.road!!.proOffers.first())
         ProCareer.next(lg); vm.install(lg); shot("P15_summer")
         vm.select(Tab.CAREER); shot("P16_career"); scrollTo(3); shot("P16b_career_story")
+        // The all-time list, with a big season added so he's on it.
+        lg.hero!!.awards += listOf("${lg.season} MVP", "${lg.season} Champion", "${lg.season} Finals MVP", "${lg.season} All-League 1st", "${lg.season} All-Star")
+        lg.road!!.allTimeRank = 0
+        com.nh.hoopscoach.game.AllTime.check(lg)
+        vm.install(lg); vm.select(Tab.RECRUIT); idle(); scrollToText("ALL-TIME LIST"); shot("P16c_me_all_time")
+        vm.select(Tab.CAREER); idle(); scrollToText("ALL-TIME LIST"); shot("P16d_all_time_list")
         // Skip ahead to the end of a career.
         ProCareer.next(lg)
         lg.hero!!.age = 34

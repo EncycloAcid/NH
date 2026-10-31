@@ -166,6 +166,8 @@ class ProTest {
             Rival.player(lg)?.let { rv -> println("   rival ${rv.name}: ${if (lg.playerOrNull(rv.id) != null) "${lg.team(rv.teamId).name}, ovr ${rv.ovr}, %.1f ppg".format(rv.stats.ppg) else lg.road!!.rivalLeft.ifEmpty { "pending" }}; duels ${Rival.record(lg)}") }
             val ovrs = lg.players.filter { it.teamId >= 0 }.map { it.ovr }.sortedDescending()
             println("   league: ${ovrs.count { it >= 97 }} at 97+, ${ovrs.count { it >= 94 }} at 94+, top-150 avg %.1f, median %d; your team's top 5 ${lg.rosterOf(t).map { it.ovr }.sortedDescending().take(5)}".format(ovrs.take(150).average(), ovrs[ovrs.size / 2]))
+            val at = com.nh.hoopscoach.game.AllTime
+            println("   all-time: No. ${at.rank(lg)} with ${at.points(at.heroScore(lg))}; next ${at.next(lg)?.let { "${it.name} ${at.points(it.score)}" }}; top 3 ${at.list(lg).take(3).map { "${it.name} ${at.points(it.score)}" }}")
             val top = lg.seasonAwards.first { it.award == "MVP" }
             println("   MVP line: ${top.line}; scoring leader %.1f".format(lg.players.filter { it.stats.gp >= 30 }.maxOf { it.stats.ppg }))
             lg = SaveIO.decode(SaveIO.encode(lg))
@@ -181,5 +183,11 @@ class ProTest {
         assertTrue("story per season", rr.proStory.size >= seasons)
         assertTrue("the hero is kept", lg.hero != null)
         assertTrue("rich", rr.earned > 10_000)
+        val at = com.nh.hoopscoach.game.AllTime
+        println("all-time: No. ${at.rank(lg)}; news: ${lg.news.filter { it.text.contains("all-time list") }.takeLast(4).map { it.text }}")
+        assertTrue("a long career makes the all-time list", at.rank(lg) > 0)
+        assertTrue("passing legends makes the news", lg.news.any { it.text.contains("on the all-time list") || it.text.contains("cracks the all-time list") })
+        assertTrue("the ending gives the rank", rr.ending.contains("all-time list"))
+        assertTrue("the list keeps the greats in order", at.LEGENDS.first().first == "Michael Jordan")
     }
 }

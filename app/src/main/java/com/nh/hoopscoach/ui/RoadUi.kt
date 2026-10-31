@@ -467,7 +467,7 @@ internal fun RivalPanel(vm: GameViewModel, lg: League) {
             if (h.stats.gp > 0 || rv.stats.gp > 0) RivalRow("Points per game", "%.1f".format(h.stats.ppg), "%.1f".format(rv.stats.ppg), h.stats.ppg.compareTo(rv.stats.ppg))
             val myRace = Rival.raceRank(lg, h)
             val hisRace = Rival.raceRank(lg, rv)
-            if (myRace in 1..100 || hisRace in 1..100) RivalRow("Player of the Year race", rankText(myRace), rankText(hisRace), rankCompare(myRace, hisRace))
+            if (myRace in 1..100 || hisRace in 1..100) RivalRow(if (lg.pro) "MVP race" else "Player of the Year race", rankText(myRace), rankText(hisRace), rankCompare(myRace, hisRace))
             if (lg.pro) {
                 val ms = h.awards.count { it.endsWith(" All-Star") }
                 val hs = rv.awards.count { it.endsWith(" All-Star") }
