@@ -100,6 +100,67 @@ class ProTest {
     }
 
     @Test
+    fun extras() {
+        var lg = ProLeague.create(toDraft(21))
+        val r = lg.road!!
+        val rb = com.nh.hoopscoach.game.RecordBook
+        assertEquals("records book seeded", 18, lg.proState!!.records.size)
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        // Recruit a star: push for a trade before the deadline.
+        repeat(15) { Sim.playDay(lg) }
+        val sr = com.nh.hoopscoach.game.StarRecruit
+        val odds = sr.odds(lg)
+        assertEquals("title odds add up", 1.0, odds.values.sum(), 0.001)
+        val targets = sr.tradeTargets(lg)
+        println("title odds ${"%.1f".format(odds[lg.userTeamId]!! * 100)}%; trade targets ${targets.map { "${it.name} ${it.ovr} (${lg.team(it.teamId).abbr}) -> ${"%.1f".format(sr.oddsWith(lg, it) * 100)}%" }}")
+        if (targets.isNotEmpty()) { println("push: " + sr.push(lg, targets.first().id)); assertTrue("one push a season", !sr.canPush(lg)) }
+        // A record night.
+        val lines = arrayOf(LinkedHashMap<Int, com.nh.hoopscoach.game.StatLine>(), LinkedHashMap())
+        lines[0][lg.heroId] = com.nh.hoopscoach.game.StatLine(gp = 1, sec = 2800, pts = 101)
+        val before = com.nh.hoopscoach.game.AllTime.heroScore(lg)
+        rb.afterGame(lg, lines)
+        val pts = lg.proState!!.records.first { it.key == "game_pts" }
+        assertTrue("he holds the points record", pts.mine && pts.value == 101.0)
+        assertTrue("it makes the news", lg.news.any { it.text.startsWith("Record: ") })
+        assertTrue("it adds legacy", com.nh.hoopscoach.game.AllTime.heroScore(lg) >= before + 3)
+        playSeason(lg)
+        // Big playoff nights: every series decider has stakes for both teams.
+        val ps = lg.proState!!
+        for (sx in ps.series.filter { it.done }) {
+            val last = lg.game(sx.gameIds.last())
+            assertTrue("deciders are big nights", com.nh.hoopscoach.game.BigNights.stakes(lg, last, sx.hi).isNotEmpty() && com.nh.hoopscoach.game.BigNights.stakes(lg, last, sx.lo).isNotEmpty())
+        }
+        val g7 = ps.series.firstOrNull { it.gameIds.size == 7 }
+        if (g7 != null) assertTrue(com.nh.hoopscoach.game.BigNights.stakes(lg, lg.game(g7.gameIds.last()), g7.hi).startsWith("Game 7"))
+        println("reel: ${r.reel.map { "${it.title}: ${it.line}" }}")
+        val lbj = ps.records.first { it.key == "career_pts" }
+        println("career points record: ${lbj.holder} ${lbj.value}")
+        assertTrue("an active holder's record keeps growing", lbj.mine || lbj.value >= lbj.base)
+        // The summer market.
+        ProCareer.next(lg)
+        assertTrue("stars available", ps.freeStars.isNotEmpty())
+        val star = lg.player(ps.freeStars.first())
+        println("pitch ${star.name} (${star.ovr}, ${"%.0f".format(sr.chance(lg, star) * 100)}%): " + sr.pitch(lg, star.id))
+        assertTrue("one pitch a summer", !sr.canPitch(lg))
+        assertTrue("rosters legal", lg.teams.all { t -> t.roster.size in 13..15 && t.roster.all { lg.player(it).teamId == t.id } })
+        // Retire, and take a college job.
+        lg.hero!!.age = 34
+        ProCareer.retire(lg)
+        println("jerseys ${lg.road!!.jerseys}, hof ${lg.road!!.hofClass}, highlights ${com.nh.hoopscoach.game.Afterward.highlights(lg)}")
+        val jobs = com.nh.hoopscoach.game.Afterward.coachingJobs(lg)
+        println("jobs: ${jobs.map { "${it.school} (${it.why})" }}")
+        assertTrue("his alma mater calls", jobs.first().why.contains("alma mater"))
+        val college = com.nh.hoopscoach.game.Afterward.becomeCoach(lg, LeagueGen.newLeague(lg.season + 1), jobs.first().school)
+        val c = college.userCoach
+        assertEquals(lg.hero!!.last, c.last)
+        assertEquals(jobs.first().school, college.user.school)
+        assertTrue("coach mode", !college.playerMode && !college.pro)
+        println("coach ${c.name}, age ${c.age}, rec ${c.rec}, off ${c.off}, def ${c.def} at ${college.user.school}, season ${college.season}")
+        repeat(5) { Season.playDay(college) }
+        assertTrue("the coach game runs", college.games.any { it.played })
+    }
+
+    @Test
     fun negotiation() {
         var lg = ProLeague.create(toDraft(21))
         val r = lg.road!!

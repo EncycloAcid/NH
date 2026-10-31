@@ -82,6 +82,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** A shooting coach helps the user's player's jump shots, and his big shots most. */
     private val heroJumper = if (heroId >= 0) Road.jumpShotBonus(lg) else 0.0
     private val heroClutch = if (heroId >= 0) Road.clutchBonus(lg) else 0.0
+    /** A Game 7, an elimination game or a close-out: more big moments, and they start earlier. */
+    val bigNight: String = if (heroSide >= 0) BigNights.stakes(lg, game) else ""
 
     /** The three ways to play a big moment. */
     enum class MomentChoice { PULL_UP, DRIVE, KICK }
@@ -129,10 +131,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     /** A big moment is due: the user's team has the ball, late and close, with him on the floor. */
     fun pendingMoment(): BigMoment? {
-        if (!interactive || finished || heroSide < 0 || poss != heroSide || momentsAsked >= 3) return null
-        if (period < 2 || clock > 120 || clock < 1.0) return null
+        val big = bigNight.isNotEmpty()
+        if (!interactive || finished || heroSide < 0 || poss != heroSide || momentsAsked >= (if (big) 5 else 3)) return null
+        if (period < 2 || clock > (if (big) 180 else 120) || clock < 1.0) return null
         val margin = score[heroSide] - score[1 - heroSide]
-        if (margin < -5 || margin > 5 || (margin > 0 && clock < 40)) return null
+        val close = if (big) 7 else 5
+        if (margin < -close || margin > close || (margin > 0 && clock < 40)) return null
         val offense = lineup(heroSide)
         val hero = offense.firstOrNull { it.id == heroId } ?: return null
         val o = heroSide
@@ -756,6 +760,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Brand.afterGame(lg, game)
             Moments.afterGame(lg, game, buzzerBeater, forcedOt)
         }
+        if (lg.pro) RecordBook.afterGame(lg, lines)
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
     }
 

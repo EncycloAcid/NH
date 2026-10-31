@@ -68,6 +68,7 @@ object AllTime {
             count(p, "All-League 1st") * ALL_LEAGUE_1 + count(p, "All-League 2nd") * ALL_LEAGUE_2 + count(p, "All-League 3rd") * ALL_LEAGUE_3 +
             count(p, "All-Star") * ALL_STAR + count(p, "Defensive Player of the Year") * DPOY + count(p, "Rookie of the Year") * ROY +
             count(p, "Olympics Gold") * 2.0 + count(p, "World Cup Gold") * 1.0 +
+            p.awards.count { it.substringAfter(" ").startsWith("Record: ") } * 3.0 +
             pts / 1000.0 * PER_1000 * SEASON_SCALE
     }
 

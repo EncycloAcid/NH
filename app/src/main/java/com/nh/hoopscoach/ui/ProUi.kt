@@ -175,6 +175,15 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
                 Section("Next up")
                 Panel {
                     Text((if (g.label.isNotEmpty()) g.label else if (g.home == u.id) "Home" else "Away").uppercase(), style = T.label, color = P.accent)
+                    val stakes = com.nh.hoopscoach.game.BigNights.stakes(lg, g)
+                    if (stakes.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Tag(stakes.uppercase(), P.bad, filled = true)
+                            Spacer(Modifier.width(8.dp))
+                            Text("A big night: more big moments, and they start earlier.", style = T.small, color = P.sub)
+                        }
+                    }
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MatchSide(lg, u, Modifier.weight(1f))
@@ -532,6 +541,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         }
         if (r.press != null) item { PressCard(vm, lg) }
         item { SituationPanel(vm, lg) }
+        item { ContenderPanel(vm, lg) }
         item { RacePanel(vm, lg) }
         item { AllTimePanel(vm, lg) }
         item { RivalPanel(vm, lg) }
@@ -580,6 +590,97 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+// ---------- playoff reel, records book, building a contender ----------
+
+@Composable
+private fun ReelRow(e: com.nh.hoopscoach.game.ReelEntry) {
+    Column(Modifier.fillMaxWidth().then(if (e.big) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Text("${e.season} · ${e.title}".uppercase(), style = T.label, color = if (e.big) P.accent else P.sub)
+        Text(e.line, style = T.small, color = P.ink)
+    }
+}
+
+private fun LazyListScope.reelSection(lg: League, limit: Int?) {
+    val r = lg.road ?: return
+    if (r.reel.isEmpty()) return
+    item {
+        Section("Playoff highlights")
+        val list = r.reel.sortedWith(compareByDescending<com.nh.hoopscoach.game.ReelEntry> { it.big }.thenByDescending { it.season }).let { if (limit != null) it.take(limit) else it.take(20) }
+        GroupList(list) { e -> ReelRow(e) }
+    }
+}
+
+private fun LazyListScope.recordsBook(lg: League) {
+    val book = lg.proState?.records ?: return
+    if (book.isEmpty()) return
+    val rb = com.nh.hoopscoach.game.RecordBook
+    for (scope in listOf("Game", "Season", "Career")) item {
+        Section(when (scope) { "Game" -> "Records book · single game"; "Season" -> "Records book · season"; else -> "Records book · career" })
+        GroupList(book.filter { it.scope == scope }) { rec ->
+            val mine = rb.mine(lg, rec)
+            Column(Modifier.fillMaxWidth().then(if (rec.mine) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(rec.label, style = T.bodyB, color = if (rec.mine) P.accent else P.ink)
+                        Text("${rec.holder}, ${rec.season}", style = T.small, color = P.sub)
+                    }
+                    Text(rb.format(rec, rec.value), style = T.numSm, color = P.ink)
+                }
+                if (!rec.mine && mine > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    Bar((mine / rec.value).toFloat().coerceIn(0f, 1f), Modifier.fillMaxWidth(), height = 4.dp)
+                    Text("You: ${rb.format(rec, mine)}", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                }
+            }
+        }
+        if (scope == "Career") Text("Career totals count each 58-game season as a full 82. Breaking a record adds 3 legacy points.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+    }
+}
+
+/** Recruit a star: pitch a free agent in the summer, or push for a trade before the deadline. Shows title odds either way. */
+@Composable
+internal fun ContenderPanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val h = lg.playerOrNull(lg.heroId) ?: return
+    if (h.teamId < 0) return
+    val sr = com.nh.hoopscoach.game.StarRecruit
+    val pitch = sr.canPitch(lg)
+    val push = sr.canPush(lg)
+    val targets = remember(vm.rev, lg) {
+        if (pitch) lg.proState!!.freeStars.mapNotNull { lg.playerOrNull(it) } else if (push) sr.tradeTargets(lg) else emptyList()
+    }
+    val odds = remember(vm.rev, lg) { sr.odds(lg)[lg.userTeamId] ?: 0.0 }
+    if (targets.isEmpty() && r.recruitNote.isEmpty()) return
+    Section("Build a contender")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("TITLE ODDS", style = T.label, color = P.sub)
+                Text("%.0f%%".format(odds * 100), style = T.title.copy(fontSize = 28.sp), color = P.accent)
+            }
+            Text(if (pitch) "Pitch one star\na summer" else if (push) "One push\nbefore the deadline" else "", style = T.small, color = P.sub, textAlign = TextAlign.End)
+        }
+        if (r.recruitNote.isNotEmpty()) Text(r.recruitNote, style = T.small, color = P.accent, modifier = Modifier.padding(top = 6.dp))
+        for (p in targets) {
+            val t = lg.team(p.teamId)
+            val after = remember(vm.rev, p.id) { sr.oddsWith(lg, p) }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                PlayerJersey(p, t, 40.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("${p.name} · ${p.ovr}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${p.pos} · age ${p.age} · ${t.name}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("With him: %.0f%% title odds".format(after * 100) + if (pitch) " · %.0f%% he says yes".format(sr.chance(lg, p) * 100) else "", style = T.small, color = P.good)
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton(if (pitch) "Pitch" else "Push", primary = true) {
+                    vm.act { val msg = if (pitch) sr.pitch(it, p.id) else sr.push(it, p.id); if (msg.isNotEmpty()) vm.toast(msg) }
+                }
+            }
         }
     }
 }
@@ -774,6 +875,8 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
         }
         item { TotalsRow("Pro career", proTotals(h)) }
         allTimeList(vm, lg)
+        reelSection(lg, null)
+        recordsBook(lg)
         item { r.collegeTotals?.let { TotalsRow("College · ${r.collegeSeasons} ${if (r.collegeSeasons == 1) "season" else "seasons"}", it) } }
         if (r.proStory.isNotEmpty()) item {
             Section("The pro years")
@@ -850,6 +953,11 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
         if (mine.isNotEmpty()) {
             Panel { mine.forEach { Text("★ $it", style = T.bodyB, color = P.ink) } }
         }
+        val reel = r.reel.filter { it.season == lg.season }
+        if (reel.isNotEmpty()) {
+            Section("Playoff reel")
+            GroupList(reel.reversed()) { e -> ReelRow(e) }
+        }
         ps.history.lastOrNull { it.season == lg.season }?.let { s ->
             Section("Around the league")
             Panel {
@@ -907,6 +1015,7 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League, t: Team) {
         }
     }
     item { SituationPanel(vm, lg) }
+    item { ContenderPanel(vm, lg) }
 }
 
 private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player, t: Team, rookie: Boolean) {
@@ -954,6 +1063,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                 Text("${c.kind} · ${c.years} ${if (c.years == 1) "year" else "years"} left" + (if (c.option) ", the last one a player option." else "."), style = T.small, color = P.sub)
             }
             SituationPanel(vm, lg)
+            ContenderPanel(vm, lg)
             return@item
         }
         Panel {
@@ -1071,10 +1181,37 @@ fun ProEnding(vm: GameViewModel, lg: League) {
                 Text(r.ending, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }
+        if (r.jerseys.isNotEmpty()) item {
+            Section("Jersey night")
+            for (j in r.jerseys) {
+                val team = lg.teams.firstOrNull { j.startsWith("The ${it.name} ") }
+                Panel(Modifier.padding(bottom = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (team != null) { TeamBadge(team, 44.dp); Spacer(Modifier.width(12.dp)) }
+                        Column(Modifier.weight(1f)) {
+                            Text("NO. ${h?.number ?: 0} IN THE RAFTERS", style = T.label, color = P.accent)
+                            Text(j, style = T.bodyB, color = P.ink)
+                        }
+                    }
+                }
+            }
+        }
+        if (r.hofClass > 0) item {
+            Section("Hall of Fame night")
+            Panel(color = P.hero) {
+                Text("CLASS OF ${r.hofClass}", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                Text("${h?.name?.uppercase() ?: ""}", style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+                Text(ProCareer.hofVerdict(lg), style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                Spacer(Modifier.height(10.dp))
+                for (line in com.nh.hoopscoach.game.Afterward.highlights(lg)) Text("★ $line", style = T.small, color = P.onHero)
+                com.nh.hoopscoach.game.Rival.player(lg)?.let { rv -> Spacer(Modifier.height(8.dp)); Text("Presented by your old rival, ${rv.name}.", style = T.small, color = P.onHero.copy(alpha = 0.85f)) }
+            }
+        }
         if (h != null) {
             item { TotalsRow("Pro career", proTotals(h)) }
             item { r.collegeTotals?.let { TotalsRow("College", it) } }
         }
+        reelSection(lg, 8)
         if (r.proStory.isNotEmpty()) item {
             Section("The pro years")
             GroupList(r.proStory) { line -> Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
@@ -1086,9 +1223,25 @@ fun ProEnding(vm: GameViewModel, lg: League) {
                 Text("${r.rings} ${if (r.rings == 1) "ring" else "rings"} · ${r.allStars} All-Star · ${r.mvps} MVP · ${Road.count(r.followers)} followers", style = T.small, color = P.ink)
                 Text("College: ${r.collegeSchools} · Pro: ${r.proTeams.joinToString(" → ") { lg.team(it).name }}", style = T.small, color = P.sub)
             }
+        }
+        if (r.retired) item {
+            val jobs = remember(lg) { com.nh.hoopscoach.game.Afterward.coachingJobs(lg) }
+            Section("What's next: coaching")
+            Text("Programs want you on the sideline. Taking a job starts a new save in the coach game, with your name and reputation.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+            GroupList(jobs, inset = 16.dp) { j ->
+                ListRow(onClick = { vm.retireToCoach(j.school) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text(j.school, style = T.bodyB, color = P.ink)
+                        Text(j.why, style = T.small, color = P.sub)
+                    }
+                    SmallButton("Coach here", primary = true) { vm.retireToCoach(j.school) }
+                }
+            }
+        }
+        item {
             Spacer(Modifier.height(16.dp))
             Box(Modifier.padding(horizontal = Gutter)) {
-                PrimaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
+                SecondaryButton("Start a new player career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
             }
             Spacer(Modifier.height(24.dp))
         }

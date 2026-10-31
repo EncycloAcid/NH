@@ -100,6 +100,14 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)
+        if (e.bigNight.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Tag(e.bigNight.uppercase(), P.bad, filled = true)
+                Spacer(Modifier.width(8.dp))
+                Text("Up to five big moments tonight", style = T.small, color = P.sub)
+            }
+        }
         if (lg.playerMode && com.nh.hoopscoach.game.Rival.isDuel(lg, e.game)) {
             val rv = com.nh.hoopscoach.game.Rival.active(lg)
             val me = lg.playerOrNull(lg.heroId)

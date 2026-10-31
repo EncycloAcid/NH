@@ -715,6 +715,16 @@ class RoadState(
     var tradeNote: String = "",
     /** Free agency: a player option on his last year that he has to decide on this summer. */
     var optionPending: Boolean = false,
+    /** Playoff highlight reel, and his best pro single games (points, rebounds, assists, threes, steals, blocks). */
+    val reel: MutableList<ReelEntry> = mutableListOf(),
+    var proBest: IntArray = IntArray(6),
+    /** Recruiting a star: the summer he last pitched one, the season he last pushed for a trade, and how it went. */
+    var pitchSeason: Int = -1,
+    var pushSeason: Int = -1,
+    var recruitNote: String = "",
+    /** After he retires: the numbers hung in the rafters, and his Hall of Fame class (0 if not in). */
+    val jerseys: MutableList<String> = mutableListOf(),
+    var hofClass: Int = 0,
     /** The all-time list: his rank (0 until he's on it), the names below him, and the last time he passed someone. */
     var allTimeRank: Int = 0,
     val allTimePassed: MutableList<String> = mutableListOf(),
@@ -791,6 +801,23 @@ class ProState(
     val moved: MutableList<Int> = mutableListOf(),
     /** All-time list scores of players who retired in this league, by name. */
     val frozen: MutableMap<String, Double> = mutableMapOf(),
+    /** The records book, and this summer's star free agents. */
+    val records: MutableList<BookRecord> = mutableListOf(),
+    val freeStars: MutableList<Int> = mutableListOf(),
+)
+
+/** One night in his playoff highlight reel. */
+@Serializable
+class ReelEntry(val season: Int, val title: String, val line: String, val big: Boolean = false)
+
+/**
+ * A record: [scope] is "Game", "Season" or "Career". [base] is a real holder's total before this
+ * league, so an active holder's record keeps growing as he plays.
+ */
+@Serializable
+class BookRecord(
+    val key: String, val label: String, val scope: String, var value: Double, var holder: String, var season: Int,
+    var mine: Boolean = false, val base: Double = 0.0, val decimals: Int = 0,
 )
 
 /** One head-to-head game against the class rival. */

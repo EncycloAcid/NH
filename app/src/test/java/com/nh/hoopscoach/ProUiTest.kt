@@ -128,6 +128,7 @@ class ProUiTest {
         vm.install(lg); vm.select(Tab.TODAY); shot("P12_review")
         walk(vm, lg)
         ProCareer.next(lg); vm.install(lg); shot("P13_draft")
+        if (lg.proState!!.freeStars.isNotEmpty()) { scrollToText("BUILD A CONTENDER"); shot("P13b_contender") }
         lg.road!!.contract!!.years = 0
         ProCareer.next(lg); vm.install(lg); shot("P14_free_agency")
         assertTrue("offers come in", lg.road!!.proOffers.isNotEmpty())
@@ -145,6 +146,12 @@ class ProUiTest {
         com.nh.hoopscoach.game.AllTime.check(lg)
         vm.install(lg); vm.select(Tab.RECRUIT); idle(); scrollToText("ALL-TIME LIST"); shot("P16c_me_all_time")
         vm.select(Tab.CAREER); idle(); scrollToText("ALL-TIME LIST"); shot("P16d_all_time_list")
+        lg.road!!.reel += com.nh.hoopscoach.game.ReelEntry(lg.season, "Conference Finals · Game 7", "41 pts, 9 reb, 6 ast · W 108-104 vs Boston Celtics · Game 7 · Game-winner", true)
+        val lines = arrayOf(LinkedHashMap<Int, com.nh.hoopscoach.game.StatLine>(), LinkedHashMap())
+        lines[0][lg.heroId] = com.nh.hoopscoach.game.StatLine(gp = 1, sec = 2800, pts = 58, tpm = 15)
+        com.nh.hoopscoach.game.RecordBook.afterGame(lg, lines)
+        vm.install(lg); vm.select(Tab.CAREER); idle(); scrollToText("PLAYOFF HIGHLIGHTS"); shot("P16e_reel")
+        scrollToText("RECORDS BOOK · SINGLE GAME"); shot("P16f_records")
         // Skip ahead to the end of a career.
         ProCareer.next(lg)
         lg.hero!!.age = 34
@@ -153,8 +160,10 @@ class ProUiTest {
         vm.install(lg); vm.select(Tab.TODAY); idle()
         assertTrue(lg.proState!!.step == ProStep.REVIEW && ProCareer.canRetire(lg))
         scrollToText("Retire"); shot("P17_retire_option")
+        lg.road!!.mvps = 2; lg.road!!.rings = 2; lg.road!!.allStars = 7
         ProCareer.retire(lg); vm.install(lg); vm.select(Tab.TODAY)
-        shot("P18_ending"); scrollTo(3); shot("P18b_ending_story")
+        shot("P18_ending"); scrollToText("HALL OF FAME NIGHT"); shot("P18b_hall_of_fame")
+        scrollToText("WHAT'S NEXT: COACHING"); shot("P18c_coaching")
         walk(vm, lg)
         println("ending: ${lg.road!!.ending}")
     }

@@ -416,7 +416,9 @@ object Road {
         val won = g.winner() == t.id
         val rivalry = lg.rivalry(g) != null
         val duel = Rival.afterGame(lg, g, line, won)
+        val stakes = BigNights.stakes(lg, g)
         val stage = when (g.type) { GameType.NCAA -> 3.0; GameType.PLAYOFF -> 2.2; GameType.CONF_TOURNEY, GameType.NIT -> 1.5; else -> 1.0 } *
+            (if (stakes.isNotEmpty()) 1.6 else 1.0) *
             (if (rivalry) 1.5 else 1.0) * (if (opp.ap > 0) 1.3 else 1.0) * (if (won) 1.2 else 0.7) *
             (if (duel != null) (if (duel.won && duel.me > duel.him) 1.8 else 1.3) else 1.0)
         val brand = 0.6 + Brand.pull(lg, t) / 100.0
@@ -432,6 +434,7 @@ object Road {
         if (won && r.persona <= -4) t.fans = (t.fans + 0.6).coerceAtMost(100.0)
         payMilestones(lg)
         r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner, duel)
+        if (lg.pro) BigNights.afterGame(lg, g, line, won, winner, stakes)
     }
 
     fun payMilestonesNow(lg: League) = payMilestones(lg)

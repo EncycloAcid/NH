@@ -259,6 +259,26 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** A retired pro takes a college job: a new save in the coach game with his name and reputation. */
+    fun retireToCoach(school: String) {
+        val pro = league ?: return
+        if (busy != null || pro.road?.retired != true) return
+        busy = "Taking the job at $school"
+        viewModelScope.launch {
+            delay(60)
+            val college = mutex.withLock {
+                withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Afterward.becomeCoach(pro, com.nh.hoopscoach.game.LeagueGen.newLeague(pro.season + 1), school) }
+            }
+            stack.clear()
+            sheet = null
+            live = null
+            tab = Tab.TODAY
+            league = college
+            busy = null
+            bump()
+        }
+    }
+
     /** One step through the pro offseason. */
     fun proNext() {
         val ps = league?.proState ?: return

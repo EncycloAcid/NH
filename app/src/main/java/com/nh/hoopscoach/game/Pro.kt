@@ -143,6 +143,7 @@ object ProLeague {
         lg.day = 0
         lg.proState!!.step = ProStep.FREE_AGENCY
         lg.news += News(lg.season, 0, "${h.name} signs with the ${t.name}: ${r.contract!!.years} years, ${Road.dollars(r.contract!!.salary)} a season", true)
+        RecordBook.seed(lg)
         return lg
     }
 
@@ -354,6 +355,7 @@ object ProSeason {
 
     private fun startPlayoffs(lg: League) {
         val ps = lg.proState ?: return
+        RecordBook.seasonEnd(lg)
         regularAwards(lg)
         ps.series.clear()
         ps.seeds.clear()
@@ -593,6 +595,7 @@ object ProCareer {
                 ps.moved.clear()
                 draft(lg)
                 Trades.summer(lg)
+                StarRecruit.openMarket(lg)
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
@@ -607,6 +610,7 @@ object ProCareer {
             }
             ProStep.FREE_AGENCY -> {
                 if (r.optionPending) optIn(lg)
+                ps.freeStars.clear()
                 if ((r.contract?.years ?: 0) <= 0) r.proOffers.firstOrNull()?.let { sign(lg, it) }
                 // The rosters start out current, so the league skips a summer of aging before its first season.
                 if (ps.history.isNotEmpty()) summer(lg)
@@ -891,6 +895,7 @@ object ProCareer {
             val stars = rv.awards.count { it.endsWith(" All-Star") }
             r.ending += " Your rival ${rv.name}: $rings ${if (rings == 1) "ring" else "rings"}, $stars All-Star ${if (stars == 1) "selection" else "selections"}."
         }
+        Afterward.retireNumbers(lg)
         lg.news += News(lg.season, lg.day, "${h.name} announces his retirement", true)
     }
 }

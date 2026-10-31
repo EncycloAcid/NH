@@ -21,6 +21,9 @@ object Trades {
     }
 
     /** Up to three players from [t] worth [lo] to [hi] times [target], best first. Null if nothing fits. */
+    /** What [t] could send for a player worth [target]: up to three of its players (never the user's). */
+    fun bundleFor(lg: League, t: Team, target: Double, lo: Double, hi: Double) = bundle(lg, t, target, lo, hi, emptySet())
+
     private fun bundle(lg: League, t: Team, target: Double, lo: Double, hi: Double, keep: Set<Int>): List<Player>? {
         val pool = lg.rosterOf(t).filter { it.id != lg.heroId && it.id !in keep && it.id !in (lg.proState?.moved ?: emptyList<Int>()) }
             .sortedByDescending { value(it) }
