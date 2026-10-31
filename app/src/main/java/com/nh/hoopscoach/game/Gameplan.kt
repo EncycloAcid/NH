@@ -14,7 +14,7 @@ object Gameplan {
 
     fun usageFor(p: Player, pro: Boolean = false): Int =
         // Pro ratings sit close together, so usage is stretched there or stars would share the ball like role players.
-        if (pro) ((Ratings.offense(p) - 84) * 5.0 + 22).roundToInt().coerceIn(10, 99)
+        if (pro) ((Ratings.offense(p) - 84) * 2.4 + 34).roundToInt().coerceIn(10, 99)
         else (Ratings.offense(p) * 1.3 - 30).roundToInt().coerceIn(10, 99)
 
     /** Picks starters and backups by position and splits the minutes. */
