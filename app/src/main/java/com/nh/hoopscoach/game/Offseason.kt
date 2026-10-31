@@ -242,7 +242,7 @@ object Offseason {
                 val before = p.ovr
                 val attrs = p.attrs.copyOf()
                 val brokeOut = Tryouts.summer(p)
-                Ratings.offseasonGrowth(p, dev)
+                if (p.id == lg.heroId && lg.road != null) Earned.hero(lg, p, dev) else Ratings.offseasonGrowth(p, dev)
                 val gains = IntArray(10) { p.attrs[it] - attrs[it] }
                 val lbs = if (p.year <= 2) Rng.range(0, 8) else Rng.range(-2, 4)
                 p.weight += lbs

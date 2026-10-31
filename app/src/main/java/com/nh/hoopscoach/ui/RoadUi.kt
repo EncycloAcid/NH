@@ -263,6 +263,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         item { RacePanel(vm, lg) }
         item { RivalPanel(vm, lg) }
         item { StaffPanel(vm, lg) }
+        item { ImpactPanel(vm, lg) }
         item { PracticePanel(vm, lg) }
         item { MediaPanel(lg) }
         item {

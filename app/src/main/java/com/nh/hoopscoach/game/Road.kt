@@ -257,6 +257,7 @@ object Road {
         val r = lg.road ?: return
         val h = lg.playerOrNull(lg.heroId) ?: return
         val t = lg.team(h.teamId)
+        Leadership.seasonEnd(lg)
         val signed = r.dealSeason == lg.season
         val upfront = if (signed && r.paidSeason == lg.season) guaranteed(r.deal, r.dealBase) else 0
         val paid = if (signed) guaranteed(r.deal, r.dealBase) + bonus(lg, h) else 0
@@ -666,6 +667,9 @@ object Road {
         if (r.practiceXp.size != 10) r.practiceXp = IntArray(10)
         val coach = Coaching.devOf(lg.coachOf(lg.team(h.teamId)))
         val gain = plan.xp * (0.8 + coach / 250.0) * (if (r.fatigue >= 70) 0.5 else 1.0) * (if (has(lg, Staff.TRAINER)) 1.25 else 1.0)
+        // How hard he works, for his summer growth: extra work counts most, worn-out work half.
+        r.work += when (plan) { Practice.REST -> 0.0; Practice.TEAM -> 0.5; Practice.FILM -> 0.8; else -> 1.0 } * (if (r.fatigue >= 70) 0.5 else 1.0)
+        r.workDays++
         for (a in practiceBoosts(lg, plan)) {
             val i = a.ordinal
             r.practiceXp[i] += gain.roundToInt()

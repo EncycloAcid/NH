@@ -42,6 +42,7 @@ object Trades {
     // ---------- doing a trade ----------
 
     private fun move(lg: League, p: Player, from: Team, to: Team) {
+        if (p.id == lg.heroId && from.id != to.id) Leadership.newTeam(lg)
         from.roster.remove(p.id)
         p.teamId = to.id
         if (to.roster.any { lg.player(it).number == p.number }) p.number = Recruiting.freeNumber(lg, to)

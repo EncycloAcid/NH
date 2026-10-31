@@ -53,6 +53,20 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     val finalPeriod get() = period >= regPeriods
     /** Clutch time, as the NBA counts it: the last five minutes of the fourth quarter or overtime, within five points. */
     private val clutchTime get() = finalPeriod && clock <= 300.0 && abs(score[0] - score[1]) <= 5
+    /** Who is on the floor this possession, for plus-minus. */
+    private val onFloor = arrayOf<List<Player>>(emptyList(), emptyList())
+    /**
+     * A star's lift: with the user's player on the floor, his teammates' shots get easier (the defense
+     * has to load up on him), more the further he's above them and the more he leads.
+     */
+    private val lift = DoubleArray(2) { s -> Leadership.lift(lg, rosters[s]) }
+
+    /** Points for [o]: the score and everyone's plus-minus. */
+    private fun scored(o: Int, pts: Int) {
+        score[o] += pts
+        for (p in onFloor[o]) line(o, p).pm += pts
+        for (p in onFloor[1 - o]) line(1 - o, p).pm -= pts
+    }
     val overtime get() = period > regPeriods
     private var poss = if (Rng.chance(0.5)) 0 else 1
     private val firstPoss = poss
@@ -233,7 +247,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val c = Clutch(o, shooter.name, what, period, clock, before, pts)
             lastBasket = c
             if (finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
-            score[o] += pts
+            scored(o, pts)
             if (passer != null) line(o, passer).ast++
             log(o, "★ ${shooter.short} ${if (type == 2) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
             lg.road?.let { it.momentsWon++ }
@@ -485,6 +499,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val d = 1 - o
         val offense = lineup(o)
         val defense = lineup(d)
+        onFloor[o] = offense
+        onFloor[d] = defense
         val trail = score[o] - score[d]
 
         var len = possLength(o)
@@ -608,6 +624,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + era.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+            if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
                 Defense.PRESS -> if (type == 0) pMake += 0.03
@@ -639,7 +656,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 val c = Clutch(o, shooter.name, what, period, clock, before, pts)
                 lastBasket = c
                 if (finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
-                score[o] += pts
+                scored(o, pts)
                 var astText = ""
                 // About half of made shots are assisted in college, closer to two-thirds in the pros.
                 val astP = (when (type) { 0 -> if (putback != null) 0.0 else 0.47; 1 -> 0.43; else -> 0.82 } * (if (lg.pro) 1.22 else 1.0)).coerceAtMost(0.95)
@@ -776,7 +793,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             sl.fta++
             taken++
             lastMade = Rng.chance(pct)
-            if (lastMade) { if (clutchTime) sl.clutch++; sl.ftm++; sl.pts++; score[o]++; made++ }
+            if (lastMade) { if (clutchTime) sl.clutch++; sl.ftm++; sl.pts++; scored(o, 1); made++ }
             if (oneAndOne && !lastMade) break
         }
         log(o, if (oneAndOne && taken == 1) "${shooter.short} misses the front end of the one-and-one" else "${shooter.short} makes $made of $taken free throw${if (taken > 1) "s" else ""}", made)

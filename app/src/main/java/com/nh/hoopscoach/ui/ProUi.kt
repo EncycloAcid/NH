@@ -819,6 +819,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { StaffPanel(vm, lg) }
+        item { ImpactPanel(vm, lg) }
         item { PracticePanel(vm, lg) }
         item { MediaPanel(lg) }
         item {
@@ -1424,6 +1425,7 @@ private fun LazyListScope.proSummerStep(vm: GameViewModel, lg: League, h: Player
             if (before != null && before != h.ovr) Text("$before → ${h.ovr} overall", style = T.title.copy(fontSize = 30.sp), color = P.ink)
             else Text("${h.ovr} overall at age ${h.age}", style = T.head, color = P.ink)
             Text(if (h.age >= 30) "Thirty-plus: the summer takes a little off the top." else if (h.ovr >= h.pot) "You're at your ceiling. Now it's about winning." else "Still climbing toward ${h.pot}.", style = T.small, color = P.sub)
+            if (r.growthNote.isNotEmpty() && h.age <= 31) Text(r.growthNote, style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
         }
     }
     if (Summer.open(lg)) item {

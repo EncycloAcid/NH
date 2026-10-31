@@ -124,18 +124,20 @@ class StatLine(
     var stl: Int = 0, var blk: Int = 0, var tov: Int = 0, var pf: Int = 0,
     /** Points in clutch time: the last five minutes of the fourth quarter or overtime, within five points. */
     var clutch: Int = 0,
+    /** Plus-minus: the team's points minus the other team's while he was on the floor. */
+    var pm: Int = 0,
 ) {
     val reb get() = orb + drb
     fun add(o: StatLine) {
         gp += o.gp; gs += o.gs; sec += o.sec; pts += o.pts; fgm += o.fgm; fga += o.fga; tpm += o.tpm; tpa += o.tpa
         ftm += o.ftm; fta += o.fta; orb += o.orb; drb += o.drb; ast += o.ast; stl += o.stl; blk += o.blk; tov += o.tov; pf += o.pf
-        clutch += o.clutch
+        clutch += o.clutch; pm += o.pm
     }
     /** What was added since [o] (a snapshot of this line taken earlier). */
     fun since(o: StatLine?): StatLine {
         if (o == null) return copy()
         return StatLine(gp - o.gp, gs - o.gs, sec - o.sec, pts - o.pts, fgm - o.fgm, fga - o.fga, tpm - o.tpm, tpa - o.tpa,
-            ftm - o.ftm, fta - o.fta, orb - o.orb, drb - o.drb, ast - o.ast, stl - o.stl, blk - o.blk, tov - o.tov, pf - o.pf, clutch - o.clutch)
+            ftm - o.ftm, fta - o.fta, orb - o.orb, drb - o.drb, ast - o.ast, stl - o.stl, blk - o.blk, tov - o.tov, pf - o.pf, clutch - o.clutch, pm - o.pm)
     }
     fun per(v: Int): Double = if (gp == 0) 0.0 else v.toDouble() / gp
     val ppg get() = per(pts)
@@ -701,6 +703,12 @@ class RoadState(
     /** His social feed (newest last), and when the last award-race column ran (season * 1000 + day). */
     val feed: MutableList<Post> = mutableListOf(),
     var lastColumn: Int = 0,
+    /** Leadership (0-100): seasons as a starter, winning beyond the projection, and how he talks; 60 and up, he's a captain. */
+    var leadership: Int = 15,
+    /** Practice this season: total effort (0 rest to 1 extra work each day) and days, and the last summer's growth, explained. */
+    var work: Double = 0.0,
+    var workDays: Int = 0,
+    var growthNote: String = "",
     /** This week's practice plan, and how worn down he is (0 fresh, 100 exhausted). */
     var practice: Practice = Practice.TEAM,
     var fatigue: Int = 0,

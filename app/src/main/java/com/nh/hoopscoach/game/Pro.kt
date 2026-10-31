@@ -1020,6 +1020,7 @@ object ProCareer {
         val r = lg.road ?: return
         val h = lg.playerOrNull(lg.heroId) ?: return
         val t = lg.team(h.teamId)
+        Leadership.seasonEnd(lg)
         val endorse = endorsements(lg)
         r.earned += endorse
         r.contract?.let { it.years-- }
@@ -1308,6 +1309,7 @@ object ProCareer {
         val from = lg.team(h.teamId)
         val to = lg.team(o.teamId)
         if (from.id != to.id) {
+            Leadership.newTeam(lg)
             from.roster.remove(h.id)
             h.teamId = to.id
             if (to.roster.any { lg.player(it).number == h.number }) h.number = Recruiting.freeNumber(lg, to)
@@ -1359,7 +1361,8 @@ object ProCareer {
                 val p = lg.player(pid)
                 ps.before[p.id] = p.ovr
                 val trainer = p.id == lg.heroId && lg.road?.hired?.contains(Staff.TRAINER) == true
-                develop(p, dev, trainer)
+                // The user's player earns his growth until 30; after that he ages like everyone.
+                if (p.id == lg.heroId && p.age <= 30) Earned.hero(lg, p, dev) else develop(p, dev, trainer)
             }
         }
         lg.reindex()

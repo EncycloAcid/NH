@@ -213,10 +213,11 @@ object Ratings {
     }
 
     /** Off-season growth toward potential. Returns OVR change. */
-    fun offseasonGrowth(p: Player, coachDev: Int): Int {
+    fun offseasonGrowth(p: Player, coachDev: Int, share: Double? = null): Int {
         val before = p.ovr
         val gap = p.pot - before
-        var gain = if (gap > 0) gap * (0.28 + Rng.d() * 0.22) + Rng.gauss() * 1.2 else Rng.gauss() * 1.0
+        // [share]: how much of the gap to his ceiling he closes (the user's player earns it; see Earned).
+        var gain = if (gap > 0) gap * (share ?: (0.28 + Rng.d() * 0.22)) + Rng.gauss() * (if (share != null) 0.7 else 1.2) else Rng.gauss() * 1.0
         gain *= 0.85 + coachDev / 330.0
         if (p.has(Trait.GYM_RAT)) gain *= 1.15
         if (p.has(Trait.LATE_BLOOMER)) gain *= 1.2
