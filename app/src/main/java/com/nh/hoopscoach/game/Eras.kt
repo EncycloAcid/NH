@@ -41,7 +41,8 @@ enum class Era(
 
 object Eras {
     /** A real player of the era: his 2K attributes (when known) and his headshot. */
-    class Star(val name: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray? = null, val photo: String = "")
+    class Star(val name: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray? = null, val photo: String = "",
+        val ppg: Double = 0.0, val rpg: Double = 0.0, val apg: Double = 0.0)
     class Club(val city: String, val name: String, val abbr: String, val primary: Long, val secondary: Long)
 
     /** The league's era (today for older saves and the college game). */
@@ -77,7 +78,7 @@ object Eras {
     /** The era's stars by today's team abbreviation: the real data (EraData), or the earlier estimates without it. */
     fun stars(era: Era): Map<String, List<Star>> {
         val real = EraData.stars(era)
-        if (real.isNotEmpty()) return real.groupBy({ it.team }, { Star(it.name, it.pos, it.age, it.ovr, it.attrs, it.photo) })
+        if (real.isNotEmpty()) return real.groupBy({ it.team }, { Star(it.name, it.pos, it.age, it.ovr, it.attrs, it.photo, it.ppg, it.rpg, it.apg) })
         return estimates(era)
     }
 

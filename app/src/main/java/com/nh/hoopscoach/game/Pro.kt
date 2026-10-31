@@ -361,8 +361,11 @@ object ProLeague {
         p.first = parts[0]
         p.last = parts.getOrElse(1) { "" }
         p.country = null
-        // His real strengths from his 2K card, and his photo.
-        s.attrs?.let { EraData.shape(p, it, proOverall(s.ovr)) }
+        // His real strengths: from his 2K card, or from his numbers that season. Then the play style that fits them.
+        val shapeFrom = s.attrs ?: if (s.ppg > 0) EraData.profile(s.pos, s.ppg, s.rpg, s.apg) else null
+        shapeFrom?.let { EraData.shape(p, it, proOverall(s.ovr)) }
+        p.style = EraData.styleFor(p)
+        p.focus = p.style
         p.pot = maxOf(p.pot, p.ovr)
         if (s.photo.isNotEmpty()) p.photo = s.photo
         return p
@@ -423,6 +426,8 @@ object ProLeague {
         EraData.today(np.name)?.let { c ->
             c.attrs?.let { EraData.shape(p, it, proOverall(np.ovr)) }
             p.pot = maxOf(p.ovr, Ratings.proInternal(c.pot))
+            p.style = EraData.styleFor(p)
+            p.focus = p.style
         }
         // Most of today's players came into the league at 19 or 20.
         p.proYears = (np.age - 20).coerceIn(0, 22)

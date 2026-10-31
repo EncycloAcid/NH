@@ -10,7 +10,8 @@ import kotlin.math.roundToInt
  * Built by tools/build_eras.py; ratings are on the game's pro scale.
  */
 object EraData {
-    class Star(val era: Era, val id: String, val name: String, val team: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray?, val photo: String)
+    class Star(val era: Era, val id: String, val name: String, val team: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray?, val photo: String,
+        val ppg: Double = 0.0, val rpg: Double = 0.0, val apg: Double = 0.0)
     class Pick(val year: Int, val pick: Int, val id: String, val name: String, val college: String, val pos: Pos?, val age: Int, val peak: Int, val photo: String)
     class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double,
         val id: String = "", val ours: String = "")
@@ -27,7 +28,8 @@ object EraData {
         table("stars.tsv").mapNotNull { f ->
             val era = Era.entries.firstOrNull { it.name == f[0] } ?: return@mapNotNull null
             val attrs = f[7].takeIf { it.isNotEmpty() }?.split(",")?.map { it.toInt() }?.toIntArray()?.takeIf { it.size == 10 }
-            Star(era, f[1], f[2], f[3], pos(f[4]) ?: Pos.SF, f[5].toIntOrNull() ?: 27, f[6].toInt(), attrs, f[8])
+            Star(era, f[1], f[2], f[3], pos(f[4]) ?: Pos.SF, f[5].toIntOrNull() ?: 27, f[6].toInt(), attrs, f[8],
+                f.getOrNull(10)?.toDoubleOrNull() ?: 0.0, f.getOrNull(11)?.toDoubleOrNull() ?: 0.0, f.getOrNull(12)?.toDoubleOrNull() ?: 0.0)
         }
     }
 
@@ -93,6 +95,35 @@ object EraData {
         p.attrs = scaled(best)
         p.pos2 = Ratings.secondFor(p.pos, p.attrs)
     }
+
+    /**
+     * Strengths from a real season's numbers, for players with no 2K attributes in the data: scorers
+     * get scoring ratings (inside for bigs, outside for guards), passers handling and passing,
+     * rebounders boards and rim protection. [shape] then scales them to his overall.
+     */
+    fun profile(pos: Pos, ppg: Double, rpg: Double, apg: Double): IntArray {
+        val big = pos == Pos.PF || pos == Pos.C
+        val guard = pos == Pos.PG || pos == Pos.SG
+        val score = 45 + ppg * 1.7
+        val pass = 45 + apg * 5.0
+        val reb = 35 + rpg * 5.0
+        val a = doubleArrayOf(
+            if (big) score + 6 else if (guard) score - 6 else score,
+            score,
+            if (big) score - 22 else if (guard) score + 2 else score - 4,
+            if (guard) maxOf(pass, score - 5) else (pass + score) / 2 - 8,
+            pass,
+            reb,
+            if (big) 55.0 else 68.0,
+            if (big) 50 + rpg * 3.5 else 50.0,
+            if (guard) 65.0 else 55.0,
+            if (big) 45 + rpg * 3.5 else 40.0,
+        )
+        return IntArray(10) { a[it].roundToInt().coerceIn(25, 99) }
+    }
+
+    /** The play style that fits a player's strengths best (the one whose three ratings are highest). */
+    fun styleFor(p: Player): Arch = Ratings.styles(p.pos).maxBy { s -> s.boosts.sumOf { p.attrs[it.ordinal] } }
 
     /** A real draftee: his name, college, ceiling, photo and college seasons. */
     fun apply(p: Player, pick: Pick) {

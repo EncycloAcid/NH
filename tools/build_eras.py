@@ -106,7 +106,11 @@ for era in ERAS.values():
             if ALIAS.get(name, name) in have or name in have: continue
             pid, start = by_name.get(ALIAS.get(name, name), ('', ''))
             photo = f'eras/{start}/{pid}' if pid else ''
-            stars_out.append([era, pid, name, team, pos, age, ovr, '', photo, '', '', '', ''])
+            # His numbers from another season in the data, so he plays like himself.
+            other = next((r for e2 in ['1985-86', '1995-96', '2002-03', '2012-13', '2026-27'] for r in rows(f'{D}/eras/{e2}/stars.csv')
+                          if r['player'] == ALIAS.get(name, name) and r.get('ppg')), None)
+            g, ppg, rpg, apg = (other['g'], other['ppg'], other['rpg'], other['apg']) if other else ('', '', '', '')
+            stars_out.append([era, pid, name, team, pos, age, ovr, '', photo, g, ppg, rpg, apg])
 
 with open(f'{RES}/stars.tsv', 'w', encoding='utf-8') as f:
     f.write('# era|id|name|team|pos|age|ovr|attrs|photo|g|ppg|rpg|apg (from the uploaded eras pack: basketball-reference, 2K ratings; personal use)\n')
