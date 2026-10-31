@@ -221,6 +221,9 @@ object Ratings {
      */
     fun shownPro(v: Int): Int = (if (v >= 85) 77 + (v - 85) * 1.5 else 77 - (85 - v) * 1.2).roundToInt().coerceIn(40, 99)
 
+    /** The other way: a 2K-style rating on the game's internal pro scale. */
+    fun proInternal(k: Int): Int = (if (k >= 77) 85 + (k - 77) / 1.5 else 85 - (77 - k) / 1.2).roundToInt().coerceIn(60, 99)
+
     fun offseasonGrowth(p: Player, coachDev: Int, share: Double? = null): Int {
         val before = p.ovr
         val gap = p.pot - before

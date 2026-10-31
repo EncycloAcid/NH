@@ -48,6 +48,17 @@ object EraData {
 
     private val picksById: Map<String, Pick> by lazy { drafts.values.flatten().associateBy { it.id } }
 
+    /** Today's players from NBA 2K27: overall, potential and the game's ten ratings, all on the 2K scale. */
+    class Card(val ovr: Int, val pot: Int, val attrs: IntArray?)
+    private val today: Map<String, Card> by lazy {
+        table("today2k.tsv").associate { f ->
+            f[0] to Card(f[1].toInt(), f[2].toInt(), f[3].takeIf { it.isNotEmpty() }?.split(",")?.map { it.toInt() }?.toIntArray())
+        }
+    }
+
+    /** [name]'s NBA 2K27 card, if the ratings file has him. */
+    fun today(name: String): Card? = today[name]
+
     /** The teams of [season] (the year it ends), 1986 to 2027, or null outside the data. */
     fun teams(season: Int): List<Franchise>? = franchises[season]
 

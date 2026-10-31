@@ -419,6 +419,11 @@ object ProLeague {
     /** A real player from the roster data: his name, number, position, age and photo; ratings built to his overall. */
     private fun makeReal(lg: League, np: NbaData.NbaPlayer, t: Team): Player {
         val p = makePro(lg, np.pos, proOverall(np.ovr), np.age, t)
+        // His NBA 2K27 card: his strengths and weaknesses, and his ceiling.
+        EraData.today(np.name)?.let { c ->
+            c.attrs?.let { EraData.shape(p, it, proOverall(np.ovr)) }
+            p.pot = maxOf(p.ovr, Ratings.proInternal(c.pot))
+        }
         // Most of today's players came into the league at 19 or 20.
         p.proYears = (np.age - 20).coerceIn(0, 22)
         val parts = np.name.split(" ", limit = 2)
@@ -1370,9 +1375,12 @@ object ProCareer {
 
     /** One summer of growth or decline for [p]. */
     fun develop(p: Player, coachDev: Int, trainer: Boolean = false) {
+        // Pros grow slower than college players, mostly while young: a fifth to a third of the gap to
+        // their ceiling a summer at 22 and under, less each year after, so the league doesn't fill up with 90s.
+        val share = when { p.age <= 22 -> 0.22 + Rng.d() * 0.12; p.age <= 25 -> 0.14 + Rng.d() * 0.1; else -> 0.06 + Rng.d() * 0.08 }
         when {
-            p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev)
-            p.age <= 30 -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev)
+            p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev, share)
+            p.age <= 30 -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
             else -> {
                 // A slow slide from 31, faster in the late 30s.
                 var drop = (p.age - 30) * 0.55 + Rng.d() * 0.8
