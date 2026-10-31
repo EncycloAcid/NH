@@ -724,6 +724,7 @@ object ProSeason {
         mvp.awards += "${lg.season} All-Star MVP"
         NbaAwards.note(lg, "All-Star MVP", mvp, mvp.teamId)
         if (h != null && h.id in ps.allStars && r != null) {
+            Alerts.add(lg, "You're an All-Star", if (h.id in ps.allStarStarters) "The fans, players and media voted you a starter for the ${lg.season} All-Star Game." else "The coaches picked you as a reserve for the ${lg.season} All-Star Game.", "star")
             r.allStars++
             val pts = (8 + (h.ovr - 88) * 1.2 + Rng.gauss() * 5).roundToInt().coerceIn(2, 40)
             val gain = (60_000 + r.followers * 0.06 * Road.damp(r.followers)).roundToInt()
@@ -880,7 +881,10 @@ object ProSeason {
         AwardsNight.mostImproved(lg, ladder)?.let { (p, t) -> give(lg, "Most Improved Player", p, t) }
         NbaAwards.awardsNight(lg, ladder, mvp, defense, rookies)
         val mine = lg.seasonAwards.filter { it.pid == lg.heroId }.map { NbaAwards.label(it.award) }
-        if (mine.isNotEmpty()) lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
+        if (mine.isNotEmpty()) {
+            lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
+            Alerts.add(lg, if ("MVP" in mine) "You're the MVP" else "Awards night", "Your ${lg.season} honors: ${mine.joinToString(", ")}.", "award")
+        }
     }
 
     private fun endSeason(lg: League) {
@@ -895,7 +899,10 @@ object ProSeason {
         for (t in lg.teams) ps.lastWins[t.id] = t.w
         for (p in lg.rosterOf(champ)) p.awards += "${lg.season} Champion"
         val r = lg.road
-        if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) r.rings++
+        if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) {
+            r.rings++
+            Alerts.add(lg, "Champions", "The ${champ.name} win the ${lg.season} title" + (if (fmvp?.id == lg.heroId) ", and you're the Finals MVP." else ". That's ring No. ${r.rings}."), "title")
+        }
         lg.news += News(lg.season, lg.day, "The ${champ.name} win the title over the ${lg.team(runnerUp).name}" + (fmvp?.let { ". Finals MVP: ${it.name}" } ?: ""), true)
         for (p in lg.players) {
             val t = if (p.teamId >= 0) lg.team(p.teamId) else null

@@ -927,6 +927,10 @@ class Honor(
     val line: String = "", val period: String = "", val conf: Int = -1,
 )
 
+/** A pop-up for a big moment: an award, an All-Star nod, a trade, a record, a title. */
+@Serializable
+class Alert(val title: String, val body: String, val kind: String = "")
+
 /** One player's share of the MVP vote: 100 voters, 10-7-5-3-1. */
 @Serializable
 class Vote(val pid: Int, val name: String, val teamId: Int, val points: Int, val firsts: Int)
@@ -1085,6 +1089,8 @@ class League(
     /** Era mode from the start: the college years are that era's ("TODAY" otherwise), and the real players already placed (their data id to player id). */
     var era: String = "TODAY",
     val eraIds: MutableMap<String, Int> = mutableMapOf(),
+    /** Big moments waiting to pop up for the user, oldest first. */
+    val alerts: MutableList<Alert> = mutableListOf(),
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

@@ -84,6 +84,10 @@ object Trades {
     fun execute(lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, offseason: Boolean = lg.phase == Phase.OFFSEASON): Trade {
         val ps = lg.proState!!
         val hero = fromA.any { it.id == lg.heroId } || fromB.any { it.id == lg.heroId }
+        if (hero) {
+            val to = if (fromA.any { it.id == lg.heroId }) b else a
+            Alerts.add(lg, "You've been traded", "You're headed to the ${to.name}. New team, new role: check the Me tab.", "trade")
+        }
         for (p in fromA) move(lg, p, a, b)
         for (p in fromB) move(lg, p, b, a)
         for (t in listOf(a, b)) {

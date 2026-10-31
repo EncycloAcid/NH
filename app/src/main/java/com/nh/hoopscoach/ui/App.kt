@@ -92,6 +92,8 @@ fun App(vm: GameViewModel) {
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     BackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
+    // Big moments pop up one at a time.
+    lg.alerts.firstOrNull()?.let { a -> AlertPopup(vm, a) }
     // The preseason magazine opens by itself once, before the first game of every season.
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview
@@ -279,3 +281,24 @@ private fun Toast(vm: GameViewModel) {
 }
 
 fun teamLabel(t: com.nh.hoopscoach.game.Team) = if (t.ap in 1..25) "#${t.ap} ${t.school}" else t.school
+
+/** A big moment: an award, an All-Star nod, a trade, a record, a title. */
+@Composable
+private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } },
+        containerColor = P.surface,
+        title = {
+            androidx.compose.foundation.layout.Column {
+                Text(when (a.kind) { "award" -> "HONOR"; "star" -> "ALL-STAR"; "trade" -> "TRADE"; "record" -> "RECORDS BOOK"; "title" -> "CHAMPIONSHIP"; else -> "NEWS" }, style = T.label, color = P.accent)
+                Text(a.title, style = T.head, color = P.ink)
+            }
+        },
+        text = { Text(a.body, style = T.body, color = P.ink) },
+        confirmButton = {
+            androidx.compose.material3.TextButton({ vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } }) {
+                Text(if (vm.league?.alerts?.size ?: 0 > 1) "Next" else "Nice", color = P.accent, style = T.bodyB)
+            }
+        },
+    )
+}

@@ -36,6 +36,7 @@ object Awards {
     private fun give(lg: League, list: MutableList<AwardWinner>, award: String, p: Player, t: Team) {
         list += AwardWinner(award, p.id, p.name, t.id, line(p))
         p.awards += "${lg.season} $award"
+        if (p.id == lg.heroId && lg.road != null) Alerts.add(lg, "Honored", "You're on the list: ${lg.season} $award.", "award")
     }
 
     /** End of the regular season: conference honors. */

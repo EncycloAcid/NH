@@ -103,6 +103,7 @@ object RecordBook {
         val shown = if (rec.decimals > 0) "%.1f".format(value) else "${value.roundToInt()}"
         if (rec.mine) {
             p.awards += "${lg.season} Record: ${rec.label}"
+            Alerts.add(lg, "Record broken", "You set the mark for ${rec.label.lowercase()}: $shown, passing $was.", "record")
             lg.road?.let { it.allTimeNote = "Record: ${rec.label}, $shown. You passed $was."; it.allTimeSeason = lg.season; it.allTimeDay = lg.day }
         }
         lg.news += News(lg.season, lg.day, "Record: ${p.name} sets the mark for ${rec.label.lowercase()} ($shown), passing $was", rec.mine)

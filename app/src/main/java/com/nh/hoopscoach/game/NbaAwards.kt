@@ -206,6 +206,7 @@ object NbaAwards {
         r.followers += gain
         val where = confName(conf).let { if (it.isEmpty()) "NBA" else it }
         lg.news += News(lg.season, lg.day, "${p.name} named $where $award ($period)", true)
+        if (big) Alerts.add(lg, "$award", "You're the $where $award for $period: $line.", "award")
         Media.post(lg, "NBA", "NBA", "media", "${p.name} is the $where $award for $period: $line.", Media.likes(lg, if (big) 0.05 else 0.025), verified = true)
     }
 
