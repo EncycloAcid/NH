@@ -96,6 +96,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var proRound by mutableIntStateOf(-1)
     var leagueConf by mutableIntStateOf(-1)
     var leagueTab by mutableIntStateOf(0)
+    /** The season the Awards page shows (0 for the current one). */
+    var awardsSeason by mutableIntStateOf(0)
     var awardsScope by mutableIntStateOf(0)
     var wrapPage by mutableIntStateOf(0)
     var recruitView by mutableIntStateOf(1)

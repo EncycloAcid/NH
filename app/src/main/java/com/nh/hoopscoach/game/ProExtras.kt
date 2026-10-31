@@ -306,12 +306,12 @@ object Afterward {
         val h = lg.hero ?: return emptyList()
         val out = mutableListOf<String>()
         if (r.rings > 0) out += "${r.rings} ${if (r.rings == 1) "championship" else "championships"}"
-        val fmvp = h.awards.count { it.endsWith(" Finals MVP") }
+        val fmvp = h.awards.count { it.substringAfter(" ") == "Finals MVP" }
         if (fmvp > 0) out += "$fmvp Finals MVP${if (fmvp == 1) "" else "s"}"
         if (r.mvps > 0) out += "${r.mvps} MVP${if (r.mvps == 1) "" else "s"}"
         if (r.allStars > 0) out += "${r.allStars} All-Star selections"
-        val firsts = h.awards.count { it.endsWith(" All-League 1st") }
-        if (firsts > 0) out += "$firsts All-League First Team${if (firsts == 1) "" else "s"}"
+        val firsts = h.awards.count { it.endsWith(" All-NBA 1st") }
+        if (firsts > 0) out += "$firsts All-NBA First Team${if (firsts == 1) "" else "s"}"
         val recs = lg.proState?.records?.filter { it.mine } ?: emptyList()
         if (recs.isNotEmpty()) out += "Records: " + recs.joinToString(", ") { it.label.lowercase() }
         AllTime.rank(lg).takeIf { it > 0 }?.let { out += "No. $it on the all-time list" }

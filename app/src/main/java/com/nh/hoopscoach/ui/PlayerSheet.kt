@@ -456,13 +456,5 @@ private fun BioTab(lg: League, p: Player) {
             }
         }
     }
-    if (p.awards.isNotEmpty()) {
-        Section("Honors")
-        GroupList(p.awards.reversed().take(12)) { a ->
-            ListRow {
-                Text(a.substringBefore(' '), style = T.numSm, color = P.sub, modifier = Modifier.width(56.dp))
-                Text(awardName(a.substringAfter(' ')), style = T.bodyB, color = P.ink)
-            }
-        }
-    }
+    if (p.awards.isNotEmpty()) TrophyCase(p)
 }

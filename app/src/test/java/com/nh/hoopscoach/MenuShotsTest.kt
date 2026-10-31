@@ -118,7 +118,7 @@ class MenuShotsTest {
         rule.setContent { App(vm) }
         vm.select(Tab.LEAGUE); vm.leagueTab = 3; idle(); shot("Z05_era_leaders")
         vm.leagueTab = 0; idle(); shot("Z06_era_standings")
-        vm.leagueTab = 4; idle(); shot("Z07_era_history")
+        vm.leagueTab = 5; idle(); shot("Z07_era_history")
         vm.select(Tab.TODAY); idle(); shot("Z08_era_today")
     }
 
@@ -131,6 +131,7 @@ class MenuShotsTest {
         rule.setContent { App(vm) }
         rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
         // The home state field: a long list that opens scrolled to the current state.
+        rule.onAllNodes(androidx.compose.ui.test.hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("STATE")); idle()
         rule.onAllNodes(hasText("STATE")).onFirst().performClick(); idle()
         assertTrue("state picker open", rule.onAllNodes(androidx.compose.ui.test.isPopup()).fetchSemanticsNodes().isNotEmpty())
         shot("Z04_state_picker")

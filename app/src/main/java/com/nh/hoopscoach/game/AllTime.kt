@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 /**
  * The all-time list: the greats of the game, today's stars (their real careers so far plus what they
  * do from here), anyone who builds a career in this league, and the user's player. Every career is
- * scored the same way: MVPs, Finals MVPs, rings, All-League teams, All-Star games, Defensive Player
+ * scored the same way: MVPs, Finals MVPs, rings, All-NBA teams, All-Star games, Defensive Player
  * of the Year and career points.
  */
 object AllTime {
@@ -70,7 +70,7 @@ object AllTime {
         var pts = p.career.filter { it.cls == PRO_YEAR }.sumOf { it.s.pts * lineScale(it) }
         if (p.teamId >= 0 && p.career.none { it.season == lg.season && it.cls == PRO_YEAR }) pts += p.stats.pts * currentScale(lg)
         return count(p, "MVP") * MVP + count(p, "Finals MVP") * FINALS_MVP + count(p, "Champion") * RING +
-            count(p, "All-League 1st") * ALL_LEAGUE_1 + count(p, "All-League 2nd") * ALL_LEAGUE_2 + count(p, "All-League 3rd") * ALL_LEAGUE_3 +
+            count(p, "All-NBA 1st") * ALL_LEAGUE_1 + count(p, "All-NBA 2nd") * ALL_LEAGUE_2 + count(p, "All-NBA 3rd") * ALL_LEAGUE_3 +
             count(p, "All-Star") * ALL_STAR + count(p, "Defensive Player of the Year") * DPOY + count(p, "Rookie of the Year") * ROY +
             count(p, "Olympics Gold") * 2.0 + count(p, "World Cup Gold") * 1.0 +
             p.awards.count { it.substringAfter(" ").startsWith("Record: ") } * 3.0 +

@@ -125,11 +125,16 @@ class ProUiTest {
         }
         while (lg.day < ProLeague.allStarDay(lg) && lg.phase == Phase.REGULAR) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         vm.install(lg); vm.select(Tab.TODAY); shot("P10_all_star"); scrollToText("ALL-STAR WEEKEND"); shot("P10b_all_star_weekend")
+        // League honors on Today, and the Awards page midseason.
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("All awards")); idle(); shot("P10c_today_honors")
+        vm.select(Tab.LEAGUE); vm.leagueTab = 4; idle(); shot("P10d_awards_midseason"); scrollToText("MONTHLY HONORS"); shot("P10e_monthly"); vm.leagueTab = 0
         var guard = 0
         while (lg.phase == Phase.REGULAR && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
         repeat(3) { Sim.playDay(lg) }
         vm.install(lg); vm.select(Tab.TODAY); shot("P11_playoffs"); scrollToText("AWARDS NIGHT"); shot("P11a_awards_night")
-        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); vm.proRound = 0; idle(); shot("P11d_play_in"); vm.proRound = -1; vm.leagueTab = 4; shot("P11c_awards"); vm.leagueTab = 0
+        vm.select(Tab.LEAGUE); vm.leagueTab = 1; shot("P11b_bracket"); vm.proRound = 0; idle(); shot("P11d_play_in"); vm.proRound = -1; vm.leagueTab = 4; shot("P11c_awards")
+        scrollToText("ALL-NBA"); shot("P11e_all_nba"); scrollToText("STATISTICAL TITLES"); shot("P11f_titles"); scrollToText("OFF THE COURT"); shot("P11g_off_court")
+        vm.leagueTab = 5; idle(); shot("P11h_history"); vm.leagueTab = 0
         walk(vm, lg)
         guard = 0
         while (lg.phase != Phase.OFFSEASON && guard++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
@@ -148,6 +153,7 @@ class ProUiTest {
         ProCareer.signWith(lg, 0, 2, option = true, discount = false)
         ProCareer.next(lg); vm.install(lg); shot("P15_summer")
         vm.select(Tab.CAREER); shot("P16_career"); scrollTo(3); shot("P16b_career_story")
+        if (lg.hero!!.awards.isNotEmpty()) { scrollToText("HONORS"); shot("P16g_honors") }
         // The all-time list, with a big season added so he's on it.
         lg.hero!!.awards += listOf("${lg.season} MVP", "${lg.season} Champion", "${lg.season} Finals MVP", "${lg.season} All-League 1st", "${lg.season} All-Star")
         lg.road!!.allTimeRank = 0

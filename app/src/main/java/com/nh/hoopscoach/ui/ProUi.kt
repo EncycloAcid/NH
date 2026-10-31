@@ -72,9 +72,9 @@ fun planMin(lg: League, t: Team, pid: Int): Int {
 fun proPace(rank: Int) = when {
     rank == 0 -> "Not ranked yet"
     rank == 1 -> "MVP pace"
-    rank <= 5 -> "All-League First Team pace"
-    rank <= 10 -> "All-League Second Team pace"
-    rank <= 15 -> "All-League Third Team pace"
+    rank <= 5 -> "All-NBA First Team pace"
+    rank <= 10 -> "All-NBA Second Team pace"
+    rank <= 15 -> "All-NBA Third Team pace"
     rank <= 24 -> "All-Star pace"
     else -> "Outside the award races"
 }
@@ -186,6 +186,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         if (r.press != null) item { PressCard(vm, lg) }
         if (r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
+        item { HonorsStrip(vm, lg) }
         if (r.suitors.isNotEmpty()) item {
             Section("Trade request")
             Panel(onClick = { vm.select(Tab.RECRUIT) }) {
@@ -417,11 +418,11 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
 
 @Composable
 fun ProLeagueScreen(vm: GameViewModel, lg: League) {
-    val tab = vm.leagueTab.coerceIn(0, 4)
+    val tab = vm.leagueTab.coerceIn(0, 5)
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", "The League", null)
-            Segmented(listOf("Standings", "Playoffs", "Cup", "Leaders", "History"), tab, { vm.leagueTab = it })
+            Segmented(listOf("Standings", "Playoffs", "Cup", "Leaders", "Awards", "History"), tab, { vm.leagueTab = it }, scroll = true)
             Spacer(Modifier.height(8.dp))
         }
         when (tab) {
@@ -442,6 +443,7 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
             1 -> playoffs(vm, lg)
             2 -> cup(lg)
             3 -> leaders(vm, lg)
+            4 -> proAwards(vm, lg)
             else -> history(lg)
         }
         item { Spacer(Modifier.height(16.dp)) }
@@ -639,15 +641,17 @@ private fun AwardsNightCard(vm: GameViewModel, lg: League) {
             Text("${v.points} pts", style = T.numSm, color = P.ink)
         }
     }
-    val major = lg.seasonAwards.filter { it.award in listOf("Rookie of the Year", "Defensive Player of the Year", "Sixth Man of the Year", "Most Improved Player") }
+    val names = listOf("Rookie of the Year", "Defensive Player of the Year", "Sixth Man of the Year", "Most Improved Player", "Clutch Player of the Year", "Coach of the Year")
+    val major = names.flatMap { n -> com.nh.hoopscoach.game.NbaAwards.of(lg).filter { it.award == n } }
     if (major.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         GroupList(major) { a ->
-            Column(Modifier.fillMaxWidth().then(if (a.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column(Modifier.fillMaxWidth().then(if ((a.pid >= 0 && a.pid == lg.heroId) || (a.pid < 0 && a.teamId == lg.userTeamId)) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(a.award.uppercase(), style = T.label, color = P.accent)
                 Text("${a.name} · ${lg.team(a.teamId).name}", style = T.bodyB, color = P.ink)
             }
         }
+        Text("All-NBA, All-Defensive, All-Rookie, the statistical titles and more on the Awards page.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 }
 
@@ -733,33 +737,6 @@ private fun LazyListScope.history(lg: League) {
     if (recent.isNotEmpty()) item {
         Section("Trades")
         GroupList(recent) { t -> TradeRow(lg, t) }
-    }
-    if (lg.seasonAwards.isNotEmpty()) item {
-        Section("${lg.season} awards")
-        GroupList(lg.seasonAwards) { a ->
-            Column(Modifier.fillMaxWidth().then(if (a.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Text(a.award.uppercase(), style = T.label, color = P.accent)
-                Text("${a.name} · ${lg.team(a.teamId).name}", style = T.bodyB, color = P.ink)
-                Text(a.line, style = T.small, color = P.sub)
-            }
-        }
-    }
-    if (ps.mvpVotes.isNotEmpty()) item {
-        Section("${lg.season} MVP vote")
-        GroupList(ps.mvpVotes.withIndex().toList()) { (i, v) ->
-            ListRow(modifier = if (v.pid == lg.heroId) Modifier.background(P.accentSoft) else Modifier) {
-                Text("${i + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(28.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(v.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${lg.team(v.teamId).name} · ${v.firsts} first-place", style = T.small, color = P.sub, maxLines = 1)
-                }
-                Text("${v.points}", style = T.numSm, color = P.ink)
-            }
-        }
-    }
-    if (ps.allStars.isNotEmpty() && ps.allStarSeason == lg.season) item {
-        Section("${lg.season} All-Stars")
-        Panel { Text(ps.allStars.mapNotNull { lg.playerOrNull(it)?.name }.joinToString(", "), style = T.small, color = P.ink) }
     }
     item {
         Section("Champions")
@@ -986,10 +963,10 @@ internal fun AllTimePanel(vm: GameViewModel, lg: League) {
         )
         val count = { a: String -> h.awards.count { it.substringAfter(" ") == a } }
         Text(
-            "Rings ${count("Champion")} · MVP ${count("MVP")} · Finals MVP ${count("Finals MVP")} · All-League ${count("All-League 1st") + count("All-League 2nd") + count("All-League 3rd")} · All-Star ${count("All-Star")}",
+            "Rings ${count("Champion")} · MVP ${count("MVP")} · Finals MVP ${count("Finals MVP")} · All-NBA ${count("All-NBA 1st") + count("All-NBA 2nd") + count("All-NBA 3rd")} · All-Star ${count("All-Star")}",
             style = T.small, color = P.sub,
         )
-        Text("MVP 8 · Finals MVP 6 · ring 5 · All-League 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+        Text("MVP 8 · Finals MVP 6 · ring 5 · All-NBA 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points", style = T.small.copy(fontSize = 11.sp), color = P.faint)
     }
 }
 
@@ -1018,7 +995,7 @@ private fun LazyListScope.allTimeList(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        Text("Scores: MVP 8 · Finals MVP 6 · ring 5 · All-League 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points. Today's stars carry their real careers and keep adding.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+        Text("Scores: MVP 8 · Finals MVP 6 · ring 5 · All-NBA 3, 1.5 or 1 · All-Star 1 · 0.6 per 1,000 points. Today's stars carry their real careers and keep adding.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 }
 
@@ -1151,10 +1128,7 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
             GroupList(r.proStory.reversed()) { line -> Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
         }
         item { CareerStory(lg) }
-        if (h.awards.isNotEmpty()) item {
-            Section("Honors")
-            GroupList(h.awards.reversed()) { a -> Text(a, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
-        }
+        if (h.awards.isNotEmpty()) item { TrophyCase(h, limit = 40) }
         item {
             Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career earnings: ${money(r.earned)}", style = T.bodyB, color = P.good)

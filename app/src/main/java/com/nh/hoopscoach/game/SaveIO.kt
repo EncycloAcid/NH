@@ -47,6 +47,7 @@ object SaveIO {
         val lg = json.decodeFromString(League.serializer(), text)
         lg.reindex()
         repair(lg)
+        NbaAwards.migrate(lg)
         if (!lg.pro) {
             Rivalries.ensure(lg)
             Brand.ensure(lg)

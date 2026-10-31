@@ -122,11 +122,20 @@ class StatLine(
     var pts: Int = 0, var fgm: Int = 0, var fga: Int = 0, var tpm: Int = 0, var tpa: Int = 0,
     var ftm: Int = 0, var fta: Int = 0, var orb: Int = 0, var drb: Int = 0, var ast: Int = 0,
     var stl: Int = 0, var blk: Int = 0, var tov: Int = 0, var pf: Int = 0,
+    /** Points in clutch time: the last five minutes of the fourth quarter or overtime, within five points. */
+    var clutch: Int = 0,
 ) {
     val reb get() = orb + drb
     fun add(o: StatLine) {
         gp += o.gp; gs += o.gs; sec += o.sec; pts += o.pts; fgm += o.fgm; fga += o.fga; tpm += o.tpm; tpa += o.tpa
         ftm += o.ftm; fta += o.fta; orb += o.orb; drb += o.drb; ast += o.ast; stl += o.stl; blk += o.blk; tov += o.tov; pf += o.pf
+        clutch += o.clutch
+    }
+    /** What was added since [o] (a snapshot of this line taken earlier). */
+    fun since(o: StatLine?): StatLine {
+        if (o == null) return copy()
+        return StatLine(gp - o.gp, gs - o.gs, sec - o.sec, pts - o.pts, fgm - o.fgm, fga - o.fga, tpm - o.tpm, tpa - o.tpa,
+            ftm - o.ftm, fta - o.fta, orb - o.orb, drb - o.drb, ast - o.ast, stl - o.stl, blk - o.blk, tov - o.tov, pf - o.pf, clutch - o.clutch)
     }
     fun per(v: Int): Double = if (gp == 0) 0.0 else v.toDouble() / gp
     val ppg get() = per(pts)
@@ -879,6 +888,30 @@ class ProState(
     val mvpVotes: MutableList<Vote> = mutableListOf(),
     /** Era mode: the season this career started in (an [Era] name). */
     var era: String = "TODAY",
+    /** Every honor of this season (weekly and monthly awards, awards night, the playoffs, the Cup and All-Star), and the season awards of past ones. */
+    val honors: MutableList<Honor> = mutableListOf(),
+    /** Season stats and team records (wins, losses, points for and against) when this week and month began, to measure them. */
+    val weekStart: MutableMap<Int, StatLine> = mutableMapOf(),
+    val monthStart: MutableMap<Int, StatLine> = mutableMapOf(),
+    val weekTeams: MutableMap<Int, IntArray> = mutableMapOf(),
+    val monthTeams: MutableMap<Int, IntArray> = mutableMapOf(),
+    var weekDay: Int = 0,
+    var week: Int = 0,
+    var month: Int = 0,
+    /** Each team's wins last season, for Coach and Executive of the Year. */
+    val lastWins: MutableMap<Int, Int> = mutableMapOf(),
+    val allStarStarters: MutableList<Int> = mutableListOf(),
+)
+
+/**
+ * One honor: [award] like "Player of the Week" or "MVP", for a player ([pid]) or a coach or front
+ * office ([pid] -1). [period] names the week or month ("Week 3", "December"); [conf] is 0 East,
+ * 1 West, or -1 league-wide.
+ */
+@Serializable
+class Honor(
+    val season: Int, val day: Int, val award: String, val pid: Int, val name: String, val teamId: Int,
+    val line: String = "", val period: String = "", val conf: Int = -1,
 )
 
 /** One player's share of the MVP vote: 100 voters, 10-7-5-3-1. */

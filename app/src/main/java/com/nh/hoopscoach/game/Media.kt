@@ -26,14 +26,14 @@ object Media {
         return "$name · $outlet"
     }
 
-    private fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1) {
+    fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1) {
         val r = lg.road ?: return
         r.feed += Post(lg.season, lg.day, name, handle, kind, text, max(likes, 3), verified, gameId)
         if (r.feed.size > 80) r.feed.subList(0, r.feed.size - 80).clear()
     }
 
     /** Likes as a share of his following, with some luck. */
-    private fun likes(lg: League, share: Double): Int {
+    fun likes(lg: League, share: Double): Int {
         val f = max(lg.road?.followers ?: 0, 2_000).toDouble()
         return (f * share * (0.5 + Rng.d())).roundToInt()
     }

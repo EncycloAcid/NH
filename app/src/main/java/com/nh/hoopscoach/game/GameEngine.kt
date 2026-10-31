@@ -51,6 +51,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         private set
     /** The last period of regulation, or overtime: when games are decided. */
     val finalPeriod get() = period >= regPeriods
+    /** Clutch time, as the NBA counts it: the last five minutes of the fourth quarter or overtime, within five points. */
+    private val clutchTime get() = finalPeriod && clock <= 300.0 && abs(score[0] - score[1]) <= 5
     val overtime get() = period > regPeriods
     private var poss = if (Rng.chance(0.5)) 0 else 1
     private val firstPoss = poss
@@ -226,6 +228,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (made) {
             sl.fgm++; sl.pts += pts
             if (type == 2) sl.tpm++
+            if (clutchTime) sl.clutch += pts
             val before = score[o] - score[d]
             val c = Clutch(o, shooter.name, what, period, clock, before, pts)
             lastBasket = c
@@ -631,6 +634,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (made) {
                 sl.fgm++; sl.pts += pts
                 if (type == 2) sl.tpm++
+                if (clutchTime) sl.clutch += pts
                 val before = score[o] - score[d]
                 val c = Clutch(o, shooter.name, what, period, clock, before, pts)
                 lastBasket = c
@@ -772,7 +776,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             sl.fta++
             taken++
             lastMade = Rng.chance(pct)
-            if (lastMade) { sl.ftm++; sl.pts++; score[o]++; made++ }
+            if (lastMade) { if (clutchTime) sl.clutch++; sl.ftm++; sl.pts++; score[o]++; made++ }
             if (oneAndOne && !lastMade) break
         }
         log(o, if (oneAndOne && taken == 1) "${shooter.short} misses the front end of the one-and-one" else "${shooter.short} makes $made of $taken free throw${if (taken > 1) "s" else ""}", made)
@@ -857,7 +861,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         game.hs = score[0]; game.aws = score[1]; game.ot = max(0, period - regPeriods)
         val userInvolved = game.involves(lg.userTeamId)
         val userConfTourney = game.type == GameType.CONF_TOURNEY && teams[0].confId == lg.user.confId
-        if (userInvolved || game.type == GameType.NCAA || userConfTourney || lg.rivalry(game) != null) {
+        // Pro playoff and Cup games keep theirs too: the series MVPs and the Cup's All-Tournament Team come from them.
+        val proKeep = lg.pro && (game.type == GameType.PLAYOFF || game.type == GameType.CUP || game.label.startsWith("NBA Cup"))
+        if (userInvolved || game.type == GameType.NCAA || userConfTourney || proKeep || lg.rivalry(game) != null) {
             game.box = boxScore()
         }
         val hw = score[0] > score[1]

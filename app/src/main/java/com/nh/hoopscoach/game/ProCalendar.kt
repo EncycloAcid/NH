@@ -163,7 +163,8 @@ object NbaCup {
         ps.cupChampion = champ.id
         val mvp = lg.rosterOf(champ).maxByOrNull { Awards.score(it, champ) + Rng.gauss() * 3 }
         for (p in lg.rosterOf(champ)) p.awards += "${lg.season} NBA Cup winner"
-        mvp?.let { it.awards += "${lg.season} NBA Cup MVP"; ps.cupMvp = it.name }
+        mvp?.let { it.awards += "${lg.season} NBA Cup MVP"; ps.cupMvp = it.name; NbaAwards.note(lg, "NBA Cup MVP", it, champ.id) }
+        NbaAwards.cupTeam(lg, champ, mvp)
         val h = lg.playerOrNull(lg.heroId)
         val r = lg.road
         if (h != null && r != null && h.teamId == champ.id) {
@@ -218,6 +219,7 @@ object AllStarWeekend {
         if (young.size >= 4) {
             val mvp = young.maxBy { Awards.score(it.first, it.second) + Rng.gauss() * 5 }.first
             mvp.awards += "${lg.season} Rising Stars MVP"
+            NbaAwards.note(lg, "Rising Stars MVP", mvp, mvp.teamId)
             val me = young.any { it.first.id == hid }
             ps.weekend += "Rising Stars: ${mvp.name} is MVP." + when {
                 mvp.id == hid -> " That's you."
@@ -236,6 +238,7 @@ object AllStarWeekend {
             val last = finalists.associateWith { threes(it) }
             val (champ, score) = last.entries.maxBy { it.value + Rng.d() }.let { it.key to it.value }
             champ.awards += "${lg.season} 3-Point Contest winner"
+            NbaAwards.note(lg, "3-Point Contest winner", champ, champ.teamId, "$score of 34 in the final")
             val me = shooters.firstOrNull { it.id == hid }
             ps.weekend += "3-Point Contest: ${champ.name} wins the final with $score of 34." + when {
                 champ.id == hid -> " You're the champion."
@@ -255,6 +258,7 @@ object AllStarWeekend {
             val last = finalists.associateWith { dunk(it) to dunk(it) }
             val champ = last.entries.maxBy { it.value.first + it.value.second + Rng.d() }
             champ.key.awards += "${lg.season} Slam Dunk Contest winner"
+            NbaAwards.note(lg, "Slam Dunk Contest winner", champ.key, champ.key.teamId, "${champ.value.second} on his last dunk")
             val me = dunkers.firstOrNull { it.id == hid }
             ps.weekend += "Slam Dunk Contest: ${champ.key.name} wins it with a ${champ.value.second} on his last dunk." + when {
                 champ.key.id == hid -> " That's you. The video is everywhere."

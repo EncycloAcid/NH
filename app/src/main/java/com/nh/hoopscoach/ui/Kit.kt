@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -178,8 +179,12 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         }
     }
     if (scroll) {
-        Row(modifier.padding(horizontal = Gutter).horizontalScroll(rememberScrollState()).then(track), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            options.forEachIndexed { i, l -> chip(i, l, Modifier) }
+        // The strip scrolls to keep the selected tab in view.
+        val state = rememberScrollState()
+        val starts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+        LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
+        Row(modifier.padding(horizontal = Gutter).horizontalScroll(state).then(track), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            options.forEachIndexed { i, l -> chip(i, l, Modifier.onGloballyPositioned { starts[i] = it.positionInParent().x.toInt() }) }
         }
     } else {
         Row(modifier.padding(horizontal = Gutter).fillMaxWidth().then(track)) {

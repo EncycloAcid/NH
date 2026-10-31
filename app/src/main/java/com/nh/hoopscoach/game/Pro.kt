@@ -278,11 +278,12 @@ object ProLeague {
             val dev = Coaching.devOf(lg.coachOf(t))
             for (pid in t.roster.toList()) {
                 val p = lg.player(pid)
+                p.proYears++
                 val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
                 if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
                 ProCareer.develop(p, dev)
             }
-            while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t)
+            while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 84), Rng.range(20, 23), t).proYears = 0
         }
         lg.reindex()
     }
@@ -293,6 +294,8 @@ object ProLeague {
     /** A real player from the roster data: his name, number, position, age and photo; ratings built to his overall. */
     private fun makeReal(lg: League, np: NbaData.NbaPlayer, t: Team): Player {
         val p = makePro(lg, np.pos, proOverall(np.ovr), np.age, t)
+        // Most of today's players came into the league at 19 or 20.
+        p.proYears = (np.age - 20).coerceIn(0, 22)
         val parts = np.name.split(" ", limit = 2)
         p.first = parts[0]
         p.last = parts.getOrElse(1) { "" }
@@ -420,6 +423,7 @@ object ProLeague {
             day++
         }
         ps?.lastDay = day - 1
+        NbaAwards.preseason(lg)
     }
 }
 
@@ -454,6 +458,7 @@ object ProSeason {
             Phase.REGULAR -> {
                 upkeep(lg)
                 NbaCup.endOfDay(lg)
+                NbaAwards.endOfDay(lg)
                 if (lg.day == ProLeague.allStarDay(lg) - 1) allStar(lg)
                 if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
@@ -558,24 +563,37 @@ object ProSeason {
         ps.allStarSeason = lg.season
         AllStarWeekend.run(lg)
         val picked = mutableListOf<Pair<Player, Team>>()
+        ps.allStarStarters.clear()
+        fun guard(p: Player) = p.pos == Pos.PG || p.pos == Pos.SG
         for (c in 0..1) {
             val pool = lg.teams.filter { it.confId == c }.flatMap { t -> lg.rosterOf(t).filter { it.stats.gp * 2 >= t.gp }.map { it to t } }
-            val ranked = pool.sortedByDescending { (p, t) -> Awards.score(p, t) + (if (p.id == lg.heroId && r != null) fanVote(r.followers) else 0.0) }
-            for (pt in ranked.take(12)) { picked += pt; ps.allStars += pt.first.id; pt.first.awards += "${lg.season} All-Star" }
+            // Starters: the fans (half the vote), players and media pick two guards and three frontcourt players.
+            // Reserves: the coaches pick two guards, three frontcourt players and two wild cards.
+            val fans = { p: Player -> if (p.id == lg.heroId && r != null) fanVote(r.followers) else 0.0 }
+            val byFans = pool.sortedByDescending { (p, t) -> Awards.score(p, t) + fans(p) * 1.5 }
+            val starters = byFans.filter { guard(it.first) }.take(2) + byFans.filter { !guard(it.first) }.take(3)
+            val rest = pool.filter { pt -> starters.none { it === pt } }.sortedByDescending { (p, t) -> Awards.score(p, t) + fans(p) * 0.5 }
+            val bench = (rest.filter { guard(it.first) }.take(2) + rest.filter { !guard(it.first) }.take(3)).toMutableList()
+            bench += rest.filter { pt -> bench.none { it === pt } }.take(7 - bench.size)
+            for (pt in starters) { ps.allStarStarters += pt.first.id; pt.first.awards += "${lg.season} All-Star starter"; NbaAwards.note(lg, "All-Star starter", pt.first, pt.second.id, conf = c) }
+            for (pt in bench) NbaAwards.note(lg, "All-Star reserve", pt.first, pt.second.id, conf = c)
+            for (pt in starters + bench) { picked += pt; ps.allStars += pt.first.id; pt.first.awards += "${lg.season} All-Star" }
         }
         val h = lg.playerOrNull(lg.heroId)
         val east = 160 + Rng.int(0, 26)
         val west = 160 + Rng.int(0, 26)
         val mvp = picked.sortedByDescending { (p, t) -> Awards.score(p, t) + Rng.gauss() * 6 }.first().first
         mvp.awards += "${lg.season} All-Star MVP"
+        NbaAwards.note(lg, "All-Star MVP", mvp, mvp.teamId)
         if (h != null && h.id in ps.allStars && r != null) {
             r.allStars++
             val pts = (8 + (h.ovr - 88) * 1.2 + Rng.gauss() * 5).roundToInt().coerceIn(2, 40)
             val gain = (60_000 + r.followers * 0.06 * Road.damp(r.followers)).roundToInt()
             r.followers += gain
-            ps.allStarNote = "You're an All-Star. East $east, West $west; you score $pts" +
+            val starter = h.id in ps.allStarStarters
+            ps.allStarNote = "You're an All-Star${if (starter) " starter" else ""}. East $east, West $west; you score $pts" +
                 (if (mvp.id == h.id) " and take home All-Star MVP" else "") + ". +${Road.count(gain)} followers."
-            lg.news += News(lg.season, lg.day, "${h.name} named an All-Star" + if (mvp.id == h.id) ", then wins All-Star MVP" else "", true)
+            lg.news += News(lg.season, lg.day, "${h.name} named an All-Star${if (starter) " starter" else ""}" + if (mvp.id == h.id) ", then wins All-Star MVP" else "", true)
             Road.payMilestonesNow(lg)
         } else {
             ps.allStarNote = "East $east, West $west. ${mvp.name} is the All-Star MVP." + if (h != null) " You weren't picked this year." else ""
@@ -628,6 +646,7 @@ object ProSeason {
             val last = s.gameIds.lastOrNull()?.let { lg.game(it) } ?: continue
             if (!last.played || last.day != lg.day) continue
             if (last.winner() == s.hi) s.hiWins++ else s.loWins++
+            if (s.done && s.round == 3) NbaAwards.conferenceFinals(lg, s)
             if (s.done && s.involves(lg.userTeamId)) {
                 val won = s.winner == lg.userTeamId
                 val other = lg.team(if (s.hi == lg.userTeamId) s.lo else s.hi)
@@ -693,14 +712,11 @@ object ProSeason {
         return if (last.done && last.winner != teamId) "Lost in the ${roundName(last)}" else roundName(last)
     }
 
-    private fun give(lg: League, award: String, p: Player, t: Team) {
-        lg.seasonAwards += AwardWinner(award, p.id, p.name, t.id, Awards.line(p))
-        p.awards += "${lg.season} $award"
-    }
+    private fun give(lg: League, award: String, p: Player, t: Team, line: String = Awards.line(p)) = NbaAwards.give(lg, award, p, t, line)
 
     /**
      * Awards night at the end of the regular season: the MVP vote, Rookie of the Year, Defensive
-     * Player, Sixth Man, Most Improved, and the All-League, All-Defensive and All-Rookie teams.
+     * Player, Sixth Man, Most Improved, and the All-NBA, All-Defensive and All-Rookie teams.
      */
     private fun regularAwards(lg: League) {
         lg.seasonAwards.clear()
@@ -708,7 +724,7 @@ object ProSeason {
         if (all.isEmpty()) return
         val r = lg.road
         val ps = lg.proState
-        // The 65-game rule: MVP, Defensive Player, Sixth Man, Most Improved and the All-League and
+        // The 65-game rule: MVP, Defensive Player, Sixth Man, Most Improved and the All-NBA and
         // All-Defensive teams need 65 games (scaled for shorter seasons). Rookie honors don't.
         val minGames = if (Eras.of(lg).gamesRule) (65.0 * ProLeague.seasonGames(lg) / 82).toInt() else 0
         // Rookie honors look at every rookie who played, not just the award-eligible.
@@ -724,11 +740,8 @@ object ProSeason {
         defense.firstOrNull()?.let { (p, t) -> give(lg, "Defensive Player of the Year", p, t) }
         ladder.firstOrNull { it.first.stats.gs * 2 < it.first.stats.gp }?.let { (p, t) -> give(lg, "Sixth Man of the Year", p, t) }
         AwardsNight.mostImproved(lg, ladder)?.let { (p, t) -> give(lg, "Most Improved Player", p, t) }
-        val allLeague = (listOf(mvp) + ladder.filter { it !== mvp }).take(15)
-        allLeague.forEachIndexed { i, (p, t) -> give(lg, "All-League ${listOf("1st", "2nd", "3rd")[i / 5]}", p, t) }
-        defense.take(5).forEach { (p, t) -> give(lg, "All-Defensive 1st", p, t) }
-        rookies.take(5).forEach { (p, t) -> give(lg, "All-Rookie 1st", p, t) }
-        val mine = lg.seasonAwards.filter { it.pid == lg.heroId }.map { it.award }
+        NbaAwards.awardsNight(lg, ladder, mvp, defense, rookies)
+        val mine = lg.seasonAwards.filter { it.pid == lg.heroId }.map { NbaAwards.label(it.award) }
         if (mine.isNotEmpty()) lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
     }
 
@@ -737,8 +750,11 @@ object ProSeason {
         val champ = lg.team(ps.champion)
         val finals = ps.series.first { it.round == 4 }
         val runnerUp = if (finals.hi == champ.id) finals.lo else finals.hi
-        val fmvp = lg.rosterOf(champ).filter { it.tourney.gp > 0 }.maxByOrNull { it.tourney.ppg + it.tourney.rpg * 0.7 + it.tourney.apg * 0.9 + it.ovr * 0.05 }
-        if (fmvp != null) give(lg, "Finals MVP", fmvp, champ)
+        // Finals MVP goes by the Finals themselves (the whole playoff run if box scores are missing).
+        val bySeries = NbaAwards.seriesMvp(lg, finals)
+        val fmvp = bySeries?.first ?: lg.rosterOf(champ).filter { it.tourney.gp > 0 }.maxByOrNull { it.tourney.ppg + it.tourney.rpg * 0.7 + it.tourney.apg * 0.9 + it.ovr * 0.05 }
+        if (fmvp != null) give(lg, "Finals MVP", fmvp, champ, bySeries?.let { NbaAwards.seriesLine(it.second) } ?: Awards.line(fmvp))
+        for (t in lg.teams) ps.lastWins[t.id] = t.w
         for (p in lg.rosterOf(champ)) p.awards += "${lg.season} Champion"
         val r = lg.road
         if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) r.rings++
@@ -814,13 +830,13 @@ object ProCareer {
 
     /**
      * The most [teamId] can pay him. A seven-to-nine-year player re-signing with his own team after
-     * an MVP, a Defensive Player of the Year or an All-League season in the last three can get the
+     * an MVP, a Defensive Player of the Year or an All-NBA season in the last three can get the
      * 35% supermax.
      */
     fun maxFor(lg: League, teamId: Int): Int {
         val h = lg.hero ?: return maxSalary(lg, 10)
         val recent = h.awards.filter { a -> a.substringBefore(" ").toIntOrNull()?.let { it >= lg.season - 2 } == true }.map { it.substringAfter(" ") }
-        val honors = recent.any { it == "MVP" || it == "Defensive Player of the Year" || it.startsWith("All-League") }
+        val honors = recent.any { it == "MVP" || it == "Defensive Player of the Year" || it.startsWith("All-NBA") }
         val supermax = Eras.of(lg).supermax && h.proYears in 7..9 && teamId == h.teamId && honors
         return maxSalary(lg, if (supermax) 10 else h.proYears)
     }
@@ -966,7 +982,7 @@ object ProCareer {
                 p.left = "Retired in ${lg.season}"
                 lg.alumni += p
             }
-            if (t.id == lg.userTeamId || p.awards.any { it.endsWith(" MVP") || it.endsWith("All-League 1st") }) ps.retiredThisSummer += "${p.name} (${p.age})"
+            if (t.id == lg.userTeamId || p.awards.any { it.endsWith(" MVP") || it.endsWith("All-NBA 1st") }) ps.retiredThisSummer += "${p.name} (${p.age})"
         }
     }
 
@@ -1234,12 +1250,12 @@ object ProCareer {
 
     // ---------- the end ----------
 
-    /** Hall of Fame case: titles, MVPs, All-League teams and All-Star games, plus longevity. */
+    /** Hall of Fame case: titles, MVPs, All-NBA teams and All-Star games, plus longevity. */
     fun hofScore(lg: League): Double {
         val r = lg.road ?: return 0.0
         val h = lg.hero ?: return 0.0
-        val allLeague = h.awards.count { it.contains("All-League 1st") } * 3.0 + h.awards.count { it.contains("All-League 2nd") || it.contains("All-League 3rd") } * 1.5
-        return r.rings * 3.0 + r.mvps * 6.0 + allLeague + r.allStars * 1.5 + h.awards.count { it.endsWith("Finals MVP") } * 3.0 + h.proYears * 0.4
+        val allLeague = h.awards.count { it.contains("All-NBA 1st") } * 3.0 + h.awards.count { it.contains("All-NBA 2nd") || it.contains("All-NBA 3rd") } * 1.5
+        return r.rings * 3.0 + r.mvps * 6.0 + allLeague + r.allStars * 1.5 + h.awards.count { it.substringAfter(" ") == "Finals MVP" } * 3.0 + h.proYears * 0.4
     }
 
     fun hofVerdict(lg: League): String {
