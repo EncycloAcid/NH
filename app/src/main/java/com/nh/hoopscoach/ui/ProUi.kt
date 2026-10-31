@@ -1074,7 +1074,10 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
                 style = T.small, color = P.sub,
             )
             Spacer(Modifier.height(8.dp))
-            SecondaryButton("Request a trade", Modifier.fillMaxWidth()) {
+            // Happy players don't need a big button for it: a quiet link does.
+            if (trades.mood(lg).score >= 70) Text("Request a trade anyway ›", style = T.bodyB, color = P.sub,
+                modifier = Modifier.clickable { vm.act { if (trades.request(it) == 0) vm.toast("Nobody made an offer. You're staying put.") } }.padding(vertical = 6.dp))
+            else SecondaryButton("Request a trade", Modifier.fillMaxWidth()) {
                 vm.act { if (trades.request(it) == 0) vm.toast("Nobody made an offer. You're staying put.") }
             }
         } else if (lg.phase == Phase.REGULAR && lg.day >= trades.deadlineDay(lg)) {

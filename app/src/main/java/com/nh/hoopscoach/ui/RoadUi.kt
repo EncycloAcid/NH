@@ -285,14 +285,17 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
+        // Four pages instead of one long scroll; the deal and the press stay on top.
+        item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
         if (lg.road?.press != null) item { PressCard(vm, lg) }
-        item { RacePanel(vm, lg) }
-        item { RivalPanel(vm, lg) }
-        item { StaffPanel(vm, lg) }
-        item { ImpactPanel(vm, lg) }
-        item { PracticePanel(vm, lg) }
-        item { MediaPanel(lg) }
-        item {
+        if (vm.meTab == 0) item { RacePanel(vm, lg) }
+        if (vm.meTab == 0) item { RivalPanel(vm, lg) }
+        if (vm.meTab == 1) item { ImpactPanel(vm, lg) }
+        if (vm.meTab == 2) item { PracticePanel(vm, lg) }
+        if (vm.meTab == 2) item { StaffPanel(vm, lg) }
+        if (vm.meTab == 3) item { MediaPanel(lg) }
+        if (vm.meTab == 3 && (lg.road?.feed?.isNotEmpty() == true)) item { SocialStrip(vm, lg) }
+        if (vm.meTab == 1) item {
             val mins = Gameplan.plannedMinutes(t, h.id)
             Section("Your role")
             Panel {
@@ -324,7 +327,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        item {
+        if (vm.meTab == 2) item {
             Section("Development")
             Panel {
                 Text("Training focus: ${h.focus.label}", style = T.bodyB, color = P.ink)
@@ -341,7 +344,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        item {
+        if (vm.meTab == 3) item {
             Section("NIL")
             Panel {
                 if (r.dealSeason == lg.season && r.deal != NilDeal.NONE) {
