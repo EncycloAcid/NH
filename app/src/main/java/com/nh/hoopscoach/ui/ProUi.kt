@@ -117,8 +117,32 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { TeamBadge(u, 50.dp) }
         }
+        if (r.tradedSeason == lg.season && r.tradeNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day - r.tradedDay in 0..7) item {
+            Section("Trade")
+            Panel(color = P.hero) {
+                Text("TRADED", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                Text(u.name.uppercase(), style = T.hero.copy(fontSize = 28.sp), color = P.onHero)
+                Text(r.tradeNote, style = T.small, color = P.onHero.copy(alpha = 0.9f))
+            }
+        }
         item { HeroTodayCard(vm, lg) }
         if (r.press != null) item { PressCard(vm, lg) }
+        if (r.suitors.isNotEmpty()) item {
+            Section("Trade request")
+            Panel(onClick = { vm.select(Tab.RECRUIT) }) {
+                Text("${r.suitors.size} teams want you. Pick one on the Me tab.", style = T.bodyB, color = P.ink)
+                Text("If you don't choose by the deadline, the front office takes the first offer.", style = T.small, color = P.sub)
+            }
+        }
+        if (lg.phase == Phase.REGULAR && lg.day in (com.nh.hoopscoach.game.Trades.DEADLINE - 10) until com.nh.hoopscoach.game.Trades.DEADLINE) item {
+            val left = com.nh.hoopscoach.game.Trades.DEADLINE - lg.day
+            val mood = com.nh.hoopscoach.game.Trades.mood(lg)
+            Section("Trade deadline", action = "Me", onAction = { vm.select(Tab.RECRUIT) })
+            Panel {
+                Text(if (left == 1) "Tomorrow" else "In $left days", style = T.head, color = P.ink)
+                Text("You're ${mood.label.lowercase()}." + if (com.nh.hoopscoach.game.Trades.canRequest(lg)) " You can still ask for a trade." else "", style = T.small, color = P.sub)
+            }
+        }
         if (ps != null && ps.allStarSeason == lg.season && ps.allStarNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day <= ProLeague.ALL_STAR_DAY + 7) item {
             Section("All-Star Weekend")
             Panel(color = if (lg.heroId in ps.allStars) P.hero else P.surface) {
@@ -433,6 +457,11 @@ private fun Modifier.widthIn(v: String) = if (v.length > 6) this.width(118.dp) e
 
 private fun LazyListScope.history(lg: League) {
     val ps = lg.proState ?: return
+    val recent = ps.trades.filter { it.season >= lg.season - 1 }.takeLast(15).reversed()
+    if (recent.isNotEmpty()) item {
+        Section("Trades")
+        GroupList(recent) { t -> TradeRow(lg, t) }
+    }
     if (lg.seasonAwards.isNotEmpty()) item {
         Section("${lg.season} awards")
         GroupList(lg.seasonAwards) { a ->
@@ -494,6 +523,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (r.press != null) item { PressCard(vm, lg) }
+        item { SituationPanel(vm, lg) }
         item { RacePanel(vm, lg) }
         item { RivalPanel(vm, lg) }
         item {
@@ -541,6 +571,88 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+// ---------- trades ----------
+
+@Composable
+private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
+    val a = lg.team(t.teamA)
+    val b = lg.team(t.teamB)
+    Column(Modifier.fillMaxWidth().then(if (t.hero) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Text(if (t.offseason) "${t.season} OFFSEASON" else "${t.season} · DAY ${t.day}", style = T.label, color = if (t.hero) P.accent else P.sub)
+        for ((team, gets) in listOf(b to t.toB, a to t.toA)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                TeamBadge(team, 24.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("${team.mascot} get ${gets.joinToString(", ")}", style = T.small, color = P.ink, maxLines = 2)
+            }
+        }
+    }
+}
+
+/** How he feels where he is, and the trade request: ask out, see who calls, pick one or stay. */
+@Composable
+internal fun SituationPanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val h = lg.playerOrNull(lg.heroId) ?: return
+    if (h.teamId < 0) return
+    val trades = com.nh.hoopscoach.game.Trades
+    val mood = remember(vm.rev, lg) { trades.mood(lg) }
+    Section("Your situation")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("MOOD", style = T.label, color = P.sub)
+                Text(mood.label, style = T.head, color = when { mood.score >= 70 -> P.good; mood.score >= 50 -> P.ink; mood.score >= 30 -> P.warn; else -> P.bad })
+            }
+            Text("${mood.score}", style = T.num, color = P.ink)
+        }
+        Spacer(Modifier.height(6.dp))
+        Bar(mood.score / 100f, Modifier.fillMaxWidth(), color = when { mood.score >= 70 -> P.good; mood.score >= 50 -> P.accent; mood.score >= 30 -> P.warn; else -> P.bad })
+        if (mood.reasons.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(mood.reasons.joinToString(" · "), style = T.small, color = P.sub)
+        }
+        if (r.suitors.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text("TEAMS THAT WANT YOU", style = T.label, color = P.accent)
+            for ((i, s) in r.suitors.withIndex()) {
+                val st = lg.team(s.teamId)
+                val back = s.sends.mapNotNull { lg.playerOrNull(it) }
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TeamBadge(st, 40.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(st.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${st.w}-${st.l} · ${s.role} there", style = T.small, color = P.sub, maxLines = 1)
+                        Text("They'd send ${back.joinToString(", ") { "${it.name} (${it.ovr})" }}", style = T.small, color = P.ink, maxLines = 2)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    SmallButton("Go", primary = true) { vm.act { trades.accept(it, i) }; vm.toast("You're headed to the ${st.name}") }
+                }
+            }
+            SmallButton("Withdraw the request", Modifier.fillMaxWidth()) { vm.act { trades.withdraw(it) } }
+        } else if (trades.canRequest(lg)) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                if (lg.phase == Phase.REGULAR) "Want out? Ask before the deadline (day ${trades.DEADLINE}). Your fans won't like it; your agent finds who's interested and you pick."
+                else "Want a fresh start? Ask now and your agent finds who's interested. Your fans won't like it.",
+                style = T.small, color = P.sub,
+            )
+            Spacer(Modifier.height(8.dp))
+            SecondaryButton("Request a trade", Modifier.fillMaxWidth()) {
+                vm.act { if (trades.request(it) == 0) vm.toast("Nobody made an offer. You're staying put.") }
+            }
+        } else if (lg.phase == Phase.REGULAR && lg.day >= trades.DEADLINE) {
+            Spacer(Modifier.height(8.dp))
+            Text("The trade deadline has passed. You can ask again in the offseason.", style = T.small, color = P.sub)
+        }
+        if (r.tradedSeason == lg.season && r.tradeNote.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(r.tradeNote, style = T.small, color = P.accent)
         }
     }
 }
@@ -702,7 +814,13 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League, t: Team) {
             Section("Retirements")
             Panel { Text(ps.retiredThisSummer.joinToString(", "), style = T.small, color = P.ink) }
         }
+        val summer = ps.trades.filter { it.season == lg.season && it.offseason }.reversed()
+        if (summer.isNotEmpty()) {
+            Section("Trades this summer")
+            GroupList(summer) { tr -> TradeRow(lg, tr) }
+        }
     }
+    item { SituationPanel(vm, lg) }
 }
 
 private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player, t: Team, rookie: Boolean) {
@@ -735,6 +853,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                 Text("${money(c.salary)} a season with the ${lg.team(c.teamId).name}", style = T.head, color = P.ink)
                 Text("${c.kind} · ${c.years} ${if (c.years == 1) "year" else "years"} left.", style = T.small, color = P.sub)
             }
+            SituationPanel(vm, lg)
             return@item
         }
         Panel {

@@ -100,6 +100,12 @@ class ProUiTest {
         vm.select(Tab.RECRUIT); shot("P06_me"); scrollTo(2); shot("P06b_me_races"); scrollToText("YOUR RIVAL"); shot("P06c_me_rival")
         vm.select(Tab.TEAM); vm.teamTab = 0; shot("P07_roster"); vm.teamTab = 1; shot("P07b_schedule")
         vm.select(Tab.LEAGUE); vm.leagueTab = 0; shot("P08_standings"); vm.leagueTab = 2; shot("P08b_leaders"); vm.leagueTab = 0
+        // Trades: how he feels, asking out, the teams that call, and the move.
+        vm.select(Tab.RECRUIT); idle(); scrollToText("YOUR SITUATION"); shot("P08c_situation")
+        assertTrue(com.nh.hoopscoach.game.Trades.request(lg) > 0)
+        vm.install(lg); vm.select(Tab.RECRUIT); idle(); scrollToText("TEAMS THAT WANT YOU"); shot("P08d_suitors")
+        vm.select(Tab.TODAY); idle(); shot("P08e_today_request")
+        com.nh.hoopscoach.game.Trades.accept(lg, 0); vm.install(lg); vm.select(Tab.TODAY); shot("P08f_traded")
         walk(vm, lg)
         vm.select(Tab.TODAY); idle()
         if (Season.userGameToday(lg) == null) Sim.playDay(lg)

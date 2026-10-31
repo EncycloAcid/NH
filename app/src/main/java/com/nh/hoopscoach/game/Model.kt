@@ -703,6 +703,23 @@ class RoadState(
     var salarySeason: Int = 0,
     /** The order pro teams pick in on his Draft Night (franchise indexes). */
     val proOrder: MutableList<Int> = mutableListOf(),
+    /** Trades: when he last asked out (season * 2, +1 in the offseason), the teams that want him, and his last move. */
+    var tradeKey: Int = -1,
+    val suitors: MutableList<Suitor> = mutableListOf(),
+    var tradedSeason: Int = 0,
+    var tradedDay: Int = -1,
+    var tradeNote: String = "",
+)
+
+/** A team that would trade for him, and the players it would send back. */
+@Serializable
+class Suitor(val teamId: Int, val sends: List<Int>, val role: String, val ahead: Int)
+
+/** A completed trade: who went each way. */
+@Serializable
+class Trade(
+    val season: Int, val day: Int, val offseason: Boolean, val teamA: Int, val teamB: Int,
+    val toB: List<String>, val toA: List<String>, val hero: Boolean = false,
 )
 
 /** A pro contract. Salary in thousands of dollars a season. */
@@ -751,6 +768,9 @@ class ProState(
     var pendingRival: Player? = null,
     /** Growth over the last summer: player id to overall before. */
     val before: MutableMap<Int, Int> = mutableMapOf(),
+    /** Every trade, newest last, and the players already moved this season (nobody is traded twice in one). */
+    val trades: MutableList<Trade> = mutableListOf(),
+    val moved: MutableList<Int> = mutableListOf(),
 )
 
 /** One head-to-head game against the class rival. */

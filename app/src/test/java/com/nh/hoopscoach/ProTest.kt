@@ -52,6 +52,49 @@ class ProTest {
     }
 
     @Test
+    fun trades() {
+        val college = toDraft(21)
+        var lg = ProLeague.create(college)
+        val r = lg.road!!
+        while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
+        repeat(20) { Sim.playDay(lg); r.press?.let { Road.answer(lg, 0) } }
+        val mood = com.nh.hoopscoach.game.Trades.mood(lg)
+        println("mood ${mood.score} ${mood.label}: ${mood.reasons}")
+        assertTrue("can ask before the deadline", com.nh.hoopscoach.game.Trades.canRequest(lg))
+        val from = lg.userTeamId
+        val n = com.nh.hoopscoach.game.Trades.request(lg)
+        println("suitors: " + r.suitors.joinToString { s -> "${lg.team(s.teamId).name} (${s.role}) sends ${s.sends.map { lg.player(it).let { p -> "${p.name} ${p.ovr}" } }}" })
+        assertTrue("teams call", n > 0)
+        assertTrue("one request per window", !com.nh.hoopscoach.game.Trades.canRequest(lg))
+        val pick = r.suitors.first()
+        val coming = pick.sends.toList()
+        assertTrue(com.nh.hoopscoach.game.Trades.accept(lg, 0))
+        val h = lg.player(lg.heroId)
+        assertEquals("on his new team", pick.teamId, h.teamId)
+        assertEquals("the user follows him", pick.teamId, lg.userTeamId)
+        assertEquals("contract moves with him", pick.teamId, r.contract!!.teamId)
+        assertTrue("old team got the players", coming.all { lg.playerOrNull(it)?.teamId == from || lg.playerOrNull(it) == null })
+        assertTrue("career lists both teams", r.proTeams.containsAll(listOf(from, pick.teamId)))
+        assertTrue("trade recorded", lg.proState!!.trades.last().hero)
+        println(r.tradeNote)
+        lg = SaveIO.decode(SaveIO.encode(lg))
+        while (lg.day < com.nh.hoopscoach.game.Trades.DEADLINE && lg.phase == Phase.REGULAR) Sim.playDay(lg)
+        val ai = lg.proState!!.trades.filter { !it.hero && !it.offseason }
+        ai.forEach { println("  " + com.nh.hoopscoach.game.Trades.describe(lg, it)) }
+        assertTrue("deadline deals", ai.size >= 2)
+        assertTrue("no asking after the deadline", !com.nh.hoopscoach.game.Trades.canRequest(lg))
+        assertTrue("rosters legal", lg.teams.all { t -> t.roster.size in 13..15 && t.roster.all { lg.player(it).teamId == t.id } })
+        var guard = 0
+        while (lg.phase != Phase.OFFSEASON && guard++ < 120) Sim.playDay(lg)
+        ProCareer.next(lg)
+        assertTrue("summer deals", lg.proState!!.trades.any { it.offseason && it.season == lg.season })
+        assertTrue("can ask again in the offseason", com.nh.hoopscoach.game.Trades.canRequest(lg))
+        com.nh.hoopscoach.game.Trades.request(lg)
+        com.nh.hoopscoach.game.Trades.withdraw(lg)
+        assertTrue("withdrawn", lg.road!!.suitors.isEmpty() && lg.player(lg.heroId).teamId == pick.teamId)
+    }
+
+    @Test
     fun proCareer() {
         val college = toDraft(21)
         val r0 = college.road!!
@@ -107,6 +150,8 @@ class ProTest {
             val h = lg.playerOrNull(lg.heroId)!!
             val t = lg.team(h.teamId)
             assertTrue("standings add up", lg.teams.all { it.w + it.l == ProLeague.GAMES })
+            assertTrue("rosters stay legal through trades", lg.teams.all { t -> t.roster.size in 13..15 && t.roster.all { lg.player(it).teamId == t.id } })
+            assertTrue("AI teams trade at the deadline", lg.proState!!.trades.any { it.season == lg.season && !it.offseason })
             assertTrue("a champion", ps.champion >= 0)
             assertTrue("16 playoff teams", ps.seeds.size == 16)
             assertTrue("playoff games kept apart", lg.games.filter { it.type == GameType.PLAYOFF }.all { it.played })

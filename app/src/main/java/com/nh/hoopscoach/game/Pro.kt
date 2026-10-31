@@ -288,6 +288,7 @@ object ProSeason {
             Phase.REGULAR -> {
                 upkeep(lg)
                 if (lg.day == ProLeague.ALL_STAR_DAY - 1) allStar(lg)
+                if (lg.day == Trades.DEADLINE - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.LAST_DAY) { startPlayoffs(lg); return }
             }
             Phase.PLAYOFFS -> {
@@ -483,6 +484,7 @@ object ProSeason {
         ps.series.clear(); ps.seeds.clear(); ps.champion = -1
         ps.allStars.clear(); ps.allStarNote = ""
         ps.draftedByUser.clear(); ps.retiredThisSummer.clear(); ps.before.clear()
+        ps.moved.clear()
         for (t in lg.teams) {
             t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0
             t.totals = StatLine(); t.opp = StatLine()
@@ -587,7 +589,9 @@ object ProCareer {
             ProStep.REVIEW -> {
                 if (age(lg) >= 40) { retire(lg); return }
                 newYear(lg)
+                ps.moved.clear()
                 draft(lg)
+                Trades.summer(lg)
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
@@ -604,7 +608,11 @@ object ProCareer {
                 if (ps.history.isNotEmpty()) summer(lg)
                 ps.step = ProStep.SUMMER
             }
-            ProStep.SUMMER -> ProSeason.startSeason(lg)
+            ProStep.SUMMER -> {
+                // A trade request still open when camp opens gets settled with the first team that called.
+                Trades.settleOpenRequest(lg)
+                ProSeason.startSeason(lg)
+            }
         }
     }
 
