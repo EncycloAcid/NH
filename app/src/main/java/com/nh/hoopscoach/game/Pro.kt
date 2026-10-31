@@ -110,7 +110,11 @@ object ProLeague {
 
     /** The pros are a step up: a college player arrives at least this much lower, and no higher than [ROOKIE_MAX] (his ceiling stays). */
     const val STEP_UP = 5
-    const val ROOKIE_MAX = 83
+    /** The rookie cap: 87 on the game's scale, 80 on the 2K scale the screens show (a top pick arrives around 77 to 80). */
+    const val ROOKIE_MAX = 87
+
+    /** A draftee's starting overall by pick: about 85 for No. 1 (77 on screen), 80 for No. 30, 76 for No. 60. */
+    fun draftOverall(pick: Int) = (85 - (pick - 1) * 0.15 + Rng.gauss() * 1.8).roundToInt().coerceIn(73, ROOKIE_MAX)
 
     /** Where a college player starts in the pros. */
     fun rookieOverall(collegeOvr: Int) = minOf(collegeOvr - STEP_UP, ROOKIE_MAX)
@@ -397,7 +401,7 @@ object ProLeague {
                 val names = lg.players.map { it.name }.toSet()
                 for (pk in EraData.draft(year).filter { it.pick <= 2 * lg.teams.size && it.name !in skip && it.name !in names }) {
                     val t = order[(pk.pick - 1) % order.size]
-                    val target = (82 - (pk.pick - 1) * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(72, ROOKIE_MAX)
+                    val target = draftOverall(pk.pick)
                     makePro(lg, pk.pos ?: scarcest(lg, t), target, pk.age, t).also {
                         it.proYears = 0
                         it.awards += "$year Draft #${pk.pick}"
@@ -1153,7 +1157,7 @@ object ProCareer {
         // Two rounds: 60 picks with 30 teams, fewer in a smaller league.
         val picks = minOf(60, 2 * lg.teams.size)
         val rookies = mutableListOf<Pair<Pos, Int>>()
-        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to (82 - i * 0.12 + Rng.gauss() * 2).roundToInt().coerceIn(72, ProLeague.ROOKIE_MAX)
+        for (i in 0 until 60) rookies += Rng.pick(Pos.entries) to ProLeague.draftOverall(i + 1)
         rookies.sortByDescending { it.second }
         val rival = ps.pendingRival
         var rivalSlot = -1
