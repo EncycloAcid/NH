@@ -638,7 +638,22 @@ class RoadState(
     /** Big moments in live games: how many he got, and how many he came through in. */
     var moments: Int = 0,
     var momentsWon: Int = 0,
+    /** NIL money spent on his own staff; the bank is earned minus spent. */
+    var spent: Int = 0,
+    /** Staff hired for [hiredSeason]; contracts run one season. */
+    val hired: MutableList<Staff> = mutableListOf(),
+    var hiredSeason: Int = 0,
+    /** Season whose guaranteed NIL was already paid at signing. */
+    var paidSeason: Int = 0,
 )
+
+/** People the user's player can pay out of his NIL money, one season at a time. Costs in thousands. */
+enum class Staff(val label: String, val blurb: String, val cost: Int) {
+    TRAINER("Personal trainer", "Develop 25% faster from games and practice.", 150),
+    NUTRITIONIST("Nutritionist", "Fatigue builds a quarter slower, and you recover faster between games.", 90),
+    SHOOTING_COACH("Shooting coach", "+3% on jump shots, and +5% when you take the big shot late.", 120),
+    AGENT("Agent", "Negotiates 15% more on NIL deals, bonuses and sponsor payouts.", 80),
+}
 
 /** The weekly practice plan in player mode. */
 enum class Practice(val label: String, val blurb: String, val tiring: Int, val boosts: List<Attr>, val xp: Int) {

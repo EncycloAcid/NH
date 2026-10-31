@@ -74,6 +74,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
     /** Fatigue costs the user's player up to 9 points of shooting percentage. */
     private val heroTired = ((lg.road?.fatigue ?: 0) - 40).coerceAtLeast(0) * 0.0015
+    /** A shooting coach helps the user's player's jump shots, and his big shots most. */
+    private val heroJumper = if (heroId >= 0) Road.jumpShotBonus(lg) else 0.0
+    private val heroClutch = if (heroId >= 0) Road.clutchBonus(lg) else 0.0
 
     /** The three ways to play a big moment. */
     enum class MomentChoice { PULL_UP, DRIVE, KICK }
@@ -110,7 +113,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
-        if (shooter.id == heroId) p -= heroTired
+        if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
         return p.coerceIn(0.12, 0.82)
     }
 
@@ -477,7 +480,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && period >= 2 && clock < 120 && abs(trail) <= 5) pMake += 0.03
-            if (shooter.id == heroId) pMake -= heroTired
+            if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) - heroTired
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)

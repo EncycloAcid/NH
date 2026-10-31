@@ -235,6 +235,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
         if (lg.road?.press != null) item { PressCard(vm, lg) }
         item { RacePanel(vm, lg) }
+        item { StaffPanel(vm, lg) }
         item { PracticePanel(vm, lg) }
         item { MediaPanel(lg) }
         item {
@@ -295,7 +296,8 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                         (if (r.deal == NilDeal.PERFORMANCE) " · bonus so far ${money(Road.bonus(lg, h))}" else ""), style = T.small, color = P.sub)
                 } else Text("No deal signed for ${lg.season} yet.", style = T.body, color = P.sub)
                 Spacer(Modifier.height(6.dp))
-                Text("Career NIL earned: ${money(r.earned)}", style = T.small, color = P.good)
+                Text("Career NIL earned: ${money(r.earned)} · in the bank ${money(Road.bank(lg))}" +
+                    (if (r.spent > 0) " · spent on your team ${money(r.spent)}" else ""), style = T.small, color = P.good)
             }
             CareerStory(lg)
             Spacer(Modifier.height(24.dp))
@@ -465,6 +467,51 @@ private fun RaceRow(rank: Int, p: Player, t: Team, you: Boolean) {
     }
 }
 
+/** Your own staff, paid out of your NIL money one season at a time. */
+@Composable
+private fun StaffPanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val bank = Road.bank(lg)
+    Section("Your team")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("IN THE BANK", style = T.label, color = P.sub)
+                Text(money(bank), style = T.title.copy(fontSize = 28.sp), color = P.good)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${r.hired.count { Road.has(lg, it) }} of ${com.nh.hoopscoach.game.Staff.entries.size}", style = T.bodyB, color = P.ink)
+                Text("HIRED THIS SEASON", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+            }
+        }
+        Text("Your NIL money pays for people who make you better. Contracts run through the season.", style = T.small, color = P.sub)
+        Spacer(Modifier.height(10.dp))
+        for (s in com.nh.hoopscoach.game.Staff.entries) {
+            val on = Road.has(lg, s)
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (on) P.accentSoft else P.surface2).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(s.label, style = T.bodyB, color = if (on) P.accent else P.ink)
+                    Text(s.blurb, style = T.small, color = P.sub)
+                }
+                Spacer(Modifier.width(8.dp))
+                when {
+                    on -> Tag("HIRED", P.good)
+                    lg.phase == com.nh.hoopscoach.game.Phase.OFFSEASON -> Text(money(s.cost), style = T.small, color = P.faint)
+                    else -> SmallButton("Hire · ${money(s.cost)}", primary = bank >= s.cost, enabled = bank >= s.cost) {
+                        vm.act { if (Road.hire(it, s)) vm.toast("${s.label} hired for ${it.season}") else vm.toast("Not enough in the bank") }
+                    }
+                }
+            }
+        }
+        if (lg.phase == com.nh.hoopscoach.game.Phase.OFFSEASON) Text("Hire for next season once it starts.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        else if (Road.needsDeal(lg)) Text("Sign your NIL deal first: the guaranteed money lands in your bank right away.", style = T.small, color = P.warn, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
 /** This week's practice plan, and what it's costing. */
 @Composable
 private fun PracticePanel(vm: GameViewModel, lg: League) {
@@ -569,6 +616,7 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
         item {
             if (r != null) Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career NIL earned: ${money(r.earned)}", style = T.bodyB, color = P.good)
+                if (r.spent > 0) Text("Invested in your own team: ${money(r.spent)}", style = T.small, color = P.ink)
                 Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
                 if (r.ended) Text(r.ending, style = T.small, color = P.sub)
             }
@@ -724,6 +772,7 @@ fun RoadEnding(vm: GameViewModel, lg: League) {
         item {
             Panel(Modifier.padding(top = 14.dp)) {
                 Text("Career NIL earned: ${money(r.earned)}", style = T.bodyB, color = P.good)
+                if (r.spent > 0) Text("Invested in your own team: ${money(r.spent)}", style = T.small, color = P.ink)
                 Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
                 Text("Schools: ${r.schools.joinToString(" → ") { lg.team(it).school }}", style = T.small, color = P.sub)
             }

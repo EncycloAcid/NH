@@ -158,8 +158,11 @@ object Road {
     /** What the user's player is worth to his school this season. */
     fun market(lg: League): Int {
         val h = lg.playerOrNull(lg.heroId) ?: return 0
-        return nilFor(lg, lg.team(h.teamId), h).coerceAtLeast(25)
+        return (nilFor(lg, lg.team(h.teamId), h) * agentCut(lg)).roundToInt().coerceAtLeast(25) / 5 * 5
     }
+
+    /** An agent gets 15% more on everything he negotiates. */
+    private fun agentCut(lg: League) = if (has(lg, Staff.AGENT)) 1.15 else 1.0
 
     fun guaranteed(deal: NilDeal, base: Int) = when (deal) {
         NilDeal.STEADY -> base
@@ -174,6 +177,9 @@ object Road {
         r.dealBase = market(lg)
         r.dealSeason = lg.season
         applyDeal(lg)
+        // The guaranteed money arrives at signing, so there's something to spend this season.
+        r.earned += guaranteed(deal, r.dealBase)
+        r.paidSeason = lg.season
         lg.news += News(lg.season, lg.day, "${lg.hero?.name} signs a ${deal.label.lowercase()} NIL deal worth ${dollars(guaranteed(deal, r.dealBase))}", true)
     }
 
@@ -189,13 +195,48 @@ object Road {
         val r = lg.road ?: return 0
         if (r.deal != NilDeal.PERFORMANCE || r.dealSeason != lg.season) return 0
         val aa = h.awards.any { it.startsWith("${lg.season} ") && it.contains("AA") }
-        return ((r.dealBase * 0.04 * h.stats.ppg) + (if (aa) r.dealBase * 0.25 else 0.0)).roundToInt() / 5 * 5
+        return (((r.dealBase * 0.04 * h.stats.ppg) + (if (aa) r.dealBase * 0.25 else 0.0)) * agentCut(lg)).roundToInt() / 5 * 5
     }
 
     /** A national brand deal eats into practice time. */
     fun xpFactor(lg: League): Double {
         val r = lg.road ?: return 1.0
-        return if (r.deal == NilDeal.BRAND && r.dealSeason == lg.season) 0.85 else 1.0
+        return (if (r.deal == NilDeal.BRAND && r.dealSeason == lg.season) 0.85 else 1.0) * (if (has(lg, Staff.TRAINER)) 1.25 else 1.0)
+    }
+
+    // ---------- your own staff ----------
+
+    /** NIL money in the bank: everything earned, minus what's been spent on staff. */
+    fun bank(lg: League): Int = lg.road?.let { it.earned - it.spent } ?: 0
+
+    fun has(lg: League, s: Staff): Boolean {
+        val r = lg.road ?: return false
+        return !r.ended && r.hiredSeason == lg.season && s in r.hired
+    }
+
+    fun canHire(lg: League, s: Staff) = lg.road?.ended == false && lg.phase != Phase.OFFSEASON && !has(lg, s) && bank(lg) >= s.cost
+
+    /** Hire [s] for the rest of this season, paid out of the bank. */
+    fun hire(lg: League, s: Staff): Boolean {
+        val r = lg.road ?: return false
+        if (!canHire(lg, s)) return false
+        if (r.hiredSeason != lg.season) { r.hired.clear(); r.hiredSeason = lg.season }
+        r.hired += s
+        r.spent += s.cost
+        lg.news += News(lg.season, lg.day, "${lg.hero?.name} hires a ${s.label.lowercase()} for the season", true)
+        return true
+    }
+
+    /** Extra make chance on the user's player's jump shots, and on big-moment shots. */
+    fun jumpShotBonus(lg: League) = if (has(lg, Staff.SHOOTING_COACH)) 0.03 else 0.0
+    fun clutchBonus(lg: League) = if (has(lg, Staff.SHOOTING_COACH)) 0.05 else 0.0
+
+    /** Fatigue added by a game and its practice. */
+    fun fatigueGain(lg: League, plan: Practice, minutes: Int): Int {
+        val nutrition = has(lg, Staff.NUTRITIONIST)
+        val work = (plan.tiring.coerceAtLeast(0) + minutes / 8) * (if (nutrition) 0.75 else 1.0)
+        val rest = (if (plan.tiring < 0) -plan.tiring else 0) + 5 + (if (nutrition) 2 else 0)
+        return (work - rest).roundToInt()
     }
 
     // ---------- the season and the offseason ----------
@@ -205,8 +246,11 @@ object Road {
         val r = lg.road ?: return
         val h = lg.playerOrNull(lg.heroId) ?: return
         val t = lg.team(h.teamId)
-        val paid = if (r.dealSeason == lg.season) guaranteed(r.deal, r.dealBase) + bonus(lg, h) else 0
-        r.earned += paid
+        val signed = r.dealSeason == lg.season
+        val upfront = if (signed && r.paidSeason == lg.season) guaranteed(r.deal, r.dealBase) else 0
+        val paid = if (signed) guaranteed(r.deal, r.dealBase) + bonus(lg, h) else 0
+        r.earned += paid - upfront
+        r.hired.clear()
         val s = h.stats
         val honors = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
         r.story += "${lg.season} · ${t.school} · ${classLabel(h.year)} · %.1f ppg, %.1f rpg, %.1f apg · ${Awards.resultFor(lg, t.id)}".format(s.ppg, s.rpg, s.apg) +
@@ -361,7 +405,7 @@ object Road {
             val (need, pay) = MILESTONES.getOrNull(r.milestone) ?: return
             if (r.followers < need) return
             r.milestone++
-            r.earned += pay
+            r.earned += (pay * agentCut(lg)).roundToInt()
             lg.news += News(lg.season, lg.day, "${lg.hero?.name} hits ${count(need)} followers. A sponsor pays ${dollars(pay)} for one post", true)
         }
     }
@@ -470,7 +514,7 @@ object Road {
         val plan = r.practice
         if (r.practiceXp.size != 10) r.practiceXp = IntArray(10)
         val coach = Coaching.devOf(lg.coachOf(lg.team(h.teamId)))
-        val gain = plan.xp * (0.8 + coach / 250.0) * (if (r.fatigue >= 70) 0.5 else 1.0)
+        val gain = plan.xp * (0.8 + coach / 250.0) * (if (r.fatigue >= 70) 0.5 else 1.0) * (if (has(lg, Staff.TRAINER)) 1.25 else 1.0)
         for (a in practiceBoosts(lg, plan)) {
             val i = a.ordinal
             r.practiceXp[i] += gain.roundToInt()
@@ -480,7 +524,7 @@ object Road {
             }
         }
         if (plan == Practice.WEIGHTS && Rng.chance(0.25)) h.weight++
-        r.fatigue = (r.fatigue + plan.tiring + minutes / 8 - 5).coerceIn(0, 100)
+        r.fatigue = (r.fatigue + fatigueGain(lg, plan, minutes)).coerceIn(0, 100)
     }
 
     // ---------- award races ----------

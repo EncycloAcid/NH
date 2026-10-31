@@ -32,6 +32,12 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
   - Weight room: Inside, Rebound and Interior D. The most tiring.
   - Rest: recovers fatigue.
   Practice work banks toward each rating (+1 per 300). Fatigue comes from practice and minutes. Past 40 it costs you up to 9% shooting in games, and past 70 practice gains are halved.
+- **Spend your NIL**: the guaranteed part of your NIL deal lands in your bank when you sign. Performance bonuses arrive at season end, and sponsor payouts as you hit milestones. Spend the bank on your own team for the season (contracts end with it):
+  - Personal trainer ($150K): develop 25% faster from games and practice.
+  - Nutritionist ($90K): fatigue builds a quarter slower, and you recover faster.
+  - Shooting coach ($120K): +3% on jump shots, +5% when you take the big shot late.
+  - Agent ($80K): 15% more on NIL deals, bonuses and sponsor payouts.
+  The Me tab shows your bank and staff; the career summary shows what you invested.
 - **Award races**: a Player of the Year ladder on the Me tab, scored the same way as the end-of-season awards. It shows your rank, your All-America pace, a weekly up or down arrow, your conference race and the freshman race.
 - **The ending**: drafted (with your pick) or, after four seasons, undrafted and overseas. You get a career summary with totals, your story, NIL earned and every school you played for.
 

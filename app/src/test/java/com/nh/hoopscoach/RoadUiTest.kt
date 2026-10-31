@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
@@ -115,6 +116,9 @@ class RoadUiTest {
         repeat(4) { Season.playDay(lg) }
         vm.install(lg); vm.select(Tab.RECRUIT); idle()
         scrollTo(1); shot("Y10d_me_races"); scrollTo(2); shot("Y10e_me_practice")
+        vm.act { Road.hire(it, com.nh.hoopscoach.game.Staff.TRAINER); Road.hire(it, com.nh.hoopscoach.game.Staff.AGENT) }; idle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR TEAM")); idle()
+        shot("Y10f_me_staff")
         // Play live games until one comes down to a big moment.
         var found = false
         var tries2 = 0
