@@ -987,7 +987,8 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
         }
         when {
             !done -> FlowFooter(null, "Skip ahead") { vm.revealSeason = lg.season; vm.reveal = stop }
-            r.goingPro -> FlowFooter(null, "Start your pro career") { vm.act { Road.watchedDraft(it) }; vm.goPro() }
+            // On to the going-pro screen, where you pick the league (today's or a past era).
+            r.goingPro -> FlowFooter(null, "Next: choose your league") { vm.act { Road.watchedDraft(it) } }
             r.ended -> FlowFooter(null, "Continue") { vm.act { Road.watchedDraft(it) } }
             else -> FlowFooter(null, "Next: the summer") { vm.roadNext() }
         }

@@ -40,7 +40,8 @@ enum class Era(
 }
 
 object Eras {
-    class Star(val name: String, val pos: Pos, val age: Int, val ovr: Int)
+    /** A real player of the era: his 2K attributes (when known) and his headshot. */
+    class Star(val name: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray? = null, val photo: String = "")
     class Club(val city: String, val name: String, val abbr: String, val primary: Long, val secondary: Long)
 
     /** The league's era (today for older saves and the college game). */
@@ -70,8 +71,15 @@ object Eras {
         else -> emptySet()
     }
 
-    /** The era's stars by today's team abbreviation. */
-    fun stars(era: Era): Map<String, List<Star>> = (RAW[era] ?: emptyMap()).mapValues { (_, s) ->
+    /** The era's stars by today's team abbreviation: the real data (EraData), or the earlier estimates without it. */
+    fun stars(era: Era): Map<String, List<Star>> {
+        val real = EraData.stars(era)
+        if (real.isNotEmpty()) return real.groupBy({ it.team }, { Star(it.name, it.pos, it.age, it.ovr, it.attrs, it.photo) })
+        return estimates(era)
+    }
+
+    /** The first hand-made lists (also where tools/build_eras.py finds stars missing from the data). */
+    private fun estimates(era: Era): Map<String, List<Star>> = (RAW[era] ?: emptyMap()).mapValues { (_, s) ->
         s.split(";").map { it.trim() }.filter { it.isNotEmpty() }.map { e ->
             val (n, p, a, o) = e.split("/").map { it.trim() }
             Star(n, Pos.valueOf(p), a.toInt(), o.toInt())

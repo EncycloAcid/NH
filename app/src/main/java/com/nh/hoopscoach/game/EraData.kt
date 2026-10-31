@@ -1,0 +1,84 @@
+package com.nh.hoopscoach.game
+
+import kotlin.math.roundToInt
+
+/**
+ * Real data for Era mode, from the user's NBA eras pack (resources/eras; personal use only):
+ * each past era's stars (the top 120 by Win Shares that season, plus a few who missed most of it)
+ * with ratings built from their NBA 2K cards, their 2K attributes and headshots; the first 60 picks
+ * of every draft from 1986 to 2026; and drafted players' college seasons.
+ * Built by tools/build_eras.py; ratings are on the game's pro scale.
+ */
+object EraData {
+    class Star(val era: Era, val id: String, val name: String, val team: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray?, val photo: String)
+    class Pick(val year: Int, val pick: Int, val id: String, val name: String, val college: String, val pos: Pos?, val age: Int, val peak: Int, val photo: String)
+    class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double)
+
+    private fun table(name: String): List<List<String>> =
+        (EraData::class.java.getResourceAsStream("/eras/$name")?.bufferedReader(Charsets.UTF_8)?.use { it.readLines() } ?: emptyList())
+            .filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split("|") }
+
+    private fun pos(s: String) = Pos.entries.firstOrNull { it.name == s }
+
+    private val allStars: List<Star> by lazy {
+        table("stars.tsv").mapNotNull { f ->
+            val era = Era.entries.firstOrNull { it.name == f[0] } ?: return@mapNotNull null
+            val attrs = f[7].takeIf { it.isNotEmpty() }?.split(",")?.map { it.toInt() }?.toIntArray()?.takeIf { it.size == 10 }
+            Star(era, f[1], f[2], f[3], pos(f[4]) ?: Pos.SF, f[5].toIntOrNull() ?: 27, f[6].toInt(), attrs, f[8])
+        }
+    }
+
+    private val drafts: Map<Int, List<Pick>> by lazy {
+        table("drafts.tsv").map { f -> Pick(f[0].toInt(), f[1].toInt(), f[2], f[3], f[4], pos(f[5]), f[6].toInt(), f[7].toInt(), f[8]) }.groupBy { it.year }
+    }
+
+    private val colleges: Map<String, List<College>> by lazy {
+        table("college.tsv").map { f ->
+            f[0] to College(f[1].toInt() + 1, f[2], f[3], listOf("FR", "SO", "JR", "SR").indexOf(f[4]) + 1, f[5].toIntOrNull() ?: 0,
+                f[6].toDoubleOrNull() ?: 0.0, f[7].toDoubleOrNull() ?: 0.0, f[8].toDoubleOrNull() ?: 0.0, f[9].toDoubleOrNull() ?: 0.0)
+        }.groupBy({ it.first }, { it.second })
+    }
+
+    fun stars(era: Era): List<Star> = allStars.filter { it.era == era }
+
+    /** The real draft of [year] (first 60 picks), or empty when there's no data for it. */
+    fun draft(year: Int): List<Pick> = drafts[year] ?: emptyList()
+
+    fun college(id: String): List<College> = colleges[id] ?: emptyList()
+
+    /**
+     * Gives [p] a real player's shape: his 2K attributes scaled so his overall lands on [target]
+     * (a great shooter stays a great shooter), then his second position from them.
+     */
+    fun shape(p: Player, attrs: IntArray, target: Int) {
+        // Each rating keeps its distance below 99, scaled: a great player's weak spots shrink but stay his weakest.
+        fun scaled(f: Double) = IntArray(10) { (99 - (99 - attrs[it]) * f).roundToInt().coerceIn(25, 99) }
+        var best = 1.0
+        var gap = Int.MAX_VALUE
+        var f = 0.05
+        while (f <= 3.0) {
+            val d = kotlin.math.abs(Ratings.ovr(p.pos, scaled(f)) - target)
+            if (d < gap) { gap = d; best = f }
+            f += 0.01
+        }
+        p.attrs = scaled(best)
+        p.pos2 = Ratings.secondFor(p.pos, p.attrs)
+    }
+
+    /** A real draftee: his name, college, ceiling, photo and college seasons. */
+    fun apply(p: Player, pick: Pick) {
+        val parts = pick.name.split(" ", limit = 2)
+        p.first = parts[0]
+        p.last = parts.getOrElse(1) { "" }
+        p.country = null
+        if (pick.photo.isNotEmpty()) p.photo = pick.photo
+        if (pick.college.isNotEmpty()) p.highSchool = pick.college
+        // Players who became stars get the ceiling they reached; the rest keep a raw rookie's.
+        if (pick.peak > 0) p.pot = maxOf(p.ovr, pick.peak + Rng.int(-1, 1)).coerceAtMost(99)
+        for (c in college(pick.id)) {
+            val s = StatLine(gp = c.g, sec = (c.mpg * 60 * c.g).roundToInt(), pts = (c.ppg * c.g).roundToInt(),
+                drb = (c.rpg * c.g).roundToInt(), ast = (c.apg * c.g).roundToInt())
+            p.career += SeasonLine(c.season, c.school, c.conf, c.cls.coerceIn(1, 4), p.ovr, s)
+        }
+    }
+}

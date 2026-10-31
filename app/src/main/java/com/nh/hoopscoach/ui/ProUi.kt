@@ -1561,7 +1561,7 @@ fun eraRules(era: Era): String = when (era) {
 @Composable
 private fun EraPicker(selected: Era, onPick: (Era) -> Unit) {
     Section("Choose your era")
-    Text("Play your pro career in today's league, or go back in time: that era's stars on their real teams, its style of play, its rules and its money.",
+    Text("Play your pro career in today's league, or go back in time: that era's real players on their real teams, with ratings from their NBA 2K cards and their photos, its style of play, its rules and its money. Each summer the real draft class arrives.",
         style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
     Spacer(Modifier.height(6.dp))
     Column(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {

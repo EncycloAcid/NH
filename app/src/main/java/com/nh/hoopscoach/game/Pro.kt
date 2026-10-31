@@ -265,6 +265,10 @@ object ProLeague {
         p.first = parts[0]
         p.last = parts.getOrElse(1) { "" }
         p.country = null
+        // His real strengths from his 2K card, and his photo.
+        s.attrs?.let { EraData.shape(p, it, proOverall(s.ovr)) }
+        p.pot = maxOf(p.pot, p.ovr)
+        if (s.photo.isNotEmpty()) p.photo = s.photo
         return p
     }
 
@@ -1011,6 +1015,8 @@ object ProCareer {
             rivalSlot = rookies.indexOfFirst { it.second <= rival.ovr }.let { if (it < 0) 59 else it }
         }
         ps.draftedByUser.clear()
+        // Past eras draft the real class of that year (1986 to 2026): names, colleges, ceilings and photos.
+        val real = if (Eras.of(lg) != Era.TODAY) EraData.draft(lg.season).associateBy { it.pick } else emptyMap()
         for (i in 0 until 60) {
             val t = lg.team(order[i % order.size])
             val p = if (i == rivalSlot && rival != null) {
@@ -1023,11 +1029,13 @@ object ProCareer {
                 rival
             } else {
                 val (pos, target) = rookies[i]
-                ProLeague.makePro(lg, pos, target, Rng.range(19, 22), t).also {
+                val pick = real[i + 1]
+                ProLeague.makePro(lg, pick?.pos ?: pos, target, pick?.age ?: Rng.range(19, 22), t).also {
                     it.proYears = 0
                     it.awards += "${lg.season} Draft #${i + 1}"
                     // Rookies come in raw, with real upside.
                     it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
+                    if (pick != null) EraData.apply(it, pick)
                 }
             }
             if (t.id == lg.userTeamId) ps.draftedByUser += p.id
