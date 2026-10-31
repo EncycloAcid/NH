@@ -8,16 +8,16 @@ import kotlin.math.roundToInt
  * conference, who shadows him all career: in the award races, on the big board, head to head and on Draft Night.
  */
 object Rival {
-    /** Signs the rival before the first season. Called once, when the career starts. */
+    /** Signs the rival: when the career starts, or at the next season for a career saved before rivals existed. */
     fun create(lg: League) {
         val r = lg.road ?: return
         val h = lg.playerOrNull(lg.heroId) ?: return
-        if (r.rivalId >= 0) return
+        if (r.rivalId >= 0 || r.ended || h.teamId < 0) return
         val home = lg.team(h.teamId)
         val conf = lg.teams.filter { it.confId == home.confId && it.id != home.id }.sortedByDescending { it.prestige }
         val t = if (conf.isNotEmpty()) Rng.pick(conf.take(3)) else lg.teams.filter { it.id != home.id }.maxBy { it.prestige }
-        val target = max(h.ovr + 1, Road.targetOvr(4) + 2).coerceAtMost(86)
-        val p = LeagueGen.makePlayer(lg, h.pos, 1, target, t.id)
+        val target = max(h.ovr + 1, Road.targetOvr(4) + 2).coerceAtMost(if (h.year <= 1) 86 else 94)
+        val p = LeagueGen.makePlayer(lg, h.pos, h.year.coerceIn(1, 4), target, t.id)
         if (p.country != null) { p.country = null; p.first = Rng.pick(Names.first); p.last = Rng.pick(Names.last); p.hometown = Rng.pick(Names.towns) }
         if (p.last == h.last) p.last = Rng.pick(Names.last.filter { it != h.last })
         p.pot = Rng.range(94, 97).coerceAtLeast(p.ovr + 8).coerceAtMost(99)
@@ -36,7 +36,12 @@ object Rival {
         Gameplan.autoAllocate(lg, t)
         r.rivalId = p.id
         r.rivalName = p.name
-        lg.news += News(lg.season, 0, "${p.name}, the No. ${p.recruitRank} recruit in the class, signs with ${t.school}", true)
+        lg.news += News(
+            lg.season, 0,
+            if (h.year <= 1) "${p.name}, the No. ${p.recruitRank} recruit in the class, signs with ${t.school}"
+            else "${p.name} of ${t.school}, the No. ${p.recruitRank} recruit in your class, is the rival everyone compares you to",
+            true,
+        )
     }
 
     /** The rival, current or former. */

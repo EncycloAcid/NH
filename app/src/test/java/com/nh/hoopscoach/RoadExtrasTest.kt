@@ -44,6 +44,32 @@ class RoadExtrasTest {
     }
 
     @Test
+    fun olderCareerGetsARival() {
+        Rng.r = Random(5)
+        var lg = LeagueGen.newLeague()
+        val hero = Road.createHero(lg, Road.Spec("Kai", "Turner", Pos.C, 83, 245, "Phoenix", "AZ", Arch.HUSTLE_BIG, 4, 33))
+        lg = Road.start(lg, hero, Road.offers(lg, hero).first().teamId)
+        // A save from before rivals: no rival on record.
+        val old = Rival.active(lg)!!
+        lg.road!!.rivalId = -1
+        lg.road!!.rivalName = ""
+        Road.chooseDeal(lg, NilDeal.STEADY)
+        var guard = 0
+        while (lg.phase != Phase.WRAP_UP && guard++ < 120) { Season.playDay(lg); lg.road!!.press?.let { Road.answer(lg, 0) } }
+        lg = SaveIO.decode(SaveIO.encode(lg))
+        Offseason.begin(lg)
+        lg.road!!.declared = false
+        while (lg.phase == Phase.OFFSEASON) Road.next(lg)
+        val rv = Rival.active(lg)
+        val h = lg.playerOrNull(lg.heroId)!!
+        assertTrue("a rival arrives with the new season", rv != null && rv.id != old.id)
+        assertEquals("from his class", h.year, rv!!.year)
+        assertEquals(h.pos, rv.pos)
+        assertTrue(rv.teamId != h.teamId)
+        println("back-filled rival: ${rv.name}, ${rv.cls}, ${lg.team(rv.teamId).school}, ovr ${rv.ovr} vs your ${h.ovr}")
+    }
+
+    @Test
     fun spotlightRivalAndSummers() {
         Rng.r = Random(11)
         var lg = LeagueGen.newLeague()

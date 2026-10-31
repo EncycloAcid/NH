@@ -358,6 +358,8 @@ object Road {
                 if (r.portal) stay(lg)
                 var g = 0
                 while (lg.phase == Phase.OFFSEASON && g++ < 20) Offseason.advance(lg)
+                // A career saved before rivals existed gets one when the new season starts.
+                if (lg.phase == Phase.REGULAR) Rival.create(lg)
             }
         }
         sync(lg)
