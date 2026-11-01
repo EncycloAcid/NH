@@ -84,6 +84,7 @@ object Careers {
                 blk = blk.getValue(p),
                 tov = tov.getValue(p),
                 foul = foul.getValue(p),
+                age = fit.totals.age,
             )
         }
     }

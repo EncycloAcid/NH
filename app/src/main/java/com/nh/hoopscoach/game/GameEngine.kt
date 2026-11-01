@@ -281,7 +281,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         ds: DefStats, trail: Int, bonus: Double, foulP: Double, passer: Player?,
     ) {
         val pMake = (makeChance(o, d, shooter, type, ds, trail) + bonus).coerceIn(0.12, 0.85)
-        val fouled = Rng.chance(foulP * (shooter.fingerprint?.draw ?: 1.0))
+        val fouled = Rng.chance(foulP * (shooter.fingerprint?.draw ?: 1.0) * ageStyle(shooter, "fta_rate"))
         val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
         val pts = if (type == 2) 3 else 2
         val sl = line(o, shooter)
@@ -439,6 +439,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
     }
 
+    private fun ageStyle(p: Player, stat: String): Double {
+        if (!lg.pro) return 1.0
+        val referenceAge = p.fingerprint?.age?.takeIf { it > 0.0 } ?: 27.0
+        return (AgeCurve.level(stat, p.age.toDouble()) / AgeCurve.level(stat, referenceAge)).coerceIn(0.6, 1.8)
+    }
+
     /**
      * Who commits a defensive foul: never a player who has already fouled out, and players in
      * foul trouble play more carefully. Big men foul most.
@@ -446,7 +452,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun pickFouler(d: Int, defense: List<Player>): Player {
         val ok = defense.filter { !fouledOut(d, it.id) }.ifEmpty { defense }
         return Rng.weighted(ok) {
-            PlayerWeights.foulW(it) * (it.fingerprint?.foul ?: 1.0) * (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble())
+            PlayerWeights.foulW(it) * (it.fingerprint?.foul ?: 1.0) * ageStyle(it, "pf36") *
+                (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble())
         }
     }
 
@@ -869,7 +876,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake = pMake.coerceIn(0.12, 0.82)
 
             val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } *
-                (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE) * (shooter.fingerprint?.draw ?: 1.0)
+                (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE) * (shooter.fingerprint?.draw ?: 1.0) *
+                ageStyle(shooter, "fta_rate")
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
             val pts = if (type == 2) 3 else 2
@@ -965,7 +973,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val (baseWi, baseWm, baseW3) = PlayerWeights.shotMix(p, lg.pro, era)
         var wi = baseWi
         var wm = baseWm
-        var w3 = baseW3 * (p.fingerprint?.three ?: 1.0)
+        var w3 = baseW3 * (p.fingerprint?.three ?: 1.0) * ageStyle(p, "3pa_share")
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }

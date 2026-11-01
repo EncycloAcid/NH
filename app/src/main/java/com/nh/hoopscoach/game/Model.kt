@@ -19,6 +19,7 @@ class Fingerprint(
     val blk: Double = 1.0,
     val tov: Double = 1.0,
     val foul: Double = 1.0,
+    var age: Double = 0.0,
 )
 
 /** The ten player attributes, stored in this order inside [Player.attrs]. */

@@ -48,7 +48,13 @@ object SaveIO {
         lg.reindex()
         repair(lg)
         NbaAwards.migrate(lg)
-        if (lg.pro && Eras.of(lg) == Era.TODAY && lg.players.none { it.fingerprint != null }) Careers.fingerprint(lg)
+        if (lg.pro && Eras.of(lg) == Era.TODAY) {
+            if (lg.players.none { it.fingerprint != null }) Careers.fingerprint(lg)
+            for (p in lg.players) {
+                val fp = p.fingerprint ?: continue
+                if (fp.age == 0.0) fp.age = EraData.career("${p.first} ${p.last}")?.age ?: 0.0
+            }
+        }
         // Saves from before team salary caps: everyone gets a deal.
         if (lg.pro && lg.players.any { it.teamId >= 0 && it.salary <= 0 && it.id != lg.heroId }) Payroll.sign(lg)
         if (lg.pro && lg.proState?.picks?.isEmpty() == true) Picks.ensure(lg)

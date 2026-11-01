@@ -3,6 +3,8 @@ package com.nh.hoopscoach.game
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.ln
+import kotlin.math.floor
 
 /**
  * The pro league the user's player enters after Draft Night: 30 franchises in two conferences,
@@ -1401,35 +1403,58 @@ object ProCareer {
                 val p = lg.player(pid)
                 ps.before[p.id] = p.ovr
                 val trainer = p.id == lg.heroId && lg.road?.hired?.contains(Staff.TRAINER) == true
-                // The user's player earns his growth until 30; after that he ages like everyone.
-                if (p.id == lg.heroId && p.age <= 30) Earned.hero(lg, p, dev) else develop(p, dev, trainer)
+                if (p.id == lg.heroId && p.age <= 27) {
+                    val ageBefore = p.age - 1
+                    Earned.hero(lg, p, dev)
+                    compositionDrift(p, ageBefore, p.age)
+                } else develop(p, dev, trainer)
             }
         }
         lg.reindex()
     }
 
     /** One summer of growth or decline for [p]. */
+    internal var DECLINE_SLOPE = 0.3
+
     fun develop(p: Player, coachDev: Int, trainer: Boolean = false) {
-        // Pros grow slower than college players, mostly while young: a fifth to a third of the gap to
-        // their ceiling a summer at 22 and under, less each year after, so the league doesn't fill up with 90s.
-        val share = when { p.age <= 22 -> 0.22 + Rng.d() * 0.12; p.age <= 25 -> 0.14 + Rng.d() * 0.1; else -> 0.06 + Rng.d() * 0.08 }
-        when {
-            p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev, share)
-            p.age <= 30 -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
-            else -> {
-                // A slow slide from 31, faster in the late 30s.
-                var drop = (p.age - 30) * 0.55 + Rng.d() * 0.8
-                if (trainer) drop *= 0.6
-                val steps = (drop * 7.3).roundToInt()
-                val w = doubleArrayOf(1.3, 0.6, 0.5, 1.0, 0.4, 1.1, 1.4, 1.0, 1.3, 1.2)
-                val idx = (0 until 10).toList()
-                repeat(steps) {
-                    val i = Rng.weighted(idx) { w[it] }
-                    p.attrs[i] = max(25, p.attrs[i] - 1)
-                }
-                p.pot = p.ovr
+        val ageAfter = p.age
+        val ageBefore = ageAfter - 1
+        if (ageAfter <= 27) {
+            val share = when { ageAfter <= 22 -> 0.22 + Rng.d() * 0.12; ageAfter <= 25 -> 0.14 + Rng.d() * 0.1; else -> 0.06 + Rng.d() * 0.08 }
+            Ratings.offseasonGrowth(p, coachDev, share)
+        } else {
+            p.pot = p.ovr
+            var drop = (ageAfter - 27) * DECLINE_SLOPE + Rng.d() * 0.6
+            if (trainer) drop *= 0.6
+            val steps = (drop * 7.3).roundToInt()
+            val weights = doubleArrayOf(1.3, 0.6, 0.5, 1.0, 0.4, 1.1, 1.4, 1.0, 1.3, 1.2)
+            val attrs = (0 until 10).toList()
+            repeat(steps) {
+                val i = Rng.weighted(attrs) { weights[it] }
+                p.attrs[i] = max(25, p.attrs[i] - 1)
             }
         }
+        compositionDrift(p, ageBefore, ageAfter)
+        if (p.pot < p.ovr) p.pot = p.ovr
+    }
+
+    private fun compositionDrift(p: Player, ageBefore: Int, ageAfter: Int) {
+        val mappings = arrayOf(
+            Attr.INS to ("fg2pct" to 59.0), Attr.MID to ("fg2pct" to 54.0), Attr.OUT to ("fg3pct" to 49.0),
+            Attr.HND to ("ast36" to 20.0), Attr.PAS to ("ast36" to 20.0), Attr.REB to ("trb" to 35.0),
+            Attr.PER to ("stl36" to 23.0), Attr.STL to ("stl36" to 23.0), Attr.IDF to ("blk36" to 23.0),
+            Attr.BLK to ("blk36" to 23.0),
+        )
+        for ((attr, mapping) in mappings) {
+            val (stat, scale) = mapping
+            val delta = scale * ln(AgeCurve.level(stat, ageAfter.toDouble()) / AgeCurve.level(stat, ageBefore.toDouble()))
+            val magnitude = kotlin.math.abs(delta)
+            var change = floor(magnitude).toInt()
+            if (Rng.chance(magnitude - change)) change++
+            if (delta < 0.0) change = -change
+            p.attrs[attr.ordinal] = (p.attrs[attr.ordinal] + change).coerceIn(25, 99)
+        }
+        if (p.pot < p.ovr) p.pot = p.ovr
     }
 
     // ---------- the end ----------
