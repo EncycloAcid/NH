@@ -143,7 +143,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                         5 -> "The biggest programs come calling, but you'll fight veterans for minutes."
                         4 -> "Strong programs want you, and a starting job is within reach."
                         else -> "Smaller schools will start you right away. Prove the big ones wrong."
-                    } + " Every level can reach the league.",
+                    } + " Your starting overall is rolled from ${Road.ovrRange(stars).first} to ${Road.ovrRange(stars).last} when the offers come in. Every level can reach the league.",
                     style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
                 )
                 Section("Jersey number")
@@ -180,6 +180,15 @@ private fun RoadOffers(vm: GameViewModel, lg: League, hero: Player, header: @Com
                             Text(hero.name, style = T.head, color = P.ink)
                             Text("${hero.posLabel} · ${Ratings.heightLabel(hero.height)} · ${hero.weight} lbs · ${hero.hometown}", style = T.small, color = P.sub)
                             Text("${Road.starLabel(hero.stars)} · No. ${hero.recruitRank} nationally · ${hero.style.label}", style = T.small, color = P.accent)
+                            val range = Road.ovrRange(hero.stars)
+                            Text(
+                                "Rolled ${hero.ovr} (range ${range.first}-${range.last}): " + when {
+                                    hero.ovr >= range.last - 2 -> "a top-end start."
+                                    hero.ovr <= range.first + 2 -> "a slow start. Plenty of room to grow."
+                                    else -> "right in the middle."
+                                },
+                                style = T.small, color = P.sub,
+                            )
                         }
                         Ring(hero.ovr, 48.dp, label = "OVR", textSize = 17.sp)
                         Spacer(Modifier.width(6.dp))

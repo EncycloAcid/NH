@@ -23,13 +23,28 @@ object Road {
         val era: Era = Era.TODAY,
     )
 
-    fun targetOvr(stars: Int) = when (stars) { 5 -> 82; 4 -> 77; else -> 71 }
+    /** A typical starting overall for each level (the middle of its range). */
+    fun targetOvr(stars: Int) = when (stars) { 5 -> 82; 4 -> 76; else -> 70 }
+
+    /** Where a new player's starting overall can land for each level. The ranges overlap, like real recruits. */
+    fun ovrRange(stars: Int): IntRange = when (stars) { 5 -> 78..86; 4 -> 72..80; else -> 66..74 }
+
+    /** His national ranking from where his roll landed in his level's range: a better roll, a better rank. */
+    private fun rankFor(stars: Int, ovr: Int): Int {
+        val r = ovrRange(stars)
+        val f = ((ovr - r.first).toDouble() / (r.last - r.first)).coerceIn(0.0, 1.0)
+        val (best, worst) = when (stars) { 5 -> 1 to 25; 4 -> 26 to 100; else -> 101 to 320 }
+        val spread = (worst - best) / 10
+        return (worst - (worst - best) * f + Rng.int(-spread, spread)).roundToInt().coerceIn(best, worst)
+    }
 
     fun starLabel(stars: Int) = when (stars) { 5 -> "Five-star blue-chipper"; 4 -> "Four-star prospect"; else -> "Three-star sleeper" }
 
     /** A high school senior built from the user's choices. Not on any team yet. */
     fun createHero(lg: League, s: Spec): Player {
-        val target = targetOvr(s.stars)
+        // A random start in his level's range: the middle is likeliest, the edges rarer.
+        val range = ovrRange(s.stars)
+        val target = ((Rng.range(range.first, range.last) + Rng.range(range.first, range.last)) / 2.0).roundToInt()
         val p = LeagueGen.makePlayer(lg, s.pos, 1, target, -1)
         p.first = s.first.trim().ifEmpty { "Jordan" }
         p.last = s.last.trim().ifEmpty { "Hayes" }
@@ -49,7 +64,7 @@ object Road {
         // A real ceiling at every level, but 99 has to be earned: growth slows above 90.
         p.pot = (when (s.stars) { 5 -> Rng.range(97, 99); 4 -> Rng.range(95, 98); else -> Rng.range(93, 97) }).coerceIn(p.ovr + 8, 99)
         p.stars = s.stars
-        p.recruitRank = when (s.stars) { 5 -> Rng.range(4, 18); 4 -> Rng.range(40, 90); else -> Rng.range(160, 320) }
+        p.recruitRank = rankFor(s.stars, p.ovr)
         p.posRank = (p.recruitRank / 5.0).roundToInt().coerceAtLeast(1)
         p.ovrHistory.clear()
         p.ovrHistory += p.ovr
