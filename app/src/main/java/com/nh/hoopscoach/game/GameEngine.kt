@@ -181,6 +181,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         )
     }
 
+    private fun scoreEffect(trail: Int): Double {
+        if (!lg.pro) return 0.0
+        val over = (abs(trail) - LEAD_FREE).coerceIn(0, LEAD_RANGE)
+        return -sign(trail.toDouble()) * over * LEAD_K
+    }
+
     /** Chance a shot of [type] goes in (0 inside, 1 mid-range, 2 three), as the regular possession figures it. */
     private fun makeChance(o: Int, d: Int, shooter: Player, type: Int, ds: DefStats, trail: Int): Double {
         var p = when (type) {
@@ -190,12 +196,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+        p += scoreEffect(trail)
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
-        if (lg.pro) {
-            val over = (abs(trail) - LEAD_FREE).coerceIn(0, LEAD_RANGE)
-            p -= sign(trail.toDouble()) * over * LEAD_K
-        }
         return p.coerceIn(0.12, 0.82)
     }
 
@@ -345,7 +348,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
         var PRO_TALENT = 1.7
-        var LEAD_K = 0.004
+        var LEAD_K = 0.003
         private const val LEAD_FREE = 8
         private const val LEAD_RANGE = 15
         private const val SIXTH_MIN = 26.0
@@ -461,8 +464,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 val starterIds = starters[side]
                 val i = chosen.indices.filter { j ->
                     val p = chosen[j]
-                    p.id !in starterIds && p.id != six.id && p.ovr <= six.ovr - 2 &&
-                        abs(p.pos.ordinal - six.pos.ordinal) <= 1
+                    p.id !in starterIds && p.id != six.id && p.ovr <= six.ovr - 1 &&
+                        abs(p.pos.ordinal - six.pos.ordinal) <= 2
                 }.minByOrNull { chosen[it].ovr }
                 if (i != null) chosen[i] = six
             }
@@ -730,6 +733,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (lg.pro) pMake += if (type == 2) 0.023 else 0.018 + era.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+            pMake += scoreEffect(trail)
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
