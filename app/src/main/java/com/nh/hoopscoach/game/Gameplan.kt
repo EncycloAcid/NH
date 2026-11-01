@@ -6,6 +6,7 @@ object Gameplan {
 
     private const val PRO_STARTER_MIN_BASE = 24
     private const val PRO_STARTER_MIN_SLOPE = 1.0
+    private val PRO_MINUTE_BASE = doubleArrayOf(34.0, 32.0, 30.5, 29.0, 27.5, 25.5, 21.0, 17.5, 13.0, 10.0)
 
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),
@@ -20,7 +21,7 @@ object Gameplan {
         if (pro) ((Ratings.offense(p) - 84) * 2.0 + 35).roundToInt().coerceIn(10, 99)
         else (Ratings.offense(p) * 1.3 - 30).roundToInt().coerceIn(10, 99)
 
-    /** Picks starters and backups by position and splits the minutes. */
+    /** Picks starters and backups by position, then assigns pro minutes by roster rank. */
     fun autoAllocate(lg: League, t: Team) {
         // Pro coaches give young, high-ceiling players development minutes: up to 4 points of credit.
         // The user's young pro gets a little extra: teams play the player they drafted to build around.
@@ -87,6 +88,25 @@ object Gameplan {
             }
             Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it, lg.pro) } ?: 50, r?.let { usageFor(it, lg.pro) } ?: 40)
         }
+        if (!lg.pro) {
+            t.plan.minutes.clear()
+            return
+        }
+        val ranked = lg.rosterOf(t).sortedByDescending(::rate).take(PRO_MINUTE_BASE.size)
+        if (ranked.isEmpty()) {
+            t.plan.minutes.clear()
+            return
+        }
+        val meanRate = ranked.map(::rate).average()
+        val targets = ranked.mapIndexed { i, p -> (PRO_MINUTE_BASE[i] + 0.8 * (rate(p) - meanRate)).coerceIn(0.0, 38.0) }.toMutableList()
+        repeat(3) {
+            val total = targets.sum()
+            if (total > 0.0) for (i in targets.indices) targets[i] = (targets[i] * 240.0 / total).coerceIn(0.0, 38.0)
+        }
+        val rounded = targets.map { it.roundToInt() }.toMutableList()
+        rounded[0] += 240 - rounded.sum()
+        t.plan.minutes = ranked.indices.associate { ranked[it].id to rounded[it] }.toMutableMap()
+        for (slot in t.plan.slots) slot.starterMin = (t.plan.minutes[slot.starter] ?: 0).coerceAtMost(40)
     }
 
     /** Makes sure the plan only references current roster players. */
@@ -100,6 +120,7 @@ object Gameplan {
     }
 
     fun plannedMinutes(t: Team, pid: Int): Int {
+        if (t.plan.minutes.isNotEmpty()) return t.plan.minutes[pid] ?: 0
         for (s in t.plan.slots) {
             if (s.starter == pid) return s.starterMin
             if (s.reserve == pid) return 40 - s.starterMin
@@ -108,6 +129,10 @@ object Gameplan {
     }
 
     fun role(t: Team, pid: Int): String {
+        if (t.plan.minutes.isNotEmpty()) {
+            if (t.plan.slots.any { it.starter == pid }) return "Starter"
+            return if ((t.plan.minutes[pid] ?: 0) > 0) "Rotation" else "Bench"
+        }
         for (s in t.plan.slots) {
             if (s.starter == pid) return "Starter"
             if (s.reserve == pid) return "Rotation"
@@ -117,6 +142,19 @@ object Gameplan {
 
     /** Team rating used for headers: minutes-weighted overall of the rotation. */
     fun teamRating(lg: League, t: Team, f: (Player) -> Int = { it.ovr }): Int {
+        if (t.plan.minutes.isNotEmpty()) {
+            var total = 0.0
+            var weight = 0
+            for (pid in t.roster) {
+                val minutes = t.plan.minutes[pid] ?: 0
+                val player = lg.playerOrNull(pid) ?: continue
+                if (minutes <= 0) continue
+                total += f(player) * minutes
+                weight += minutes
+            }
+            if (weight > 0) return (total / weight).roundToInt()
+            return lg.rosterOf(t).map(f).average().roundToInt()
+        }
         var s = 0.0
         var w = 0.0
         for (slot in t.plan.slots) {

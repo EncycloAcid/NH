@@ -67,7 +67,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
-    private val sixth: Array<Player?> = arrayOfNulls(2)
+    private val regularTargets: Array<Map<Int, Int>>
+    private val gameTargets: Array<Map<Int, Int>>
+    private val proFloor = Array(2) { mutableListOf<Player>() }
+    private val stintStart = Array(2) { mutableMapOf<Int, Double>() }
+    private val benchSince = Array(2) { mutableMapOf<Int, Double>() }
+    private val proLineupPeriod = IntArray(2)
     val score = IntArray(2)
     /**
      * The rules of the level. NBA: four 12-minute quarters, a 24-second shot clock (14 after an
@@ -351,7 +356,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         var LEAD_K = 0.003
         private const val LEAD_FREE = 8
         private const val LEAD_RANGE = 15
-        private const val SIXTH_MIN = 26.0
+        private val PLAYOFF_MINUTE_ADJ = doubleArrayOf(4.0, 4.0, 4.0, 3.5, 3.0, 1.0, -1.0, -4.0)
         /** The most of his team's shots one player takes while on the floor, in the pros. */
         var SHOT_CAP = 0.33
         const val NON_SHOOTING_PRO = 0.08
@@ -388,12 +393,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     init {
         for (t in teams) Gameplan.validate(lg, t)
+        regularTargets = Array(2) { side ->
+            teams[side].plan.minutes.takeIf { it.isNotEmpty() }?.toMap()
+                ?: rosters[side].associate { it.id to Gameplan.plannedMinutes(teams[side], it.id) }
+        }
+        gameTargets = Array(2) { side ->
+            if (lg.pro && game.type == GameType.PLAYOFF) playoffTargets(side) else regularTargets[side]
+        }
         for (side in 0..1) {
-            if (lg.pro) {
-                sixth[side] = teams[side].plan.slots.mapNotNull { slot ->
-                    if (slot.reserve == -1) null else byId[side][slot.reserve]
-                }.maxByOrNull { it.ovr }
-            }
+            for (p in rosters[side]) benchSince[side][p.id] = 0.0
         }
         for (side in 0..1) for (p in rosters[side]) lines[side][p.id] = StatLine()
         starters = Array(2) { side -> teams[side].plan.slots.map { it.starter }.filter { it >= 0 }.toSet() }
@@ -406,6 +414,30 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     // ---------- lineups ----------
 
     private fun fouledOut(side: Int, id: Int) = (lines[side][id]?.pf ?: 0) >= foulLimit
+
+    private fun playoffTargets(side: Int): Map<Int, Int> {
+        val ranked = rosters[side].sortedByDescending { regularTargets[side][it.id] ?: 0 }.take(PLAYOFF_MINUTE_ADJ.size)
+        if (ranked.isEmpty()) return emptyMap()
+        val targets = ranked.mapIndexed { i, p ->
+            ((regularTargets[side][p.id] ?: 0) + PLAYOFF_MINUTE_ADJ[i]).coerceIn(0.0, 42.0)
+        }.toMutableList()
+        repeat(3) {
+            val total = targets.sum()
+            if (total > 0.0) for (i in targets.indices) targets[i] = (targets[i] * 240.0 / total).coerceIn(0.0, 42.0)
+        }
+        val rounded = targets.map { it.roundToInt() }.toMutableList()
+        rounded[0] += 240 - rounded.sum()
+        return ranked.indices.associate { ranked[it].id to rounded[it] }
+    }
+
+    private fun gameSeconds(): Double {
+        val regulation = periodLen * regPeriods
+        return if (period <= regPeriods) {
+            (period - 1) * periodLen + periodLen - clock
+        } else {
+            regulation + (period - regPeriods - 1) * 300.0 + 300.0 - clock
+        }
+    }
 
     /**
      * Who commits a defensive foul: never a player who has already fouled out, and players in
@@ -430,7 +462,106 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         period <= 4 && pf >= period + 1 && !(period == 4 && clock <= 300)
     } else (period == 1 && pf >= 2 && clock > 300) || (period == 2 && pf >= 4 && clock > 240)
 
+    private fun proLineup(side: Int): List<Player> {
+        val roster = rosters[side]
+        val now = gameSeconds()
+        val frac = (now / (periodLen * regPeriods)).coerceIn(0.0, 1.0)
+        val late = finalPeriod && clock < 240
+        val margin = score[side] - score[1 - side]
+        val garbage = period == regPeriods && clock < 270 && abs(margin) >= 18
+        val chosen = ArrayList<Player>(5)
+        fun target(p: Player) = gameTargets[side][p.id] ?: 0
+        fun due(p: Player) = target(p) * 60.0 * frac - (lines[side][p.id]?.sec ?: 0)
+        fun notChosen(p: Player) = chosen.none { it.id == p.id }
+        val available = roster.filter { !fouledOut(side, it.id) }
+        val firstCallOfPeriod = proLineupPeriod[side] != period
+
+        if (firstCallOfPeriod && period in listOf(1, 3)) {
+            for (slot in teams[side].plan.slots) {
+                val starter = byId[side][slot.starter] ?: continue
+                if (!fouledOut(side, starter.id) && chosen.none { it.id == starter.id }) chosen += starter
+            }
+            for (p in available.sortedByDescending(::target)) {
+                if (chosen.size >= 5) break
+                if (chosen.none { it.id == p.id }) chosen += p
+            }
+        } else if (overtime || late && abs(margin) <= 12) {
+            chosen += available.sortedByDescending(::target).take(5)
+            if (chosen.none { it.pos == Pos.PG || it.pos == Pos.SG }) {
+                val guard = available.filter { notChosen(it) && (it.pos == Pos.PG || it.pos == Pos.SG) }.maxByOrNull(::target)
+                val out = chosen.minByOrNull(::target)
+                if (guard != null && out != null) chosen[chosen.indexOf(out)] = guard
+            }
+            val bigs = chosen.filter { it.pos == Pos.PF || it.pos == Pos.C }
+            if (bigs.size >= 3) {
+                val nonBig = available.filter { notChosen(it) && it.pos != Pos.PF && it.pos != Pos.C }.maxByOrNull(::target)
+                val out = bigs.minByOrNull(::target)
+                if (nonBig != null && out != null) chosen[chosen.indexOf(out)] = nonBig
+            }
+        } else {
+            chosen += proFloor[side]
+            for (out in chosen.filter { fouledOut(side, it.id) }.toList()) {
+                chosen.removeAll { it.id == out.id }
+                val replacement = roster.filter { !fouledOut(side, it.id) && it.id !in chosen.map(Player::id) }.maxByOrNull(::due)
+                if (replacement != null) chosen += replacement
+            }
+            chosen.removeAll { fouledOut(side, it.id) }
+
+            for (swap in 0 until 2) {
+                val onFloor = chosen.map(Player::id).toSet()
+                val outgoing = chosen.filter { p ->
+                    val stint = now - (stintStart[side][p.id] ?: now)
+                    val pf = lines[side][p.id]?.pf ?: 0
+                    !fouledOut(side, p.id) &&
+                        (stint >= 180.0 && (due(p) < -60.0 || foulTrouble(pf)) || stint >= 720.0)
+                }
+                val incoming = available.filter { p ->
+                    p.id !in onFloor && target(p) > 0 && !foulTrouble(lines[side][p.id]?.pf ?: 0) &&
+                        due(p) > 60.0 && now - (benchSince[side][p.id] ?: 0.0) >= 120.0
+                }.sortedByDescending(::due)
+                var pair: Pair<Player, Player>? = null
+                for (inPlayer in incoming) {
+                    val outPlayer = outgoing.filter { abs(it.pos.ordinal - inPlayer.pos.ordinal) <= 2 }.minByOrNull(::due)
+                    if (outPlayer != null) {
+                        pair = outPlayer to inPlayer
+                        break
+                    }
+                }
+                val (out, into) = pair ?: break
+                chosen.removeAll { it.id == out.id }
+                chosen += into
+            }
+        }
+
+        if (garbage) {
+            val deep = roster.filter { p -> chosen.none { it.id == p.id } && !fouledOut(side, p.id) }.sortedByDescending { it.ovr }
+            val starterIds = starters[side]
+            var k = 0
+            for (i in chosen.indices) {
+                if (k >= deep.size) break
+                if (chosen[i].id in starterIds) { chosen[i] = deep[k]; k++ }
+            }
+        }
+        if (chosen.size < 5) {
+            val extra = roster.filter { p -> chosen.none { it.id == p.id } && !fouledOut(side, p.id) }.sortedByDescending { it.ovr }
+            for (p in extra) { if (chosen.size >= 5) break; chosen += p }
+            if (chosen.size < 5) {
+                for (p in roster) { if (chosen.size >= 5) break; if (chosen.none { it.id == p.id }) chosen += p }
+            }
+        }
+
+        val ids = chosen.map { it.id }.toSet()
+        for (p in proFloor[side]) if (p.id !in ids) benchSince[side][p.id] = now
+        val oldIds = proFloor[side].map { it.id }.toSet()
+        for (p in chosen) if (p.id !in oldIds) stintStart[side][p.id] = now
+        proFloor[side].clear()
+        proFloor[side].addAll(chosen)
+        proLineupPeriod[side] = period
+        return chosen
+    }
+
     private fun lineup(side: Int): List<Player> {
+        if (lg.pro) return proLineup(side)
         val t = teams[side]
         val roster = rosters[side]
         val lookup = byId[side]
@@ -455,20 +586,6 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             var pick = if (useStarter) st ?: rs else rs ?: st
             if (pick != null && fouledOut(side, pick.id)) pick = (if (pick === st) rs else st)?.takeIf { !fouledOut(side, it.id) }
             if (pick != null && chosen.none { it.id == pick.id }) chosen += pick
-        }
-        if (lg.pro && !overtime && !(late && abs(margin) <= 12)) {
-            val six = sixth[side]
-            val elapsedFraction = (((period - 1) * periodLen + periodLen - clock) / (regPeriods * periodLen)).coerceIn(0.0, 1.0)
-            if (six != null && chosen.none { it.id == six.id } && !fouledOut(side, six.id) &&
-                (lines[side][six.id]?.sec ?: 0) < SIXTH_MIN * 60 * elapsedFraction) {
-                val starterIds = starters[side]
-                val i = chosen.indices.filter { j ->
-                    val p = chosen[j]
-                    p.id !in starterIds && p.id != six.id && p.ovr <= six.ovr - 1 &&
-                        abs(p.pos.ordinal - six.pos.ordinal) <= 2
-                }.minByOrNull { chosen[it].ovr }
-                if (i != null) chosen[i] = six
-            }
         }
         if (garbage) {
             // Empty the bench: swap the two best on the floor for deep reserves.
@@ -530,10 +647,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (shots == 1) freeThrows(o, shooter, 2, offense, defense, oneAndOne = true) else freeThrows(o, shooter, 2, offense, defense)
 
     private fun usage(side: Int, p: Player): Double {
-        var u = Gameplan.usageFor(p, lg.pro).toDouble() * 0.8
-        for (s in teams[side].plan.slots) {
-            if (s.starter == p.id) { u = s.starterUsg.toDouble(); break }
-            if (s.reserve == p.id) { u = s.reserveUsg.toDouble(); break }
+        var u = Gameplan.usageFor(p, lg.pro).toDouble() * if (lg.pro) 1.0 else 0.8
+        if (!lg.pro) {
+            for (s in teams[side].plan.slots) {
+                if (s.starter == p.id) { u = s.starterUsg.toDouble(); break }
+                if (s.reserve == p.id) { u = s.reserveUsg.toDouble(); break }
+            }
         }
         // Scorers look for their shot; defenders and glue guys less. The user's player, once he's the team's best, gets the ball like a star.
         return u * Tendency.usage(p) * (if (p.id == heroId) heroUsage[side] else 1.0)

@@ -274,6 +274,7 @@ class GamePlan(
     var offense: Offense = Offense.BALANCED,
     var defense: Defense = Defense.MAN,
     var slots: MutableList<Slot> = mutableListOf(),
+    var minutes: MutableMap<Int, Int> = mutableMapOf(),
     var auto: Boolean = true,
 )
 

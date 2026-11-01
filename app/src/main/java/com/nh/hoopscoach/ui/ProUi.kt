@@ -62,10 +62,10 @@ import com.nh.hoopscoach.game.Team
 
 // ---------- small helpers ----------
 
-/** Planned minutes: the plan is written per 40, and a pro game runs 48. */
+/** Legacy pro plans are per 40; minutes-target plans already use a 48-minute game. */
 fun planMin(lg: League, t: Team, pid: Int): Int {
     val m = com.nh.hoopscoach.game.Gameplan.plannedMinutes(t, pid)
-    return if (lg.pro) (m * 1.2).toInt() else m
+    return if (lg.pro && t.plan.minutes.isEmpty()) (m * 1.2).toInt() else m
 }
 
 /** Where an MVP-race rank puts him. */

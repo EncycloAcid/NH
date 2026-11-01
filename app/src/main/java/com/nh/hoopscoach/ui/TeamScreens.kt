@@ -112,7 +112,10 @@ private fun RingStat(label: String, v: Int) {
 fun LazyListScope.rosterList(vm: GameViewModel, lg: League, t: Team, mine: Boolean) {
     val roster = lg.rosterOf(t)
     val starters = t.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.starter } }
-    val rotation = t.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.reserve } }
+    val rotation = if (lg.pro && t.plan.minutes.isNotEmpty()) {
+        roster.filter { it !in starters && Gameplan.plannedMinutes(t, it.id) > 0 }
+            .sortedByDescending { Gameplan.plannedMinutes(t, it.id) }
+    } else t.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.reserve } }
     val bench = roster.filter { it !in starters && it !in rotation }.sortedByDescending { it.ovr }
     for ((label, list) in listOf("Starting five" to starters, "Rotation" to rotation, "Bench" to bench)) {
         if (list.isEmpty()) continue
@@ -175,7 +178,7 @@ private fun LazyListScope.lineup(vm: GameViewModel, lg: League, t: Team) {
             Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> vm.act { it.user.plan.offense = Offense.entries[i] } }
             Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> vm.act { it.user.plan.defense = Defense.entries[i] } }
         }
-        Section("Rotation · 200 minutes")
+        Section(if (lg.pro) "Rotation · 240 minutes" else "Rotation · 200 minutes")
     }
     items(Pos.entries.size) { i -> SlotPanel(vm, lg, t, i) }
 }
@@ -198,17 +201,24 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             SlotPick("Backup", rs, Modifier.weight(1f)) { choose = false }
         }
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$minutes", style = T.numSm, color = P.ink, modifier = Modifier.width(30.dp))
-            HoopsSlider(
-                minutes.toFloat(), { minutes = kotlin.math.round(it).toInt() }, 0f..40f, Modifier.weight(1f), enabled = rs != null,
-                onFinished = { val m = minutes; vm.act { slot.starterMin = m; it.user.plan.auto = false } },
+        if (lg.pro && t.plan.minutes.isNotEmpty()) {
+            Text(
+                "${st?.let { Gameplan.plannedMinutes(t, it.id) } ?: 0} / ${rs?.let { Gameplan.plannedMinutes(t, it.id) } ?: 0} min targets",
+                style = T.small, color = P.sub,
             )
-            Text("${40 - minutes}", style = T.numSm, color = P.sub, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
-        }
-        Expandable("Usage") {
-            UsageRow("Starter shot share", slot.starterUsg) { v -> vm.act { slot.starterUsg = v; it.user.plan.auto = false } }
-            if (rs != null) UsageRow("Backup shot share", slot.reserveUsg) { v -> vm.act { slot.reserveUsg = v; it.user.plan.auto = false } }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$minutes", style = T.numSm, color = P.ink, modifier = Modifier.width(30.dp))
+                HoopsSlider(
+                    minutes.toFloat(), { minutes = kotlin.math.round(it).toInt() }, 0f..40f, Modifier.weight(1f), enabled = rs != null,
+                    onFinished = { val m = minutes; vm.act { slot.starterMin = m; it.user.plan.auto = false } },
+                )
+                Text("${40 - minutes}", style = T.numSm, color = P.sub, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
+            }
+            Expandable("Usage") {
+                UsageRow("Starter shot share", slot.starterUsg) { v -> vm.act { slot.starterUsg = v; it.user.plan.auto = false } }
+                if (rs != null) UsageRow("Backup shot share", slot.reserveUsg) { v -> vm.act { slot.reserveUsg = v; it.user.plan.auto = false } }
+            }
         }
     }
     if (choose != null) {

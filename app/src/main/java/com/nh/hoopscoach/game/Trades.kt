@@ -310,7 +310,8 @@ object Trades {
             else if (t.winPct >= 0.6) { s += 10; why += "Winning: ${t.w}-${t.l}" }
         }
         val rank = lg.rosterOf(t).sortedByDescending { it.ovr }.indexOfFirst { it.id == h.id } + 1
-        val mins = (Gameplan.plannedMinutes(t, h.id) * 1.2).roundToInt()
+        val planned = Gameplan.plannedMinutes(t, h.id)
+        val mins = if (lg.pro && t.plan.minutes.isNotEmpty()) planned else (planned * 1.2).roundToInt()
         val want = when (rank) { 1 -> 34; 2 -> 32; 3 -> 30; else -> 24 }
         if (mins < want - 4) { s -= (want - mins) * 2.0; why += "Minutes: $mins a game; you want $want" }
         else if (rank <= 2 && mins >= want) why += "You're a focal point"
