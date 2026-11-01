@@ -7,6 +7,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 class PlayEvent(
     val period: Int,
@@ -66,6 +67,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
+    private val sixth: Array<Player?> = arrayOfNulls(2)
     val score = IntArray(2)
     /**
      * The rules of the level. NBA: four 12-minute quarters, a 24-second shot clock (14 after an
@@ -190,6 +192,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
+        if (lg.pro) {
+            val over = (abs(trail) - LEAD_FREE).coerceIn(0, LEAD_RANGE)
+            p -= sign(trail.toDouble()) * over * LEAD_K
+        }
         return p.coerceIn(0.12, 0.82)
     }
 
@@ -338,7 +344,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
-        var PRO_TALENT = 1.5
+        var PRO_TALENT = 1.9
+        var LEAD_K = 0.004
+        private const val LEAD_FREE = 8
+        private const val LEAD_RANGE = 15
+        private const val SIXTH_MIN = 26.0
         /** The most of his team's shots one player takes while on the floor, in the pros. */
         var SHOT_CAP = 0.33
         const val NON_SHOOTING_PRO = 0.08
@@ -375,6 +385,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     init {
         for (t in teams) Gameplan.validate(lg, t)
+        for (side in 0..1) {
+            if (lg.pro) {
+                sixth[side] = teams[side].plan.slots.mapNotNull { slot ->
+                    if (slot.reserve == -1) null else byId[side][slot.reserve]
+                }.maxByOrNull { it.ovr }
+            }
+        }
         for (side in 0..1) for (p in rosters[side]) lines[side][p.id] = StatLine()
         starters = Array(2) { side -> teams[side].plan.slots.map { it.starter }.filter { it >= 0 }.toSet() }
         if (pbp) {
@@ -435,6 +452,20 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             var pick = if (useStarter) st ?: rs else rs ?: st
             if (pick != null && fouledOut(side, pick.id)) pick = (if (pick === st) rs else st)?.takeIf { !fouledOut(side, it.id) }
             if (pick != null && chosen.none { it.id == pick.id }) chosen += pick
+        }
+        if (lg.pro && !overtime && !(late && abs(margin) <= 12)) {
+            val six = sixth[side]
+            val elapsedFraction = (((period - 1) * periodLen + periodLen - clock) / (regPeriods * periodLen)).coerceIn(0.0, 1.0)
+            if (six != null && chosen.none { it.id == six.id } && !fouledOut(side, six.id) &&
+                (lines[side][six.id]?.sec ?: 0) < SIXTH_MIN * 60 * elapsedFraction) {
+                val starterIds = starters[side]
+                val i = chosen.indices.filter { j ->
+                    val p = chosen[j]
+                    p.id !in starterIds && p.id != six.id && p.ovr <= six.ovr - 2 &&
+                        abs(p.pos.ordinal - six.pos.ordinal) <= 1
+                }.minByOrNull { chosen[it].ovr }
+                if (i != null) chosen[i] = six
+            }
         }
         if (garbage) {
             // Empty the bench: swap the two best on the floor for deep reserves.

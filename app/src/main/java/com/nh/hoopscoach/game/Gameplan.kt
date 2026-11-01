@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 object Gameplan {
 
     private const val PRO_STARTER_MIN_BASE = 24
-    private const val PRO_STARTER_MIN_SLOPE = 0.8
+    private const val PRO_STARTER_MIN_SLOPE = 1.0
 
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),
