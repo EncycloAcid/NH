@@ -189,22 +189,27 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
   - **Other moments**: multi-overtime classics, Cinderella runs (a 10 seed or lower reaching the Sweet 16, a 7 seed or lower reaching the Final Four) and the national title.
   - **Where they show**: each one gets a tagged headline, and during March, Today shows the latest upset alerts. Bracket winners that pulled an upset get an UPSET tag.
   - **Highlight reel**: every moment is saved to a reel under League → History, with a filter for your team, and the season review lists the year's top March moments. Your own buzzer-beaters count in any month.
-- **Hoops Dynasty Preview**: a 15-page preseason yearbook. Each new issue opens itself before your first game of the season, and you swipe through it page by page (or tap the page ticks to jump). Reopen it any time from Today or League → Polls.
-  1. **Cover**: the preseason No. 1 and what's inside.
-  2. **Contents and editor's letter**: the big storylines of the year.
-  3. **Top 5**: a feature on each, with projected record, star, newcomer and a scouting report of strengths and worries.
-  4. **Nos. 6–25**: the rest of the poll, each with a short write-up.
-  5. **Preseason All-America**: three five-man teams.
-  6. **Freshman class**: the top recruiting classes and the top 10 freshmen.
-  7. **New faces, last calls**: impact transfers, portal winners and the best seniors.
-  8. **Breakouts and sleepers**: breakout candidates, plus stars at mid-major schools.
-  9. **Your conference in depth**: predicted finish and a line on every team.
-  10. **Power conferences**: contenders and Player of the Year picks for the big leagues.
-  11. **Mid-major roundup**: the pick and player to watch in every other league.
-  12. **Team report**: your own team's outlook, starting five, bench and scouting report.
-  13. **Coaches**: the top 10 coaches and the hot seat.
-  14. **Games to watch**: early-season tournaments and the 10 regular-season games to circle.
-  15. **Predictions**: Final Four, champion, Cinderella, sleeper, award picks and bold predictions.
+- **Hoops Dynasty Preview**: an 18-page preseason magazine. Each new issue opens itself before your first game of the season, and you swipe through it page by page (or tap the page ticks to jump). Reopen it any time from Today or League → Polls.
+  - **Built on 400 simulated seasons**: before the issue goes out, the season is played 400 times from each game's win odds: the regular season, the conference tournaments, a 68-team NCAA field (conference winners plus the best at-large résumés, with the First Four) and the bracket. Every team gets a projected record with a likely win range and its odds to win its conference, make the NCAA Tournament, reach the Sweet 16 and the Final Four, and win the title. Each conference gets a projected number of bids.
+  - **Different every year**: the cover headline, the storylines and the write-ups come from what happened (the defending champion, who returns, who transferred, new coaches) and change wording from season to season.
+  1. **Cover**: the No. 1 team, its title odds, three cover stories and your team's outlook.
+  2. **Contents and editor's letter**.
+  3. **Storylines**: up to 12 stories to follow: the favorite (or a wide-open year), your team (and your player in player mode), the defending champion, the closest power-conference race, the biggest riser and faller, the portal's winner, the top freshman, a new coach, the hot seat, the Player of the Year race, a senior's last ride, a bracket buster and a rivalry.
+  4. **The title race**: favorites, contenders, dark horses and long shots with their title, Final Four and Sweet 16 odds, plus title odds by conference.
+  5. **Top 5**: a feature on each in team colors: projected record and win range, conference/Final Four/title odds, returning starters and scoring, the star and the X-factor, why they'll win it and why they won't.
+  6. **Nos. 6–25**: movement from last season's final poll, Final Four odds, last season, the star and the top newcomer.
+  7. **Preseason All-America**: the Player of the Year pick, three five-man teams with last season's numbers, and the Player of the Year odds.
+  8. **Best at every spot**: the top five at each position, and where your best player at each spot ranks.
+  9. **Freshman class**: the top recruiting classes and the top 10 freshmen.
+  10. **New faces, last calls**: impact transfers, portal winners, good teams starting over and the best seniors.
+  11. **Breakouts and sleepers**: breakout candidates with their ceilings, plus stars at mid-major schools.
+  12. **Your conference in depth**: projected bids, predicted finish with every team's title odds and NCAA odds.
+  13. **Power rankings**: conferences ranked by their best eight teams with projected bids, then the power conferences' contenders.
+  14. **Mid-major roundup**: the pick, its NCAA odds and the player to watch in every other league.
+  15. **Team report**: your team's odds, returning starters, scouting grades (against the teams ranked closest to you), three key questions, the starting five, bench, newcomers, the big games with your chance to win each, and the bottom line.
+  16. **Coaches**: the top 10, new hires, the hot seat and your coach's job security.
+  17. **Games to watch**: early-season tournaments and the 10 regular-season games to circle, with our pick.
+  18. **Predictions**: Final Four, champion, Cinderella, sleeper, every conference champion, award picks and bold predictions.
   Once conference play starts, the conference pages show who's ahead of or behind the prediction.
 - **Player archetypes**: 54 play styles, each locked to one position (10 or 11 per position), so a center can't be a Floor General and a point guard can't be a Rim Protector. No two styles at a position boost the same three ratings. PG: Floor General, Playmaker, Table Setter, Ball Hawk, Pest, Logo Shooter, Scoring Point, Speedster, Pick-and-Roll Maestro, Point-of-Attack Defender. SG: Sharpshooter, Combo Guard, Shot Creator, Two-Way Guard, Microwave, Movement Shooter, Bully Guard, Spot-Up Shooter, Midrange Maestro, Downhill Guard, Spark Plug. SF: Slasher, 3-and-D Wing, Lockdown Defender, Point Forward, Glue Guy, High Flyer, Iso Wing, Three-Level Scorer, Post Wing, Corner Specialist, Two-Way Wing. PF: Stretch, Rebounder, Face-Up Four, Switchable Big, Pick-and-Pop Big, Hustle Big, Athletic Four, Low-Post Four, Playmaking Four, Dunker Spot Big, Defensive Anchor. C: Post Scorer, Rim Protector, Rim Runner, Point Center, Stretch Five, Enforcer, Unicorn, Glass Cleaner, Elbow Hub, Mobile Big, Paint Beast. The creator, Training focus and Edit player only offer the position's own styles (and his second position's, if he has one). Each raises three ratings when used as a training focus.
 - **Rarer 99s**: up to 90 every point of growth takes; above that each point gets harder (60% at 93, 30% at 96, 10% at 98), for training, practice, summers and camps alike. Created players' ceilings are 97 to 99 for a five-star, 95 to 98 for a four-star and 93 to 97 for a three-star, so most careers peak around 96 to 98 and a 99 has to be earned.

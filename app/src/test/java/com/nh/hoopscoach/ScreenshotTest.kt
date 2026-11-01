@@ -140,7 +140,7 @@ class ScreenshotTest {
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Read the issue", substring = true))
         rule.waitForIdle(); shot("V01_today_card")
         vm.push(Route.Preview); rule.waitForIdle(); shot("V01_page01")
-        for (page in 2..15) {
+        for (page in 2..18) {
             rule.onNodeWithText("Next ›").performClick()
             rule.mainClock.advanceTimeBy(1500)
             rule.waitForIdle(); shot("V01_page" + "%02d".format(page))
