@@ -185,41 +185,74 @@ object Brand {
 
     fun target(lg: League, t: Team, round: Int, confPlace: Int, confChamp: Boolean): Target {
         val record = 24 + t.winPct * 46
-        val conf = (if (confPlace == 1) 5.0 else if (confPlace <= 3) 2.0 else 0.0) + if (confChamp) 3.0 else 0.0
+        val conf = (if (confPlace == 1) 5.0 else if (confPlace <= 3) 2.0 else 0.0) + if (confChamp) 4.0 else 0.0
         val e = exposure(lg, t.confId)
-        val resist = 0.72 + 0.28 * e / 100.0
+        val resist = 0.78 + 0.22 * e / 100.0
         val march = when (round) { 0 -> 0.0; 1 -> 5.0; 2 -> 10.0; 3 -> 16.0; 4 -> 21.0; 5 -> 27.0; 6 -> 30.0; else -> 34.0 }
         val q1 = Rankings.quadRecord(lg, t, 1).substringBefore('-').toIntOrNull() ?: 0
         val quality = q1.coerceAtMost(9) * 1.2
         val lastDraft = lg.draftHistory.filter { it.season == lg.season - 1 && it.teamId == t.id }.sumOf { Pipeline.value(it.pick) }
         val awards = lg.seasonAwards.count { it.teamId == t.id } * 1.5
-        return Target(record, conf, march, quality, lastDraft.coerceAtMost(5).toDouble(), awards.coerceAtMost(5.0), resist, (e - 50) * 0.25)
+        // A big stage adds; a small one takes away a little less than it used to.
+        val stage = if (e >= 50) (e - 50) * 0.25 else (e - 50) * 0.15
+        return Target(record, conf, march, quality, lastDraft.coerceAtMost(5).toDouble(), awards.coerceAtMost(5.0), resist, stage)
+    }
+
+    /** Seasons in a row that Prestige went up, up to three: a program on a run climbs faster. */
+    fun streak(t: Team): Int {
+        val h = t.history.map { it.prestige }
+        var n = 0
+        for (i in h.indices.reversed()) {
+            if (i == 0 || h[i] <= h[i - 1]) break
+            n++
+        }
+        return n.coerceAtMost(3)
+    }
+
+    /** How far Prestige moves toward what a season earned: a fifth-plus of the way up (more on a streak), 14% down. */
+    fun climbRate(t: Team, earned: Double): Double {
+        val now = t.prestige.toDouble()
+        if (earned < now) return 0.14
+        val legacyBoost = if (t.legacy > now) 0.12 * ((t.legacy - now) / 25).coerceIn(0.0, 1.0) else 0.0
+        return 0.22 + 0.04 * streak(t) + legacyBoost
     }
 
     /**
-     * End-of-season prestige. Moves 15% toward what the season earned (faster for a fallen power
-     * with Legacy to fall back on), leans slightly on Legacy, then meets the resume ceiling.
+     * End-of-season prestige. Moves toward what the season earned (faster on a streak of rising
+     * seasons, and for a fallen power with Legacy to fall back on), leans slightly on Legacy, then
+     * meets the resume ceiling. A season well above the program's standing always shows: at least
+     * +2 (or +1 for a smaller gap).
      */
     fun newPrestige(t: Team, earned: Double, round: Int): Double {
         val now = t.prestige.toDouble()
-        val climbBoost = if (earned > now && t.legacy > now) 0.12 * ((t.legacy - now) / 25).coerceIn(0.0, 1.0) else 0.0
-        val rate = if (earned >= now) 0.15 + climbBoost else 0.12
-        var p = now + (earned - now) * rate
-        p += (t.legacy - p) * 0.04
+        var p = now + (earned - now) * climbRate(t, earned)
+        p += (t.legacy - p) * 0.03
+        if (earned - now >= 8) p = max(p, now + 2) else if (earned - now >= 3) p = max(p, now + 1)
         val ceil = ceiling(t, round)
         if (p > 70 && p > ceil) {
             if (p > now) {
                 val start = max(now, ceil)
-                if (p > start) p = start + (p - start) * 0.25
+                if (p > start) p = start + (p - start) * 0.4
             }
             if (p > 80) p -= (p - max(ceil, 80.0)) * 0.15
         }
         return p
     }
 
+    /**
+     * Where the season in progress is heading: what it would earn if it ended now with an NCAA
+     * finish of [round], and the Prestige change that would bring.
+     */
+    fun outlook(lg: League, t: Team, round: Int): Pair<Int, Int> {
+        val place = Season.standings(lg, t.confId).indexOf(t) + 1
+        val earned = target(lg, t, round, place, false).total
+        return earned.roundToInt() to (newPrestige(t, earned, round).roundToInt().coerceIn(5, 99) - t.prestige)
+    }
+
     /** Legacy creeps toward Prestige, with a bump for the biggest moments. */
     fun updateLegacy(t: Team, round: Int) {
-        t.legacy += (t.prestige - t.legacy) * 0.05
+        // Legacy follows a rising program a little faster, so a climb sticks.
+        t.legacy += (t.prestige - t.legacy) * if (t.prestige > t.legacy) 0.08 else 0.05
         if (round >= 5) t.legacy += 0.8
         if (round == 7) t.legacy += 1.2
         t.legacy = t.legacy.coerceIn(5.0, 99.0)

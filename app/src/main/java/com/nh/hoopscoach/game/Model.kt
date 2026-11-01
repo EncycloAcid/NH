@@ -583,6 +583,12 @@ class WrapUp(
     /** Short round names for each game in [path]. */
     val pathRounds: List<String> = emptyList(),
     val nitReward: NitReward? = null,
+    /** What the season earned (Prestige moves toward it), and the pieces that added up to it. */
+    val earned: Int = 0,
+    val earnedParts: List<Driver> = emptyList(),
+    /** How far Prestige moved toward [earned] this season, and the rising streak behind it. */
+    val climbRate: Double = 0.0,
+    val streak: Int = 0,
 )
 
 /** What an NIT title earned the program. */

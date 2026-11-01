@@ -1,5 +1,7 @@
 package com.nh.hoopscoach.ui
 
+import kotlin.math.roundToInt
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -279,13 +281,47 @@ private fun LazyListScope.programPage(vm: GameViewModel, lg: League, w: WrapUp) 
             Spacer(Modifier.height(8.dp))
             Text(
                 when {
-                    w.prestigeDelta >= 3 -> "A ${w.w}-${w.l} season and a ${w.result.lowercase()} finish lifted the program."
-                    w.prestigeDelta > 0 -> "A solid year nudged the program forward. Prestige moves slowly; March runs move it most."
+                    w.prestigeDelta >= 3 -> "A ${w.w}-${w.l} season and a ${w.result.lowercase()} finish lifted the program." +
+                        if (w.streak >= 1) " That's ${w.streak + 1} straight seasons up, and a program on a run climbs faster." else " Do it again and the climb speeds up."
+                    w.prestigeDelta > 0 -> "A solid year moved the program forward. Rise again next year and the climb speeds up; March runs move it most."
                     w.prestigeDelta == 0 -> "The program held steady. A deeper tournament run would move the needle."
-                    else -> "The program slipped this year. Prestige follows several seasons of results, so one good year starts the climb back."
+                    else -> "The program slipped this year. One good season starts the climb back."
                 },
                 style = T.small, color = P.sub,
             )
+        }
+        if (w.earned > 0 && w.earnedParts.isNotEmpty()) {
+            Section("What the season earned")
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("THIS SEASON EARNED", style = T.label, color = P.sub)
+                        Text("${w.earned}", style = T.hero, color = if (w.earned > w.prestigeBefore) P.good else if (w.earned < w.prestigeBefore) P.bad else P.ink)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("PRESTIGE WAS", style = T.label, color = P.sub)
+                        Text("${w.prestigeBefore}", style = T.hero, color = P.ink)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (w.earned > w.prestigeBefore) "Prestige climbs ${(w.climbRate * 100).roundToInt()}% of the way toward what a season earns" +
+                        (if (w.streak > 0) ", faster after ${w.streak} rising season${if (w.streak == 1) "" else "s"} in a row." else ". Each rising season in a row adds 4 points to that.") +
+                        " A season well above your standing is always worth at least +2."
+                    else "When a season earns less than the program's standing, Prestige slides 14% of the way down.",
+                    style = T.small, color = P.sub,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            GroupList(w.earnedParts) { d ->
+                ListRow {
+                    Column(Modifier.weight(1f)) {
+                        Text(d.label, style = T.bodyB, color = P.ink)
+                        Text(d.detail, style = T.small, color = P.sub)
+                    }
+                    Text(d.value, style = T.numSm, color = if (d.value.startsWith("-")) P.bad else if (d.value == "+0") P.faint else P.good)
+                }
+            }
         }
         Section("Season signals")
         GroupList(w.signals) { s ->

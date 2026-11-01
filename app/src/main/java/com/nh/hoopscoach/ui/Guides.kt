@@ -171,14 +171,14 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
         ),
         sec(
             "How Prestige moves",
-            "After each season, Prestige moves about 15% of the way toward what the season earned (12% on the way down). A season earns credit for:",
+            "After each season, Prestige moves about 22% of the way toward what the season earned, plus 4 more for each season in a row it went up (up to three), so a program on a run climbs faster. A season well above your standing is always worth at least +2. On the way down it slides 14% of the way. A season earns credit for:",
             "• Your record.",
             "• Your conference finish, plus a conference tournament title.",
             "• Your NCAA Tournament run.",
             "• Quadrant 1 wins.",
             "• Players taken in the most recent draft.",
             "• National awards.",
-            "Rivalry games move Prestige during the season, and an NIT title adds 2 or 3 on top.",
+            "Rivalry games move Prestige during the season, and an NIT title adds 2 or 3 on top. During the season, the Program panel shows what the season is on pace to earn and what a Sweet 16 run would add; the season review breaks down what it earned, piece by piece.",
             "Below 70, records and conference titles do most of the work. Above 70, the climb needs national proof: quality wins and deep March runs.",
             "Your conference doesn't wall you in, but it pushes back. Records in a low-exposure league count for less, and a high-exposure league adds a little on its own. A small school can become a national brand, but it gets there in March, not just by winning its league.",
             "• Round of 32 most years supports the low 80s.",
@@ -188,7 +188,7 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
         ),
         sec(
             "Resume ceiling",
-            "Above 70, your last 10 NCAA Tournaments set a soft ceiling on Prestige. Past it, climbing slows to a quarter of the usual pace, and above 80 you drift back toward the ceiling each season. Seasons before your save began count at the level your Legacy implies.",
+            "Above 70, your last 10 NCAA Tournaments set a soft ceiling on Prestige. Past it, climbing slows to 40% of the usual pace, and above 80 you drift back toward the ceiling each season. Seasons before your save began count at the level your Legacy implies.",
             "A great season can still push you up, but holding a higher tier takes the March history to back it.",
         ),
         sec(

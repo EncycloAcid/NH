@@ -263,6 +263,17 @@ fun ProgramNumbers(vm: GameViewModel, lg: League, t: Team) {
         BrandLine("Program Pull", "What recruits, coaches and players see. Recruits call it Recruiting Pull.")
         BrandLine("Conference", "${com.nh.hoopscoach.game.Brand.exposureLabel(exposure)} exposure in the ${lg.conf(t.confId).abbr}.")
         BrandLine("Resume ceiling", "${ceiling.roundToInt()} · ${com.nh.hoopscoach.game.Brand.ceilingLabel(ceiling)}. Above 70, Prestige won't stick far past this without more March wins.")
+        // The season in progress: where Prestige is heading, and what March would add.
+        if (!lg.pro && t.gp >= 5 && (lg.phase == com.nh.hoopscoach.game.Phase.REGULAR || lg.phase == com.nh.hoopscoach.game.Phase.CONF_TOURNEY)) {
+            val (now, d) = com.nh.hoopscoach.game.Brand.outlook(lg, t, 0)
+            val (_, s16) = com.nh.hoopscoach.game.Brand.outlook(lg, t, 3)
+            val streak = com.nh.hoopscoach.game.Brand.streak(t)
+            BrandLine(
+                "This season",
+                "On pace to earn $now, for ${if (d >= 0) "+" else "−"}${abs(d)} Prestige. A Sweet 16 run would make it ${if (s16 >= 0) "+" else "−"}${abs(s16)}." +
+                    if (streak > 0) " $streak rising season${if (streak == 1) "" else "s"} in a row: the climb is faster." else "",
+            )
+        }
         if (t.expWins > 0) BrandLine("Expected wins", "${t.expWins.roundToInt()}, the preseason target from this schedule. ${if (t.gp > 0) "${t.w} so far." else ""}")
     }
 }
