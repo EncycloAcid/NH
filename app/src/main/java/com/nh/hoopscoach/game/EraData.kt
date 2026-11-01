@@ -16,7 +16,7 @@ object EraData {
     class CareerTotals(
         val id: String, val games: Int, val mp: Int, val fg: Int, val fga: Int, val fg3: Int, val fg3a: Int,
         val ft: Int, val fta: Int, val orb: Int, val drb: Int, val ast: Int, val stl: Int, val blk: Int,
-        val tov: Int, val pf: Int, val pts: Int,
+        val tov: Int, val pf: Int, val pts: Int, val age: Double,
     )
     class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double,
         val id: String = "", val ours: String = "")
@@ -67,7 +67,7 @@ object EraData {
         table("today_career.tsv").associate { f ->
             f[0] to CareerTotals(f[1], f[2].toInt(), f[3].toInt(), f[4].toInt(), f[5].toInt(), f[6].toInt(), f[7].toInt(),
                 f[8].toInt(), f[9].toInt(), f[10].toInt(), f[11].toInt(), f[12].toInt(), f[13].toInt(), f[14].toInt(),
-                f[15].toInt(), f[16].toInt(), f[17].toInt())
+                f[15].toInt(), f[16].toInt(), f[17].toInt(), f[18].toDouble())
         }
     }
 

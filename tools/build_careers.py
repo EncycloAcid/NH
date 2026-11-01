@@ -16,6 +16,7 @@ def page(y):
     return open(path, encoding='utf-8').read()
 
 car, names, last = collections.defaultdict(collections.Counter), {}, {}
+age_minutes, weighted_age = collections.defaultdict(float), collections.defaultdict(float)
 for y in range(2004, LAST + 1):
     t = re.search(r'<table[^>]*id="totals_stats".*?</table>', page(y), re.S).group(0)
     rows = collections.defaultdict(list)
@@ -30,6 +31,9 @@ for y in range(2004, LAST + 1):
         nm, d = (comb or lst)[0]
         names[pid], last[pid] = nm, y
         for k in S: car[pid][k] += float(d.get(k) or 0)
+        mp = float(d.get('mp') or 0)
+        age_minutes[pid] += mp
+        weighted_age[pid] += mp * float(d.get('age') or 0)
 
 def norm(n):
     n = unicodedata.normalize('NFKD', n).encode('ascii', 'ignore').decode().lower().replace('.', '')
@@ -47,8 +51,9 @@ for line in open(f'{REPO}/app/src/main/resources/eras/today2k.tsv', encoding='ut
     ids = by.get(ALIAS.get(norm(name), norm(name)))
     if not ids: missing.append(name); continue
     pid = max(ids, key=lambda i: last[i])  # same name (a father, a namesake): the one playing now
-    out.append([name, pid] + [str(int(car[pid][k])) for k in S])
+    age = weighted_age[pid] / age_minutes[pid] if age_minutes[pid] else 0.0
+    out.append([name, pid] + [str(int(car[pid][k])) for k in S] + [f'{age:.1f}'])
 with open(f'{REPO}/app/src/main/resources/eras/today_career.tsv', 'w', encoding='utf-8') as f:
-    f.write('# name|bbref id|' + '|'.join(S) + f' (NBA regular-season career totals 2003-04 to {LAST - 1}-{LAST % 100:02d}, basketball-reference; personal use)\n')
+    f.write('# name|bbref id|' + '|'.join(S) + '|age' + f' (NBA regular-season career totals 2003-04 to {LAST - 1}-{LAST % 100:02d}, basketball-reference; personal use)\n')
     for r in out: f.write('|'.join(r) + '\n')
 print(len(out), 'players;', len(missing), 'without NBA games:', ', '.join(missing))
