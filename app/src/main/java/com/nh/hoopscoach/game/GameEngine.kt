@@ -27,7 +27,7 @@ internal object PlayerWeights {
     private fun posBlk(pos: Pos) = when (pos) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
     private fun posFoul(pos: Pos) = when (pos) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
     private fun posReb(pos: Pos, pro: Boolean) = if (pro) when (pos) {
-        Pos.C -> 1.3; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 0.9; Pos.PG -> 0.85
+        Pos.C -> 1.03; Pos.PF -> 0.83; Pos.SF -> 0.86; Pos.SG -> 1.21; Pos.PG -> 1.21
     } else when (pos) {
         Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05
     }
