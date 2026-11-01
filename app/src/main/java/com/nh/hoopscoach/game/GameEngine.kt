@@ -353,6 +353,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
         var PRO_TALENT = 1.7
+        internal var AGE_STYLE = true
         var LEAD_K = 0.003
         private const val LEAD_FREE = 8
         private const val LEAD_RANGE = 15
@@ -440,7 +441,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     private fun ageStyle(p: Player, stat: String): Double {
-        if (!lg.pro) return 1.0
+        if (!lg.pro || !AGE_STYLE) return 1.0
         val referenceAge = p.fingerprint?.age?.takeIf { it > 0.0 } ?: 27.0
         return (AgeCurve.level(stat, p.age.toDouble()) / AgeCurve.level(stat, referenceAge)).coerceIn(0.6, 1.8)
     }

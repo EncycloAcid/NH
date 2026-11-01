@@ -6,7 +6,7 @@ object Gameplan {
 
     private const val PRO_STARTER_MIN_BASE = 24
     private const val PRO_STARTER_MIN_SLOPE = 1.0
-    private val PRO_MINUTE_BASE = doubleArrayOf(34.0, 32.0, 30.5, 29.0, 27.5, 25.5, 21.0, 17.5, 13.0, 10.0)
+    private val PRO_MINUTE_BASE = doubleArrayOf(31.7, 29.7, 28.3, 27.5, 26.5, 26.5, 22.0, 19.5, 15.3, 13.0)
 
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),

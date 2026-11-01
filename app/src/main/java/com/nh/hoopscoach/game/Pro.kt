@@ -1414,7 +1414,7 @@ object ProCareer {
     }
 
     /** One summer of growth or decline for [p]. */
-    internal var DECLINE_SLOPE = 0.3
+    internal var DECLINE_SLOPE = 0.0
 
     fun develop(p: Player, coachDev: Int, trainer: Boolean = false) {
         val ageAfter = p.age
@@ -1427,10 +1427,9 @@ object ProCareer {
             var drop = (ageAfter - 27) * DECLINE_SLOPE + Rng.d() * 0.6
             if (trainer) drop *= 0.6
             val steps = (drop * 7.3).roundToInt()
-            val weights = doubleArrayOf(1.3, 0.6, 0.5, 1.0, 0.4, 1.1, 1.4, 1.0, 1.3, 1.2)
             val attrs = (0 until 10).toList()
             repeat(steps) {
-                val i = Rng.weighted(attrs) { weights[it] }
+                val i = Rng.pick(attrs)
                 p.attrs[i] = max(25, p.attrs[i] - 1)
             }
         }
