@@ -802,7 +802,7 @@ class RoadState(
 
 /** A team that would trade for him, and the players it would send back. */
 @Serializable
-class Suitor(val teamId: Int, val sends: List<Int>, val role: String, val ahead: Int)
+class Suitor(val teamId: Int, val sends: List<Int>, val role: String, val ahead: Int, val pickKeys: List<Int> = emptyList())
 
 /** A completed trade: who went each way. */
 @Serializable
@@ -917,7 +917,17 @@ class ProState(
     /** Each team's wins last season, for Coach and Executive of the Year. */
     val lastWins: MutableMap<Int, Int> = mutableMapOf(),
     val allStarStarters: MutableList<Int> = mutableListOf(),
+    /** This summer's free-agent signings and coaching changes around the league, for the offseason screens. */
+    val faMoves: MutableList<String> = mutableListOf(),
+    val staffMoves: MutableList<String> = mutableListOf(),
+    /** Future first-round picks and who owns them; each team's general manager. */
+    val picks: MutableList<PickAsset> = mutableListOf(),
+    val execs: MutableMap<Int, String> = mutableMapOf(),
 )
+
+/** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
+@Serializable
+class PickAsset(val season: Int, val original: Int, var owner: Int)
 
 /**
  * One honor: [award] like "Player of the Week" or "MVP", for a player ([pid]) or a coach or front

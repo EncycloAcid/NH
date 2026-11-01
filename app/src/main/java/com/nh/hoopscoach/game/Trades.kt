@@ -30,6 +30,10 @@ object Trades {
         return exp((p.ovr - 82) / 3.5 + upside + prod) * age
     }
 
+    /** A rebuilding seller wants a first-round pick back: the buyer's furthest one, if it has one. */
+    fun sweetener(lg: League, seller: Team, buyer: Team): List<PickAsset> =
+        if (seller.w + seller.l >= 10 && seller.winPct < 0.45) listOfNotNull(Picks.owned(lg, buyer).lastOrNull()) else emptyList()
+
     /** His trade value in a word: Franchise, All-Star, Starter, Rotation or Bench. */
     fun tier(p: Player): String {
         val v = value(p)
@@ -51,8 +55,8 @@ object Trades {
     }
 
     /** A deal in a word, by what each side gives up: "Fair", "They're overpaying", "Lowball". */
-    fun verdict(lg: League, sends: List<Player>, gets: Player): String {
-        val give = sends.sumOf { value(it) }
+    fun verdict(lg: League, sends: List<Player>, gets: Player, picks: List<PickAsset> = emptyList()): String {
+        val give = sends.sumOf { value(it) } + picks.sumOf { Picks.value(lg, it) }
         val r = give / value(gets).coerceAtLeast(0.01)
         return when { r >= 1.15 -> "They're overpaying"; r >= 0.9 -> "Fair deal"; r >= 0.75 -> "A little light"; else -> "Lowball" }
     }
@@ -87,7 +91,8 @@ object Trades {
     }
 
     /** Swaps [fromA] (to [b]) for [fromB] (to [a]) and fixes up both rosters. */
-    fun execute(lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, offseason: Boolean = lg.phase == Phase.OFFSEASON): Trade {
+    fun execute(lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, offseason: Boolean = lg.phase == Phase.OFFSEASON,
+                picksA: List<PickAsset> = emptyList(), picksB: List<PickAsset> = emptyList()): Trade {
         val ps = lg.proState!!
         val hero = fromA.any { it.id == lg.heroId } || fromB.any { it.id == lg.heroId }
         if (hero) {
@@ -102,7 +107,12 @@ object Trades {
             Gameplan.autoAllocate(lg, t)
         }
         ps.moved += (fromA + fromB).map { it.id }
-        val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, fromA.map { it.name }, fromB.map { it.name }, hero)
+        // Picks change hands too.
+        val pickNamesA = picksA.map { Picks.label(lg, it) }
+        val pickNamesB = picksB.map { Picks.label(lg, it) }
+        Picks.move(lg, picksA, b)
+        Picks.move(lg, picksB, a)
+        val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, fromA.map { it.name } + pickNamesA, fromB.map { it.name } + pickNamesB, hero)
         ps.trades += trade
         Rumors.breaking(lg, trade)
         if (ps.trades.size > 200) ps.trades.removeAt(0)
@@ -144,7 +154,9 @@ object Trades {
             // Over the cap, the salaries have to match.
             if (!Payroll.tradeWorks(lg, t, Payroll.salaryOf(lg, h), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
             val ahead = lg.rosterOf(t).count { it.pos == h.pos && it.ovr >= h.ovr && pack.none { p -> p.id == it.id } }
-            out += Suitor(t.id, pack.map { it.id }, ProCareer.roleFor(ahead), ahead)
+            // Short on players? They add a first-round pick.
+            val sweet = if (pack.sumOf { value(it) } < target * 0.95) listOfNotNull(Picks.owned(lg, t).firstOrNull()) else emptyList()
+            out += Suitor(t.id, pack.map { it.id }, ProCareer.roleFor(ahead), ahead, sweet.map { Picks.key(it) })
             if (out.size >= count * 2) break
         }
         return out.sortedByDescending { lg.team(it.teamId).winPct + lg.team(it.teamId).elo / 10_000.0 }.take(count)
@@ -193,7 +205,8 @@ object Trades {
         val to = lg.team(s.teamId)
         val back = s.sends.mapNotNull { lg.playerOrNull(it) }.filter { it.teamId == to.id }
         if (back.isEmpty() || to.id == from.id) { r.suitors.clear(); return false }
-        execute(lg, from, to, listOf(h), back)
+        val picks = lg.proState?.picks?.filter { Picks.key(it) in s.pickKeys && it.owner == to.id } ?: emptyList()
+        execute(lg, from, to, listOf(h), back, picksB = picks)
         r.suitors.clear()
         r.contract = r.contract?.let { Contract(to.id, it.salary, it.years, it.kind, it.signed, it.option) }
         if (r.proTeams.lastOrNull() != to.id) r.proTeams += to.id
@@ -235,7 +248,7 @@ object Trades {
             val keep = (listOf(lg.heroId) + lg.rosterOf(starTeam).filter { it.id != lg.heroId }.sortedByDescending { value(it) }.take(1).map { it.id }).toSet()
             val pack = bundle(lg, starTeam, value(vet), 0.7, 1.35, keep) ?: continue
             if (!Payroll.tradeWorks(lg, starTeam, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            val trade = execute(lg, seller, starTeam, listOf(vet), pack)
+            val trade = execute(lg, seller, starTeam, listOf(vet), pack, picksB = sweetener(lg, seller, starTeam))
             lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
             made++
             break
@@ -253,7 +266,7 @@ object Trades {
             val keep = lg.rosterOf(buyer).sortedByDescending { value(it) }.take(2).map { it.id }.toSet()
             val pack = bundle(lg, buyer, target, 0.75, 1.3, keep) ?: continue
             if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            val trade = execute(lg, seller, buyer, listOf(vet), pack)
+            val trade = execute(lg, seller, buyer, listOf(vet), pack, picksB = sweetener(lg, seller, buyer))
             if (seller.id == lg.userTeamId || buyer.id == lg.userTeamId) lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
             made++
         }

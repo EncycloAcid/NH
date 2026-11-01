@@ -287,8 +287,9 @@ object ProLeague {
         lg.proState!!.step = ProStep.FREE_AGENCY
         lg.news += News(lg.season, 0, "${h.name} signs with the ${t.name}: ${r.contract!!.years} years, ${Road.dollars(r.contract!!.salary)} a season", true)
         RecordBook.seed(lg)
-        // Every pro gets a deal, so payrolls are real from day one.
+        // Every pro gets a deal, so payrolls are real from day one, and every team owns its picks.
         Payroll.sign(lg)
+        Picks.ensure(lg)
         return lg
     }
 
@@ -1082,9 +1083,12 @@ object ProCareer {
         when (ps.step) {
             ProStep.REVIEW -> {
                 if (age(lg) >= MAX_AGE) { retire(lg, "Nobody plays forever. "); return }
+                // Coaches and general managers on the hot seat.
+                Staffing.offseason(lg)
                 newYear(lg)
                 ps.moved.clear()
                 draft(lg)
+                Picks.ensure(lg)
                 Trades.summer(lg)
                 StarRecruit.openMarket(lg)
                 ps.step = ProStep.DRAFT
@@ -1100,6 +1104,8 @@ object ProCareer {
                     if (r.proOffers.isEmpty()) { retire(lg, "Nobody called. "); return }
                     Rumors.freeAgency(lg)
                 }
+                // The rest of the league's free agents sign around him.
+                Market.run(lg)
                 ps.step = ProStep.FREE_AGENCY
             }
             ProStep.FREE_AGENCY -> {
@@ -1174,7 +1180,8 @@ object ProCareer {
         val names = lg.players.map { it.name }.toSet()
         val real = if (Eras.of(lg) != Era.TODAY) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
         for (i in 0 until picks) {
-            val t = lg.team(order[i % order.size])
+            // A traded first-round pick goes to the team that owns it.
+            val t = lg.team(if (i < order.size) Picks.owner(lg, lg.season, order[i]) else order[i % order.size])
             val p = if (i == rivalSlot && rival != null) {
                 ProLeague.joinPro(lg, rival, t, rival.year + 1)
                 r.rivalPick = i + 1

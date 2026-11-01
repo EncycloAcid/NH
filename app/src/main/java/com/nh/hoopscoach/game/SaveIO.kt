@@ -50,6 +50,7 @@ object SaveIO {
         NbaAwards.migrate(lg)
         // Saves from before team salary caps: everyone gets a deal.
         if (lg.pro && lg.players.any { it.teamId >= 0 && it.salary <= 0 && it.id != lg.heroId }) Payroll.sign(lg)
+        if (lg.pro && lg.proState?.picks?.isEmpty() == true) Picks.ensure(lg)
         if (!lg.pro) {
             Rivalries.ensure(lg)
             Brand.ensure(lg)

@@ -368,7 +368,7 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
     val u = lg.user
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader("${lg.season} · ${lg.conf(u.confId).name}", u.name, "${teamLine(lg, u)} · Coach ${lg.coachOf(u).last}") { TeamBadge(u, 50.dp) }
+            ScreenHeader("${lg.season} · ${lg.conf(u.confId).name}", u.name, "${teamLine(lg, u)} · Coach ${lg.coachOf(u).last}: ${u.plan.offense.label}, ${u.plan.defense.label}") { TeamBadge(u, 50.dp) }
             // The payroll against the cap and the luxury tax line.
             val pay = com.nh.hoopscoach.game.Payroll.total(lg, u)
             val cap = com.nh.hoopscoach.game.Payroll.cap(lg)
@@ -384,6 +384,8 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(6.dp))
                 Bar((pay.toFloat() / (tax * 1.1f)).coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = if (pay > tax) P.bad else if (pay > cap) P.warn else P.good, height = 7.dp)
                 Text("Cap ${money(cap)} · tax line ${money(tax)}" + if (pay < cap) " · ${money(cap - pay)} in room" else "", style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+                val own = com.nh.hoopscoach.game.Picks.owned(lg, u)
+                Text("First-round picks: " + (if (own.isEmpty()) "none" else own.joinToString(", ") { "${it.season}" + if (it.original != u.id) " (${lg.team(it.original).abbr})" else "" }), style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
             }
             Segmented(listOf("Roster", "Schedule"), vm.teamTab.coerceIn(0, 1), { vm.teamTab = it })
             Spacer(Modifier.height(8.dp))
@@ -1074,8 +1076,9 @@ internal fun SituationPanel(vm: GameViewModel, lg: League) {
                         Text(st.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${st.w}-${st.l} · ${s.role} there", style = T.small, color = P.sub, maxLines = 1)
                         val sc = LocalRatingScale.current
-                        Text("They'd send ${back.joinToString(", ") { "${it.name} (${sc(it.ovr)})" }}", style = T.small, color = P.ink, maxLines = 2)
-                        lg.playerOrNull(lg.heroId)?.let { me -> if (back.isNotEmpty()) Text(com.nh.hoopscoach.game.Trades.verdict(lg, back, me), style = T.label, color = P.accent) }
+                        val picks = lg.proState?.picks?.filter { com.nh.hoopscoach.game.Picks.key(it) in s.pickKeys } ?: emptyList()
+                        Text("They'd send ${back.joinToString(", ") { "${it.name} (${sc(it.ovr)})" }}" + picks.joinToString("") { " + " + com.nh.hoopscoach.game.Picks.label(lg, it) }, style = T.small, color = P.ink, maxLines = 3)
+                        lg.playerOrNull(lg.heroId)?.let { me -> if (back.isNotEmpty()) Text(com.nh.hoopscoach.game.Trades.verdict(lg, back, me, picks), style = T.label, color = P.accent) }
                     }
                     Spacer(Modifier.width(8.dp))
                     SmallButton("Go", primary = true) { vm.act { trades.accept(it, i) }; vm.toast("You're headed to the ${st.name}") }
@@ -1473,6 +1476,15 @@ private fun LazyListScope.proSummerStep(vm: GameViewModel, lg: League, h: Player
     } else if (r.summer == lg.season && r.summerNote.isNotEmpty()) item {
         Section("Your summer")
         Panel(color = P.accentSoft) { Text(r.summerNote, style = T.body, color = P.ink) }
+    }
+    // Around the league this summer: free agency and coaching changes.
+    if (ps.faMoves.isNotEmpty()) item {
+        Section("Free agency · ${ps.faMoves.size} moves")
+        GroupList(ps.faMoves.take(15)) { line -> Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) }
+    }
+    if (ps.staffMoves.isNotEmpty()) item {
+        Section("Coaching and front offices")
+        GroupList(ps.staffMoves) { line -> Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) }
     }
 }
 

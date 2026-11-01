@@ -88,6 +88,7 @@ object NbaAwards {
 
     /** The general manager credited with a team's moves; the same name for as long as the save runs. */
     fun executive(lg: League, t: Team): String {
+        lg.proState?.execs?.get(t.id)?.let { return it }
         val r = Random(t.id * 7919L + Eras.of(lg).ordinal * 31L)
         return "${Names.first[r.nextInt(Names.first.size)]} ${Names.last[r.nextInt(Names.last.size)]}"
     }

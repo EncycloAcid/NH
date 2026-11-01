@@ -43,10 +43,9 @@ object Payroll {
         p.contractYears = if (pick <= lg.teams.size) 4 else 2
     }
 
-    /** A new season: a year comes off every deal, and expiring players re-sign at today's value. */
+    /** A new season: anyone without a deal gets one (the years come off in free agency; see Market). */
     fun newSeason(lg: League) {
         if (!lg.pro) return
-        for (p in lg.players) if (p.contractYears > 0) p.contractYears--
         sign(lg)
     }
 
