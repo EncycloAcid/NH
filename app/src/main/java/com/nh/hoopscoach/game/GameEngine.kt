@@ -344,7 +344,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
-        var PRO_TALENT = 1.9
+        var PRO_TALENT = 1.7
         var LEAD_K = 0.004
         private const val LEAD_FREE = 8
         private const val LEAD_RANGE = 15
