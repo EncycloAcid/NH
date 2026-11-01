@@ -1,5 +1,8 @@
 package com.nh.hoopscoach.game
 
+import kotlin.math.exp
+import kotlin.math.ln
+
 /**
  * Player careers: single-game career highs, honors by season, and former players kept on record
  * so their career pages outlive their time in school.
@@ -8,6 +11,80 @@ object Careers {
     val HIGHS = listOf("Points", "Rebounds", "Assists", "Threes", "Steals", "Blocks")
     /** Former players kept on record, oldest dropped first (the user's own are kept longest). */
     private const val KEEP = 1500
+
+    private data class CareerFit(val player: Player, val totals: EraData.CareerTotals)
+
+    /** Attach a ratings-relative profile to today's pros using their NBA career totals. */
+    fun fingerprint(lg: League) {
+        val era = Eras.of(lg)
+        if (!lg.pro || era != Era.TODAY) return
+        val candidates = lg.players.mapNotNull { p ->
+            EraData.career("${p.first} ${p.last}")?.takeIf { it.mp > 0 && it.fga > 0 }?.let { CareerFit(p, it) }
+        }
+        if (candidates.isEmpty()) return
+
+        fun normalize(real: (CareerFit) -> Double, engine: (CareerFit) -> Double): Map<Player, Double> {
+            val numerator = candidates.sumOf { it.totals.mp * real(it) }
+            val denominator = candidates.sumOf { it.totals.mp * engine(it) }
+            if (numerator <= 0.0 || denominator <= 0.0) return candidates.associate { it.player to 1.0 }
+            val scale = numerator / denominator
+            return candidates.associate { fit ->
+                val raw = real(fit) / (scale * engine(fit))
+                val safeRaw = raw.takeIf { it.isFinite() && it > 0.0 } ?: 1e-9
+                val shrunk = exp(ln(safeRaw) * fit.totals.mp / (fit.totals.mp + 1500.0))
+                fit.player to shrunk.coerceIn(0.25, 4.0)
+            }
+        }
+
+        val shots = normalize(
+            { (it.totals.fga + 0.44 * it.totals.fta) / it.totals.mp },
+            { PlayerWeights.shotW(it.player) },
+        )
+        val orb = normalize({ it.totals.orb.toDouble() / it.totals.mp }, { PlayerWeights.rebW(it.player, true) })
+        val drb = normalize({ it.totals.drb.toDouble() / it.totals.mp }, { PlayerWeights.rebW(it.player, true) })
+        val ast = normalize({ it.totals.ast.toDouble() / it.totals.mp }, { PlayerWeights.astW(it.player) })
+        val stl = normalize({ it.totals.stl.toDouble() / it.totals.mp }, { PlayerWeights.stlW(it.player) })
+        val blk = normalize({ it.totals.blk.toDouble() / it.totals.mp }, { PlayerWeights.blkW(it.player) })
+        val tov = normalize({ it.totals.tov.toDouble() / it.totals.mp }, { PlayerWeights.tovW(it.player) })
+        val foul = normalize({ it.totals.pf.toDouble() / it.totals.mp }, { PlayerWeights.foulW(it.player) })
+        val three = normalize(
+            { fit ->
+                val r = (fit.totals.fg3a.toDouble() / fit.totals.fga).coerceIn(0.01, 0.95)
+                r / (1.0 - r)
+            },
+            { fit ->
+                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era)
+                w3 / (wi + wm)
+            },
+        )
+        val draw = normalize(
+            { it.totals.fta.toDouble() / it.totals.fga },
+            { fit ->
+                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era)
+                val adjustedW3 = w3 * (three[fit.player] ?: 1.0)
+                (wi * 0.2 + wm * 0.06 + adjustedW3 * 0.022) / (wi + wm + adjustedW3)
+            },
+        )
+
+        for (fit in candidates) {
+            val p = fit.player
+            val baseFt = PlayerWeights.ftBase(p, true)
+            val ftReal = (fit.totals.ft + baseFt * 150.0) / (fit.totals.fta + 150.0)
+            p.fingerprint = Fingerprint(
+                shots = shots.getValue(p),
+                three = three.getValue(p),
+                draw = draw.getValue(p),
+                ftAdj = ftReal - baseFt,
+                orb = orb.getValue(p),
+                drb = drb.getValue(p),
+                ast = ast.getValue(p),
+                stl = stl.getValue(p),
+                blk = blk.getValue(p),
+                tov = tov.getValue(p),
+                foul = foul.getValue(p),
+            )
+        }
+    }
 
     /** After each game: new career highs and the game they came in. */
     fun track(lg: League, p: Player, st: StatLine, g: Game, teamId: Int) {
@@ -82,7 +159,7 @@ object Careers {
             val text = honor(code, p.pos) ?: continue
             bySeason.getOrPut(season) { mutableListOf() } += text to rank(code)
         }
-        val seasons = (p.career.map { it.season } + bySeason.keys + if (p.teamId >= 0 && p.stats.gp > 0) listOf(currentSeason) else emptyList()).toSortedSet().reversed()
+        val seasons = (p.career.map { it.season } + bySeason.keys + if (p.teamId >= 0 && p.stats.gp > 0) listOf(currentSeason) else emptyList()).toSortedSet().toList().asReversed()
         return seasons.map { s -> SeasonHonors(s, bySeason[s].orEmpty().distinct().sortedByDescending { it.second }) }
     }
 

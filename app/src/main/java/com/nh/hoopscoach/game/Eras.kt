@@ -16,7 +16,7 @@ enum class Era(
     val pace: Double, val threes: Double, val fg: Double, val fouls: Double,
 ) {
     TODAY(0, "Today", "Today's league", "The real teams and players of today, threes everywhere, the NBA Cup and the play-in.",
-        154_647, 1.0, 1.0, 0.0, 1.0),
+        154_647, 1.0, 1.12, 0.007, 1.12),
     Y2013(2013, "2013", "LeBron's Heat", "LeBron, Wade and Bosh chase a repeat. Durant and Westbrook in OKC, Lob City, Curry's first big year. The three is taking over.",
         58_044, 1.08, 0.44, -0.042, 0.95),
     Y2003(2003, "2003", "Shaq, Kobe and Duncan", "The Lakers' three-peat ends and Duncan wins again. McGrady, Iverson, Garnett, Kidd's Nets. Hand-checking and grind-it-out defense.",

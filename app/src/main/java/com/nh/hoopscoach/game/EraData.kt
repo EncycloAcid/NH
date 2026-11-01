@@ -13,6 +13,11 @@ object EraData {
     class Star(val era: Era, val id: String, val name: String, val team: String, val pos: Pos, val age: Int, val ovr: Int, val attrs: IntArray?, val photo: String,
         val ppg: Double = 0.0, val rpg: Double = 0.0, val apg: Double = 0.0)
     class Pick(val year: Int, val pick: Int, val id: String, val name: String, val college: String, val pos: Pos?, val age: Int, val peak: Int, val photo: String)
+    class CareerTotals(
+        val id: String, val games: Int, val mp: Int, val fg: Int, val fga: Int, val fg3: Int, val fg3a: Int,
+        val ft: Int, val fta: Int, val orb: Int, val drb: Int, val ast: Int, val stl: Int, val blk: Int,
+        val tov: Int, val pf: Int, val pts: Int,
+    )
     class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double,
         val id: String = "", val ours: String = "")
     /** A franchise in a season: its place in today's league ([slot]) and what it was called then. */
@@ -58,8 +63,18 @@ object EraData {
         }
     }
 
+    private val todayCareer: Map<String, CareerTotals> by lazy {
+        table("today_career.tsv").associate { f ->
+            f[0] to CareerTotals(f[1], f[2].toInt(), f[3].toInt(), f[4].toInt(), f[5].toInt(), f[6].toInt(), f[7].toInt(),
+                f[8].toInt(), f[9].toInt(), f[10].toInt(), f[11].toInt(), f[12].toInt(), f[13].toInt(), f[14].toInt(),
+                f[15].toInt(), f[16].toInt(), f[17].toInt())
+        }
+    }
+
     /** [name]'s NBA 2K27 card, if the ratings file has him. */
     fun today(name: String): Card? = today[name]
+
+    fun career(name: String): CareerTotals? = todayCareer[name]
 
     /** The teams of [season] (the year it ends), 1986 to 2027, or null outside the data. */
     fun teams(season: Int): List<Franchise>? = franchises[season]

@@ -5,6 +5,22 @@ import kotlinx.serialization.Transient
 
 enum class Pos { PG, SG, SF, PF, C }
 
+/** How a real player plays, from his NBA career: multipliers on what his ratings alone would do. */
+@Serializable
+class Fingerprint(
+    val shots: Double = 1.0,
+    val three: Double = 1.0,
+    val draw: Double = 1.0,
+    val ftAdj: Double = 0.0,
+    val orb: Double = 1.0,
+    val drb: Double = 1.0,
+    val ast: Double = 1.0,
+    val stl: Double = 1.0,
+    val blk: Double = 1.0,
+    val tov: Double = 1.0,
+    val foul: Double = 1.0,
+)
+
 /** The ten player attributes, stored in this order inside [Player.attrs]. */
 enum class Attr(val short: String, val label: String) {
     INS("INS", "Inside"),
@@ -230,6 +246,7 @@ class Player(
     var photo: String = "",
     /** A second position he can play (a neighbor of his first), or null. */
     var pos2: Pos? = null,
+    var fingerprint: Fingerprint? = null,
 ) {
     val name get() = "$first $last".trim()
     /** "PG/SG" for a two-position player, else just his position. */

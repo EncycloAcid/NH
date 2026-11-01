@@ -261,6 +261,7 @@ object ProLeague {
             Gameplan.autoAllocate(lg, t)
         }
         lg.reindex()
+        if (era == Era.TODAY) Careers.fingerprint(lg)
         rateTeams(lg)
         // The user's player, his first contract and his college record.
         val h = lg.player(hero.id)

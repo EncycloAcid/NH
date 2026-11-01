@@ -20,6 +20,41 @@ class PlayEvent(
     val hero: Boolean = false,
 )
 
+internal object PlayerWeights {
+    private fun proShotPos(pos: Pos) = when (pos) { Pos.C -> 1.2; Pos.PF -> 1.1; else -> 1.0 }
+    private fun posAst(pos: Pos) = when (pos) { Pos.PG -> 1.25; Pos.SG -> 1.05; Pos.SF -> 1.0; Pos.PF -> 0.95; Pos.C -> 1.1 }
+    private fun posBlk(pos: Pos) = when (pos) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
+    private fun posFoul(pos: Pos) = when (pos) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
+    private fun posReb(pos: Pos, pro: Boolean) = if (pro) when (pos) {
+        Pos.C -> 1.3; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 0.9; Pos.PG -> 0.85
+    } else when (pos) {
+        Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05
+    }
+
+    fun shotW(p: Player) =
+        (Gameplan.usageFor(p, true) * Tendency.usage(p)).pow(0.8) * (Ratings.offense(p) / 70.0).pow(0.6) * proShotPos(p.pos)
+
+    fun shotMix(p: Player, pro: Boolean, era: Era): Triple<Double, Double, Double> {
+        val posIns = when (p.pos) { Pos.PG -> 0.8; Pos.SG -> 0.8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
+        val pos3 = if (pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> 0.95; Pos.PF -> 0.85; Pos.C -> 0.62 }
+            else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> 0.95; Pos.PF -> 0.66; Pos.C -> 0.34 }
+        val wi = (p[Attr.INS] / 70.0).pow(3) * posIns * Tendency.inside(p)
+        val wm = (p[Attr.MID] / 70.0).pow(3) * 0.5 * Tendency.mid(p)
+        val w3 = (p[Attr.OUT] / 70.0).pow(if (pro) 1.5 else 4.0) * pos3 * (if (pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
+        return Triple(wi, wm, w3)
+    }
+
+    fun ftBase(p: Player, pro: Boolean) =
+        ((if (pro) 0.66 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
+
+    fun rebW(p: Player, pro: Boolean) = (p[Attr.REB] / 70.0).pow(2) * posReb(p.pos, pro) * Tendency.reb(p)
+    fun astW(p: Player) = exp((p[Attr.PAS] - 70) / 20.0) * posAst(p.pos) * Tendency.pass(p)
+    fun stlW(p: Player) = (0.5 * p[Attr.STL] + 0.5 * p[Attr.PER]).pow(3) * Tendency.stl(p)
+    fun blkW(p: Player) = (p[Attr.BLK] / 70.0).pow(3) * posBlk(p.pos) * Tendency.blk(p)
+    fun foulW(p: Player) = posFoul(p.pos)
+    fun tovW(p: Player) = Gameplan.usageFor(p, true) * Tendency.usage(p) * (p[Attr.HND] / 70.0).pow(2)
+}
+
 /**
  * Simulates one game a possession at a time. Call [step] until it returns false
  * (or [simToEnd]), then [commit] to write results into the league.
@@ -206,7 +241,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         road?.let { it.moments++ }
         fun stolen(loser: Player, how: String) {
             line(o, loser).tov++
-            val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+            val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
             line(d, stealer).stl++
             log(d, "${stealer.short} $how ${loser.short}!", 0)
             lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
@@ -232,7 +267,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         ds: DefStats, trail: Int, bonus: Double, foulP: Double, passer: Player?,
     ) {
         val pMake = (makeChance(o, d, shooter, type, ds, trail) + bonus).coerceIn(0.12, 0.85)
-        val fouled = Rng.chance(foulP)
+        val fouled = Rng.chance(foulP * (shooter.fingerprint?.draw ?: 1.0))
         val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
         val pts = if (type == 2) 3 else 2
         val sl = line(o, shooter)
@@ -358,7 +393,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
      */
     private fun pickFouler(d: Int, defense: List<Player>): Player {
         val ok = defense.filter { !fouledOut(d, it.id) }.ifEmpty { defense }
-        return Rng.weighted(ok) { posFoul(it.pos) * (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble()) }
+        return Rng.weighted(ok) {
+            PlayerWeights.foulW(it) * (it.fingerprint?.foul ?: 1.0) * (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble())
+        }
     }
 
     /** Seconds played in the current half of regulation, for the rotation (0 in overtime). */
@@ -486,7 +523,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
      */
     private fun pickShooter(o: Int, offense: List<Player>): Player {
         val w = offense.map {
-            if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / 70.0).pow(0.6) * proShotPos(it.pos)
+            if (lg.pro) PlayerWeights.shotW(it) *
+                (usage(o, it) / (Gameplan.usageFor(it, true) * Tendency.usage(it))).pow(0.8) *
+                (it.fingerprint?.shots ?: 1.0)
             else usage(o, it).pow(1.1) * (Ratings.offense(it) / 70.0).pow(1.2)
         }.toMutableList()
         if (lg.pro && w.size > 1) {
@@ -497,8 +536,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         return offense[Rng.weighted(offense.indices.toList()) { w[it] }]
     }
 
-    /** Free-throw percentage: about 78% in the NBA and 71% in college for the average shooter. */
-    private fun ft(p: Player): Double = ((if (lg.pro) 0.675 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
+    /** Rating-based free-throw percentage for players without a career fingerprint. */
+    private fun ft(p: Player): Double = (PlayerWeights.ftBase(p, lg.pro) + (p.fingerprint?.ftAdj ?: 0.0)).coerceIn(0.4, 0.95)
 
     private fun line(side: Int, p: Player) = lines[side].getOrPut(p.id) { StatLine() }
 
@@ -600,12 +639,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (lg.pro) pTo *= 0.9
         pTo = pTo.coerceIn(0.07, 0.3)
         if (Rng.chance(pTo)) {
-            val loser = if (Rng.chance(0.6)) handler else Rng.weighted(offense) { usage(o, it) }
+            val loser = Rng.weighted(offense) {
+                PlayerWeights.tovW(it) * (usage(o, it) / (Gameplan.usageFor(it, true) * Tendency.usage(it))) * (it.fingerprint?.tov ?: 1.0)
+            }
             line(o, loser).tov++
             val kind = Rng.d()
             when {
                 kind < 0.55 -> {
-                    val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+                    val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
                     line(d, stealer).stl++
                     log(d, "${stealer.short} steals it from ${loser.short}", 0)
                 }
@@ -655,7 +696,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.
-            if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + era.fg
+            if (lg.pro) pMake += if (type == 2) 0.023 else 0.018 + era.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
@@ -673,7 +714,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
-            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE)
+            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } *
+                (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE) * (shooter.fingerprint?.draw ?: 1.0)
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
             val pts = if (type == 2) 3 else 2
@@ -698,7 +740,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     val mates = offense.filter { it.id != shooter.id }
                     if (mates.isNotEmpty()) {
                         // The best passers, point guards above all, get most of the assists.
-                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) * Tendency.pass(it) * spec(it) }
+                        val passer = Rng.weighted(mates) { PlayerWeights.astW(it) * (it.fingerprint?.ast ?: 1.0) * spec(it) }
                         line(o, passer).ast++
                         astText = " (${passer.short} assists)"
                     }
@@ -727,11 +769,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
             // Missed shot
             var blocked = false
-            val pBlk = when (type) { 0 -> 0.23 * (blkD / n[8]).pow(2); 1 -> 0.055; else -> 0.017 } * (if (lg.pro) 1.25 else 1.0)
+            val pBlk = when (type) { 0 -> 0.23 * (blkD / n[8]).pow(2); 1 -> 0.055; else -> 0.017 } * (if (lg.pro) 1.15 else 1.0)
             if (Rng.chance(pBlk)) {
                 // Rim protectors, big men above all, get most of the blocks.
                 // Rim protectors get most blocks at the rim; on jump shots anyone closing out can get a hand on it.
-                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) * spec(it) }
+                val b = Rng.weighted(defense) {
+                    (if (lg.pro) PlayerWeights.blkW(it) else (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it)) *
+                        (it.fingerprint?.blk ?: 1.0) * spec(it)
+                }
                 line(d, b).blk++
                 blocked = true
                 log(d, "${b.short} blocks ${shooter.short}!", 0)
@@ -751,29 +796,22 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         poss = d
     }
 
-    private fun proShotPos(p: Pos) = when (p) { Pos.C -> 1.2; Pos.PF -> 1.1; else -> 1.0 }
-    private fun posAst(p: Pos) = when (p) { Pos.PG -> 1.25; Pos.SG -> 1.05; Pos.SF -> 1.0; Pos.PF -> 0.95; Pos.C -> 1.1 }
     private fun posBlk(p: Pos) = when (p) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
-    private fun posFoul(p: Pos) = when (p) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
-    private fun posReb(p: Pos) = if (lg.pro) when (p) { Pos.C -> 1.3; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 0.9; Pos.PG -> 0.85 }
-        else when (p) { Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05 }
 
     /** Who grabs a rebound: good rebounders and big men most, but guards chase long ones too. */
-    private fun rebounder(side: List<Player>) = Rng.weighted(side) { (it[Attr.REB] / 70.0).pow(2) * posReb(it.pos) * Tendency.reb(it) * spec(it) }
+    private fun rebounder(side: List<Player>, offensive: Boolean) = Rng.weighted(side) {
+        PlayerWeights.rebW(it, lg.pro) * (it.fingerprint?.let { fp -> if (offensive) fp.orb else fp.drb } ?: 1.0) * spec(it)
+    }
 
-    /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
-    private val teamRebound get() = Rng.chance(if (lg.pro) 0.11 else 0.05)
+    /** About one rebound in ten in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
+    private val teamRebound get() = Rng.chance(if (lg.pro) 0.10 else 0.05)
 
     private fun shotType(o: Int, d: Int, p: Player, trail: Int): Int {
         if (finalPeriod && clock < 25 && trail == -3) return 2
-        val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
-        // Modern pro bigs step out more than college bigs.
-        val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
-            else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> .95; Pos.PF -> .66; Pos.C -> .34 }
-        var wi = (p[Attr.INS] / 70.0).pow(3) * posIns * Tendency.inside(p)
-        var wm = (p[Attr.MID] / 70.0).pow(3) * 0.5 * Tendency.mid(p)
-        // In the pros nearly everyone can shoot it, so volume leans on the rating less than in college.
-        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 1.5 else 4.0) * pos3 * (if (lg.pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
+        val (baseWi, baseWm, baseW3) = PlayerWeights.shotMix(p, lg.pro, era)
+        var wi = baseWi
+        var wm = baseWm
+        var w3 = baseW3 * (p.fingerprint?.three ?: 1.0)
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }
@@ -803,13 +841,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         pOff = pOff.coerceIn(0.15, 0.45)
         return if (Rng.chance(pOff)) {
             if (teamRebound) { log(o, "Out of bounds, ${teams[o].abbr} ball", 0); return o to null }
-            val r = rebounder(offense)
+            val r = rebounder(offense, offensive = true)
             line(o, r).orb++
             log(o, "${r.short} grabs the offensive board", 0)
             o to r
         } else {
             if (teamRebound) return d to null
-            val r = rebounder(defense)
+            val r = rebounder(defense, offensive = false)
             line(d, r).drb++
             d to r
         }
@@ -834,11 +872,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (!lastMade) {
             val oReb = Rng.chance(0.14)
             if (oReb) {
-                if (!teamRebound) line(o, rebounder(offense)).orb++
+                if (!teamRebound) line(o, rebounder(offense, offensive = true)).orb++
                 poss = o
                 return
             }
-            if (!teamRebound) line(d, rebounder(defense)).drb++
+            if (!teamRebound) line(d, rebounder(defense, offensive = false)).drb++
         }
         poss = d
     }

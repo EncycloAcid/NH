@@ -48,6 +48,7 @@ object SaveIO {
         lg.reindex()
         repair(lg)
         NbaAwards.migrate(lg)
+        if (lg.pro && Eras.of(lg) == Era.TODAY && lg.players.none { it.fingerprint != null }) Careers.fingerprint(lg)
         // Saves from before team salary caps: everyone gets a deal.
         if (lg.pro && lg.players.any { it.teamId >= 0 && it.salary <= 0 && it.id != lg.heroId }) Payroll.sign(lg)
         if (lg.pro && lg.proState?.picks?.isEmpty() == true) Picks.ensure(lg)
