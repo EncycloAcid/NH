@@ -4,6 +4,9 @@ import kotlin.math.roundToInt
 
 object Gameplan {
 
+    private const val PRO_STARTER_MIN_BASE = 24
+    private const val PRO_STARTER_MIN_SLOPE = 0.8
+
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),
         Pos.SG to listOf(Pos.SG, Pos.PG, Pos.SF, Pos.PF, Pos.C),
@@ -48,10 +51,11 @@ object Gameplan {
             var best: Triple<Int, Int, Double>? = null
             for (ri in 0 until 5) {
                 val r = reserves[ri] ?: continue
-                for (alt in (NEIGHBORS.getValue(r.pos).take(2) + listOfNotNull(r.pos2)).distinct()) {
+                val near = NEIGHBORS.getValue(r.pos).take(if (lg.pro) 3 else 2) + listOfNotNull(r.pos2)
+                for (alt in near.distinct()) {
                     val s = starters[alt.ordinal] ?: continue
                     val gain = rate(r) - rate(s)
-                    if (gain >= 3.0 && (best == null || gain > best!!.third)) best = Triple(ri, alt.ordinal, gain)
+                    if (gain >= (if (lg.pro) 2.0 else 3.0) && (best == null || gain > best!!.third)) best = Triple(ri, alt.ordinal, gain)
                 }
             }
             val b = best ?: return@repeat
@@ -78,6 +82,7 @@ object Gameplan {
             val sMin = when {
                 s == null -> 0
                 r == null -> 40
+                lg.pro -> (PRO_STARTER_MIN_BASE + (rate(s) - rate(r)) * PRO_STARTER_MIN_SLOPE).roundToInt().coerceIn(20, 31)
                 else -> (28 + (rate(s) - rate(r)) * 0.6).roundToInt().coerceIn(22, 36)
             }
             Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it, lg.pro) } ?: 50, r?.let { usageFor(it, lg.pro) } ?: 40)

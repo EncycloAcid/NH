@@ -338,7 +338,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
-        var PRO_TALENT = 1.8
+        var PRO_TALENT = 1.5
         /** The most of his team's shots one player takes while on the floor, in the pros. */
         var SHOT_CAP = 0.33
         const val NON_SHOOTING_PRO = 0.08
