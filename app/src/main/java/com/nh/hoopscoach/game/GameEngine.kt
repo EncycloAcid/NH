@@ -45,7 +45,7 @@ internal object PlayerWeights {
     }
 
     fun ftBase(p: Player, pro: Boolean) =
-        ((if (pro) 0.66 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
+        ((if (pro) 0.636 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
 
     fun rebW(p: Player, pro: Boolean) = (p[Attr.REB] / 70.0).pow(2) * posReb(p.pos, pro) * Tendency.reb(p)
     fun astW(p: Player) = exp((p[Attr.PAS] - 70) / 20.0) * posAst(p.pos) * Tendency.pass(p)
@@ -536,7 +536,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         return offense[Rng.weighted(offense.indices.toList()) { w[it] }]
     }
 
-    /** Rating-based free-throw percentage for players without a career fingerprint. */
+    /** Free-throw percentage: about 78% in the NBA and 71% in college for the average shooter; a real pro shoots his career mark. */
     private fun ft(p: Player): Double = (PlayerWeights.ftBase(p, lg.pro) + (p.fingerprint?.ftAdj ?: 0.0)).coerceIn(0.4, 0.95)
 
     private fun line(side: Int, p: Player) = lines[side].getOrPut(p.id) { StatLine() }

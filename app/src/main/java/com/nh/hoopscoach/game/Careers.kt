@@ -22,6 +22,7 @@ object Careers {
             EraData.career("${p.first} ${p.last}")?.takeIf { it.mp > 0 && it.fga > 0 }?.let { CareerFit(p, it) }
         }
         if (candidates.isEmpty()) return
+        val leagueFt = candidates.sumOf { it.totals.ft.toDouble() } / candidates.sumOf { it.totals.fta.toDouble() }
 
         fun normalize(real: (CareerFit) -> Double, engine: (CareerFit) -> Double): Map<Player, Double> {
             val numerator = candidates.sumOf { it.totals.mp * real(it) }
@@ -69,7 +70,8 @@ object Careers {
         for (fit in candidates) {
             val p = fit.player
             val baseFt = PlayerWeights.ftBase(p, true)
-            val ftReal = (fit.totals.ft + baseFt * 150.0) / (fit.totals.fta + 150.0)
+            // Shrink low-volume marks toward the matched players' career FT%.
+            val ftReal = (fit.totals.ft + leagueFt * 150.0) / (fit.totals.fta + 150.0)
             p.fingerprint = Fingerprint(
                 shots = shots.getValue(p),
                 three = three.getValue(p),
