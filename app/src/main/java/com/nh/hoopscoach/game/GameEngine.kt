@@ -281,7 +281,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         ds: DefStats, trail: Int, bonus: Double, foulP: Double, passer: Player?,
     ) {
         val pMake = (makeChance(o, d, shooter, type, ds, trail) + bonus).coerceIn(0.12, 0.85)
-        val fouled = Rng.chance(foulP * (shooter.fingerprint?.draw ?: 1.0) * ageStyle(shooter, "fta_rate"))
+        val fouled = Rng.chance(foulP * (shooter.fingerprint?.draw ?: 1.0))
         val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
         val pts = if (type == 2) 3 else 2
         val sl = line(o, shooter)
@@ -453,7 +453,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun pickFouler(d: Int, defense: List<Player>): Player {
         val ok = defense.filter { !fouledOut(d, it.id) }.ifEmpty { defense }
         return Rng.weighted(ok) {
-            PlayerWeights.foulW(it) * (it.fingerprint?.foul ?: 1.0) * ageStyle(it, "pf36") *
+            PlayerWeights.foulW(it) * (it.fingerprint?.foul ?: 1.0) *
                 (1.0 - 0.6 * (lines[d][it.id]?.pf ?: 0) / foulLimit.toDouble())
         }
     }
@@ -877,8 +877,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake = pMake.coerceIn(0.12, 0.82)
 
             val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } *
-                (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE) * (shooter.fingerprint?.draw ?: 1.0) *
-                ageStyle(shooter, "fta_rate")
+                (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE) * (shooter.fingerprint?.draw ?: 1.0)
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
             val pts = if (type == 2) 3 else 2
