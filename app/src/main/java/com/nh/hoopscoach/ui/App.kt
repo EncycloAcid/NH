@@ -27,8 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,7 +80,8 @@ fun App(vm: GameViewModel) {
                 vm.loading -> BusyScreen("Loading")
                 busy != null -> BusyScreen(busy)
                 lg == null -> NewGameScreen(vm)
-                else -> Shell(vm, lg)
+                // A pro league shows ratings on a 2K-style scale.
+                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v })) { Shell(vm, lg) }
             }
             Toast(vm)
         }
@@ -93,6 +92,8 @@ fun App(vm: GameViewModel) {
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     BackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
+    // Big moments pop up one at a time.
+    lg.alerts.firstOrNull()?.let { a -> AlertPopup(vm, a) }
     // The preseason magazine opens by itself once, before the first game of every season.
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview
@@ -105,18 +106,24 @@ private fun Shell(vm: GameViewModel, lg: League) {
         val route = vm.stack.lastOrNull()
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (route == null) {
-                when (vm.tab) {
+                if (lg.pro) when (vm.tab) {
+                    Tab.TODAY -> TodayScreen(vm, lg)
+                    Tab.TEAM -> ProTeamScreen(vm, lg)
+                    Tab.RECRUIT -> ProHeroScreen(vm, lg)
+                    Tab.LEAGUE -> ProLeagueScreen(vm, lg)
+                    Tab.CAREER -> ProCareerScreen(vm, lg)
+                } else when (vm.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> TeamScreen(vm, lg)
-                    Tab.RECRUIT -> RecruitScreen(vm, lg)
+                    Tab.RECRUIT -> if (lg.playerMode) HeroScreen(vm, lg) else RecruitScreen(vm, lg)
                     Tab.LEAGUE -> LeagueScreen(vm, lg)
-                    Tab.CAREER -> CareerScreen(vm, lg)
+                    Tab.CAREER -> if (lg.playerMode) HeroCareerScreen(vm, lg) else CareerScreen(vm, lg)
                 }
             } else RouteScreen(vm, lg, route)
         }
         if (route == null) {
             val flowOnScreen = vm.tab == Tab.TODAY && (lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON)
-            if (!flowOnScreen) ContinueBar(vm, lg)
+            if (!flowOnScreen) { if (lg.pro) ProContinueBar(vm, lg) else ContinueBar(vm, lg) }
             NavBar(vm)
         } else Spacer(Modifier.navigationBarsPadding())
     }
@@ -143,6 +150,8 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Preview -> PreviewScreen(vm, lg)
         is Route.EditPlayer -> EditPlayerScreen(vm, lg, r.playerId)
         is Route.RecruitPreview -> RecruitPreviewScreen(vm, lg)
+        is Route.Social -> SocialScreen(vm, lg)
+        is Route.Article -> ArticleScreen(vm, lg, r.newsIndex)
     }
 }
 
@@ -161,8 +170,10 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
         when (lg.phase) {
             Phase.WRAP_UP, Phase.OFFSEASON -> {
                 Column(Modifier.weight(1f)) {
-                    Text(if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
-                    Text(if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
+                    val draft = com.nh.hoopscoach.game.Road.inGreenRoom(lg)
+                    val done = lg.road?.ended == true && !draft
+                    Text(if (draft) "DRAFT NIGHT" else if (done) "CAREER COMPLETE" else if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
+                    Text(if (draft) "Back to the green room" else if (done) "See how it ended" else if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
                 }
                 SmallButton("Continue", primary = true) { vm.select(Tab.TODAY) }
             }
@@ -181,18 +192,25 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
                     }
                 }
                 Box {
-                    Box(Modifier.size(40.dp).clip(CircleShape).clickable { menu = true }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.MoreVert, "More sim options", tint = P.sub)
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(if (menu) P.accentSoft else Color.Transparent).clickable { menu = true }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.MoreVert, "More sim options", tint = if (menu) P.accent else P.sub)
                     }
-                    DropdownMenu(menu, { menu = false }, Modifier.background(P.surface)) {
-                        @Composable
-                        fun item(label: String, a: () -> Unit) = DropdownMenuItem(text = { Text(label, style = T.body, color = P.ink) }, onClick = { menu = false; a() })
+                    AppMenu(menu, { menu = false }, title = "Sim ahead") {
+                        fun pick(a: () -> Unit) { menu = false; a() }
+                        val left = lg.games.count { it.involves(u.id) && !it.played && it.day <= Schedule.REG_DAYS }
                         if (lg.phase == Phase.REGULAR) {
-                            item("Sim one week") { vm.simDays(7) }
-                            item("Sim to conference tournament") { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season") }
+                            AppMenuItem("Sim one week", "The next 7 days", MenuIcons.Week) { pick { vm.simDays(7) } }
+                            AppMenuItem("Sim to the conference tournament", "$left regular-season ${if (left == 1) "game" else "games"} left", MenuIcons.Calendar) {
+                                pick { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season") }
+                            }
                         }
-                        if (lg.phase != Phase.NCAA) item("Sim to Selection Sunday") { vm.simToPhase(Phase.NCAA, "Simulating to Selection Sunday") }
-                        item("Sim to end of season") { vm.simToPhase(Phase.WRAP_UP, "Simulating the rest of the season") }
+                        if (lg.phase != Phase.NCAA) AppMenuItem("Sim to Selection Sunday", "Conference tournaments, then the bracket", MenuIcons.Bracket) {
+                            pick { vm.simToPhase(Phase.NCAA, "Simulating to Selection Sunday") }
+                        }
+                        AppMenuDivider()
+                        AppMenuItem("Sim to the end of the season", "Through the national championship", MenuIcons.Trophy) {
+                            pick { vm.simToPhase(Phase.WRAP_UP, "Simulating the rest of the season") }
+                        }
                     }
                 }
                 Spacer(Modifier.width(4.dp))
@@ -215,15 +233,16 @@ private fun NavBar(vm: GameViewModel) {
             for (t in Tab.entries) {
                 val icon = when (t) { Tab.TODAY -> NavIcons.Today; Tab.TEAM -> NavIcons.Team; Tab.RECRUIT -> NavIcons.Recruit; Tab.LEAGUE -> NavIcons.League; Tab.CAREER -> NavIcons.Career }
                 val sel = vm.tab == t
+                val label = if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { vm.select(t) }.padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(Modifier.clip(RoundedCornerShape(50)).background(if (sel) P.accentSoft else Color.Transparent).padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Icon(icon, t.label, tint = if (sel) P.accent else P.sub, modifier = Modifier.size(22.dp))
+                        Icon(icon, label, tint = if (sel) P.accent else P.sub, modifier = Modifier.size(22.dp))
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(t.label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
+                    Text(label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
                 }
             }
         }
@@ -262,3 +281,24 @@ private fun Toast(vm: GameViewModel) {
 }
 
 fun teamLabel(t: com.nh.hoopscoach.game.Team) = if (t.ap in 1..25) "#${t.ap} ${t.school}" else t.school
+
+/** A big moment: an award, an All-Star nod, a trade, a record, a title. */
+@Composable
+private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } },
+        containerColor = P.surface,
+        title = {
+            androidx.compose.foundation.layout.Column {
+                Text(when (a.kind) { "award" -> "HONOR"; "star" -> "ALL-STAR"; "trade" -> "TRADE"; "record" -> "RECORDS BOOK"; "title" -> "CHAMPIONSHIP"; else -> "NEWS" }, style = T.label, color = P.accent)
+                Text(a.title, style = T.head, color = P.ink)
+            }
+        },
+        text = { Text(a.body, style = T.body, color = P.ink) },
+        confirmButton = {
+            androidx.compose.material3.TextButton({ vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } }) {
+                Text(if (vm.league?.alerts?.size ?: 0 > 1) "Next" else "Nice", color = P.accent, style = T.bodyB)
+            }
+        },
+    )
+}

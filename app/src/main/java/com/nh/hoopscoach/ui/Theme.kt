@@ -180,6 +180,13 @@ fun HoopsTheme(primary: Color? = null, secondary: Color? = null, content: @Compo
     }
 }
 
+/** Ratings as the screens show them: a pro league's on a 2K-style scale (the app sets this), college ratings as they are. */
+val LocalRatingScale = androidx.compose.runtime.staticCompositionLocalOf<(Int) -> Int> { { it } }
+
+/** [v] as the screens show it (see [LocalRatingScale]). */
+@Composable
+fun shown(v: Int): Int = LocalRatingScale.current(v)
+
 /** Tier color for a 0-99 rating. */
 @Composable
 fun tier(v: Int): Color {

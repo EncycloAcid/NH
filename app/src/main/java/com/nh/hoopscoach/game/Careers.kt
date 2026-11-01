@@ -29,7 +29,7 @@ object Careers {
     fun keep(lg: League, p: Player, t: Team, pick: Int, how: String? = null) {
         val star = p.awards.any { a -> listOf("AA 1st", "AA 2nd", "AA 3rd", "Nat MVP", "MOP").any { a.endsWith(it) } }
         val legend = t.legends.any { it.pid == p.id }
-        if (t.id != lg.userTeamId && pick <= 0 && !star && !legend && p.transferFrom != lg.userTeamId) return
+        if (t.id != lg.userTeamId && p.id != lg.heroId && pick <= 0 && !star && !legend && p.transferFrom != lg.userTeamId) return
         p.lastTeam = t.id
         p.teamId = -1
         p.left = how ?: if (pick > 0) "Drafted No. $pick overall in ${lg.season}" else "Graduated from ${t.school} in ${lg.season}"

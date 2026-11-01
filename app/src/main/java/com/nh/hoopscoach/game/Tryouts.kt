@@ -79,8 +79,8 @@ object Tryouts {
 
     /** Other programs hold tryouts too. Once in a while one finds a gem, who replaces its weakest player. */
     fun aiTryout(lg: League, t: Team) {
-        if (t.id == lg.userTeamId || !Rng.chance(AI_GEM_CHANCE)) return
-        val cut = lg.rosterOf(t).minByOrNull { it.ovr } ?: return
+        if (lg.humanCoach(t) || !Rng.chance(AI_GEM_CHANCE)) return
+        val cut = lg.rosterOf(t).filter { it.id != lg.heroId }.minByOrNull { it.ovr } ?: return
         t.roster.remove(cut.id)
         lg.removePlayer(cut)
         val p = unrated(lg, cut.pos, 1, (42 + t.prestige * 0.05).roundToInt(), gem = true)

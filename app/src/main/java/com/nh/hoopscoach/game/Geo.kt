@@ -49,6 +49,9 @@ object Geo {
 
     fun stateOf(t: Team): String? = schoolStates[t.abbr]
 
+    /** Every state (and DC), for the create-a-player screen. */
+    val states: List<String> get() = regions.keys.sorted()
+
     /** A recruit's home state, from "City, ST". Players from abroad have none. */
     fun stateOf(p: Player): String? = p.hometown.substringAfterLast(", ", "").takeIf { it.length == 2 && it in regions }
 

@@ -45,11 +45,12 @@ import com.nh.hoopscoach.game.Team
 
 @Composable
 fun TodayScreen(vm: GameViewModel, lg: League) {
+    if (lg.pro) { ProTodayScreen(vm, lg); return }
     when (lg.phase) {
         Phase.REGULAR -> SeasonToday(vm, lg)
-        Phase.CONF_TOURNEY, Phase.NCAA -> TourneyToday(vm, lg)
+        Phase.CONF_TOURNEY, Phase.NCAA, Phase.PLAYOFFS -> TourneyToday(vm, lg)
         Phase.WRAP_UP -> WrapUpFlow(vm, lg)
-        Phase.OFFSEASON -> OffseasonFlow(vm, lg)
+        Phase.OFFSEASON -> if (lg.playerMode) RoadOffseasonFlow(vm, lg) else OffseasonFlow(vm, lg)
     }
 }
 
@@ -70,6 +71,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
@@ -78,6 +80,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         if (u.gp >= 8) item { Outlook(vm, lg) }
         item { ConfSnapshot(vm, lg, u) }
         item { TopPlayers(vm, lg, u) }
+        if (lg.playerMode) item { SocialStrip(vm, lg) }
         item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }
@@ -203,7 +206,7 @@ private fun TopPlayers(vm: GameViewModel, lg: League, t: Team) {
     val ps = lg.rosterOf(t)
     val top = if (t.gp > 0) ps.sortedByDescending { it.stats.ppg }.take(3) else ps.sortedByDescending { it.ovr }.take(3)
     Section(if (t.gp > 0) "Top performers" else "Key players", action = "Roster", onAction = { vm.teamTab = 0; vm.select(Tab.TEAM) })
-    GroupList(top, inset = 70.dp) { p -> PlayerLine(vm, lg, t, p, if (t.gp > 0) statLine(p) else "${p.pos} · ${p.cls} · ${p.style.label}") }
+    GroupList(top, inset = 70.dp) { p -> PlayerLine(vm, lg, t, p, if (t.gp > 0) statLine(p) else "${p.posLabel} · ${p.cls} · ${p.style.label}") }
 }
 
 fun statLine(p: Player) = "${f1(p.stats.ppg)} pts · ${f1(p.stats.rpg)} reb · ${f1(p.stats.apg)} ast"
@@ -211,7 +214,7 @@ fun statLine(p: Player) = "${f1(p.stats.ppg)} pts · ${f1(p.stats.rpg)} reb · $
 @Composable
 fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, trailing: (@Composable () -> Unit)? = null) {
     val team = t ?: if (p.teamId >= 0) lg.team(p.teamId) else null
-    ListRow(onClick = { vm.openPlayer(p.id) }) {
+    ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (p.id == lg.heroId) Modifier.background(P.accentSoft) else Modifier) {
         PlayerJersey(p, team, 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -228,6 +231,20 @@ fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, 
 fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
     val primary = t?.let { Color(it.primary) } ?: P.faint
     val secondary = t?.let { Color(it.secondary) } ?: Color.White
+    if (p.photo.isNotEmpty()) {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val img = remember(p.photo) { Logos.asset(ctx, "nba/heads/${p.photo}.webp") }
+        if (img != null) {
+            // A headshot on a soft team-colored plate, cropped to a circle from the top.
+            Box(Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f))) {
+                androidx.compose.foundation.Image(
+                    img, p.name, Modifier.size(size),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter,
+                )
+            }
+            return
+        }
+    }
     Jersey(p.number, primary, secondary, size)
 }
 
@@ -236,16 +253,7 @@ private fun Headlines(vm: GameViewModel, lg: League) {
     val items = lg.news.filter { it.season == lg.season }.takeLast(6).reversed()
     if (items.isEmpty()) return
     Section("Around the league")
-    GroupList(items, inset = 34.dp) { n ->
-        ListRow(onClick = if (n.gameId >= 0 && lg.games.any { it.id == n.gameId }) ({ vm.push(Route.Box(n.gameId)) }) else null) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (n.mine) P.accent else P.line))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                NewsTag(n)
-                Text(n.text, style = T.body, color = if (n.mine) P.ink else P.sub)
-            }
-        }
-    }
+    GroupList(items, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
 }
 
 // ---------- tournaments ----------
@@ -272,6 +280,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         when {
@@ -312,6 +321,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             GroupList(shown.take(8)) { g -> MatchRow(vm, lg, b, g) }
         }
         if (post) item { OtherEvents(vm, lg, b) }
+        if (lg.playerMode) item { SocialStrip(vm, lg) }
         item { Headlines(vm, lg) }
         item { Spacer(Modifier.height(20.dp)) }
     }

@@ -74,12 +74,42 @@ object Ratings {
     fun defense(p: Player) = group(p.pos, p.attrs, DEF)
     fun shooting(p: Player) = group(p.pos, p.attrs, SHOOT)
 
+    /** Second positions a player at [pos] can have: the spots next to his. */
+    fun secondOptions(pos: Pos): List<Pos> = when (pos) {
+        Pos.PG -> listOf(Pos.SG); Pos.SG -> listOf(Pos.PG, Pos.SF); Pos.SF -> listOf(Pos.SG, Pos.PF); Pos.PF -> listOf(Pos.SF, Pos.C); Pos.C -> listOf(Pos.PF)
+    }
+
+    /**
+     * How much better than usual his rating at the next spot has to be for him to play it. Each position's
+     * overall weighs ratings differently (a power forward almost always rates higher as a center), so the
+     * bar is set per pair, about a third of each position qualifying.
+     */
+    private val SECOND_BAR = mapOf(
+        (Pos.PG to Pos.SG) to -2, (Pos.SG to Pos.PG) to 1, (Pos.SG to Pos.SF) to -1, (Pos.SF to Pos.SG) to 2,
+        (Pos.SF to Pos.PF) to 0, (Pos.PF to Pos.SF) to -2, (Pos.PF to Pos.C) to 3, (Pos.C to Pos.PF) to -3,
+    )
+
+    /** A second position when his ratings fit it better than most at his position, else null. */
+    fun secondFor(pos: Pos, a: IntArray): Pos? {
+        val mine = ovr(pos, a)
+        return secondOptions(pos).map { it to ovr(it, a) - mine - (SECOND_BAR[pos to it] ?: 0) }.filter { it.second >= 0 }.maxByOrNull { it.second }?.first
+    }
+
+    /** Play styles for a player: his position's, and his second position's too. */
+    fun stylesFor(p: Player): List<Arch> = styles(p.pos) + (p.pos2?.let { styles(it) } ?: emptyList())
+
     fun styles(pos: Pos): List<Arch> = when (pos) {
-        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.SLASHER, Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.SHOT_CREATOR)
-        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.SLASHER, Arch.COMBO_GUARD, Arch.LOCKDOWN, Arch.PLAYMAKER, Arch.THREE_AND_D, Arch.SHOT_CREATOR, Arch.BALL_HAWK)
-        Pos.SF -> listOf(Arch.SLASHER, Arch.POINT_FORWARD, Arch.SHARPSHOOTER, Arch.LOCKDOWN, Arch.STRETCH, Arch.THREE_AND_D, Arch.GLUE_GUY, Arch.SHOT_CREATOR)
-        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.POST_SCORER, Arch.POINT_FORWARD, Arch.RIM_PROTECTOR, Arch.GLUE_GUY, Arch.RIM_RUNNER, Arch.ENFORCER)
-        Pos.C -> listOf(Arch.REBOUNDER, Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.STRETCH, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER)
+        // Every archetype belongs to one position.
+        Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER,
+            Arch.SCORING_POINT, Arch.SPEEDSTER, Arch.PNR_MAESTRO, Arch.POINT_OF_ATTACK)
+        Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD,
+            Arch.SPOT_UP, Arch.MIDRANGE_MAESTRO, Arch.DOWNHILL_GUARD, Arch.SPARK_PLUG)
+        Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING,
+            Arch.THREE_LEVEL, Arch.POST_WING, Arch.CORNER_SPECIALIST, Arch.TWO_WAY_WING)
+        Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR,
+            Arch.LOW_POST_FOUR, Arch.PLAYMAKING_FOUR, Arch.DUNKER_SPOT, Arch.DEFENSIVE_FOUR)
+        Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN,
+            Arch.GLASS_CLEANER, Arch.ELBOW_HUB, Arch.MOBILE_BIG, Arch.PAINT_BEAST)
     }
 
     /** Build an attribute set whose overall lands near [target]. */
@@ -126,16 +156,26 @@ object Ratings {
         return (v / 5).roundToInt() * 5
     }
 
+    /**
+     * One point of growth for rating [i], if it takes. Up to 90 it always does; above that each point
+     * is harder (60% at 93, 30% at 96, 10% at 98), so 99s are rare and earned.
+     */
+    fun raise(p: Player, i: Int): Boolean {
+        val a = p.attrs[i]
+        if (a >= 99) return false
+        if (a >= 90 && !Rng.chance((99 - a) / 10.0)) return false
+        p.attrs[i] = a + 1
+        p.seasonGains[i] += 1
+        // He grew past his ceiling: the ceiling was wrong, not the growth.
+        if (p.pot < p.ovr) p.pot = p.ovr
+        return true
+    }
+
     /** Applies one training level-up to a player. Returns the attributes raised. */
     fun levelUp(p: Player, arch: Arch): List<Attr> {
         val raised = mutableListOf<Attr>()
         for (a in arch.boosts) {
-            val i = a.ordinal
-            if (p.attrs[i] < 99) {
-                p.attrs[i] += 1
-                p.seasonGains[i] += 1
-                raised += a
-            }
+            if (raise(p, a.ordinal)) raised += a
         }
         p.seasonLevels++
         p.careerLevels++
@@ -170,18 +210,25 @@ object Ratings {
     fun spendBanked(p: Player, arch: Arch) {
         while (p.banked > 0) {
             p.banked--
-            for (a in arch.boosts) {
-                val i = a.ordinal
-                if (p.attrs[i] < 99) { p.attrs[i] += 1; p.seasonGains[i] += 1 }
-            }
+            for (a in arch.boosts) raise(p, a.ordinal)
         }
     }
 
     /** Off-season growth toward potential. Returns OVR change. */
-    fun offseasonGrowth(p: Player, coachDev: Int): Int {
+    /**
+     * A pro rating as the screens show it, on a 2K-style scale: 90 and up is about the league's top
+     * 20, a typical starter about 77, a rookie about 70. The game works on its own internal scale.
+     */
+    fun shownPro(v: Int): Int = (if (v >= 85) 77 + (v - 85) * 1.5 else 77 - (85 - v) * 1.2).roundToInt().coerceIn(40, 99)
+
+    /** The other way: a 2K-style rating on the game's internal pro scale. */
+    fun proInternal(k: Int): Int = (if (k >= 77) 85 + (k - 77) / 1.5 else 85 - (77 - k) / 1.2).roundToInt().coerceIn(60, 99)
+
+    fun offseasonGrowth(p: Player, coachDev: Int, share: Double? = null): Int {
         val before = p.ovr
         val gap = p.pot - before
-        var gain = if (gap > 0) gap * (0.28 + Rng.d() * 0.22) + Rng.gauss() * 1.2 else Rng.gauss() * 1.0
+        // [share]: how much of the gap to his ceiling he closes (the user's player earns it; see Earned).
+        var gain = if (gap > 0) gap * (share ?: (0.28 + Rng.d() * 0.22)) + Rng.gauss() * (if (share != null) 0.7 else 1.2) else Rng.gauss() * 1.0
         gain *= 0.85 + coachDev / 330.0
         if (p.has(Trait.GYM_RAT)) gain *= 1.15
         if (p.has(Trait.LATE_BLOOMER)) gain *= 1.2
@@ -198,7 +245,7 @@ object Ratings {
         if (steps > 0) {
             repeat(steps) {
                 val i = Rng.weighted(idx) { w[it] * (if (p.attrs[it] >= 99) 0.0 else 1.0) }
-                p.attrs[i] = min(99, p.attrs[i] + 1)
+                if (raise(p, i)) p.seasonGains[i] -= 1
             }
         } else if (steps < 0) {
             repeat(-steps) {
@@ -206,6 +253,7 @@ object Ratings {
                 p.attrs[i] = max(20, p.attrs[i] - 1)
             }
         }
+        if (p.pot < p.ovr) p.pot = p.ovr
         return p.ovr - before
     }
 }

@@ -339,15 +339,28 @@ fun NewGameScreen(vm: GameViewModel) {
     var conf by remember { mutableIntStateOf(-1) }
     var query by remember { mutableStateOf("") }
     var pick by remember { mutableIntStateOf(-1) }
+    var mode by remember { mutableIntStateOf(if (vm.roadHero != null) 1 else 0) }
     Column(Modifier.fillMaxSize().background(P.bg).statusBarsPadding()) {
         if (lg == null) { BusyScreen("Building your league"); return@Column }
+        val header: @Composable () -> Unit = {
+            Column(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 26.dp, bottom = 6.dp)) {
+                Text("NEW CAREER", style = T.label, color = P.accent)
+                Text("HOOPS DYNASTY", style = T.hero.copy(fontSize = 46.sp, lineHeight = 46.sp), color = P.ink)
+                Text(
+                    if (mode == 0) "Take over any of ${lg.teams.size} Division I programs. Recruit, coach, develop and build a dynasty."
+                    else "Road to the League: create a high school senior, pick a school, earn your minutes and chase the draft.",
+                    style = T.body, color = P.sub,
+                )
+            }
+            if (vm.roadHero == null) {
+                Spacer(Modifier.height(8.dp))
+                Segmented(listOf("Coach a program", "Play as a player"), mode, { mode = it })
+            }
+        }
+        if (mode == 1) { RoadNewGame(vm, lg, header); return@Column }
         LazyColumn(Modifier.weight(1f)) {
             item {
-                Column(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 26.dp, bottom = 6.dp)) {
-                    Text("NEW CAREER", style = T.label, color = P.accent)
-                    Text("HOOPS DYNASTY", style = T.hero.copy(fontSize = 46.sp, lineHeight = 46.sp), color = P.ink)
-                    Text("Take over any of ${lg.teams.size} Division I programs. Recruit, coach, develop and build a dynasty.", style = T.body, color = P.sub)
-                }
+                header()
                 Section("Your coach")
                 Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(first, { first = it.take(16) }, placeholder = { Text("First name", color = P.faint) }, singleLine = true, modifier = Modifier.weight(1f),

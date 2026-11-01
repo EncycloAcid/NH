@@ -105,7 +105,7 @@ object Season {
             }
         }
         // AI coaches re-tune their rotations as players develop.
-        if (lg.day % 7 == 0) for (t in lg.teams) if (t.id != lg.userTeamId || t.plan.auto) Gameplan.autoAllocate(lg, t)
+        if (lg.day % 7 == 0) for (t in lg.teams) if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t)
     }
 
     // ---------- in-season events ----------
@@ -347,10 +347,12 @@ object Season {
         Brand.ensure(lg)
         val places = HashMap<Int, Int>()
         for (c in lg.confs) standings(lg, c.id).forEachIndexed { i, tm -> places[tm.id] = i + 1 }
-        val earned = lg.teams.associate { t ->
+        val targets = lg.teams.associate { t ->
             val round = Awards.tourneyRound(lg, t.id)
-            t.id to Brand.target(lg, t, round, places[t.id] ?: 99, confChamps[t.confId] == t.id).total
+            t.id to Brand.target(lg, t, round, places[t.id] ?: 99, confChamps[t.confId] == t.id)
         }
+        val earned = targets.mapValues { it.value.total }
+        val userRate = Brand.climbRate(lg.user, earned.getValue(lg.userTeamId))
         for (t in lg.teams) {
             val round = Awards.tourneyRound(lg, t.id)
             t.prevPrestige = t.prestige - t.rivalryDelta
@@ -380,11 +382,12 @@ object Season {
         val points = Coaching.pointsEarned(lg)
         lg.userCoach.points += points
         val reward = if (nitChamp == lg.userTeamId) NitReward(nitBoost, NIT_POINTS, NIT_XP, nitPlayers) else null
-        lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward)
+        lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward, targets[lg.userTeamId], userRate)
+        if (lg.playerMode) Road.seasonEnd(lg)
         lg.phase = Phase.WRAP_UP
     }
 
-    private fun buildWrapUp(lg: League, prestigeBefore: Int, points: Int, nitReward: NitReward?): WrapUp {
+    private fun buildWrapUp(lg: League, prestigeBefore: Int, points: Int, nitReward: NitReward?, target: Brand.Target? = null, rate: Double = 0.0): WrapUp {
         val t = lg.user
         val round = Awards.tourneyRound(lg, t.id)
         val b = lg.ncaa!!
@@ -456,6 +459,19 @@ object Season {
         )
         if (nitReward != null) drivers += Driver("NIT title", "Earned ${nitReward.points} extra coaching points.", "+${nitReward.points}", true)
         if (coachAwards.isNotEmpty()) drivers += Driver("Awards", coachAwards.joinToString(" + "), "+${coachAwards.size * 2}", true)
+        // What the season earned, piece by piece: Prestige moves toward this number.
+        val confAbbr = lg.conf(t.confId).abbr
+        val parts = target?.let { x ->
+            listOf(
+                Driver("Record", "${t.w}-${t.l}" + if (x.resistance < 0.97) ", counted at ${(x.resistance * 100).roundToInt()}% in the $confAbbr" else "", "+%.0f".format(x.record * x.resistance), true),
+                Driver("Conference", "Finished $confFinish" + if (ctResult == "Champions") ", won the tournament" else "", "+%.0f".format(x.conference * x.resistance), x.conference > 0),
+                Driver("National stage", "${Brand.exposureLabel(Brand.exposure(lg, t.confId))} exposure in the $confAbbr", "%+.0f".format(x.stage), x.stage >= 0),
+                Driver("March", tourneyText, "+%.0f".format(x.march), x.march > 0),
+                Driver("Quality wins", "$q1w Quadrant 1 win${if (q1w == 1) "" else "s"}", "+%.0f".format(x.quality), x.quality > 0),
+                Driver("Draft picks", "Players taken in last summer's draft", "+%.0f".format(x.draft), x.draft > 0),
+                Driver("National awards", "$natAwards honor${if (natAwards == 1) "" else "s"}", "+%.0f".format(x.awards), x.awards > 0),
+            )
+        } ?: emptyList()
         return WrapUp(
             lg.season, t.id, result, seed, path, won,
             t.w, t.l, regW, regular.size - regW, t.cw, t.cl, t.expWins, t.net, t.ap, st.indexOf(t) + 1,
@@ -463,6 +479,7 @@ object Season {
             Rankings.quadRecord(lg, t, 1), Rankings.quadRecord(lg, t, 2), Rankings.wab(lg, t), Rankings.sosRank(lg, t),
             mine, coachAwards, prestigeBefore, points, drivers, signals, ctResult,
             event, rounds.take(path.size), nitReward,
+            earned = target?.total?.roundToInt() ?: 0, earnedParts = parts, climbRate = rate, streak = Brand.streak(t),
         )
     }
 
@@ -530,5 +547,6 @@ object Season {
         }
         Phase.WRAP_UP -> "Season Complete"
         Phase.OFFSEASON -> "Offseason"
+        Phase.PLAYOFFS -> "Playoffs"
     }
 }

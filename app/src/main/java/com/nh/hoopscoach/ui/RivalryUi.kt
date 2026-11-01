@@ -133,7 +133,8 @@ fun NewspaperBanner(vm: GameViewModel, lg: League, g: Game, onClick: (() -> Unit
                 modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.height(2.dp))
-        FitText("The Hoops Dispatch", TextStyle(fontFamily = serif, fontWeight = FontWeight.Black, textAlign = TextAlign.Center), ink, 32f, 15f)
+        // Your school's own paper.
+        FitText("The ${lg.user.school} Daily", TextStyle(fontFamily = serif, fontWeight = FontWeight.Black, textAlign = TextAlign.Center), ink, 32f, 15f)
         Spacer(Modifier.height(4.dp))
         Rule(ink, 2.dp)
         Spacer(Modifier.height(2.dp))
@@ -157,12 +158,35 @@ fun NewspaperBanner(vm: GameViewModel, lg: League, g: Game, onClick: (() -> Unit
         Rule(ink.copy(alpha = 0.15f), 0.75.dp)
         PaperLine(l, g.scoreFor(l.id), -g.swing, false, ink, red, serif)
         Rule(ink.copy(alpha = 0.4f), 0.75.dp)
+        // Top performers: each side's best line, yours marked.
+        g.box?.let { box ->
+            val tops = listOf(g.home to box.home, g.away to box.away).mapNotNull { (tid, lines) ->
+                lines.maxByOrNull { it.s.pts + 0.7 * (it.s.orb + it.s.drb) + 0.9 * it.s.ast }?.let { tid to it }
+            }
+            if (tops.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("TOP PERFORMERS", style = small.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.5.sp), color = faded)
+                for ((tid, pl) in tops) {
+                    val me = pl.pid == lg.heroId
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(lg.team(tid).abbr, style = small.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp), color = faded, modifier = Modifier.width(44.dp), maxLines = 1)
+                        Text(pl.name + if (me) " (you)" else "", style = TextStyle(fontFamily = serif, fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            color = if (me) red else ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${pl.s.pts} PTS · ${pl.s.orb + pl.s.drb} REB · ${pl.s.ast} AST", style = small.copy(fontSize = 11.sp), color = ink, maxLines = 1)
+                    }
+                }
+                Rule(ink.copy(alpha = 0.4f), 0.75.dp)
+            }
+        }
         Spacer(Modifier.height(8.dp))
+        // The written story when there is one, or the box score.
+        val story = lg.news.indexOfLast { it.gameId == g.id && it.body.isNotEmpty() }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${seriesLine(lg, r)} in your dynasty", style = small.copy(fontSize = 12.sp, lineHeight = 16.sp), color = faded, modifier = Modifier.weight(1f))
             if (onClick != null) {
                 Spacer(Modifier.width(8.dp))
-                Text("Box score ›", style = small.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp), color = ink, maxLines = 1)
+                Text(if (story >= 0) "Read the story ›" else "Box score ›", style = small.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp), color = ink, maxLines = 1,
+                    modifier = if (story >= 0) Modifier.clickable { vm.push(Route.Article(story)) } else Modifier)
             }
         }
     }

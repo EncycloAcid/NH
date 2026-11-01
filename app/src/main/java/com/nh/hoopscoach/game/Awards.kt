@@ -20,6 +20,9 @@ object Awards {
 
     fun line(p: Player): String = "%.1f ppg · %.1f rpg · %.1f apg".format(p.stats.ppg, p.stats.rpg, p.stats.apg)
 
+    /** Everyone eligible for national awards, best first by the award score. */
+    fun ladder(lg: League): List<Pair<Player, Team>> = eligible(lg).sortedByDescending { score(it.first, it.second) }
+
     private fun eligible(lg: League, ids: Collection<Int>? = null): List<Pair<Player, Team>> {
         val out = mutableListOf<Pair<Player, Team>>()
         for (t in lg.teams) for (pid in t.roster) {
@@ -33,6 +36,7 @@ object Awards {
     private fun give(lg: League, list: MutableList<AwardWinner>, award: String, p: Player, t: Team) {
         list += AwardWinner(award, p.id, p.name, t.id, line(p))
         p.awards += "${lg.season} $award"
+        if (p.id == lg.heroId && lg.road != null) Alerts.add(lg, "Honored", "You're on the list: ${lg.season} $award.", "award")
     }
 
     /** End of the regular season: conference honors. */

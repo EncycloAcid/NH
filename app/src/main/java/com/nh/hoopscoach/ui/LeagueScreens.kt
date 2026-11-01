@@ -169,7 +169,7 @@ fun LeaderRow(vm: GameViewModel, lg: League, rank: String, p: Player, value: Str
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = if (t.id == lg.userTeamId) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${t.school} · ${p.cls} · ${p.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${t.school} · ${p.cls} · ${p.posLabel}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (value != null) Text(value, style = T.numSm, color = P.ink) else Ring(p.ovr, 40.dp, textSize = 16.sp)
     }

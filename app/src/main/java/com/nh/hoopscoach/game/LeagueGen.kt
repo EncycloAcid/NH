@@ -88,6 +88,9 @@ object LeagueGen {
         Morale.setInitialNil(lg, t)
     }
 
+    /** A typical age for a class: high school seniors 17 or 18, freshmen 18 or 19, and a year more each class after. */
+    fun collegeAge(year: Int) = when (year.coerceIn(0, 5)) { 0 -> Rng.range(17, 18); 1 -> Rng.range(18, 19); 2 -> Rng.range(19, 20); 3 -> Rng.range(20, 21); 4 -> Rng.range(21, 22); else -> Rng.range(22, 23) }
+
     fun makePlayer(lg: League, pos: Pos, year: Int, target: Int, teamId: Int): Player {
         val style = Rng.pick(Ratings.styles(pos))
         val intl = Rng.chance(0.07)
@@ -120,6 +123,8 @@ object LeagueGen {
         p.recruitRank = when (p.stars) { 5 -> Rng.range(1, 25); 4 -> Rng.range(26, 120); 3 -> Rng.range(121, 400); else -> Rng.range(401, 800) }
         p.posRank = (p.recruitRank / 5.0 + Rng.range(-3, 3)).roundToInt().coerceAtLeast(1)
         p.happiness = Rng.range(55, 85)
+        p.age = collegeAge(year)
+        p.pos2 = Ratings.secondFor(pos, p.attrs)
         return p
     }
 
@@ -173,7 +178,7 @@ object LeagueGen {
             var guard = 0
             while (chosen.size < k && guard++ < 50) {
                 val t = Rng.weighted(lg.teams) { tm ->
-                    if (tm.id == lg.userTeamId) 0.0 else kotlin.math.exp(-((pulls[tm.id] - target) / 14.0).pow(2)) + 1e-9
+                    if (tm.id == lg.recruiterId) 0.0 else kotlin.math.exp(-((pulls[tm.id] - target) / 14.0).pow(2)) + 1e-9
                 }
                 chosen += t.id
             }

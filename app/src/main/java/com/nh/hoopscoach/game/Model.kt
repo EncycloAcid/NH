@@ -24,7 +24,7 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     SHARPSHOOTER("Sharpshooter", "SHP", listOf(Attr.INS, Attr.MID, Attr.OUT), "Elite shooter who stretches the floor from all three levels"),
     FLOOR_GENERAL("Floor General", "FLG", listOf(Attr.MID, Attr.HND, Attr.PAS), "Court commander who orchestrates the offense and controls tempo"),
     PLAYMAKER("Playmaker", "PLY", listOf(Attr.INS, Attr.HND, Attr.PAS), "Creative passer who finds open teammates and creates easy baskets"),
-    SLASHER("Slasher", "SLA", listOf(Attr.INS, Attr.PER, Attr.STL), "Explosive scorer who attacks the rim and finishes through contact"),
+    SLASHER("Slasher", "SLA", listOf(Attr.INS, Attr.PER, Attr.STL), "Attacks the rim on offense and jumps the passing lanes on defense"),
     LOCKDOWN("Lockdown Defender", "LCK", listOf(Attr.PER, Attr.STL, Attr.BLK), "Suffocating defender who shuts down the opposing team's best player"),
     COMBO_GUARD("Combo Guard", "CMB", listOf(Attr.MID, Attr.OUT, Attr.HND), "Scores and creates off the dribble from either guard spot"),
     POINT_FORWARD("Point Forward", "PTF", listOf(Attr.HND, Attr.PAS, Attr.REB), "Big wing who runs the offense and pushes the ball off the glass"),
@@ -40,7 +40,46 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     RIM_RUNNER("Rim Runner", "RUN", listOf(Attr.INS, Attr.REB, Attr.BLK), "Sprints the floor and finishes lobs and putbacks above the rim"),
     POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
     STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
-    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends");
+    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
+    TWO_WAY_GUARD("Two-Way Guard", "2WG", listOf(Attr.OUT, Attr.HND, Attr.PER), "Hits threes off the bounce and picks up the ball full court"),
+    PEST("Pest", "PES", listOf(Attr.PAS, Attr.PER, Attr.STL), "Hounds the ball for 94 feet and makes the simple pass"),
+    MICROWAVE("Microwave", "MIC", listOf(Attr.INS, Attr.OUT, Attr.HND), "Instant offense: gets to the rim or pulls up from deep the moment he checks in"),
+    MOVEMENT_SHOOTER("Movement Shooter", "MOV", listOf(Attr.MID, Attr.OUT, Attr.PAS), "Never stops running off screens, and the defense bends to find him"),
+    BULLY_GUARD("Bully Guard", "BLY", listOf(Attr.INS, Attr.REB, Attr.PER), "Big guard who backs down smaller defenders, crashes the glass and bodies up on defense"),
+    HIGH_FLYER("High Flyer", "FLY", listOf(Attr.INS, Attr.PER, Attr.BLK), "Finishes above the rim and chases down blocks in transition"),
+    FACE_UP_FOUR("Face-Up Four", "FUP", listOf(Attr.MID, Attr.HND, Attr.REB), "Faces up from the elbow, drives past slower bigs and cleans the glass"),
+    SWITCHABLE_BIG("Switchable Big", "SWB", listOf(Attr.PER, Attr.IDF, Attr.BLK), "Big who can guard all five spots and still protect the rim"),
+    PICK_AND_POP("Pick-and-Pop Big", "PNP", listOf(Attr.MID, Attr.OUT, Attr.IDF), "Sets the screen, pops to the arc and holds his own in the paint"),
+    HUSTLE_BIG("Hustle Big", "HUS", listOf(Attr.REB, Attr.STL, Attr.BLK), "All energy: tips, deflections, loose balls and second chances"),
+    LOGO_SHOOTER("Logo Shooter", "LGO", listOf(Attr.OUT, Attr.HND, Attr.PAS), "Pulls up from the logo and punishes every defender who goes under the screen"),
+    ISO_WING("Iso Wing", "ISO", listOf(Attr.MID, Attr.HND, Attr.PER), "Wins one-on-one at both ends: the pull-up on offense, the lockdown on defense"),
+    ATHLETIC_FOUR("Athletic Four", "ATH", listOf(Attr.INS, Attr.PER, Attr.REB), "Runs the floor, guards wings and owns the glass"),
+    UNICORN("Unicorn", "UNI", listOf(Attr.OUT, Attr.HND, Attr.BLK), "A seven-footer who handles, shoots threes and blocks everything at the rim"),
+    // Point guards
+    SCORING_POINT("Scoring Point", "SPG", listOf(Attr.INS, Attr.MID, Attr.OUT), "Score-first point guard who hunts his own shot from every spot"),
+    SPEEDSTER("Speedster", "SPD", listOf(Attr.INS, Attr.HND, Attr.STL), "A blur in the open floor who gets downhill before the defense is set"),
+    PNR_MAESTRO("Pick-and-Roll Maestro", "PNR", listOf(Attr.MID, Attr.OUT, Attr.PAS), "Reads every pick-and-roll: the pocket pass, the pull-up, the skip to the corner"),
+    POINT_OF_ATTACK("Point-of-Attack Defender", "POA", listOf(Attr.PER, Attr.STL, Attr.REB), "Picks up full court, fights over every screen and rebounds like a wing"),
+    // Shooting guards
+    SPOT_UP("Spot-Up Shooter", "SPU", listOf(Attr.MID, Attr.OUT, Attr.REB), "Waits on the wing, catches and fires, and crashes the long rebounds"),
+    MIDRANGE_MAESTRO("Midrange Maestro", "MRM", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives at the elbow with a pull-up nobody can stop, and guards his man on the other end"),
+    DOWNHILL_GUARD("Downhill Guard", "DHG", listOf(Attr.INS, Attr.MID, Attr.PER), "Attacks closeouts, finishes in traffic and sits down on defense"),
+    SPARK_PLUG("Spark Plug", "SPK", listOf(Attr.INS, Attr.OUT, Attr.PAS), "Instant energy off the bench: scores in bunches and finds the hot hand"),
+    // Small forwards
+    THREE_LEVEL("Three-Level Scorer", "3LV", listOf(Attr.INS, Attr.MID, Attr.OUT), "Scores at the rim, from the elbow and from deep"),
+    POST_WING("Post Wing", "PWG", listOf(Attr.INS, Attr.MID, Attr.REB), "Backs down smaller wings and turns over either shoulder"),
+    CORNER_SPECIALIST("Corner Specialist", "CRN", listOf(Attr.OUT, Attr.REB, Attr.PER), "Lives in the corner, guards the wing and boxes out"),
+    TWO_WAY_WING("Two-Way Wing", "2WW", listOf(Attr.MID, Attr.OUT, Attr.PER), "Creates his own shot and still takes the toughest assignment"),
+    // Power forwards
+    LOW_POST_FOUR("Low-Post Four", "LPF", listOf(Attr.INS, Attr.REB, Attr.IDF), "Old-school power forward: drop steps, hook shots and boxing out"),
+    PLAYMAKING_FOUR("Playmaking Four", "PMF", listOf(Attr.MID, Attr.HND, Attr.PAS), "Runs the offense from the top of the key and hits every cutter"),
+    DUNKER_SPOT("Dunker Spot Big", "DNK", listOf(Attr.INS, Attr.REB, Attr.STL), "Lurks on the baseline for dump-offs, putbacks and deflections"),
+    DEFENSIVE_FOUR("Defensive Anchor", "DAF", listOf(Attr.PER, Attr.IDF, Attr.STL), "Guards the other team's best forward and wins the hustle plays"),
+    // Centers
+    GLASS_CLEANER("Glass Cleaner", "GLS", listOf(Attr.REB, Attr.PAS, Attr.IDF), "Owns the defensive glass and starts the break with an outlet"),
+    ELBOW_HUB("Elbow Hub", "ELB", listOf(Attr.MID, Attr.PAS, Attr.IDF), "Runs the offense from the elbow with a soft jumper and sharp passes"),
+    MOBILE_BIG("Mobile Big", "MOB", listOf(Attr.PER, Attr.REB, Attr.BLK), "Switches onto guards, contests at the rim and runs the floor"),
+    PAINT_BEAST("Paint Beast", "BST", listOf(Attr.INS, Attr.IDF, Attr.BLK), "Overpowers everyone inside on both ends of the floor");
 }
 
 enum class Trait(val label: String, val good: Boolean) {
@@ -70,9 +109,12 @@ enum class Defense(val label: String, val blurb: String) {
     PACKLINE("Pack Line", "Walls off the rim, lowers turnovers forced."),
 }
 
-enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON }
+enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON, PLAYOFFS }
 
-enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT") }
+/** College basketball, or (once the user's player is drafted) the pro league. */
+enum class Level { COLLEGE, PRO }
+
+enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT"), PLAYOFF("PO"), CUP("CUP") }
 
 @Serializable
 class StatLine(
@@ -80,11 +122,22 @@ class StatLine(
     var pts: Int = 0, var fgm: Int = 0, var fga: Int = 0, var tpm: Int = 0, var tpa: Int = 0,
     var ftm: Int = 0, var fta: Int = 0, var orb: Int = 0, var drb: Int = 0, var ast: Int = 0,
     var stl: Int = 0, var blk: Int = 0, var tov: Int = 0, var pf: Int = 0,
+    /** Points in clutch time: the last five minutes of the fourth quarter or overtime, within five points. */
+    var clutch: Int = 0,
+    /** Plus-minus: the team's points minus the other team's while he was on the floor. */
+    var pm: Int = 0,
 ) {
     val reb get() = orb + drb
     fun add(o: StatLine) {
         gp += o.gp; gs += o.gs; sec += o.sec; pts += o.pts; fgm += o.fgm; fga += o.fga; tpm += o.tpm; tpa += o.tpa
         ftm += o.ftm; fta += o.fta; orb += o.orb; drb += o.drb; ast += o.ast; stl += o.stl; blk += o.blk; tov += o.tov; pf += o.pf
+        clutch += o.clutch; pm += o.pm
+    }
+    /** What was added since [o] (a snapshot of this line taken earlier). */
+    fun since(o: StatLine?): StatLine {
+        if (o == null) return copy()
+        return StatLine(gp - o.gp, gs - o.gs, sec - o.sec, pts - o.pts, fgm - o.fgm, fga - o.fga, tpm - o.tpm, tpa - o.tpa,
+            ftm - o.ftm, fta - o.fta, orb - o.orb, drb - o.drb, ast - o.ast, stl - o.stl, blk - o.blk, tov - o.tov, pf - o.pf, clutch - o.clutch, pm - o.pm)
     }
     fun per(v: Int): Double = if (gp == 0) 0.0 else v.toDouble() / gp
     val ppg get() = per(pts)
@@ -167,16 +220,34 @@ class Player(
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
+    /** Pro league: age, and pro seasons finished (0 for a rookie). */
+    var age: Int = 0,
+    var proYears: Int = 0,
+    /** A pro's salary (thousands a season) and the years left on his deal (the user's player's live in his contract). */
+    var salary: Int = 0,
+    var contractYears: Int = 0,
+    /** Headshot file for real pro players (assets/nba/heads/<photo>.webp), or empty. */
+    var photo: String = "",
+    /** A second position he can play (a neighbor of his first), or null. */
+    var pos2: Pos? = null,
 ) {
-    val name get() = "$first $last"
-    val short get() = "${first.first()}. $last"
+    val name get() = "$first $last".trim()
+    /** "PG/SG" for a two-position player, else just his position. */
+    val posLabel get() = pos2?.let { "$pos/$it" } ?: "$pos"
+    /** He can play [p]: his first position or his second. */
+    fun plays(p: Pos) = pos == p || pos2 == p
+    /** "J. Smith", or the one name for players known by one ("Nene"). */
+    val short get() = if (last.isEmpty() || first.isEmpty()) name else "${first.first()}. $last"
     val ovr: Int get() = Ratings.ovr(pos, attrs)
     operator fun get(a: Attr) = attrs[a.ordinal]
     fun has(t: Trait) = t in traits
     val cls get() = classLabel(year)
 }
 
-fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; else -> "GR" }
+fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; PRO_YEAR -> "PRO"; else -> "GR" }
+
+/** The class year every pro player carries. */
+const val PRO_YEAR = 9
 
 @Serializable
 class Slot(var starter: Int, var reserve: Int, var starterMin: Int, var starterUsg: Int, var reserveUsg: Int)
@@ -207,6 +278,8 @@ class Team(
     var secondary: Long,
     var logo: Int,
     var coachId: Int = -1,
+    /** The franchise's place in today's league (its abbreviation today), whatever it's called this season. */
+    var slot: String = "",
     var roster: MutableList<Int> = mutableListOf(),
     var plan: GamePlan = GamePlan(),
     var w: Int = 0, var l: Int = 0, var cw: Int = 0, var cl: Int = 0, var streak: Int = 0,
@@ -299,7 +372,7 @@ class Conference(val id: Int, val name: String, val abbr: String, val tier: Int,
 class PlayerLine(val pid: Int, val name: String, val pos: Pos, val starter: Boolean, val s: StatLine)
 
 @Serializable
-class BoxScore(val home: List<PlayerLine>, val away: List<PlayerLine>, val halves: List<IntArray>)
+class BoxScore(val home: List<PlayerLine>, val away: List<PlayerLine>, val halves: List<IntArray>, val quarters: Boolean = false)
 
 @Serializable
 class Game(
@@ -409,7 +482,11 @@ class RoundReport(
 )
 
 @Serializable
-class News(val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "") {
+class News(
+    val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "",
+    /** A short article behind the headline, and the outlet that ran it. */
+    val body: String = "", val source: String = "",
+) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
 }
@@ -459,7 +536,7 @@ class Rivalry(
 }
 
 @Serializable
-class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1)
+class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1, var proTeam: String = "")
 
 @Serializable
 class HofEntry(val season: Int, val name: String, val pos: Pos, val school: String, val summary: String, val isCoach: Boolean = false)
@@ -506,6 +583,12 @@ class WrapUp(
     /** Short round names for each game in [path]. */
     val pathRounds: List<String> = emptyList(),
     val nitReward: NitReward? = null,
+    /** What the season earned (Prestige moves toward it), and the pieces that added up to it. */
+    val earned: Int = 0,
+    val earnedParts: List<Driver> = emptyList(),
+    /** How far Prestige moved toward [earned] this season, and the rising streak behind it. */
+    val climbRate: Double = 0.0,
+    val streak: Int = 0,
 )
 
 /** What an NIT title earned the program. */
@@ -585,6 +668,363 @@ class GradEntry(val pid: Int, val name: String, val pos: Pos, val ovr: Int, val 
 @Serializable
 class Growth(val pid: Int, val before: Int, val after: Int, val gains: IntArray, val weight: Int)
 
+enum class GameMode { COACH, PLAYER }
+
+enum class NilDeal(val label: String, val blurb: String) {
+    NONE("No deal", ""),
+    STEADY("Hometown dealership", "Full value, guaranteed, no strings."),
+    PERFORMANCE("Performance deal", "60% guaranteed, plus a bonus for every point you average and for All-America honors."),
+    BRAND("National brand", "150% of your value, but appearances and shoots cost 15% of your development this season."),
+}
+
+/** A school's scholarship offer to the user's player: out of high school or out of the transfer portal. */
+@Serializable
+class SchoolOffer(val teamId: Int, val nil: Int, val role: String, val ahead: Int, val closeness: Int)
+
+/** Player-mode state: NIL deal, offseason decisions and how the career ended. */
+@Serializable
+class RoadState(
+    var startSeason: Int = 0,
+    var dealSeason: Int = 0,
+    var deal: NilDeal = NilDeal.NONE,
+    var dealBase: Int = 0,
+    /** NIL earned over the career, in thousands. */
+    var earned: Int = 0,
+    var declared: Boolean = false,
+    var portal: Boolean = false,
+    val offers: MutableList<SchoolOffer> = mutableListOf(),
+    val schools: MutableList<Int> = mutableListOf(),
+    var ended: Boolean = false,
+    var draftPick: Int = 0,
+    var ending: String = "",
+    /** One line per finished season for the career story. */
+    val story: MutableList<String> = mutableListOf(),
+    /** Social following. Every follower adds a dollar a year to his NIL value. */
+    var followers: Int = 0,
+    var seasonStartFollowers: Int = 0,
+    /** Media persona from press answers: negative humble, positive brash. */
+    var persona: Int = 0,
+    /** Follower milestones already paid out by sponsors. */
+    var milestone: Int = 0,
+    /** The open postgame press question, if any. */
+    var press: PressQuestion? = null,
+    val pressLog: MutableList<String> = mutableListOf(),
+    /** His social feed (newest last), and when the last award-race column ran (season * 1000 + day). */
+    val feed: MutableList<Post> = mutableListOf(),
+    var lastColumn: Int = 0,
+    /** Leadership (0-100): seasons as a starter, winning beyond the projection, and how he talks; 60 and up, he's a captain. */
+    var leadership: Int = 15,
+    /** Practice this season: total effort (0 rest to 1 extra work each day) and days, and the last summer's growth, explained. */
+    var work: Double = 0.0,
+    var workDays: Int = 0,
+    var growthNote: String = "",
+    /** This week's practice plan, and how worn down he is (0 fresh, 100 exhausted). */
+    var practice: Practice = Practice.TEAM,
+    var fatigue: Int = 0,
+    /** Practice work banked toward each rating; every 300 is +1. */
+    var practiceXp: IntArray = IntArray(10),
+    /** Player of the Year ladder: this week's rank, last week's, and the day it was taken. */
+    var raceRank: Int = 0,
+    var lastRaceRank: Int = 0,
+    var raceDay: Int = -99,
+    /** Big moments in live games: how many he got, and how many he came through in. */
+    var moments: Int = 0,
+    var momentsWon: Int = 0,
+    /** NIL money spent on his own staff; the bank is earned minus spent. */
+    var spent: Int = 0,
+    /** Staff hired for [hiredSeason]; contracts run one season. */
+    val hired: MutableList<Staff> = mutableListOf(),
+    var hiredSeason: Int = 0,
+    /** Season whose guaranteed NIL was already paid at signing. */
+    var paidSeason: Int = 0,
+    /** Draft Night: the season he was in the draft, his big-board rank going in, and the season whose green room he watched to the end. */
+    var draftSeason: Int = -1,
+    var draftRank: Int = 0,
+    var draftWatched: Int = -1,
+    /** Live games jump straight to his plays. */
+    var spotlight: Boolean = true,
+    /** The class rival: a top recruit from the same class who follows him all career. */
+    var rivalId: Int = -1,
+    var rivalName: String = "",
+    val duels: MutableList<Duel> = mutableListOf(),
+    /** How the rival's college career ended ("went No. 4 in the 2027 draft"), once it has. */
+    var rivalLeft: String = "",
+    var rivalPick: Int = 0,
+    var rivalDraft: Int = 0,
+    /** Summer events: the offseason (by season) whose summer is already booked, and what happened. */
+    var summer: Int = -1,
+    var summerNote: String = "",
+    /** Pro career: drafted (or signed undrafted) and headed to the pros, and everything after. */
+    var goingPro: Boolean = false,
+    var undrafted: Boolean = false,
+    var proStart: Int = 0,
+    var contract: Contract? = null,
+    val proTeams: MutableList<Int> = mutableListOf(),
+    val proStory: MutableList<String> = mutableListOf(),
+    val proOffers: MutableList<ProOffer> = mutableListOf(),
+    var rings: Int = 0,
+    var allStars: Int = 0,
+    var mvps: Int = 0,
+    var retired: Boolean = false,
+    /** College numbers, kept when he turns pro. */
+    var collegeTotals: StatLine? = null,
+    var collegeSeasons: Int = 0,
+    var collegeSchools: String = "",
+    /** Season his salary for that season was paid. */
+    var salarySeason: Int = 0,
+    /** The order pro teams pick in on his Draft Night (franchise indexes). */
+    val proOrder: MutableList<Int> = mutableListOf(),
+    /** Trades: when he last asked out (season * 2, +1 in the offseason), the teams that want him, and his last move. */
+    var tradeKey: Int = -1,
+    val suitors: MutableList<Suitor> = mutableListOf(),
+    var tradedSeason: Int = 0,
+    var tradedDay: Int = -1,
+    var tradeNote: String = "",
+    /** Free agency: a player option on his last year that he has to decide on this summer. */
+    var optionPending: Boolean = false,
+    /** Restricted free agency after a first-round rookie deal: his team can match any offer sheet. */
+    var restricted: Boolean = false,
+    /** Playoff highlight reel, and his best pro single games (points, rebounds, assists, threes, steals, blocks). */
+    val reel: MutableList<ReelEntry> = mutableListOf(),
+    var proBest: IntArray = IntArray(6),
+    /** Recruiting a star: the summer he last pitched one, the season he last pushed for a trade, and how it went. */
+    var pitchSeason: Int = -1,
+    var pushSeason: Int = -1,
+    var recruitNote: String = "",
+    /** After he retires: the numbers hung in the rafters, and his Hall of Fame class (0 if not in). */
+    val jerseys: MutableList<String> = mutableListOf(),
+    var hofClass: Int = 0,
+    /** His overall the day he left college, before the step up to the pros. */
+    var collegeOvr: Int = 0,
+    /** The all-time list: his rank (0 until he's on it), the names below him, and the last time he passed someone. */
+    var allTimeRank: Int = 0,
+    val allTimePassed: MutableList<String> = mutableListOf(),
+    /** Names already announced as passed, so a back-and-forth with an active player isn't news twice. */
+    val allTimeNamed: MutableList<String> = mutableListOf(),
+    var allTimeNote: String = "",
+    var allTimeSeason: Int = 0,
+    var allTimeDay: Int = -1,
+)
+
+/** A team that would trade for him, and the players it would send back. */
+@Serializable
+class Suitor(val teamId: Int, val sends: List<Int>, val role: String, val ahead: Int, val pickKeys: List<Int> = emptyList())
+
+/** A completed trade: who went each way. */
+@Serializable
+class Trade(
+    val season: Int, val day: Int, val offseason: Boolean, val teamA: Int, val teamB: Int,
+    val toB: List<String>, val toA: List<String>, val hero: Boolean = false,
+)
+
+/** A pro contract. Salary in thousands of dollars a season. */
+@Serializable
+class Contract(val teamId: Int, val salary: Int, var years: Int, val kind: String, val signed: Int = 0, var option: Boolean = false)
+
+/** A free-agent offer. */
+@Serializable
+class ProOffer(
+    val teamId: Int, var salary: Int, val years: Int, val role: String, val ahead: Int, val winPct: Double,
+    /** The most the team will pay (hidden), whether he's countered yet, and how the team answered. */
+    val max: Int = 0, var countered: Boolean = false, var note: String = "",
+)
+
+/**
+ * A playoff series, best of seven unless [bestOf] says otherwise (play-in and NBA Cup games are one game).
+ * [conf] is -1 for the Finals; [slot] orders the bracket. Round 0 is the play-in.
+ */
+@Serializable
+class Series(
+    val round: Int, val conf: Int, val slot: Int, val hi: Int, val lo: Int,
+    var hiWins: Int = 0, var loWins: Int = 0, val gameIds: MutableList<Int> = mutableListOf(),
+    val bestOf: Int = 7,
+) {
+    private val need get() = bestOf / 2 + 1
+    val done get() = hiWins == need || loWins == need
+    val winner get() = if (hiWins == need) hi else if (loWins == need) lo else -1
+    val loser get() = if (hiWins == need) lo else if (loWins == need) hi else -1
+    fun involves(t: Int) = hi == t || lo == t
+}
+
+/** One finished pro season, for the history page. */
+@Serializable
+class ProSeasonSummary(
+    val season: Int, val champion: Int, val runnerUp: Int, val mvp: String, val finalsMvp: String, val roy: String,
+    val heroResult: String = "",
+)
+
+enum class ProStep { REVIEW, DRAFT, FREE_AGENCY, SUMMER }
+
+/** Pro league state that the college game doesn't have. */
+@Serializable
+class ProState(
+    val series: MutableList<Series> = mutableListOf(),
+    val seeds: MutableMap<Int, Int> = mutableMapOf(),
+    val allStars: MutableList<Int> = mutableListOf(),
+    var allStarSeason: Int = 0,
+    var allStarNote: String = "",
+    var champion: Int = -1,
+    val history: MutableList<ProSeasonSummary> = mutableListOf(),
+    var step: ProStep = ProStep.FREE_AGENCY,
+    /** Rookies the user's team drafted this summer, and the order the lottery set. */
+    val draftedByUser: MutableList<Int> = mutableListOf(),
+    val retiredThisSummer: MutableList<String> = mutableListOf(),
+    /** The rival, if he was still in college when the user turned pro: he enters next year's draft. */
+    var pendingRival: Player? = null,
+    /** Growth over the last summer: player id to overall before. */
+    val before: MutableMap<Int, Int> = mutableMapOf(),
+    /** Every trade, newest last, and the players already moved this season (nobody is traded twice in one). */
+    val trades: MutableList<Trade> = mutableListOf(),
+    val moved: MutableList<Int> = mutableListOf(),
+    /** All-time list scores of players who retired in this league, by name. */
+    val frozen: MutableMap<String, Double> = mutableMapOf(),
+    /** This season's calendar: the All-Star break, the trade deadline and the last regular-season day (58-game defaults for older saves). */
+    var allStarDay: Int = 30,
+    var deadline: Int = 40,
+    var lastDay: Int = 59,
+    /** The records book, and this summer's star free agents. */
+    val records: MutableList<BookRecord> = mutableListOf(),
+    val freeStars: MutableList<Int> = mutableListOf(),
+    /** The NBA Cup: six groups of five (East first), the knockout bracket, its days and its winner. */
+    val cupGroups: MutableList<MutableList<Int>> = mutableListOf(),
+    val cup: MutableList<Series> = mutableListOf(),
+    val cupSeeds: MutableMap<Int, Int> = mutableMapOf(),
+    var cupQfDay: Int = 0,
+    var cupSfDay: Int = 0,
+    var cupFinalDay: Int = 0,
+    var cupChampion: Int = -1,
+    var cupMvp: String = "",
+    var cupNote: String = "",
+    /** Game 83: Rivalry Night. */
+    var rivalryDay: Int = 0,
+    /** All-Star Saturday and the Rising Stars: one line per event. */
+    val weekend: MutableList<String> = mutableListOf(),
+    /** Lottery night: the 14 lottery teams worst first, and the order the balls set. */
+    val lotteryPre: MutableList<Int> = mutableListOf(),
+    val lotteryPicks: MutableList<Int> = mutableListOf(),
+    var lotterySeason: Int = 0,
+    /** Awards night: the MVP vote. */
+    val mvpVotes: MutableList<Vote> = mutableListOf(),
+    /** Era mode: the season this career started in (an [Era] name). */
+    var era: String = "TODAY",
+    /** The league follows the real list of teams each season (expansions and moves); games a team plays this season. */
+    var realTeams: Boolean = false,
+    var games: Int = 0,
+    /** Every honor of this season (weekly and monthly awards, awards night, the playoffs, the Cup and All-Star), and the season awards of past ones. */
+    val honors: MutableList<Honor> = mutableListOf(),
+    /** Season stats and team records (wins, losses, points for and against) when this week and month began, to measure them. */
+    val weekStart: MutableMap<Int, StatLine> = mutableMapOf(),
+    val monthStart: MutableMap<Int, StatLine> = mutableMapOf(),
+    val weekTeams: MutableMap<Int, IntArray> = mutableMapOf(),
+    val monthTeams: MutableMap<Int, IntArray> = mutableMapOf(),
+    var weekDay: Int = 0,
+    var week: Int = 0,
+    var month: Int = 0,
+    /** Each team's wins last season, for Coach and Executive of the Year. */
+    val lastWins: MutableMap<Int, Int> = mutableMapOf(),
+    val allStarStarters: MutableList<Int> = mutableListOf(),
+    /** This summer's free-agent signings and coaching changes around the league, for the offseason screens. */
+    val faMoves: MutableList<String> = mutableListOf(),
+    val staffMoves: MutableList<String> = mutableListOf(),
+    /** Future first-round picks and who owns them; each team's general manager. */
+    val picks: MutableList<PickAsset> = mutableListOf(),
+    val execs: MutableMap<Int, String> = mutableMapOf(),
+)
+
+/** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
+@Serializable
+class PickAsset(val season: Int, val original: Int, var owner: Int)
+
+/**
+ * One honor: [award] like "Player of the Week" or "MVP", for a player ([pid]) or a coach or front
+ * office ([pid] -1). [period] names the week or month ("Week 3", "December"); [conf] is 0 East,
+ * 1 West, or -1 league-wide.
+ */
+@Serializable
+class Honor(
+    val season: Int, val day: Int, val award: String, val pid: Int, val name: String, val teamId: Int,
+    val line: String = "", val period: String = "", val conf: Int = -1,
+)
+
+/** A pop-up for a big moment: an award, an All-Star nod, a trade, a record, a title. */
+@Serializable
+class Alert(val title: String, val body: String, val kind: String = "")
+
+/** One player's share of the MVP vote: 100 voters, 10-7-5-3-1. */
+@Serializable
+class Vote(val pid: Int, val name: String, val teamId: Int, val points: Int, val firsts: Int)
+
+/** One night in his playoff highlight reel. */
+@Serializable
+class ReelEntry(val season: Int, val title: String, val line: String, val big: Boolean = false)
+
+/**
+ * A record: [scope] is "Game", "Season" or "Career". [base] is a real holder's total before this
+ * league, so an active holder's record keeps growing as he plays.
+ */
+@Serializable
+class BookRecord(
+    val key: String, val label: String, val scope: String, var value: Double, var holder: String, var season: Int,
+    var mine: Boolean = false, val base: Double = 0.0, val decimals: Int = 0,
+)
+
+/** One head-to-head game against the class rival. */
+@Serializable
+class Duel(val season: Int, val gameId: Int, val opp: Int, val me: Int, val him: Int, val won: Boolean)
+
+/** Summer invitations: camps sharpen three ratings; the U19 national team raises everything a little and the profile a lot. */
+enum class SummerEvent(val label: String, val blurb: String, val boosts: List<Attr>) {
+    SHOOTING_CAMP("Elite Shooting Camp", "A week of game-speed reps with pro shooting coaches.", listOf(Attr.OUT, Attr.MID, Attr.INS)),
+    GUARD_CAMP("Elite Guard Camp", "Pick-and-roll reads, ball pressure and a handle that holds up against the best guards in the country.", listOf(Attr.HND, Attr.PAS, Attr.PER)),
+    WING_CAMP("Elite Wing Camp", "Attack closeouts, finish through contact and guard the other team's best scorer.", listOf(Attr.INS, Attr.PER, Attr.STL)),
+    BIGS_CAMP("Elite Bigs Camp", "Footwork, post counters and rim protection with former pros.", listOf(Attr.INS, Attr.REB, Attr.IDF)),
+    LOCKDOWN_CAMP("Lockdown Defense Camp", "Slides, deflections and contests until your legs give out.", listOf(Attr.PER, Attr.STL, Attr.BLK)),
+    U19("U19 National Team", "Represent the USA at the U19 World Cup against the best teenagers on the planet.", emptyList()),
+    NATIONAL_TEAM("Team USA", "The best players in the country, one summer, one gold medal to chase.", emptyList()),
+}
+
+/** People the user's player can pay out of his NIL money, one season at a time. Costs in thousands. */
+enum class Staff(val label: String, val blurb: String, val cost: Int) {
+    TRAINER("Personal trainer", "Develop 25% faster from games and practice.", 150),
+    NUTRITIONIST("Nutritionist", "Fatigue builds a quarter slower, and you recover faster between games.", 90),
+    SHOOTING_COACH("Shooting coach", "+3% on jump shots, and +5% when you take the big shot late.", 120),
+    AGENT("Agent", "Negotiates 15% more on NIL deals, bonuses and sponsor payouts.", 80),
+}
+
+/** The weekly practice plan in player mode. */
+enum class Practice(val label: String, val blurb: String, val tiring: Int, val boosts: List<Attr>, val xp: Int) {
+    TEAM("Team practice", "The normal schedule: steady work on your training focus.", 3, emptyList(), 14),
+    SHOOTING("Shooting reps", "Extra shots after practice. Inside, Mid-Range and 3-Point grow faster.", 7, listOf(Attr.INS, Attr.MID, Attr.OUT), 40),
+    FILM("Film study", "Watch tape. Handling, Passing and Perimeter D grow. Easy on the legs.", 2, listOf(Attr.HND, Attr.PAS, Attr.PER), 30),
+    WEIGHTS("Weight room", "Lift heavy. Inside, Rebound and Interior D grow. The most tiring.", 9, listOf(Attr.INS, Attr.REB, Attr.IDF), 40),
+    REST("Rest", "No extra work. Fatigue drops fast.", -12, emptyList(), 0),
+}
+
+/** One answer at the postgame podium and what it does. */
+@Serializable
+class PressAnswer(
+    val text: String,
+    /** Follower change as a share of the current following (0.05 = +5%). */
+    val followers: Double,
+    /** Change to the school's fan mood. */
+    val fans: Int = 0,
+    /** Change to teammates' happiness. */
+    val teammates: Int = 0,
+    val persona: Int = 0,
+)
+
+@Serializable
+class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "")
+
+/** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
+@Serializable
+class Post(
+    val season: Int, val day: Int, val name: String, val handle: String, val kind: String, val text: String,
+    val likes: Int, val verified: Boolean = false, val gameId: Int = -1,
+    /** A real account's avatar (assets/social/<avatar>.webp), or empty. */
+    val avatar: String = "",
+)
+
 @Serializable
 class OffseasonState(
     var step: OffStep = OffStep.ROSTER,
@@ -660,6 +1100,18 @@ class League(
     var cotyCoachId: Int = -1,
     var apHistory: MutableList<Int> = mutableListOf(),
     var norms: DoubleArray? = null,
+    /** Coach a program, or play one player's college career ("Road to the League"). */
+    var mode: GameMode = GameMode.COACH,
+    /** In player mode, the user's player. */
+    var heroId: Int = -1,
+    var road: RoadState? = null,
+    var level: Level = Level.COLLEGE,
+    var proState: ProState? = null,
+    /** Era mode from the start: the college years are that era's ("TODAY" otherwise), and the real players already placed (their data id to player id). */
+    var era: String = "TODAY",
+    val eraIds: MutableMap<String, Int> = mutableMapOf(),
+    /** Big moments waiting to pop up for the user, oldest first. */
+    val alerts: MutableList<Alert> = mutableListOf(),
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()
@@ -692,6 +1144,16 @@ class League(
 
     val user get() = teams[userTeamId]
     val userCoach get() = coach(userCoachId)
+
+    val playerMode get() = mode == GameMode.PLAYER
+    val pro get() = level == Level.PRO
+    /** True when the user runs this team's bench. In player mode every team is coached by the AI. */
+    fun humanCoach(t: Team) = mode == GameMode.COACH && t.id == userTeamId
+    fun humanCoach(teamId: Int) = mode == GameMode.COACH && teamId == userTeamId
+    /** The school the user recruits for, or -1 in player mode (every school recruits on its own). */
+    val recruiterId get() = if (mode == GameMode.COACH) userTeamId else -1
+    /** The user's player in player mode, on a roster or (once his college career is over) among the alumni. */
+    val hero: Player? get() = if (heroId < 0) null else anyPlayer(heroId)
 
     fun rosterOf(t: Team): List<Player> = t.roster.map { player(it) }
 

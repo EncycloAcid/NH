@@ -223,7 +223,7 @@ object Recruiting {
             out += Factor("Winning", 0.85 + pct * 0.4, "Won ${(pct * 100).roundToInt()}% of games")
         }
         // NIL: shown for your school; it adds interest each round on its own (see project()).
-        if (t.id == lg.userTeamId) {
+        if (t.id == lg.recruiterId) {
             val g = nilGain(r, r.nilOffer)
             val pct = if (r.nilAsk <= 0) 100 else (r.nilOffer * 100.0 / r.nilAsk).roundToInt()
             out += Factor(
@@ -243,8 +243,8 @@ object Recruiting {
     /** Where every school in the race would stand after this round, with the points as they are now. */
     fun project(lg: League, r: Recruit, ctx: Ctx): Map<Int, Int> {
         val out = HashMap<Int, Int>()
-        val u = lg.userTeamId
-        val ids = r.interest.keys + r.alloc.keys + (if (r.nilOffer > 0) setOf(u) else emptySet())
+        val u = lg.recruiterId
+        val ids = r.interest.keys + r.alloc.keys + (if (u >= 0 && r.nilOffer > 0) setOf(u) else emptySet())
         for (tid in ids) {
             val now = r.interest[tid] ?: 4
             val pts = r.alloc[tid] ?: 0
@@ -294,8 +294,8 @@ object Recruiting {
         val races = HashMap<Int, MutableList<Recruit>>()
         for (r in lg.recruits) {
             if (r.committed >= 0) continue
-            r.alloc.keys.retainAll(setOf(lg.userTeamId))
-            for (tid in r.interest.keys) if (tid != lg.userTeamId && room[tid] > 0) races.getOrPut(tid) { mutableListOf() } += r
+            r.alloc.keys.retainAll(setOf(lg.recruiterId))
+            for (tid in r.interest.keys) if (tid != lg.recruiterId && room[tid] > 0) races.getOrPut(tid) { mutableListOf() } += r
         }
         for ((tid, list) in races) {
             val t = lg.team(tid)
@@ -401,7 +401,7 @@ object Recruiting {
         val round = os.round.coerceIn(1, ROUNDS)
         val ctx = Ctx(lg)
         val room = IntArray(lg.teams.size) { openSpots(lg, lg.teams[it]) }
-        val u = lg.userTeamId
+        val u = lg.recruiterId
         val rep = RoundReport(round)
         val order = lg.recruits.filter { it.committed < 0 }.sortedByDescending { it.p.ovr }
         for (r in order) {
@@ -452,7 +452,7 @@ object Recruiting {
     }
 
     private fun commit(lg: League, r: Recruit, tid: Int, round: Int, room: IntArray?, rep: RoundReport?) {
-        val u = lg.userTeamId
+        val u = lg.recruiterId
         val wasTarget = r.onBoard || u in r.alloc || u in r.interest
         r.committed = tid
         r.round = round
@@ -474,7 +474,7 @@ object Recruiting {
      * of the rest, and everyone else goes unsigned. Returns ids of players added to the user's team.
      */
     fun endCycle(lg: League): List<Int> {
-        val u = lg.userTeamId
+        val u = lg.recruiterId
         val room = IntArray(lg.teams.size) { openRoom(lg, lg.teams[it]) }
         for (r in lg.recruits.filter { it.committed < 0 }.sortedByDescending { it.p.ovr }) {
             val top = r.interest.entries.filter { room[it.key] > 0 && it.value >= 40 }.maxByOrNull { it.value } ?: continue

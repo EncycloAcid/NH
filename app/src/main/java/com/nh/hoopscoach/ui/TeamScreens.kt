@@ -63,14 +63,19 @@ fun TeamScreen(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
             ScreenHeader("${lg.conf(t.confId).name} · Coach ${lg.coachOf(t).last}", t.school, "${t.mascot}  ·  ${recordLine(lg, t)}") {
-                GuideButton { vm.openGuide(Guide.PROGRAM, when (vm.teamTab) { 0 -> 0; 1 -> 2; 2 -> 3; else -> 4 }) }
+                GuideButton { vm.openGuide(Guide.PROGRAM, if (lg.playerMode) (if (vm.teamTab == 0) 0 else 4) else when (vm.teamTab) { 0 -> 0; 1 -> 2; 2 -> 3; else -> 4 }) }
                 TeamBadge(t, 46.dp)
             }
             TeamRings(lg, t)
             Spacer(Modifier.height(14.dp))
-            Segmented(listOf("Roster", "Lineup", "Develop", "Program"), vm.teamTab, { vm.teamTab = it })
+            // In player mode the coach runs the team: you see the roster and the program, not the controls.
+            if (lg.playerMode) Segmented(listOf("Roster", "Program"), vm.teamTab.coerceIn(0, 1), { vm.teamTab = it })
+            else Segmented(listOf("Roster", "Lineup", "Develop", "Program"), vm.teamTab, { vm.teamTab = it })
         }
-        when (vm.teamTab) {
+        if (lg.playerMode) {
+            if (vm.teamTab == 0) rosterList(vm, lg, t, mine = false)
+            else item { ProgramNumbers(vm, lg, t); FanPanel(t); RivalsList(vm, lg, t); ProgramLegends(t) { vm.openPlayer(it) } }
+        } else when (vm.teamTab) {
             0 -> rosterList(vm, lg, t, mine = true)
             1 -> lineup(vm, lg, t)
             2 -> develop(vm, lg, t)
@@ -120,12 +125,14 @@ fun LazyListScope.rosterList(vm: GameViewModel, lg: League, t: Team, mine: Boole
 @Composable
 fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) {
     val mins = Gameplan.plannedMinutes(t, p.id)
-    ListRow(onClick = { vm.openPlayer(p.id) }) {
+    val you = p.id == lg.heroId
+    ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (you) Modifier.background(P.accentSoft) else Modifier) {
         PlayerJersey(p, t, 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (you) { Spacer(Modifier.width(6.dp)); Tag("YOU", P.accent, filled = true) }
                 if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }
@@ -134,7 +141,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 }
             }
             Text(
-                "${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
+                "${p.posLabel} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
                 style = T.small, color = P.sub, maxLines = 1,
             )
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
@@ -211,7 +218,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             title = { Text("${if (starter) "Starting" else "Backup"} ${Pos.entries[idx].name}", style = T.head, color = P.ink) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { it.pos.ordinal == idx }.thenByDescending { it.ovr })) { p ->
+                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { it.pos.ordinal == idx }.thenByDescending { it.plays(Pos.entries[idx]) }.thenByDescending { it.ovr })) { p ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable {
                                 choose = null
@@ -219,7 +226,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                             }.padding(vertical = 8.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(p.pos.name, style = T.small, color = P.sub, modifier = Modifier.width(32.dp))
+                            Text(p.posLabel, style = T.small, color = if (p.plays(Pos.entries[idx])) P.accent else P.sub, modifier = Modifier.width(50.dp))
                             Text(p.name, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(Gameplan.role(t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
                             Ring(p.ovr, 34.dp, textSize = 14.sp)
@@ -242,7 +249,7 @@ private fun SlotPick(label: String, p: Player?, modifier: Modifier, onClick: () 
             Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.sub)
             Text(p?.short ?: "Choose", style = T.bodyB.copy(fontSize = 14.sp), color = if (p == null) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (p != null) Text("${p.ovr}", style = T.numSm.copy(fontSize = 17.sp), color = tier(p.ovr))
+        if (p != null) Text("${shown(p.ovr)}", style = T.numSm.copy(fontSize = 17.sp), color = tier(shown(p.ovr)))
     }
 }
 
@@ -282,8 +289,8 @@ private fun LazyListScope.develop(vm: GameViewModel, lg: League, t: Team) {
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${p.ovr}", style = T.numSm, color = tier(p.ovr))
-                    Text("POT ${p.pot}", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                    Text("${shown(p.ovr)}", style = T.numSm, color = tier(shown(p.ovr)))
+                    Text("POT ${shown(p.pot)}", style = T.label.copy(fontSize = 9.sp), color = P.sub)
                 }
             }
         }
@@ -301,7 +308,8 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        items(Arch.entries) { a ->
+        // Only the archetypes of his position (plus whatever he trains now, for older saves).
+        items(Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.stylesFor(p) }) { a ->
             val current = p.focus == a
             Panel(
                 Modifier.padding(bottom = 8.dp),
@@ -466,6 +474,7 @@ fun GameRow(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game.Game, me: I
 }
 
 fun gameKind(lg: League, g: com.nh.hoopscoach.game.Game): String {
+    if (lg.pro) return g.label.ifEmpty { "Regular season" }
     val base = when (g.type) {
         com.nh.hoopscoach.game.GameType.CONF -> "Conference"
         com.nh.hoopscoach.game.GameType.NONCONF -> "Non-conference"

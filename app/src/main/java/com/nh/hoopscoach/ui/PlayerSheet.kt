@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Attr
+import com.nh.hoopscoach.game.PRO_YEAR
 import com.nh.hoopscoach.game.Careers
 import com.nh.hoopscoach.game.Finance
 import com.nh.hoopscoach.game.Gameplan
@@ -101,8 +102,15 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 Column(Modifier.weight(1f)) {
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
+                    Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
+                        " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
+                    // A pro's contract.
+                    if (lg.pro && team != null) {
+                        val sal = com.nh.hoopscoach.game.Payroll.salaryOf(lg, p)
+                        val yrs = if (p.id == lg.heroId) lg.road?.contract?.years ?: 0 else p.contractYears
+                        if (sal > 0) Text("${money(sal)} a season · " + (if (yrs <= 0) "expiring" else "$yrs ${if (yrs == 1) "year" else "years"} left"), style = T.small, color = P.sub)
+                    }
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }
             }
@@ -114,11 +122,30 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Ring(Ratings.defense(p), 50.dp, label = "DEF")
                 }
             }
+            // This season at a glance.
+            val s = p.stats
+            if (s.gp > 0) {
+                Spacer(Modifier.height(8.dp))
+                Panel(padding = PaddingValues(vertical = 10.dp, horizontal = 8.dp)) {
+                    Text("${lg.season} · ${s.gp} ${if (s.gp == 1) "game" else "games"} · ${"%.1f".format(s.mpg)} min", style = T.label, color = P.sub, modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        for ((label, v) in listOf("PTS" to "%.1f".format(s.ppg), "REB" to "%.1f".format(s.rpg), "AST" to "%.1f".format(s.apg),
+                            "STL" to "%.1f".format(s.spg), "BLK" to "%.1f".format(s.bpg), "FG%" to "%.0f".format(s.fgPct * 100), "3P%" to "%.0f".format(s.tpPct * 100))) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(v, style = T.numSm, color = P.ink)
+                                Text(label, style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                            }
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag(p.style.label.uppercase(), P.accent)
-                if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
-                if (team != null) {
+                // College players have a draft stock and a mood; pros have a trade value.
+                if (lg.pro && team != null) Tag("TRADE VALUE: ${com.nh.hoopscoach.game.Trades.tier(p).uppercase()}", P.sub)
+                else if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
+                if (team != null && !lg.pro) {
                     val m = Morale.mood(p)
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
                 }
@@ -126,11 +153,15 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
             }
-            Spacer(Modifier.height(12.dp))
+            Text(playsLike(p), style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+            Spacer(Modifier.height(6.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (mine) SmallButton("NIL ${money(p.nil)}") { editNil = true }
-                if (mine) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
-                if (mine) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
+                // In player mode you only manage yourself, and your NIL comes from your deal.
+                val coaching = mine && !lg.playerMode
+                val yourself = lg.playerMode && p.id == lg.heroId
+                if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
+                if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
+                if (coaching || yourself) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
             }
             if (mine && p.walkOn && team != null) {
@@ -192,12 +223,36 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
     }
 }
 
+/** What his play style does on the floor, in a line: "Two-Way Guard: hunts threes, creates off the dribble, locks down the perimeter." */
+private fun playsLike(p: Player): String = p.style.label + ": " + p.style.boosts.joinToString(", ") {
+    when (it) {
+        Attr.OUT -> "hunts threes"; Attr.INS -> "attacks the rim"; Attr.MID -> "pulls up from mid-range"; Attr.PAS -> "sets up teammates"
+        Attr.HND -> "creates off the dribble"; Attr.REB -> "crashes the glass"; Attr.PER -> "locks down the perimeter"; Attr.IDF -> "guards the paint"
+        Attr.STL -> "jumps passing lanes"; Attr.BLK -> "blocks shots"
+    }
+} + "."
+
 @Composable
 private fun RatingsTab(p: Player) {
+    // The five categories, then every rating.
+    Section("Categories")
+    Panel(padding = PaddingValues(vertical = 12.dp, horizontal = 6.dp)) {
+        fun avg(vararg a: Attr) = a.map { p[it] }.average().toInt()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Ring(avg(Attr.OUT, Attr.MID), 44.dp, label = "OUT")
+            Ring(avg(Attr.INS), 44.dp, label = "INS")
+            Ring(avg(Attr.HND, Attr.PAS), 44.dp, label = "PLAY")
+            // Defense by what the position needs: perimeter defense and steals for guards and wings, interior defense and blocks for bigs.
+            val big = p.pos == com.nh.hoopscoach.game.Pos.PF || p.pos == com.nh.hoopscoach.game.Pos.C
+            Ring((if (big) 0.15 * p[Attr.PER] + 0.4 * p[Attr.IDF] + 0.15 * p[Attr.STL] + 0.3 * p[Attr.BLK]
+                else 0.55 * p[Attr.PER] + 0.1 * p[Attr.IDF] + 0.3 * p[Attr.STL] + 0.05 * p[Attr.BLK]).toInt(), 44.dp, label = "DEF")
+            Ring(avg(Attr.REB), 44.dp, label = "REB")
+        }
+    }
     Section("Offense")
-    Panel { listOf(Attr.INS, Attr.MID, Attr.OUT, Attr.HND, Attr.PAS).forEach { AttrBar(it.label, p[it], p.seasonGains[it.ordinal]) } }
+    Panel { listOf(Attr.INS, Attr.MID, Attr.OUT, Attr.HND, Attr.PAS).forEach { AttrBar(it.label, shown(p[it]), p.seasonGains[it.ordinal]) } }
     Section("Defense")
-    Panel { listOf(Attr.REB, Attr.PER, Attr.IDF, Attr.STL, Attr.BLK).forEach { AttrBar(it.label, p[it], p.seasonGains[it.ordinal]) } }
+    Panel { listOf(Attr.REB, Attr.PER, Attr.IDF, Attr.STL, Attr.BLK).forEach { AttrBar(it.label, shown(p[it]), p.seasonGains[it.ordinal]) } }
 }
 
 @Composable
@@ -236,16 +291,25 @@ private fun CareerTab(vm: GameViewModel, lg: League, p: Player) {
     else {
         if (rows.size > 1) rows += CareerRow("Career", "${rows.size} yrs", "", Careers.total(p), total = true)
         Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(rows, totals) }
+        Text("Swipe the table sideways for steals, blocks and shooting.", style = T.small, color = P.faint, modifier = Modifier.padding(start = Gutter + 4.dp, top = 4.dp))
         if (rows.any { it.current }) Text("Highlighted: season in progress.", style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 6.dp))
     }
 
     // NCAA Tournament.
     val march = p.career.filter { it.ncaa != null && it.ncaa.gp > 0 }.map { CareerRow("${it.season}", it.team, classLabel(it.cls), it.ncaa!!) }.toMutableList()
     if (inSchool && p.tourney.gp > 0 && p.career.none { it.season == lg.season }) march += CareerRow("${lg.season}", lg.team(p.teamId).abbr, p.cls, p.tourney, current = true)
-    if (march.isNotEmpty()) {
-        if (march.size > 1) march += CareerRow("Career", "${march.sumOf { it.s.gp }} G", "", Careers.total(p, ncaa = true), total = true)
-        Section("NCAA Tournament")
-        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(march, totals) }
+    // College tournament games and pro playoff games go in their own tables.
+    val proRows = march.filter { it.cls == "PRO" }
+    val collegeRows = march.filter { it.cls != "PRO" }
+    for ((title, list0) in listOf("NCAA Tournament" to collegeRows, "Playoffs" to proRows)) {
+        if (list0.isEmpty()) continue
+        val list = list0.toMutableList()
+        if (list.size > 1) {
+            val tot = StatLine().also { t -> list.forEach { t.add(it.s) } }
+            list += CareerRow("Career", "${tot.gp} G", "", tot, total = true)
+        }
+        Section(title)
+        Panel(padding = PaddingValues(vertical = 10.dp)) { StatTable(list, totals) }
     }
 
     // Career highs.
@@ -355,11 +419,22 @@ private fun HonorsTimeline(lg: League, p: Player) {
 private fun GrowthTab(p: Player) {
     Section("Overall by year")
     Panel {
-        val pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5)
-        Sparkline(pts, p.pot, Modifier.fillMaxWidth().height(120.dp))
+        val sc = LocalRatingScale.current
+        // A pro shows his pro seasons (on the pro scale) with their years; a college player his classes.
+        val proSeasons = p.career.filter { it.cls == PRO_YEAR }
+        val pts: List<Int>
+        val labels: List<String>
+        if (proSeasons.isNotEmpty() || p.year == PRO_YEAR) {
+            pts = (proSeasons.map { it.ovr } + p.ovr).takeLast(8).map(sc)
+            labels = (proSeasons.map { "'" + (it.season % 100).toString().padStart(2, '0') } + "Now").takeLast(8)
+        } else {
+            pts = (p.ovrHistory + if (p.ovrHistory.size <= p.year) listOf(p.ovr) else emptyList()).take(5)
+            labels = pts.indices.map { classLabel(it) }
+        }
+        Sparkline(pts, sc(p.pot), Modifier.fillMaxWidth().height(120.dp))
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth()) {
-            pts.indices.forEach { i -> Text(classLabel(i), style = T.label, color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
+            labels.forEach { l -> Text(l, style = T.label, color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
         }
     }
     Section("Development")
@@ -417,7 +492,14 @@ private fun Sparkline(values: List<Int>, pot: Int, modifier: Modifier) {
 private fun BioTab(lg: League, p: Player) {
     Section("Background")
     GroupList(
-        listOfNotNull(
+        if (lg.pro) listOfNotNull(
+            "Age" to "${p.age}",
+            "Pro seasons" to "${p.proYears}",
+            "Hometown" to p.hometown,
+            p.awards.lastOrNull { it.contains("Draft #") }?.let { "Drafted" to "No. ${it.substringAfter("#")} in ${it.substringBefore(" ")}" },
+            if (p.recruitRank > 0) "Recruit rating" to "${p.stars}★ · No. ${p.recruitRank} overall" else null,
+        ) else listOfNotNull(
+            if (p.age > 0) "Age" to "${p.age}" else null,
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
             "Recruit rating" to when {
@@ -446,13 +528,5 @@ private fun BioTab(lg: League, p: Player) {
             }
         }
     }
-    if (p.awards.isNotEmpty()) {
-        Section("Honors")
-        GroupList(p.awards.reversed().take(12)) { a ->
-            ListRow {
-                Text(a.substringBefore(' '), style = T.numSm, color = P.sub, modifier = Modifier.width(56.dp))
-                Text(awardName(a.substringAfter(' ')), style = T.bodyB, color = P.ink)
-            }
-        }
-    }
+    if (p.awards.isNotEmpty()) TrophyCase(p)
 }

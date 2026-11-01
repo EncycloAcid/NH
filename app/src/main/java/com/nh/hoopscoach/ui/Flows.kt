@@ -1,5 +1,7 @@
 package com.nh.hoopscoach.ui
 
+import kotlin.math.roundToInt
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,20 +59,23 @@ import com.nh.hoopscoach.game.WrapUp
 // Season review
 // ======================================================================
 
-private val WRAP_PAGES = listOf("Season", "Awards", "Seniors", "Program", "Coach")
+private val COACH_PAGES = listOf("Season", "Awards", "Seniors", "Program", "Coach")
+private val PLAYER_PAGES = listOf("Season", "Awards", "You", "Program")
 
 @Composable
 fun WrapUpFlow(vm: GameViewModel, lg: League) {
     val w = lg.wrapUp ?: run { Empty("Season complete."); return }
+    val WRAP_PAGES = if (lg.playerMode) PLAYER_PAGES else COACH_PAGES
     val page = vm.wrapPage.coerceIn(0, WRAP_PAGES.lastIndex)
     Column(Modifier.fillMaxSize()) {
         StepHeader("Season review · ${lg.season}", WRAP_PAGES, page) { vm.wrapPage = it }
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            when (page) {
-                0 -> seasonPage(vm, lg, w)
-                1 -> awardsPage(vm, lg)
-                2 -> seniorsPage(vm, lg)
-                3 -> programPage(vm, lg, w)
+            when (WRAP_PAGES[page]) {
+                "Season" -> seasonPage(vm, lg, w)
+                "Awards" -> awardsPage(vm, lg)
+                "Seniors" -> seniorsPage(vm, lg)
+                "You" -> heroSeasonPage(vm, lg)
+                "Program" -> programPage(vm, lg, w)
                 else -> coachPage(vm, lg, w)
             }
             item { Spacer(Modifier.height(20.dp)) }
@@ -276,13 +281,47 @@ private fun LazyListScope.programPage(vm: GameViewModel, lg: League, w: WrapUp) 
             Spacer(Modifier.height(8.dp))
             Text(
                 when {
-                    w.prestigeDelta >= 3 -> "A ${w.w}-${w.l} season and a ${w.result.lowercase()} finish lifted the program."
-                    w.prestigeDelta > 0 -> "A solid year nudged the program forward. Prestige moves slowly; March runs move it most."
+                    w.prestigeDelta >= 3 -> "A ${w.w}-${w.l} season and a ${w.result.lowercase()} finish lifted the program." +
+                        if (w.streak >= 1) " That's ${w.streak + 1} straight seasons up, and a program on a run climbs faster." else " Do it again and the climb speeds up."
+                    w.prestigeDelta > 0 -> "A solid year moved the program forward. Rise again next year and the climb speeds up; March runs move it most."
                     w.prestigeDelta == 0 -> "The program held steady. A deeper tournament run would move the needle."
-                    else -> "The program slipped this year. Prestige follows several seasons of results, so one good year starts the climb back."
+                    else -> "The program slipped this year. One good season starts the climb back."
                 },
                 style = T.small, color = P.sub,
             )
+        }
+        if (w.earned > 0 && w.earnedParts.isNotEmpty()) {
+            Section("What the season earned")
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("THIS SEASON EARNED", style = T.label, color = P.sub)
+                        Text("${w.earned}", style = T.hero, color = if (w.earned > w.prestigeBefore) P.good else if (w.earned < w.prestigeBefore) P.bad else P.ink)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("PRESTIGE WAS", style = T.label, color = P.sub)
+                        Text("${w.prestigeBefore}", style = T.hero, color = P.ink)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (w.earned > w.prestigeBefore) "Prestige climbs ${(w.climbRate * 100).roundToInt()}% of the way toward what a season earns" +
+                        (if (w.streak > 0) ", faster after ${w.streak} rising season${if (w.streak == 1) "" else "s"} in a row." else ". Each rising season in a row adds 4 points to that.") +
+                        " A season well above your standing is always worth at least +2."
+                    else "When a season earns less than the program's standing, Prestige slides 14% of the way down.",
+                    style = T.small, color = P.sub,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            GroupList(w.earnedParts) { d ->
+                ListRow {
+                    Column(Modifier.weight(1f)) {
+                        Text(d.label, style = T.bodyB, color = P.ink)
+                        Text(d.detail, style = T.small, color = P.sub)
+                    }
+                    Text(d.value, style = T.numSm, color = if (d.value.startsWith("-")) P.bad else if (d.value == "+0") P.faint else P.good)
+                }
+            }
         }
         Section("Season signals")
         GroupList(w.signals) { s ->
@@ -436,7 +475,7 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, style = T.bodyB, color = P.ink)
-                        Text("${p.pos} · ${p.cls} · ${Offseason.projection(board[p.id], p.year)} grade · ${money(p.nil)}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · ${p.cls} · ${Offseason.projection(board[p.id], p.year)} grade · ${money(p.nil)}", style = T.small, color = P.sub)
                         Text(if (leaving) "Declaring for the draft" else "Returning next season", style = T.small, color = if (leaving) P.warn else P.good)
                     }
                     Ring(p.ovr, 42.dp)
@@ -478,7 +517,7 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
     item {
         Section("Rest of the roster")
         GroupList(rest, inset = 70.dp) { p ->
-            PlayerLine(vm, lg, t, p, if (p.recruitRank == 0) "${p.pos} · ${p.cls} · walk-on" else "${p.pos} · ${p.cls} · ${money(p.nil)}") {
+            PlayerLine(vm, lg, t, p, if (p.recruitRank == 0) "${p.posLabel} · ${p.cls} · walk-on" else "${p.posLabel} · ${p.cls} · ${money(p.nil)}") {
                 Row(verticalAlignment = Alignment.CenterVertically) { Ring(p.ovr, 40.dp, textSize = 15.sp); Spacer(Modifier.width(8.dp)); ReleaseButton(vm, p, compact = true) }
             }
         }
@@ -605,7 +644,7 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1)
-                        Text("${p.pos} · now a ${p.cls}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · now a ${p.cls}", style = T.small, color = P.sub)
                     }
                     Text("${gr.before} → ", style = T.small, color = P.sub)
                     Text("${gr.after}", style = T.numSm, color = tier(gr.after))
@@ -656,7 +695,7 @@ private fun LazyListScope.tryoutsStep(vm: GameViewModel, lg: League) {
     if (current.isNotEmpty()) item {
         Section("Your walk-ons")
         GroupList(current, inset = 70.dp) { p ->
-            PlayerLine(vm, lg, t, p, "${p.pos} · ${p.cls} · ${if (p.tryout > 0) "made the team in ${p.tryout}" else "walk-on"}") {
+            PlayerLine(vm, lg, t, p, "${p.posLabel} · ${p.cls} · ${if (p.tryout > 0) "made the team in ${p.tryout}" else "walk-on"}") {
                 SmallButton("Release", danger = true) { vm.act { Tryouts.release(it, p.id) } }
             }
         }
@@ -686,7 +725,7 @@ private fun TryoutCard(vm: GameViewModel, lg: League, i: Int, tr: Tryout, looks:
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${p.pos} · ${com.nh.hoopscoach.game.classLabel(p.year)} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub, maxLines = 1)
+                Text("${p.posLabel} · ${com.nh.hoopscoach.game.classLabel(p.year)} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub, maxLines = 1)
                 Text(p.hometown, style = T.small.copy(fontSize = 12.sp), color = P.faint, maxLines = 1)
             }
             if (tr.looked) Ring(p.ovr, 46.dp, label = "OVR", textSize = 16.sp) else UnknownRating()

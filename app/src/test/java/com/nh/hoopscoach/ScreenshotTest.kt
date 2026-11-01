@@ -140,7 +140,7 @@ class ScreenshotTest {
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Read the issue", substring = true))
         rule.waitForIdle(); shot("V01_today_card")
         vm.push(Route.Preview); rule.waitForIdle(); shot("V01_page01")
-        for (page in 2..15) {
+        for (page in 2..18) {
             rule.onNodeWithText("Next ›").performClick()
             rule.mainClock.advanceTimeBy(1500)
             rule.waitForIdle(); shot("V01_page" + "%02d".format(page))
@@ -154,7 +154,8 @@ class ScreenshotTest {
         rule.waitForIdle(); shot("E02_edit_player_more")
         vm.back()
         vm.push(Route.Focus(star.id)); rule.waitForIdle()
-        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(14)
+        // Training focus lists only his position's archetypes now (plus Manual).
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(6)
         rule.waitForIdle(); shot("E03_archetypes")
     }
 
@@ -217,7 +218,8 @@ class ScreenshotTest {
         }
         while (lg.phase == Phase.NCAA) Season.playDay(lg)
         vm.install(lg); vm.wrapPage = 0
-        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("cuts down the nets", substring = true))
+        // The wrap page shows the season's top four moments (your own first), so scroll to the section, not one story.
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("MARCH MOMENTS"))
         rule.waitForIdle(); shot("M04_wrap_moments")
         vm.select(Tab.LEAGUE); vm.leagueTab = 5; scrollTo(0); shot("M05_history_preview")
         vm.push(Route.History(HistoryKind.MOMENTS)); scrollTo(0); shot("M06_highlight_reel")

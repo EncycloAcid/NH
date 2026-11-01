@@ -79,7 +79,9 @@ object Morale {
 
     /** AI programs keep their players paid close to market. */
     fun aiNilRefresh(lg: League, t: Team) {
-        if (t.id == lg.userTeamId) return
+        if (lg.humanCoach(t)) return
         setInitialNil(lg, t)
+        // In player mode the user's own NIL comes from the deal he signed.
+        if (lg.playerMode) Road.applyDeal(lg)
     }
 }

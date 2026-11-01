@@ -1,0 +1,205 @@
+package com.nh.hoopscoach
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.test.core.app.ApplicationProvider
+import com.nh.hoopscoach.game.Arch
+import com.nh.hoopscoach.game.League
+import com.nh.hoopscoach.game.LeagueGen
+import com.nh.hoopscoach.game.NilDeal
+import com.nh.hoopscoach.game.OffStep
+import com.nh.hoopscoach.game.Offseason
+import com.nh.hoopscoach.game.Phase
+import com.nh.hoopscoach.game.Pos
+import com.nh.hoopscoach.game.Road
+import com.nh.hoopscoach.game.Rng
+import com.nh.hoopscoach.game.Season
+import com.nh.hoopscoach.ui.App
+import com.nh.hoopscoach.ui.GameViewModel
+import com.nh.hoopscoach.ui.Guide
+import com.nh.hoopscoach.ui.HistoryKind
+import com.nh.hoopscoach.ui.Route
+import com.nh.hoopscoach.ui.Tab
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.random.Random
+
+/** Road to the League through the real screens: create, offers, seasons, decisions and the ending. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w400dp-h880dp-xhdpi")
+class RoadUiTest {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val out = File(System.getProperty("screenshots.dir") ?: "build/screenshots").apply { mkdirs() }
+
+    private fun idle() = rule.waitForIdle()
+
+    private fun shot(name: String) {
+        idle()
+        val view = rule.activity.window.decorView.rootView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        FileOutputStream(File(out, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    private fun scrollTo(i: Int) { rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(i); idle() }
+    private fun swipe() { rule.onAllNodes(hasScrollToIndexAction()).onFirst().performTouchInput { swipeUp() }; idle() }
+
+    /** Every tab and the screens a player can reach, so nothing in player mode crashes. */
+    private fun walk(vm: GameViewModel, lg: League) {
+        vm.install(lg); idle()
+        for (t in Tab.entries) { vm.select(t); idle(); if (t == Tab.TEAM) for (i in 0..1) { vm.teamTab = i; idle() }; if (t == Tab.LEAGUE) for (i in 0..5) { vm.leagueTab = i; idle() } }
+        if (lg.phase == Phase.WRAP_UP) { vm.select(Tab.TODAY); for (i in 0..3) { vm.wrapPage = i; idle() } }
+        val routes = mutableListOf<Route>(Route.TeamPage(lg.userTeamId), Route.Schedule(lg.userTeamId), Route.Settings, Route.Leaders, Route.Preview)
+        HistoryKind.entries.forEach { routes += Route.History(it) }
+        lg.playerOrNull(lg.heroId)?.let { routes += Route.Focus(it.id); routes += Route.EditPlayer(it.id) }
+        lg.games.lastOrNull { it.played && it.involves(lg.userTeamId) }?.let { routes += Route.Box(it.id) }
+        for (r in routes) { vm.push(r); idle(); vm.back(); idle() }
+        vm.openGuide(Guide.PROGRAM, 0); idle(); vm.guide = null; idle()
+        lg.hero?.let { vm.openPlayer(it.id); idle(); vm.sheet = null; idle() }
+        vm.select(Tab.TODAY); idle()
+    }
+
+    @Test
+    fun career() {
+        GameViewModel.autoLoad = false
+        Rng.r = Random(9)
+        val draft = LeagueGen.newLeague()
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.installDraft(draft)
+        rule.setContent { App(vm) }
+        shot("Y00_new_game")
+        rule.onNodeWithText("Play as a player").performClick(); idle()
+        shot("Y01_create")
+        // Pick a second position: the second "PG" on screen is in the second-position row.
+        rule.onAllNodesWithText("PG")[1].performClick(); idle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("SECOND POSITION")); idle()
+        shot("Y01b_create_second_pos")
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("ERA")); idle()
+        rule.onNodeWithText("1986").performClick(); idle(); shot("Y01c_create_era_1986")
+        rule.onNodeWithText("Today").performClick(); idle()
+        scrollTo(1); shot("Y02_create_more")
+
+        val hero = Road.createHero(draft, Road.Spec("Marcus", "Hayes", Pos.PG, 74, 185, "Lexington", "KY", Arch.FLOOR_GENERAL, 5, 1, pos2 = Pos.SG))
+        vm.roadHero = hero
+        vm.roadOffers = Road.offers(draft, hero)
+        idle(); shot("Y03_offers"); swipe(); shot("Y04_offers_more")
+
+        val lg = Road.start(draft, hero, vm.roadOffers.minBy { it.ahead }.teamId)
+        vm.roadHero = null
+        vm.install(lg); idle()
+        shot("Y05_today_start")
+        vm.select(Tab.RECRUIT); shot("Y06_me_deal")
+        vm.act { Road.chooseDeal(it, NilDeal.PERFORMANCE) }; idle()
+        shot("Y07_me_signed"); scrollTo(3); shot("Y08_me_depth")
+        vm.select(Tab.TEAM); vm.teamTab = 0; shot("Y09_team_roster")
+        walk(vm, lg)
+        repeat(10) { Season.playDay(lg) }
+        vm.install(lg); vm.select(Tab.TODAY); shot("Y10_today_midseason")
+        var tries = 0
+        while (lg.road!!.press == null && tries++ < 25 && lg.phase == Phase.REGULAR) Season.playDay(lg)
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        if (lg.road!!.press != null) { scrollTo(1); shot("Y10b_press") }
+        vm.select(Tab.RECRUIT); scrollTo(1); shot("Y10c_me_media"); vm.select(Tab.TODAY)
+        if (lg.road!!.press != null) { vm.act { Road.answer(it, 1) }; idle() }
+        vm.act { Road.setPractice(it, com.nh.hoopscoach.game.Practice.SHOOTING) }
+        repeat(4) { Season.playDay(lg) }
+        vm.install(lg); vm.select(Tab.RECRUIT); idle()
+        scrollTo(1); shot("Y10d_me_races"); scrollTo(2); shot("Y10e_me_practice")
+        vm.act { Road.hire(it, com.nh.hoopscoach.game.Staff.TRAINER); Road.hire(it, com.nh.hoopscoach.game.Staff.AGENT) }; idle()
+        vm.meTab = 2; idle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR TEAM")); idle()
+        shot("Y10f_me_staff")
+        vm.meTab = 0; idle()
+        rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR RIVAL")); idle()
+        shot("Y10g_me_rival")
+        // Play live games until one comes down to a big moment.
+        var found = false
+        var tries2 = 0
+        while (!found && tries2++ < 20 && lg.phase == Phase.REGULAR) {
+            val g = Season.userGameToday(lg)
+            if (g == null) { Season.playDay(lg); continue }
+            val e = com.nh.hoopscoach.game.GameEngine(lg, g, true).also { it.interactive = true }
+            var m: com.nh.hoopscoach.game.GameEngine.BigMoment? = null
+            while (!e.finished) { m = e.pendingMoment(); if (m != null) break; e.step() }
+            if (m != null) {
+                val lv = com.nh.hoopscoach.ui.LiveGame(e).also { it.speed = 0; it.moment = m }
+                vm.live = lv; vm.push(Route.Live); idle()
+                shot("Y21_big_moment")
+                e.playMoment(m.options.first().first); lv.momentResult = e.lastMoment; lv.moment = null; lv.tick++; idle()
+                shot("Y22_moment_result")
+                found = true
+            }
+            e.simToEnd(); e.commit()
+            vm.live?.done = true
+            if (found) { vm.back(); idle() }
+            Season.playDay(lg)
+        }
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        vm.startLive(); idle()
+        vm.live?.let { lv -> lv.speed = 0; repeat(80) { lv.engine.step() }; lv.tick++ }
+        shot("Y11_live"); vm.back(); idle()
+
+        var seasons = 0
+        while (!lg.road!!.ended && !lg.road!!.goingPro && seasons < 5) {
+            seasons++
+            if (Road.needsDeal(lg)) Road.chooseDeal(lg, NilDeal.STEADY)
+            var guard = 0
+            while (lg.phase != Phase.WRAP_UP && guard++ < 120) Season.playDay(lg)
+            if (seasons == 1) { vm.install(lg); vm.select(Tab.TODAY); vm.wrapPage = 2; shot("Y12_wrap_you"); walk(vm, lg) }
+            Offseason.begin(lg)
+            val me = lg.playerOrNull(lg.heroId)!!
+            val rank = Offseason.draftBoard(lg)[me.id]
+            lg.road!!.declared = me.year < 4 && rank != null && rank <= 20
+            if (seasons == 1) lg.road!!.portal = true
+            vm.install(lg); vm.select(Tab.TODAY)
+            if (seasons == 1) shot("Y13_decision")
+            Road.next(lg); vm.install(lg)
+            if (lg.road!!.ended || lg.road!!.goingPro) break
+            if (seasons == 1) shot("Y14_draft_back")
+            Road.next(lg); vm.install(lg)
+            if (seasons == 1) shot("Y15_summer_portal")
+            com.nh.hoopscoach.game.Summer.invites(lg).firstOrNull()?.let { com.nh.hoopscoach.game.Summer.attend(lg, it) }
+            if (seasons == 1) { vm.install(lg); shot("Y15b_summer_done") }
+            assertTrue(lg.offseason!!.step == OffStep.DEVELOPMENT)
+            Road.next(lg); vm.install(lg)
+            if (seasons == 1) { shot("Y16_today_year2"); walk(vm, lg) }
+        }
+        assertTrue(lg.road!!.ended || lg.road!!.goingPro)
+        // Draft Night: the green room fills in pick by pick, then the ending.
+        assertTrue(Road.inGreenRoom(lg))
+        vm.install(lg); vm.select(Tab.TODAY); idle()
+        rule.mainClock.advanceTimeBy(4_000); shot("Y16a_green_room")
+        rule.mainClock.advanceTimeBy(4_500); shot("Y16b_green_room_later")
+        println("green room after 8.5s: ${vm.reveal} picks in")
+        vm.select(Tab.RECRUIT); idle(); shot("Y16d_me_green_room"); vm.select(Tab.TODAY); idle()
+        if (rule.onAllNodesWithText("Skip ahead").fetchSemanticsNodes().isNotEmpty()) { rule.onNodeWithText("Skip ahead").performClick(); idle() }
+        shot("Y16c_draft_called")
+        if (lg.road!!.goingPro) { Road.watchedDraft(lg); vm.install(lg); idle() }
+        else { rule.onNodeWithText("Continue").performClick(); idle() }
+        assertTrue(!Road.inGreenRoom(lg))
+        vm.install(lg); vm.select(Tab.TODAY); shot("Y17_ending"); swipe(); shot("Y18_ending_story")
+        vm.select(Tab.CAREER); shot("Y19_career")
+        vm.select(Tab.RECRUIT); shot("Y20_me_after")
+        walk(vm, lg)
+        println("ending: ${lg.road!!.ending}")
+    }
+}
