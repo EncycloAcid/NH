@@ -125,8 +125,10 @@ class RoadUiTest {
         vm.install(lg); vm.select(Tab.RECRUIT); idle()
         scrollTo(1); shot("Y10d_me_races"); scrollTo(2); shot("Y10e_me_practice")
         vm.act { Road.hire(it, com.nh.hoopscoach.game.Staff.TRAINER); Road.hire(it, com.nh.hoopscoach.game.Staff.AGENT) }; idle()
+        vm.meTab = 2; idle()
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR TEAM")); idle()
         shot("Y10f_me_staff")
+        vm.meTab = 0; idle()
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(androidx.compose.ui.test.hasText("YOUR RIVAL")); idle()
         shot("Y10g_me_rival")
         // Play live games until one comes down to a big moment.

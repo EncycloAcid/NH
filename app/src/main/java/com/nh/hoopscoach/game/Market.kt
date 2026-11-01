@@ -53,7 +53,7 @@ object Market {
                 ps.faMoves += line
                 lg.news += News(lg.season, 0, "Free agency: $line, leaving the ${lg.team(from).name}", best.team.id == lg.userTeamId || from == lg.userTeamId)
                 if (Trades.value(p) >= 8) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.pay * p.contractYears)} deal with the ${best.team.name}, per sources.", Media.likes(lg, 0.04), verified = true)
-            } else if (best.team.id == from && Trades.value(p) >= 8) ps.faMoves += "${p.name} re-signs with the ${best.team.name}: ${p.contractYears} years, ${Road.dollars(best.pay)} a season"
+            } else if (best.team.id == from && Trades.value(p) >= 8) ps.faMoves += "${p.name} re-signs with the ${best.team.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.pay)} a season"
         }
         // Nobody bid: veterans retire, the rest take the minimum where there's a spot.
         for (p in unsigned) {
