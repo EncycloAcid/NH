@@ -649,14 +649,24 @@ object ProSeason {
         for ((pid, minutes) in minutesPlayed) {
             val p = lg.playerOrNull(pid) ?: continue
             if (pid == lg.heroId) continue
-            val chance = INJURY_BASE * (minutes / 30.0) * (1.0 + 0.04 * (p.age - 27).coerceAtLeast(0))
+            val playoffs = lg.phase == Phase.PLAYOFFS
+            val chance = INJURY_BASE * (minutes / 30.0) * (1.0 + 0.04 * (p.age - 27).coerceAtLeast(0)) *
+                if (playoffs) 0.45 else 1.0
             if (!Rng.chance(chance)) continue
             val bucket = Rng.d()
-            p.injury = when {
-                bucket < 0.55 -> Rng.int(1, 4)
-                bucket < 0.80 -> Rng.int(4, 11)
-                bucket < 0.95 -> Rng.int(11, 26)
-                else -> Rng.int(26, 61)
+            p.injury = if (playoffs) {
+                when {
+                    bucket < 25.0 / 45.0 -> Rng.int(4, 11)
+                    bucket < 40.0 / 45.0 -> Rng.int(11, 26)
+                    else -> Rng.int(26, 61)
+                }
+            } else {
+                when {
+                    bucket < 0.55 -> Rng.int(1, 4)
+                    bucket < 0.80 -> Rng.int(4, 11)
+                    bucket < 0.95 -> Rng.int(11, 26)
+                    else -> Rng.int(26, 61)
+                }
             }
         }
     }
@@ -795,6 +805,7 @@ object ProSeason {
 
     private fun startPlayoffs(lg: League) {
         val ps = lg.proState ?: return
+        for (p in lg.players) p.injury = (p.injury - 3).coerceAtLeast(0)
         RecordBook.seasonEnd(lg)
         regularAwards(lg)
         ps.series.clear()
