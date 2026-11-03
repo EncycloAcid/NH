@@ -51,9 +51,9 @@ object Careers {
         )
         val orb = normalize({ it.totals.orb.toDouble() / it.totals.mp }, { PlayerWeights.rebW(it.player, true) })
         val drb = normalize({ it.totals.drb.toDouble() / it.totals.mp }, { PlayerWeights.rebW(it.player, true) })
-        val ast = normalize({ it.totals.ast.toDouble() / it.totals.mp }, { PlayerWeights.astW(it.player) })
-        val stl = normalize({ it.totals.stl.toDouble() / it.totals.mp }, { PlayerWeights.stlW(it.player) })
-        val blk = normalize({ it.totals.blk.toDouble() / it.totals.mp }, { PlayerWeights.blkW(it.player) })
+        val ast = normalize({ it.totals.ast.toDouble() / it.totals.mp }, { PlayerWeights.astW(it.player, false) })
+        val stl = normalize({ it.totals.stl.toDouble() / it.totals.mp }, { PlayerWeights.stlW(it.player, false) })
+        val blk = normalize({ it.totals.blk.toDouble() / it.totals.mp }, { PlayerWeights.blkW(it.player, false) })
         val tov = normalize({ it.totals.tov.toDouble() / it.totals.mp }, { PlayerWeights.tovW(it.player) })
         val foul = normalize({ it.totals.pf.toDouble() / it.totals.mp }, { PlayerWeights.foulW(it.player) })
         val three = normalize(
@@ -62,14 +62,14 @@ object Careers {
                 r / (1.0 - r)
             },
             { fit ->
-                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era)
+                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era, applyPositionAdj = false)
                 w3 / (wi + wm)
             },
         )
         val draw = normalize(
             { it.totals.fta.toDouble() / it.totals.fga },
             { fit ->
-                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era)
+                val (wi, wm, w3) = PlayerWeights.shotMix(fit.player, true, era, applyPositionAdj = false)
                 val adjustedW3 = w3 * (three[fit.player] ?: 1.0)
                 (wi * 0.2 + wm * 0.06 + adjustedW3 * 0.022) / (wi + wm + adjustedW3)
             },

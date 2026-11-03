@@ -22,10 +22,21 @@ class PlayEvent(
 )
 
 internal object PlayerWeights {
+    // Fitted to 2025-26 per-36 by position.
+    internal val PRO_POS_ADJ: Array<DoubleArray> = arrayOf(
+        doubleArrayOf(1.2541, 0.8592, 2.5000, 1.1556),
+        doubleArrayOf(0.9279, 1.2851, 2.5000, 1.0454),
+        doubleArrayOf(0.9385, 0.9822, 1.2356, 1.3627),
+        doubleArrayOf(1.0978, 1.2824, 1.2844, 1.6568),
+        doubleArrayOf(1.1218, 2.5000, 1.2006, 2.5000),
+    )
+
     private fun proShotPos(pos: Pos) = when (pos) { Pos.C -> 1.2; Pos.PF -> 1.1; else -> 1.0 }
     private fun posAst(pos: Pos) = when (pos) { Pos.PG -> 1.25; Pos.SG -> 1.05; Pos.SF -> 1.0; Pos.PF -> 0.95; Pos.C -> 1.1 }
     private fun posBlk(pos: Pos) = when (pos) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
     private fun posFoul(pos: Pos) = when (pos) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
+    private fun positionAdj(p: Player, pro: Boolean, stat: Int) =
+        if (pro && p.fingerprint == null) PRO_POS_ADJ[p.pos.ordinal][stat] else 1.0
     private fun posReb(pos: Pos, pro: Boolean) = if (pro) when (pos) {
         Pos.C -> 1.03; Pos.PF -> 0.83; Pos.SF -> 0.86; Pos.SG -> 1.21; Pos.PG -> 1.21
     } else when (pos) {
@@ -35,13 +46,14 @@ internal object PlayerWeights {
     fun shotW(p: Player) =
         (Gameplan.usageFor(p, true) * Tendency.usage(p)).pow(0.8) * (Ratings.offense(p) / 70.0).pow(0.6) * proShotPos(p.pos)
 
-    fun shotMix(p: Player, pro: Boolean, era: Era): Triple<Double, Double, Double> {
+    fun shotMix(p: Player, pro: Boolean, era: Era, applyPositionAdj: Boolean = true): Triple<Double, Double, Double> {
         val posIns = when (p.pos) { Pos.PG -> 0.8; Pos.SG -> 0.8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
         val pos3 = if (pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> 0.95; Pos.PF -> 0.85; Pos.C -> 0.62 }
             else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> 0.95; Pos.PF -> 0.66; Pos.C -> 0.34 }
         val wi = (p[Attr.INS] / 70.0).pow(3) * posIns * Tendency.inside(p)
         val wm = (p[Attr.MID] / 70.0).pow(3) * 0.5 * Tendency.mid(p)
-        val w3 = (p[Attr.OUT] / 70.0).pow(if (pro) 1.5 else 4.0) * pos3 * (if (pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
+        val w3 = (p[Attr.OUT] / 70.0).pow(if (pro) 1.5 else 4.0) * pos3 * (if (pro) 1.62 * era.threes else 1.2) *
+            Tendency.three(p) * (if (applyPositionAdj) positionAdj(p, pro, 3) else 1.0)
         return Triple(wi, wm, w3)
     }
 
@@ -49,9 +61,9 @@ internal object PlayerWeights {
         ((if (pro) 0.636 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
 
     fun rebW(p: Player, pro: Boolean) = (p[Attr.REB] / 70.0).pow(2) * posReb(p.pos, pro) * Tendency.reb(p)
-    fun astW(p: Player) = exp((p[Attr.PAS] - 70) / 20.0) * posAst(p.pos) * Tendency.pass(p)
-    fun stlW(p: Player) = (0.5 * p[Attr.STL] + 0.5 * p[Attr.PER]).pow(3) * Tendency.stl(p)
-    fun blkW(p: Player) = (p[Attr.BLK] / 70.0).pow(3) * posBlk(p.pos) * Tendency.blk(p)
+    fun astW(p: Player, pro: Boolean) = exp((p[Attr.PAS] - 70) / 20.0) * posAst(p.pos) * Tendency.pass(p) * positionAdj(p, pro, 0)
+    fun stlW(p: Player, pro: Boolean) = (0.5 * p[Attr.STL] + 0.5 * p[Attr.PER]).pow(3) * Tendency.stl(p) * positionAdj(p, pro, 1)
+    fun blkW(p: Player, pro: Boolean) = (p[Attr.BLK] / 70.0).pow(3) * posBlk(p.pos) * Tendency.blk(p) * positionAdj(p, pro, 2)
     fun foulW(p: Player) = posFoul(p.pos)
     fun tovW(p: Player) = Gameplan.usageFor(p, true) * Tendency.usage(p) * (p[Attr.HND] / 70.0).pow(2)
 }
@@ -255,7 +267,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         road?.let { it.moments++ }
         fun stolen(loser: Player, how: String) {
             line(o, loser).tov++
-            val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
+            val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it, lg.pro) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
             line(d, stealer).stl++
             log(d, "${stealer.short} $how ${loser.short}!", 0)
             lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
@@ -835,7 +847,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val kind = Rng.d()
             when {
                 kind < 0.55 -> {
-                    val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
+                    val stealer = Rng.weighted(defense) { PlayerWeights.stlW(it, lg.pro) * (it.fingerprint?.stl ?: 1.0) * spec(it) }
                     line(d, stealer).stl++
                     log(d, "${stealer.short} steals it from ${loser.short}", 0)
                 }
@@ -930,7 +942,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     val mates = offense.filter { it.id != shooter.id }
                     if (mates.isNotEmpty()) {
                         // The best passers, point guards above all, get most of the assists.
-                        val passer = Rng.weighted(mates) { PlayerWeights.astW(it) * (it.fingerprint?.ast ?: 1.0) * spec(it) }
+                        val passer = Rng.weighted(mates) { PlayerWeights.astW(it, lg.pro) * (it.fingerprint?.ast ?: 1.0) * spec(it) }
                         line(o, passer).ast++
                         astText = " (${passer.short} assists)"
                     }
@@ -964,7 +976,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 // Rim protectors, big men above all, get most of the blocks.
                 // Rim protectors get most blocks at the rim; on jump shots anyone closing out can get a hand on it.
                 val b = Rng.weighted(defense) {
-                    (if (lg.pro) PlayerWeights.blkW(it) else (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it)) *
+                    (if (lg.pro) PlayerWeights.blkW(it, lg.pro) else (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it)) *
                         (it.fingerprint?.blk ?: 1.0) * spec(it)
                 }
                 line(d, b).blk++
