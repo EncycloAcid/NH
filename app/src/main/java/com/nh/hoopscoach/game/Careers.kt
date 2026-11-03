@@ -85,6 +85,8 @@ object Careers {
                 tov = tov.getValue(p),
                 foul = foul.getValue(p),
                 age = fit.totals.age,
+                mpg = if (fit.totals.rG > 0.0) fit.totals.rMp / fit.totals.rG else 0.0,
+                season = lg.season,
             )
         }
     }

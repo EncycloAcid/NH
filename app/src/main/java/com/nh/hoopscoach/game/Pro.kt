@@ -577,11 +577,14 @@ object ProLeague {
 
 /** The pro season: games, the All-Star break, the playoffs and the awards. */
 object ProSeason {
+    internal var INJURY_BASE = 0.05
+
     fun playDay(lg: League) {
         if (Season.seasonOver(lg)) return
         prepareDay(lg)
+        val before = lg.players.associate { it.id to it.stats.copy() }
         for (g in Season.gamesOn(lg, lg.day)) if (!g.played) GameEngine(lg, g, false).commit()
-        endOfDay(lg)
+        endOfDay(lg, before)
         AllTime.check(lg)
     }
 
@@ -601,7 +604,8 @@ object ProSeason {
         }
     }
 
-    private fun endOfDay(lg: League) {
+    private fun endOfDay(lg: League, before: Map<Int, StatLine>) {
+        updateInjuries(lg, before)
         when (lg.phase) {
             Phase.REGULAR -> {
                 upkeep(lg)
@@ -620,6 +624,41 @@ object ProSeason {
         }
         lg.day++
         prepareDay(lg)
+    }
+
+    private fun updateInjuries(lg: League, before: Map<Int, StatLine>) {
+        val games = Season.gamesOn(lg, lg.day).filter { it.played }
+        if (games.isEmpty()) return
+        val teamsPlayed = games.flatMap { listOf(it.home, it.away) }.toSet()
+        val minutesPlayed = mutableMapOf<Int, Double>()
+        for (game in games) {
+            val box = game.box ?: continue
+            for (line in box.home + box.away) {
+                if (line.s.sec > 0) minutesPlayed[line.pid] = line.s.sec / 60.0
+            }
+        }
+        val teamsWithoutBox = games.filter { it.box == null }.flatMap { listOf(it.home, it.away) }.toSet()
+        for (p in lg.players) {
+            if (p.teamId !in teamsWithoutBox) continue
+            val sec = p.stats.since(before[p.id]).sec
+            if (sec > 0) minutesPlayed[p.id] = sec / 60.0
+        }
+        for (teamId in teamsPlayed) for (p in lg.rosterOf(lg.team(teamId))) {
+            if (p.injury > 0 && p.id !in minutesPlayed) p.injury = (p.injury - 1).coerceAtLeast(0)
+        }
+        for ((pid, minutes) in minutesPlayed) {
+            val p = lg.playerOrNull(pid) ?: continue
+            if (pid == lg.heroId) continue
+            val chance = INJURY_BASE * (minutes / 30.0) * (1.0 + 0.04 * (p.age - 27).coerceAtLeast(0))
+            if (!Rng.chance(chance)) continue
+            val bucket = Rng.d()
+            p.injury = when {
+                bucket < 0.55 -> Rng.int(1, 4)
+                bucket < 0.80 -> Rng.int(4, 11)
+                bucket < 0.95 -> Rng.int(11, 26)
+                else -> Rng.int(26, 61)
+            }
+        }
     }
 
     private fun upkeep(lg: League) {
@@ -929,6 +968,7 @@ object ProSeason {
             lg.seasonAwards.firstOrNull { it.award == "Rookie of the Year" }?.name ?: "", heroResult,
         )
         ProCareer.seasonEnd(lg)
+        for (p in lg.players) p.injury = 0
         lg.phase = Phase.OFFSEASON
         ps.step = ProStep.REVIEW
     }

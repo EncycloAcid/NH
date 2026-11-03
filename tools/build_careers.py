@@ -1,11 +1,15 @@
-"""Career regular-season totals for today's players, from basketball-reference season totals pages (personal use).
+"""Career and weighted recent regular-season totals for today's players (personal use).
 Writes resources/eras/today_career.tsv keyed by the names in today2k.tsv. Every active player's career starts in
 2003-04 or later, so the 2004-LAST season pages cover full careers. Pages are cached in CACHE and fetched politely.
+Recent totals weight 2023-24, 2024-25, and 2025-26 by 3, 4, and 5 respectively.
 Usage: python3 tools/build_careers.py REPO CACHE [LAST]"""
 import collections, html, os, re, sys, time, unicodedata, urllib.request
 REPO, CACHE = sys.argv[1], sys.argv[2]
 LAST = int(sys.argv[3]) if len(sys.argv) > 3 else 2026
 S = ['games', 'mp', 'fg', 'fga', 'fg3', 'fg3a', 'ft', 'fta', 'orb', 'drb', 'ast', 'stl', 'blk', 'tov', 'pf', 'pts']
+RECENT = ['r_g', 'r_mp', 'r_fga', 'r_fta', 'r_ft', 'r_fg3a', 'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_blk', 'r_tov', 'r_pf', 'r_pts']
+RECENT_SOURCE = ['games', 'mp', 'fga', 'fta', 'ft', 'fg3a', 'orb', 'drb', 'ast', 'stl', 'blk', 'tov', 'pf', 'pts']
+RECENT_WEIGHT = {2024: 3, 2025: 4, 2026: 5}
 
 def page(y):
     path = f'{CACHE}/totals_{y}.html'
@@ -15,7 +19,7 @@ def page(y):
         time.sleep(4)
     return open(path, encoding='utf-8').read()
 
-car, names, last = collections.defaultdict(collections.Counter), {}, {}
+car, recent, names, last = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter), {}, {}
 age_minutes, weighted_age = collections.defaultdict(float), collections.defaultdict(float)
 for y in range(2004, LAST + 1):
     t = re.search(r'<table[^>]*id="totals_stats".*?</table>', page(y), re.S).group(0)
@@ -31,6 +35,9 @@ for y in range(2004, LAST + 1):
         nm, d = (comb or lst)[0]
         names[pid], last[pid] = nm, y
         for k in S: car[pid][k] += float(d.get(k) or 0)
+        if y in RECENT_WEIGHT:
+            for k, source in zip(RECENT, RECENT_SOURCE):
+                recent[pid][k] += RECENT_WEIGHT[y] * float(d.get(source) or 0)
         mp = float(d.get('mp') or 0)
         age_minutes[pid] += mp
         weighted_age[pid] += mp * float(d.get('age') or 0)
@@ -52,8 +59,8 @@ for line in open(f'{REPO}/app/src/main/resources/eras/today2k.tsv', encoding='ut
     if not ids: missing.append(name); continue
     pid = max(ids, key=lambda i: last[i])  # same name (a father, a namesake): the one playing now
     age = weighted_age[pid] / age_minutes[pid] if age_minutes[pid] else 0.0
-    out.append([name, pid] + [str(int(car[pid][k])) for k in S] + [f'{age:.1f}'])
+    out.append([name, pid] + [str(int(car[pid][k])) for k in S] + [f'{age:.1f}'] + [f'{recent[pid][k]:.1f}' for k in RECENT])
 with open(f'{REPO}/app/src/main/resources/eras/today_career.tsv', 'w', encoding='utf-8') as f:
-    f.write('# name|bbref id|' + '|'.join(S) + '|age' + f' (NBA regular-season career totals 2003-04 to {LAST - 1}-{LAST % 100:02d}, basketball-reference; personal use)\n')
+    f.write('# name|bbref id|' + '|'.join(S) + '|age|' + '|'.join(RECENT) + f' (NBA regular-season career totals 2003-04 to {LAST - 1}-{LAST % 100:02d}; recent totals weight 2023-24/2024-25/2025-26 by 3/4/5, basketball-reference; personal use)\n')
     for r in out: f.write('|'.join(r) + '\n')
 print(len(out), 'players;', len(missing), 'without NBA games:', ', '.join(missing))

@@ -1,12 +1,18 @@
 package com.nh.hoopscoach.game
 
 import kotlin.math.roundToInt
+import kotlin.math.pow
 
 object Gameplan {
 
     private const val PRO_STARTER_MIN_BASE = 24
     private const val PRO_STARTER_MIN_SLOPE = 1.0
     private val PRO_MINUTE_BASE = doubleArrayOf(31.7, 29.7, 28.3, 27.5, 26.5, 26.5, 22.0, 19.5, 15.3, 13.0)
+
+    private fun rate(lg: League, p: Player): Double =
+        p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
+            (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
+            (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
 
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),
@@ -23,13 +29,7 @@ object Gameplan {
 
     /** Picks starters and backups by position, then assigns pro minutes by roster rank. */
     fun autoAllocate(lg: League, t: Team) {
-        // Pro coaches give young, high-ceiling players development minutes: up to 4 points of credit.
-        // The user's young pro gets a little extra: teams play the player they drafted to build around.
-        // High-ceiling rookies get a bit more, as lottery picks do.
-        fun rate(p: Player): Double = p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
-            (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
-            (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
-        val pool = lg.rosterOf(t).sortedByDescending { rate(it) }.toMutableList()
+        val pool = lg.rosterOf(t).sortedByDescending { rate(lg, it) }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
@@ -39,7 +39,7 @@ object Gameplan {
                 val cand = (if (rank == 0) pool.firstOrNull { it.plays(pos) } else pool.firstOrNull { it.pos == alt }) ?: continue
                 if (rank == 0) { pool.remove(cand); return cand }
                 val natural = pool.firstOrNull { it.plays(pos) }
-                if (natural == null || rate(cand) - rate(natural) > 6 * rank) { pool.remove(cand); return cand }
+                if (natural == null || rate(lg, cand) - rate(lg, natural) > 6 * rank) { pool.remove(cand); return cand }
             }
             return pool.removeFirstOrNull()
         }
@@ -55,7 +55,7 @@ object Gameplan {
                 val near = NEIGHBORS.getValue(r.pos).take(if (lg.pro) 3 else 2) + listOfNotNull(r.pos2)
                 for (alt in near.distinct()) {
                     val s = starters[alt.ordinal] ?: continue
-                    val gain = rate(r) - rate(s)
+                    val gain = rate(lg, r) - rate(lg, s)
                     if (gain >= (if (lg.pro) 2.0 else 3.0) && (best == null || gain > best!!.third)) best = Triple(ri, alt.ordinal, gain)
                 }
             }
@@ -68,11 +68,11 @@ object Gameplan {
         // position takes that backup's minutes, so nobody good sits all season for being third at his spot.
         var guard = 0
         while (guard++ < 5) {
-            val out = pool.maxByOrNull { rate(it) } ?: break
+            val out = pool.maxByOrNull { rate(lg, it) } ?: break
             val near = NEIGHBORS.getValue(out.pos).take(3) + listOfNotNull(out.pos2)
-            val i = (0 until 5).filter { Pos.entries[it] in near && reserves[it] != null }.minByOrNull { rate(reserves[it]!!) } ?: break
+            val i = (0 until 5).filter { Pos.entries[it] in near && reserves[it] != null }.minByOrNull { rate(lg, reserves[it]!!) } ?: break
             val bench = reserves[i]!!
-            if (rate(out) < rate(bench) + 1.0) break
+            if (rate(lg, out) < rate(lg, bench) + 1.0) break
             reserves[i] = out
             pool.remove(out)
             pool += bench
@@ -83,8 +83,8 @@ object Gameplan {
             val sMin = when {
                 s == null -> 0
                 r == null -> 40
-                lg.pro -> (PRO_STARTER_MIN_BASE + (rate(s) - rate(r)) * PRO_STARTER_MIN_SLOPE).roundToInt().coerceIn(20, 31)
-                else -> (28 + (rate(s) - rate(r)) * 0.6).roundToInt().coerceIn(22, 36)
+                lg.pro -> (PRO_STARTER_MIN_BASE + (rate(lg, s) - rate(lg, r)) * PRO_STARTER_MIN_SLOPE).roundToInt().coerceIn(20, 31)
+                else -> (28 + (rate(lg, s) - rate(lg, r)) * 0.6).roundToInt().coerceIn(22, 36)
             }
             Slot(s?.id ?: -1, r?.id ?: -1, sMin, s?.let { usageFor(it, lg.pro) } ?: 50, r?.let { usageFor(it, lg.pro) } ?: 40)
         }
@@ -92,21 +92,34 @@ object Gameplan {
             t.plan.minutes.clear()
             return
         }
-        val ranked = lg.rosterOf(t).sortedByDescending(::rate).take(PRO_MINUTE_BASE.size)
-        if (ranked.isEmpty()) {
-            t.plan.minutes.clear()
-            return
-        }
-        val meanRate = ranked.map(::rate).average()
-        val targets = ranked.mapIndexed { i, p -> (PRO_MINUTE_BASE[i] + 0.8 * (rate(p) - meanRate)).coerceIn(0.0, 38.0) }.toMutableList()
+        t.plan.minutes = proTargets(lg, t, lg.rosterOf(t))
+        for (slot in t.plan.slots) slot.starterMin = (t.plan.minutes[slot.starter] ?: 0).coerceAtMost(40)
+    }
+
+    fun proTargets(lg: League, t: Team, players: List<Player>): MutableMap<Int, Int> {
+        val ranked = players.sortedByDescending { rate(lg, it) }
+        val top = ranked.take(PRO_MINUTE_BASE.size)
+        if (ranked.isEmpty()) return mutableMapOf()
+        val meanRate = top.map { rate(lg, it) }.average()
+        val claims = ranked.mapIndexed { i, p ->
+            val base = if (i < PRO_MINUTE_BASE.size) {
+                (PRO_MINUTE_BASE[i] + 0.8 * (rate(lg, p) - meanRate)).coerceAtLeast(0.0)
+            } else 0.0
+            val fp = p.fingerprint
+            val claim = if (fp != null && fp.mpg > 0.0) {
+                val w = 0.75 * 0.5.pow((lg.season - fp.season).toDouble())
+                w * fp.mpg + (1.0 - w) * base
+            } else base
+            p to claim
+        }.sortedByDescending { it.second }.take(PRO_MINUTE_BASE.size)
+        val targets = claims.map { it.second.coerceIn(0.0, 38.0) }.toMutableList()
         repeat(3) {
             val total = targets.sum()
             if (total > 0.0) for (i in targets.indices) targets[i] = (targets[i] * 240.0 / total).coerceIn(0.0, 38.0)
         }
         val rounded = targets.map { it.roundToInt() }.toMutableList()
         rounded[0] += 240 - rounded.sum()
-        t.plan.minutes = ranked.indices.associate { ranked[it].id to rounded[it] }.toMutableMap()
-        for (slot in t.plan.slots) slot.starterMin = (t.plan.minutes[slot.starter] ?: 0).coerceAtMost(40)
+        return claims.indices.associate { claims[it].first.id to rounded[it] }.toMutableMap()
     }
 
     /** Makes sure the plan only references current roster players. */

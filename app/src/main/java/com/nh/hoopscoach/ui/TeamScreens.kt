@@ -136,6 +136,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (you) { Spacer(Modifier.width(6.dp)); Tag("YOU", P.accent, filled = true) }
+                if (lg.pro && p.injury > 0) { Spacer(Modifier.width(6.dp)); Tag("OUT · ${p.injury} G", P.bad) }
                 if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }
@@ -196,9 +197,9 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                 Text(Pos.entries[idx].name, style = T.numSm.copy(fontSize = 16.sp), color = P.accent)
             }
             Spacer(Modifier.width(12.dp))
-            SlotPick("Starter", st, Modifier.weight(1f)) { choose = true }
+            SlotPick(lg, "Starter", st, Modifier.weight(1f)) { choose = true }
             Spacer(Modifier.width(8.dp))
-            SlotPick("Backup", rs, Modifier.weight(1f)) { choose = false }
+            SlotPick(lg, "Backup", rs, Modifier.weight(1f)) { choose = false }
         }
         Spacer(Modifier.height(10.dp))
         if (lg.pro && t.plan.minutes.isNotEmpty()) {
@@ -238,6 +239,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                         ) {
                             Text(p.posLabel, style = T.small, color = if (p.plays(Pos.entries[idx])) P.accent else P.sub, modifier = Modifier.width(50.dp))
                             Text(p.name, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (lg.pro && p.injury > 0) Tag("OUT · ${p.injury} G", P.bad)
                             Text(Gameplan.role(t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
                             Ring(p.ovr, 34.dp, textSize = 14.sp)
                         }
@@ -250,14 +252,20 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
 }
 
 @Composable
-private fun SlotPick(label: String, p: Player?, modifier: Modifier, onClick: () -> Unit) {
+private fun SlotPick(lg: League, label: String, p: Player?, modifier: Modifier, onClick: () -> Unit) {
     Row(
         modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, P.line, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.sub)
-            Text(p?.short ?: "Choose", style = T.bodyB.copy(fontSize = 14.sp), color = if (p == null) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(p?.short ?: "Choose", style = T.bodyB.copy(fontSize = 14.sp), color = if (p == null) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (lg.pro && p != null && p.injury > 0) {
+                    Spacer(Modifier.width(5.dp))
+                    Tag("OUT · ${p.injury} G", P.bad)
+                }
+            }
         }
         if (p != null) Text("${shown(p.ovr)}", style = T.numSm.copy(fontSize = 17.sp), color = tier(shown(p.ovr)))
     }
@@ -290,6 +298,7 @@ private fun LazyListScope.develop(vm: GameViewModel, lg: League, t: Team) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (lg.pro && p.injury > 0) Tag("OUT · ${p.injury} G", P.bad)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(p.focus.label, style = T.small, color = P.accent, maxLines = 1)
                         if (p.banked > 0) { Spacer(Modifier.width(6.dp)); Tag("${p.banked} TO SPEND", P.gold) }

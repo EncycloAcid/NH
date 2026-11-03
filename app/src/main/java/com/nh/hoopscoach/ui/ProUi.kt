@@ -403,6 +403,7 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(if (me) "${p.name} (you)" else p.name, style = T.bodyB, color = if (me) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (p.injury > 0) Tag("OUT · ${p.injury} G", P.bad)
                             val mins = planMin(lg, u, p.id)
                             Text("${p.posLabel} · age ${p.age} · ${if (p.id in starters) "Starter" else if (mins > 0) "$mins min" else "Bench"}" +
                                 if (p.stats.gp > 0) " · ${f1(p.stats.ppg)} ppg" else "", style = T.small, color = P.sub, maxLines = 1)
@@ -1331,7 +1332,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(if (p.id == h.id) "${p.name} (you)" else p.name, style = T.bodyB, color = if (p.id == h.id) P.accent else P.ink, maxLines = 1)
-                        Text("${p.posLabel} · age ${p.age}", style = T.small, color = P.sub)
+                        Text("${p.posLabel} · age ${p.age}" + if (p.injury > 0) " · OUT · ${p.injury} G" else "", style = T.small, color = if (p.injury > 0) P.bad else P.sub)
                     }
                     Ring(p.ovr, 40.dp)
                 }

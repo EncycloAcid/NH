@@ -63,7 +63,7 @@ internal object PlayerWeights {
 class GameEngine(private val lg: League, val game: Game, private val pbp: Boolean) {
     val teams = arrayOf(lg.team(game.home), lg.team(game.away))
     private val coaches = arrayOf(lg.coachOf(teams[0]), lg.coachOf(teams[1]))
-    private val rosters: Array<List<Player>> = arrayOf(lg.rosterOf(teams[0]), lg.rosterOf(teams[1]))
+    private val rosters: Array<List<Player>> = arrayOf(gameRoster(teams[0]), gameRoster(teams[1]))
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
@@ -395,8 +395,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     init {
         for (t in teams) Gameplan.validate(lg, t)
         regularTargets = Array(2) { side ->
-            teams[side].plan.minutes.takeIf { it.isNotEmpty() }?.toMap()
-                ?: rosters[side].associate { it.id to Gameplan.plannedMinutes(teams[side], it.id) }
+            val team = teams[side]
+            val fullRoster = lg.rosterOf(team)
+            if (lg.pro && fullRoster.any { it.injury > 0 }) {
+                injuredTeamTargets(team, fullRoster.filter { it.injury <= 0 })
+            } else {
+                team.plan.minutes.takeIf { it.isNotEmpty() }?.toMap()
+                    ?: rosters[side].associate { it.id to Gameplan.plannedMinutes(team, it.id) }
+            }
         }
         gameTargets = Array(2) { side ->
             if (lg.pro && game.type == GameType.PLAYOFF) playoffTargets(side) else regularTargets[side]
@@ -469,6 +475,28 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun foulTrouble(pf: Int) = if (lg.pro) {
         period <= 4 && pf >= period + 1 && !(period == 4 && clock <= 300)
     } else (period == 1 && pf >= 2 && clock > 300) || (period == 2 && pf >= 4 && clock > 240)
+
+    private fun gameRoster(team: Team): List<Player> {
+        val roster = lg.rosterOf(team)
+        if (!lg.pro) return roster
+        val healthy = roster.filter { it.injury <= 0 }
+        if (healthy.size >= 8) return healthy
+        return healthy + roster.filter { it.injury > 0 }.sortedBy { it.injury }.take(8 - healthy.size)
+    }
+
+    private fun injuredTeamTargets(team: Team, healthy: List<Player>): Map<Int, Int> {
+        if (!lg.humanCoach(team)) return Gameplan.proTargets(lg, team, healthy)
+        val planned = healthy.map { it to (team.plan.minutes[it.id] ?: 0).toDouble() }
+        if (planned.none { it.second > 0.0 }) return Gameplan.proTargets(lg, team, healthy)
+        val targets = planned.map { it.second }.toMutableList()
+        repeat(3) {
+            val total = targets.sum()
+            if (total > 0.0) for (i in targets.indices) targets[i] = (targets[i] * 240.0 / total).coerceIn(0.0, 42.0)
+        }
+        val rounded = targets.map { it.roundToInt() }.toMutableList()
+        rounded[0] += 240 - rounded.sum()
+        return planned.indices.associate { planned[it].first.id to rounded[it] }
+    }
 
     private fun proLineup(side: Int): List<Player> {
         val roster = rosters[side]

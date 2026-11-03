@@ -20,6 +20,8 @@ class Fingerprint(
     val tov: Double = 1.0,
     val foul: Double = 1.0,
     var age: Double = 0.0,
+    var mpg: Double = 0.0,
+    var season: Int = 0,
 )
 
 /** The ten player attributes, stored in this order inside [Player.attrs]. */
@@ -240,6 +242,8 @@ class Player(
     /** Pro league: age, and pro seasons finished (0 for a rookie). */
     var age: Int = 0,
     var proYears: Int = 0,
+    /** Pro league games still to miss. */
+    var injury: Int = 0,
     /** A pro's salary (thousands a season) and the years left on his deal (the user's player's live in his contract). */
     var salary: Int = 0,
     var contractYears: Int = 0,

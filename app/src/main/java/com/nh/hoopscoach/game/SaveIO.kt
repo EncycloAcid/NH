@@ -52,7 +52,12 @@ object SaveIO {
             if (lg.players.none { it.fingerprint != null }) Careers.fingerprint(lg)
             for (p in lg.players) {
                 val fp = p.fingerprint ?: continue
-                if (fp.age == 0.0) fp.age = EraData.career("${p.first} ${p.last}")?.age ?: 0.0
+                val career = EraData.career("${p.first} ${p.last}")
+                if (fp.age == 0.0) fp.age = career?.age ?: 0.0
+                if (fp.mpg == 0.0 && career != null) {
+                    fp.mpg = if (career.rG > 0.0) career.rMp / career.rG else 0.0
+                    fp.season = lg.season
+                }
             }
         }
         // Saves from before team salary caps: everyone gets a deal.

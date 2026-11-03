@@ -17,6 +17,10 @@ object EraData {
         val id: String, val games: Int, val mp: Int, val fg: Int, val fga: Int, val fg3: Int, val fg3a: Int,
         val ft: Int, val fta: Int, val orb: Int, val drb: Int, val ast: Int, val stl: Int, val blk: Int,
         val tov: Int, val pf: Int, val pts: Int, val age: Double,
+        val rG: Double = 0.0, val rMp: Double = 0.0, val rFga: Double = 0.0, val rFta: Double = 0.0,
+        val rFt: Double = 0.0, val rFg3a: Double = 0.0, val rOrb: Double = 0.0, val rDrb: Double = 0.0,
+        val rAst: Double = 0.0, val rStl: Double = 0.0, val rBlk: Double = 0.0, val rTov: Double = 0.0,
+        val rPf: Double = 0.0, val rPts: Double = 0.0,
     )
     class College(val season: Int, val school: String, val conf: String, val cls: Int, val g: Int, val mpg: Double, val ppg: Double, val rpg: Double, val apg: Double,
         val id: String = "", val ours: String = "")
@@ -67,7 +71,14 @@ object EraData {
         table("today_career.tsv").associate { f ->
             f[0] to CareerTotals(f[1], f[2].toInt(), f[3].toInt(), f[4].toInt(), f[5].toInt(), f[6].toInt(), f[7].toInt(),
                 f[8].toInt(), f[9].toInt(), f[10].toInt(), f[11].toInt(), f[12].toInt(), f[13].toInt(), f[14].toInt(),
-                f[15].toInt(), f[16].toInt(), f[17].toInt(), f[18].toDouble())
+                f[15].toInt(), f[16].toInt(), f[17].toInt(), f[18].toDouble(),
+                f.getOrNull(19)?.toDoubleOrNull() ?: 0.0, f.getOrNull(20)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(21)?.toDoubleOrNull() ?: 0.0, f.getOrNull(22)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(23)?.toDoubleOrNull() ?: 0.0, f.getOrNull(24)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(25)?.toDoubleOrNull() ?: 0.0, f.getOrNull(26)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(27)?.toDoubleOrNull() ?: 0.0, f.getOrNull(28)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(29)?.toDoubleOrNull() ?: 0.0, f.getOrNull(30)?.toDoubleOrNull() ?: 0.0,
+                f.getOrNull(31)?.toDoubleOrNull() ?: 0.0, f.getOrNull(32)?.toDoubleOrNull() ?: 0.0)
         }
     }
 
