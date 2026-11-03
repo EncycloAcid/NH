@@ -359,7 +359,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         private const val LEAD_RANGE = 15
         private val PLAYOFF_MINUTE_ADJ = doubleArrayOf(4.0, 4.0, 4.0, 3.5, 3.0, 1.0, -1.0, -4.0)
         /** The most of his team's shots one player takes while on the floor, in the pros. */
-        var SHOT_CAP = 0.33
+        var SHOT_CAP = 0.42
         const val NON_SHOOTING_PRO = 0.08
         const val NON_SHOOTING_COLLEGE = 0.13
         const val SHOOTING_FOUL_PRO = 1.0

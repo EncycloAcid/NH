@@ -13,6 +13,14 @@ object Careers {
     private const val KEEP = 1500
 
     private data class CareerFit(val player: Player, val totals: EraData.CareerTotals)
+    private val todayFingerprint: Map<String, List<Double>> by lazy {
+        Careers::class.java.getResourceAsStream("/eras/today_fingerprint.tsv")?.bufferedReader()?.use { reader ->
+            reader.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.associate { line ->
+                val fields = line.split("|")
+                fields[0] to fields.drop(1).map { it.toDouble() }
+            }
+        } ?: emptyMap()
+    }
 
     /** Attach a ratings-relative profile to today's pros using their NBA career totals. */
     fun fingerprint(lg: League) {
@@ -72,21 +80,23 @@ object Careers {
             val baseFt = PlayerWeights.ftBase(p, true)
             // Shrink low-volume marks toward the matched players' career FT%.
             val ftReal = (fit.totals.ft + leagueFt * 150.0) / (fit.totals.fta + 150.0)
+            val calibrated = todayFingerprint["${p.first} ${p.last}"]
             p.fingerprint = Fingerprint(
-                shots = shots.getValue(p),
-                three = three.getValue(p),
-                draw = draw.getValue(p),
-                ftAdj = ftReal - baseFt,
-                orb = orb.getValue(p),
-                drb = drb.getValue(p),
-                ast = ast.getValue(p),
-                stl = stl.getValue(p),
-                blk = blk.getValue(p),
-                tov = tov.getValue(p),
-                foul = foul.getValue(p),
+                shots = calibrated?.getOrNull(0) ?: shots.getValue(p),
+                three = calibrated?.getOrNull(1) ?: three.getValue(p),
+                draw = calibrated?.getOrNull(2) ?: draw.getValue(p),
+                ftAdj = calibrated?.getOrNull(3) ?: ftReal - baseFt,
+                orb = calibrated?.getOrNull(4) ?: orb.getValue(p),
+                drb = calibrated?.getOrNull(5) ?: drb.getValue(p),
+                ast = calibrated?.getOrNull(6) ?: ast.getValue(p),
+                stl = calibrated?.getOrNull(7) ?: stl.getValue(p),
+                blk = calibrated?.getOrNull(8) ?: blk.getValue(p),
+                tov = calibrated?.getOrNull(9) ?: tov.getValue(p),
+                foul = calibrated?.getOrNull(10) ?: foul.getValue(p),
                 age = fit.totals.age,
                 mpg = if (fit.totals.rG > 0.0) fit.totals.rMp / fit.totals.rG else 0.0,
                 season = lg.season,
+                v = 2,
             )
         }
     }

@@ -22,6 +22,7 @@ class Fingerprint(
     var age: Double = 0.0,
     var mpg: Double = 0.0,
     var season: Int = 0,
+    var v: Int = 0,
 )
 
 /** The ten player attributes, stored in this order inside [Player.attrs]. */

@@ -50,6 +50,20 @@ object SaveIO {
         NbaAwards.migrate(lg)
         if (lg.pro && Eras.of(lg) == Era.TODAY) {
             if (lg.players.none { it.fingerprint != null }) Careers.fingerprint(lg)
+            if (lg.players.any { it.fingerprint?.let { fp -> fp.v < 2 } == true }) {
+                val metadata = lg.players.mapNotNull { p ->
+                    p.fingerprint?.let { p.id to Triple(it.age, it.mpg, it.season) }
+                }.toMap()
+                Careers.fingerprint(lg)
+                for (p in lg.players) {
+                    val old = metadata[p.id] ?: continue
+                    p.fingerprint?.let {
+                        it.age = old.first
+                        it.mpg = old.second
+                        it.season = old.third
+                    }
+                }
+            }
             for (p in lg.players) {
                 val fp = p.fingerprint ?: continue
                 val career = EraData.career("${p.first} ${p.last}")
