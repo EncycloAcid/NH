@@ -480,7 +480,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val stopped = Offseason.autoComplete(it, stopForNba = true)
         wrapPage = 0
         tab = Tab.TODAY
-        if (stopped) toast("NBA teams are calling: decide on their offers before you sim ahead")
+        if (stopped) toast("A big decision is waiting on the Career step: decide before you sim ahead")
     }
 
     // ---------- live games ----------

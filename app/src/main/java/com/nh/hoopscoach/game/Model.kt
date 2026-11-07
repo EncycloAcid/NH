@@ -1057,6 +1057,8 @@ class OffseasonState(
     var fired: Boolean = false,
     /** NBA teams that want the user (their places in today's league: "BOS", "LAL"...). */
     val nbaOffers: MutableList<String> = mutableListOf(),
+    /** Conferences inviting the user's school to join. */
+    val confInvites: MutableList<ConfInvite> = mutableListOf(),
     val growth: MutableList<Growth> = mutableListOf(),
     var round: Int = 1,
     val signed: MutableList<Int> = mutableListOf(),

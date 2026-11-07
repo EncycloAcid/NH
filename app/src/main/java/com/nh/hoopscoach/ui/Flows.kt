@@ -585,6 +585,43 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                 }
             }
         }
+        if (os.confInvites.isNotEmpty() && !os.fired) {
+            Section("Conference invitations")
+            GroupList(os.confInvites.toList()) { inv ->
+                val c = lg.conf(inv.confId)
+                var ask by remember { mutableStateOf(false) }
+                ListRow {
+                    Column(Modifier.weight(1f)) {
+                        Text(c.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${when (c.tier) { 0 -> "Power conference"; 1 -> "Mid-major"; else -> "Conference" }} · ${c.teamIds.size} schools · ${com.nh.hoopscoach.game.Brand.exposureLabel(com.nh.hoopscoach.game.Brand.exposure(lg, c.id))} exposure", style = T.small, color = P.sub, maxLines = 1)
+                        Text(inv.note, style = T.small, color = P.accent, maxLines = 1)
+                    }
+                    SmallButton("Consider", primary = true) { ask = true }
+                }
+                if (ask) AlertDialog(
+                    onDismissRequest = { ask = false }, containerColor = P.surface,
+                    title = { Text("Join the ${c.name}?", style = T.head, color = P.ink) },
+                    text = {
+                        Column {
+                            Text("${u.school} would leave the ${lg.conf(u.confId).name} next season.", style = T.body, color = P.sub)
+                            Spacer(Modifier.height(8.dp))
+                            for ((k, v) in com.nh.hoopscoach.game.Realignment.effects(lg, u, c)) {
+                                Text(k.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                                Text(v, style = T.small, color = P.ink, modifier = Modifier.padding(bottom = 6.dp))
+                            }
+                            Text("Winning the league gets harder, and so does the automatic NCAA bid. In return: bigger games, more quality wins and a bigger stage for recruiting.", style = T.small, color = P.sub)
+                        }
+                    },
+                    confirmButton = { TextButton({
+                        ask = false
+                        vm.act { l -> com.nh.hoopscoach.game.Realignment.join(l, l.userTeamId, c.id); l.offseason?.confInvites?.clear() }
+                        vm.toast("Welcome to the ${c.name}")
+                    }) { Text("Join", color = P.accent) } },
+                    dismissButton = { TextButton({ ask = false }) { Text("Not now", color = P.sub) } },
+                )
+            }
+            Text("Or stay where you are: the invitation lapses when you move on.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+        }
         if (os.nbaOffers.isNotEmpty()) {
             val nba = com.nh.hoopscoach.game.NbaCoach.teamsFor(lg.season)
             Section("NBA teams calling")

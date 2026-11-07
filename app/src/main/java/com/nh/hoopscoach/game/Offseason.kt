@@ -23,6 +23,7 @@ object Offseason {
         os.entrants += declarations(lg, board).filter { it != lg.heroId }
         lg.offseason = os
         Coaching.carousel(lg, os)
+        Realignment.offseason(lg, os)
         lg.phase = Phase.OFFSEASON
     }
 
@@ -376,7 +377,7 @@ object Offseason {
         var guard = 0
         while (lg.phase == Phase.OFFSEASON && guard++ < 20) {
             val os = lg.offseason ?: break
-            if (stopForNba && os.step == OffStep.CAREER && os.nbaOffers.isNotEmpty()) return true
+            if (stopForNba && os.step == OffStep.CAREER && (os.nbaOffers.isNotEmpty() || os.confInvites.isNotEmpty())) return true
             if (os.step == OffStep.CAREER && os.fired) Coaching.acceptOffer(lg, os.offers.first().teamId)
             if (os.step == OffStep.RECRUITING) Recruiting.autoPlan(lg)
             advance(lg)
@@ -504,6 +505,7 @@ object Coaching {
         newTeam.plan.auto = true
         os.offers.clear()
         os.fired = false
+        os.confInvites.clear()
         os.graduates.clear()
         os.signed.clear()
         // Commitments made to the old school stay there.
