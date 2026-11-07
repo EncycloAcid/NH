@@ -48,6 +48,7 @@ import com.nh.hoopscoach.game.Road
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Team
 import com.nh.hoopscoach.game.Trades
+import com.nh.hoopscoach.game.TradeFinder
 
 /** The years a coaching career can start: 1986-87 through today's league (2026-27). */
 private val COACH_YEARS = (1987..2027).toList().reversed()
@@ -255,6 +256,146 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
 
 @Composable
 fun NbaTradeScreen(vm: GameViewModel, lg: League) {
+    var page by remember { mutableIntStateOf(0) }
+    val open = NbaCoach.canTrade(lg)
+    val offers = lg.proState?.tradeOffers.orEmpty().mapNotNull { o -> TradeFinder.dealOf(lg, o)?.let { o to it } }
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            ScreenHeader("Front office", "Trades", if (open) "Your team overall: ${TradeFinder.overall(lg, lg.user)} · ${Payroll.status(lg, lg.user)}"
+                else if (lg.phase == Phase.REGULAR) "The deadline has passed. Trades open again in the summer." else "Trades open after the draft.")
+            if (open) Segmented(listOf("Finder", "Offers" + if (offers.isNotEmpty()) " (${offers.size})" else "", "Build"), page, { page = it })
+        }
+        if (!open) return@LazyColumn
+        when (page) {
+            0 -> item { TradeFinderPage(vm, lg) }
+            1 -> item {
+                Section("Offers on the table")
+                if (offers.isEmpty()) Panel { Text("No offers this week. Teams call every week until the deadline, and in the summer.", style = T.body, color = P.sub) }
+                for ((o, d) in offers) {
+                    DealCard(vm, lg, d, o.note) {
+                        vm.act { l -> l.proState?.tradeOffers?.remove(o) }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+            else -> item { TradeBuilder(vm, lg) }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** Shop one of your players to the league, or find a deal for a player you want. */
+@Composable
+private fun TradeFinderPage(vm: GameViewModel, lg: League) {
+    var mode by remember { mutableIntStateOf(0) }
+    var pick by remember { mutableIntStateOf(-1) }
+    var pos by remember { mutableIntStateOf(0) }
+    val u = lg.user
+    Spacer(Modifier.height(10.dp))
+    Chips(listOf("Shop my player", "Find a player"), mode, { mode = it; pick = -1 })
+    Text(if (mode == 0) "Pick one of your players: every team's best offer for him, with what each deal does to your team." else "Pick a player you want: the packages his team would take for him, best for your team first.",
+        style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+    val p = lg.playerOrNull(pick)
+    if (p == null) {
+        if (mode == 0) {
+            GroupList(lg.rosterOf(u).sortedByDescending { it.ovr }) { x -> TradeRow(lg, x, false) { pick = x.id } }
+        } else {
+            Chips(listOf("All", "PG", "SG", "SF", "PF", "C"), pos, { pos = it })
+            Spacer(Modifier.height(6.dp))
+            val list = lg.teams.filter { it.id != u.id }.flatMap { lg.rosterOf(it) }
+                .filter { pos == 0 || it.pos.ordinal == pos - 1 || it.pos2?.ordinal == pos - 1 }.sortedByDescending { it.ovr }.take(40)
+            GroupList(list) { x -> TradeRow(lg, x, false) { pick = x.id } }
+        }
+        return
+    }
+    Section(if (mode == 0) "Offers for ${p.name}" else "Ways to get ${p.name}", action = "Change", onAction = { pick = -1 })
+    Panel { Row(verticalAlignment = Alignment.CenterVertically) {
+        PlayerJersey(p, lg.team(p.teamId), 44.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(p.name, style = T.bodyB, color = P.ink)
+            Text("${lg.team(p.teamId).name} · ${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.tier(p)}", style = T.small, color = P.sub, maxLines = 1)
+        }
+        Ring(p.ovr, 40.dp, textSize = 14.sp)
+    } }
+    val deals = remember(p.id, vm.rev, mode) { if (mode == 0) TradeFinder.shop(lg, p) else TradeFinder.target(lg, p) }
+    Spacer(Modifier.height(10.dp))
+    if (deals.isEmpty()) Panel { Text(if (mode == 0) "Nobody bites at his salary and value right now." else "No package from your roster gets it done: they want more, or the salaries don't match.", style = T.body, color = P.sub) }
+    for (d in deals) {
+        DealCard(vm, lg, d, null) { pick = -1 }
+        Spacer(Modifier.height(10.dp))
+    }
+}
+
+/** A deal: who goes where, then what it does to each team, and a button to make it. */
+@Composable
+private fun DealCard(vm: GameViewModel, lg: League, d: TradeFinder.Deal, note: String?, onDone: () -> Unit) {
+    val mine = TradeFinder.mine(lg, d)
+    val theirs = TradeFinder.theirs(lg, d)
+    var result by remember { mutableStateOf<String?>(null) }
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TeamBadge(d.other, 32.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(d.other.name, style = T.bodyB, color = P.ink, maxLines = 1)
+                Text(note ?: "${d.other.w}-${d.other.l} · ${Payroll.status(lg, d.other)}", style = T.small, color = if (note != null) P.accent else P.sub, maxLines = 2)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text("YOU GET", style = T.label.copy(fontSize = 10.sp), color = P.good)
+        for (x in d.get) DealPlayer(lg, x)
+        for (k in d.getPicks) Text(Picks.label(lg, k).replaceFirstChar { it.uppercase() }, style = T.small, color = P.ink, modifier = Modifier.padding(vertical = 2.dp))
+        Spacer(Modifier.height(6.dp))
+        Text("YOU SEND", style = T.label.copy(fontSize = 10.sp), color = P.bad)
+        for (x in d.give) DealPlayer(lg, x)
+        for (k in d.givePicks) Text(Picks.label(lg, k).replaceFirstChar { it.uppercase() }, style = T.small, color = P.ink, modifier = Modifier.padding(vertical = 2.dp))
+        Spacer(Modifier.height(10.dp))
+        ImpactRow("Your team", mine)
+        ImpactRow("The ${d.other.name.substringAfterLast(' ')}", theirs)
+        result?.let { Text(it, style = T.bodyB, color = P.accent, modifier = Modifier.padding(top = 6.dp)) }
+        Spacer(Modifier.height(8.dp))
+        PrimaryButton("Make this trade", Modifier.fillMaxWidth()) {
+            vm.act { l ->
+                val t = l.team(d.other.id)
+                val r = NbaCoach.trade(l, t, l.rosterOf(l.user).filter { x -> d.give.any { it.id == x.id } }, l.rosterOf(t).filter { x -> d.get.any { it.id == x.id } }, d.givePicks, d.getPicks)
+                result = if (r.ok) "Done. The trade is official." else r.text
+                if (r.ok) l.proState?.tradeOffers?.removeAll { o -> o.teamId == t.id }
+            }
+            onDone()
+        }
+    }
+}
+
+@Composable
+private fun DealPlayer(lg: League, p: Player) {
+    Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(p.name, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${p.posLabel} · ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))}", style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.padding(horizontal = 8.dp))
+        Ring(p.ovr, 30.dp, textSize = 12.sp)
+    }
+}
+
+/** "Your team: 84.2 → 85.0 (+0.8) · +2.3 wins · over the cap". */
+@Composable
+private fun ImpactRow(label: String, i: TradeFinder.Impact) {
+    val d = Math.round((i.after - i.before) * 10) / 10.0
+    val color = when { d >= 0.1 || i.wins >= 0.5 -> P.good; d <= -0.1 || i.wins <= -0.5 -> P.bad; else -> P.sub }
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = T.small, color = P.sub, modifier = Modifier.width(84.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${"%.1f".format(i.before)} → ${"%.1f".format(i.after)}", style = T.numSm.copy(fontSize = 15.sp), color = P.ink)
+        Text(if (kotlin.math.abs(d) < 0.1) "  (=)" else "  (${if (d > 0) "+" else "−"}${"%.1f".format(kotlin.math.abs(d))})", style = T.small, color = color)
+        Spacer(Modifier.weight(1f))
+        Column(horizontalAlignment = Alignment.End) {
+            Text("${if (i.wins >= 0) "+" else "−"}${"%.1f".format(kotlin.math.abs(i.wins))} wins", style = T.bodyB.copy(fontSize = 13.sp), color = color)
+            Text(i.status, style = T.small.copy(fontSize = 11.sp), color = P.faint)
+        }
+    }
+}
+
+/** Build a deal by hand, with the same impact panel. */
+@Composable
+private fun TradeBuilder(vm: GameViewModel, lg: League) {
     val u = lg.user
     var otherId by remember { mutableIntStateOf(-1) }
     val give = remember { mutableStateListOf<Int>() }
@@ -262,71 +403,60 @@ fun NbaTradeScreen(vm: GameViewModel, lg: League) {
     val givePicks = remember { mutableStateListOf<Int>() }
     val getPicks = remember { mutableStateListOf<Int>() }
     var result by remember { mutableStateOf<String?>(null) }
-    val open = NbaCoach.canTrade(lg)
-    LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            ScreenHeader("Front office", "Trades", if (open) "Build a deal: pick a team, then what you send and what you want." else if (lg.phase == Phase.REGULAR) "The deadline has passed. Trades open again in the summer." else "Trades open after the draft.")
+    val other = lg.teams.getOrNull(otherId)
+    Section("Trade with")
+    Panel {
+        Picker("Team", other?.name ?: "Choose a team", lg.teams.filter { it.id != u.id }.sortedBy { it.name }.map { it.name to "${it.w}-${it.l} · ${Payroll.status(lg, it)}" }) { i ->
+            otherId = lg.teams.filter { it.id != u.id }.sortedBy { it.name }[i].id
+            get.clear(); getPicks.clear(); result = null
         }
-        if (!open) return@LazyColumn
-        val other = lg.teams.getOrNull(otherId)
-        item {
-            Section("Trade with")
-            Panel {
-                Picker("Team", other?.name ?: "Choose a team", lg.teams.filter { it.id != u.id }.sortedBy { it.name }.map { it.name to "${it.w}-${it.l} · ${Payroll.status(lg, it)}" }) { i ->
-                    otherId = lg.teams.filter { it.id != u.id }.sortedBy { it.name }[i].id
-                    get.clear(); getPicks.clear(); result = null
-                }
-            }
+    }
+    if (other == null) return
+    Section("You send")
+    GroupList(lg.rosterOf(u).sortedByDescending { it.ovr }) { p -> TradeRow(lg, p, p.id in give) { if (p.id in give) give.remove(p.id) else give.add(p.id); result = null } }
+    val mine = Picks.owned(lg, u)
+    if (mine.isNotEmpty()) {
+        Spacer(Modifier.height(6.dp))
+        Chips(mine.map { Picks.label(lg, it).removePrefix("a ") + if (Picks.key(it) in givePicks) " ✓" else "" }, -1, { i ->
+            val k = Picks.key(mine[i]); if (k in givePicks) givePicks.remove(k) else givePicks.add(k); result = null
+        })
+    }
+    Section("You get")
+    GroupList(lg.rosterOf(other).sortedByDescending { it.ovr }) { p -> TradeRow(lg, p, p.id in get) { if (p.id in get) get.remove(p.id) else get.add(p.id); result = null } }
+    val theirs = Picks.owned(lg, other)
+    if (theirs.isNotEmpty()) {
+        Spacer(Modifier.height(6.dp))
+        Chips(theirs.map { Picks.label(lg, it).removePrefix("a ") + if (Picks.key(it) in getPicks) " ✓" else "" }, -1, { i ->
+            val k = Picks.key(theirs[i]); if (k in getPicks) getPicks.remove(k) else getPicks.add(k); result = null
+        })
+    }
+    val gp = lg.rosterOf(u).filter { it.id in give }
+    val gt = lg.rosterOf(other).filter { it.id in get }
+    val pa = lg.proState?.picks.orEmpty().filter { Picks.key(it) in givePicks && it.owner == u.id }
+    val pb = lg.proState?.picks.orEmpty().filter { Picks.key(it) in getPicks && it.owner == other.id }
+    val v = NbaCoach.judge(lg, other, gp, gt, pa, pb)
+    Section("The deal")
+    Panel {
+        Text("Salaries: you send ${Road.dollars(gp.sumOf { Payroll.salaryOf(lg, it) })}, you take back ${Road.dollars(gt.sumOf { Payroll.salaryOf(lg, it) })}.", style = T.small, color = P.sub)
+        if (gp.isNotEmpty() || gt.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            ImpactRow("Your team", TradeFinder.impact(lg, u, gp, gt))
+            ImpactRow("The ${other.name.substringAfterLast(' ')}", TradeFinder.impact(lg, other, gt, gp))
+            Spacer(Modifier.height(6.dp))
+            val ratio = if (v.get > 0) (v.give / v.get).coerceIn(0.0, 2.0) else 0.0
+            Text("How the ${other.name} see it", style = T.label, color = P.sub)
+            GrowBar((ratio / 2).toFloat(), Modifier.fillMaxWidth().padding(vertical = 4.dp), if (v.ok) P.good else if (ratio >= 0.85) P.warn else P.bad, 8.dp)
+            Text(v.text, style = T.bodyB, color = if (v.ok) P.good else P.ink)
         }
-        if (other == null) return@LazyColumn
-        item {
-            Section("You send")
-            GroupList(lg.rosterOf(u).sortedByDescending { it.ovr }) { p -> TradeRow(lg, p, p.id in give) { if (p.id in give) give.remove(p.id) else give.add(p.id); result = null } }
-            val mine = Picks.owned(lg, u)
-            if (mine.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Chips(mine.map { Picks.label(lg, it).removePrefix("a ") + if (Picks.key(it) in givePicks) " ✓" else "" }, -1, { i ->
-                    val k = Picks.key(mine[i]); if (k in givePicks) givePicks.remove(k) else givePicks.add(k); result = null
-                })
+        result?.let { Text(it, style = T.bodyB, color = P.accent, modifier = Modifier.padding(top = 6.dp)) }
+        Spacer(Modifier.height(10.dp))
+        PrimaryButton("Propose the trade", Modifier.fillMaxWidth(), enabled = v.ok) {
+            vm.act { l ->
+                val r = NbaCoach.trade(l, l.team(other.id), l.rosterOf(l.user).filter { it.id in give }, l.rosterOf(l.team(other.id)).filter { it.id in get },
+                    l.proState?.picks.orEmpty().filter { Picks.key(it) in givePicks && it.owner == l.userTeamId }, l.proState?.picks.orEmpty().filter { Picks.key(it) in getPicks && it.owner == other.id })
+                result = if (r.ok) "Done. The trade is official." else r.text
             }
-            Section("You get")
-            GroupList(lg.rosterOf(other).sortedByDescending { it.ovr }) { p -> TradeRow(lg, p, p.id in get) { if (p.id in get) get.remove(p.id) else get.add(p.id); result = null } }
-            val theirs = Picks.owned(lg, other)
-            if (theirs.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Chips(theirs.map { Picks.label(lg, it).removePrefix("a ") + if (Picks.key(it) in getPicks) " ✓" else "" }, -1, { i ->
-                    val k = Picks.key(theirs[i]); if (k in getPicks) getPicks.remove(k) else getPicks.add(k); result = null
-                })
-            }
-        }
-        item {
-            val gp = lg.rosterOf(u).filter { it.id in give }
-            val gt = lg.rosterOf(other).filter { it.id in get }
-            val pa = lg.proState?.picks.orEmpty().filter { Picks.key(it) in givePicks && it.owner == u.id }
-            val pb = lg.proState?.picks.orEmpty().filter { Picks.key(it) in getPicks && it.owner == other.id }
-            val v = NbaCoach.judge(lg, other, gp, gt, pa, pb)
-            Section("The deal")
-            Panel {
-                Text("Salaries: you send ${Road.dollars(gp.sumOf { Payroll.salaryOf(lg, it) })}, you take back ${Road.dollars(gt.sumOf { Payroll.salaryOf(lg, it) })}.", style = T.small, color = P.sub)
-                if (gp.isNotEmpty() || gt.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    val ratio = if (v.get > 0) (v.give / v.get).coerceIn(0.0, 2.0) else 0.0
-                    Text("How the ${other.name} see it", style = T.label, color = P.sub)
-                    GrowBar((ratio / 2).toFloat(), Modifier.fillMaxWidth().padding(vertical = 4.dp), if (v.ok) P.good else if (ratio >= 0.85) P.warn else P.bad, 8.dp)
-                    Text(v.text, style = T.bodyB, color = if (v.ok) P.good else P.ink)
-                }
-                result?.let { Text(it, style = T.bodyB, color = P.accent, modifier = Modifier.padding(top = 6.dp)) }
-                Spacer(Modifier.height(10.dp))
-                PrimaryButton("Propose the trade", Modifier.fillMaxWidth(), enabled = v.ok) {
-                    vm.act { l ->
-                        val r = NbaCoach.trade(l, l.team(other.id), l.rosterOf(l.user).filter { it.id in give }, l.rosterOf(l.team(other.id)).filter { it.id in get },
-                            l.proState?.picks.orEmpty().filter { Picks.key(it) in givePicks && it.owner == l.userTeamId }, l.proState?.picks.orEmpty().filter { Picks.key(it) in getPicks && it.owner == other.id })
-                        result = if (r.ok) "Done. The trade is official." else r.text
-                    }
-                    give.clear(); get.clear(); givePicks.clear(); getPicks.clear()
-                }
-            }
-            Spacer(Modifier.height(24.dp))
+            give.clear(); get.clear(); givePicks.clear(); getPicks.clear()
         }
     }
 }
@@ -338,7 +468,7 @@ private fun TradeRow(lg: League, p: Player, picked: Boolean, onClick: () -> Unit
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.tier(p)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+            Text("${if (p.teamId >= 0 && p.teamId != lg.userTeamId) lg.team(p.teamId).abbr + " · " else ""}${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.tier(p)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
         }
         Ring(p.ovr, 36.dp, textSize = 13.sp)
         Spacer(Modifier.width(6.dp))

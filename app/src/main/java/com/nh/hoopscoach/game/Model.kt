@@ -949,6 +949,8 @@ class ProState(
     /** The projection re-run during the season (results so far, current strength), and the day it was run. */
     var live: Map<Int, NbaProj> = emptyMap(),
     var liveDay: Int = 0,
+    /** Trade offers other teams have made the user (NBA coach mode). */
+    val tradeOffers: MutableList<TradeOffer> = mutableListOf(),
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */

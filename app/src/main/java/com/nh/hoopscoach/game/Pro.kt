@@ -796,6 +796,8 @@ object ProSeason {
                 NewsDesk.endOfDay(lg)
                 // Every week the projection is re-run from the results so far.
                 if (lg.day % 7 == 0) lg.proState?.let { ps -> ps.live = NbaPreviews.project(lg); ps.liveDay = lg.day }
+                // When he coaches: teams call with offers every week until the deadline.
+                if (NbaCoach.active(lg) && lg.day % 7 == 3) TradeFinder.makeOffers(lg)
                 NbaCup.endOfDay(lg)
                 NbaAwards.endOfDay(lg)
                 Rumors.daily(lg)
@@ -1357,6 +1359,7 @@ object ProCareer {
             ProStep.DRAFT -> {
                 Market.run(lg)
                 ps.step = ProStep.FREE_AGENCY
+                TradeFinder.makeOffers(lg)
             }
             ProStep.FREE_AGENCY -> {
                 if (ps.history.isNotEmpty()) summer(lg)
