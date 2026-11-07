@@ -262,12 +262,41 @@ fun BracketScreen(vm: GameViewModel, lg: League, confId: Int) {
         else -> 0
     }
     var region by remember { mutableIntStateOf(mine) }
+    var asList by remember { mutableIntStateOf(0) }
     val split = if (ncaa) 4 else 3
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             val now = if (ncaa && Season.firstFourDay(lg)) "First Four" else roundTitle(b, b.current, ncaa)
             BackBar(b.name, if (b.done) "Champion: ${lg.team(b.champion).school}" else now, onBack = { vm.back() })
+            BracketHeader(lg, b, ncaa)
+            Spacer(Modifier.height(12.dp))
             if (tabs.isNotEmpty()) { Segmented(tabs, region, { region = it }, scroll = true); Spacer(Modifier.height(6.dp)) }
+            Segmented(listOf("Bracket", "List"), asList, { asList = it })
+            Spacer(Modifier.height(4.dp))
+        }
+        // The new look: the bracket as a tree (the list below is the old view, one round at a time).
+        if (asList == 0) {
+            if (ncaa && region < 4) {
+                val pis = b.playIns.filter { it.slot / 16 == region }
+                if (pis.isNotEmpty()) item {
+                    Section("First Four · Dayton")
+                    GroupList(pis) { pi -> BracketPair(vm, lg, b, pi.a, pi.b, pi.gameId.takeIf { it >= 0 }?.let { lg.game(it) }) }
+                }
+            }
+            item {
+                val size = b.rounds[0].size
+                when {
+                    ncaa && region < 4 -> TreeBracket(vm, lg, b, 0, 4, region * 16, 16, true, "${Season.REGIONS[region]} champion")
+                    ncaa -> TreeBracket(vm, lg, b, 4, 2, 0, 4, true, "National champion")
+                    nit && region < 4 -> TreeBracket(vm, lg, b, 0, 3, region * 8, 8, false, "To the semis")
+                    nit -> TreeBracket(vm, lg, b, 3, 2, 0, 4, false, "NIT champion")
+                    else -> TreeBracket(vm, lg, b, 0, b.roundNames.size, 0, size, false, "Champion")
+                }
+                Text("Tap a finished game for its box score. Lines light up as winners move on.", style = T.small, color = P.faint,
+                    modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+            return@LazyColumn
         }
         if (ncaa && region < 4) {
             val pis = b.playIns.filter { it.slot / 16 == region }
