@@ -385,6 +385,7 @@ object Season {
         val reward = if (nitChamp == lg.userTeamId) NitReward(nitBoost, NIT_POINTS, NIT_XP, nitPlayers) else null
         lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward, targets[lg.userTeamId], userRate)
         if (lg.playerMode) Road.seasonEnd(lg)
+        runCatching { Columns.reviewCollege(lg) }
         lg.phase = Phase.WRAP_UP
     }
 

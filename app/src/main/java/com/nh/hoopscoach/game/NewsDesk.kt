@@ -81,6 +81,7 @@ object NewsDesk {
             if (lg.road == null && lg.day >= 21 && lg.day % 14 == 0) mvpLadder(lg)
         }
         if (lg.pro && lg.phase == Phase.PLAYOFFS) seriesStories(lg)
+        runCatching { Columns.notebook(lg) }
     }
 
     /** The best line around the league tonight, if it's a big one (the user's own player has his own coverage). */
@@ -112,6 +113,13 @@ object NewsDesk {
                 n.won -> Rng.pick(listOf("The ${nick(lg, t)} needed every bit of it.", "He took over when it mattered.", "It was a clinic from start to finish."))
                 else -> "His team couldn't hold on."
             })
+            // Context: how far above his normal it was, or who it came against.
+            val above = s.pts - p.stats.ppg
+            when {
+                above >= 14 && p.stats.gp >= 5 -> add("He came in averaging ${"%.1f".format((p.stats.pts - s.pts).toDouble() / (p.stats.gp - 1).coerceAtLeast(1))} points. This was ${above.roundToInt()} more than that, out of nowhere.")
+                opp.w + opp.l >= 10 && opp.winPct >= 0.65 -> add("And it came against ${if (lg.pro) "the ${opp.name}" else opp.school}, ${opp.record} and one of the best teams in the ${if (lg.pro) "league" else "country"}.")
+                opp.w + opp.l >= 10 && opp.winPct <= 0.3 -> add("Yes, it came against ${if (lg.pro) "the ${opp.name}" else opp.school} (${opp.record}). Numbers are numbers.")
+            }
             add("He's averaging ${"%.1f".format(p.stats.ppg)} points, ${"%.1f".format(p.stats.rpg)} rebounds and ${"%.1f".format(p.stats.apg)} assists. The ${nick(lg, t)} are ${t.w}-${t.l}" +
                 when { t.streak >= 3 -> ", winners of ${t.streak} straight."; t.streak <= -3 -> " and have lost ${-t.streak} in a row."; else -> "." })
             val coach = lg.coachOf(t)
@@ -201,18 +209,40 @@ object NewsDesk {
         val order = lg.teams.sortedWith(compareByDescending<Team> { it.winPct * 100 + (it.totals.pts - it.opp.pts).toDouble() / max(1, it.w + it.l) * 0.8 }.thenByDescending { it.elo })
         val last = ps.powerLast.toList()
         val top = order.take(10)
+        // Each team gets a reason: a streak, its last ten, its margin, or its best player.
+        fun reason(t: Team): String {
+            val (w10, l10) = Columns.lastN(lg, t, 10)
+            val margin = (t.totals.pts - t.opp.pts).toDouble() / max(1, t.w + t.l)
+            val star = lg.rosterOf(t).filter { it.stats.gp > 0 }.maxByOrNull { it.stats.ppg }
+            val why = when {
+                t.streak >= 5 -> "Winners of ${t.streak} straight."
+                t.streak <= -3 -> "Lost ${-t.streak} in a row; the cushion is shrinking."
+                w10 >= 8 -> "$w10-$l10 in their last ${w10 + l10}."
+                w10 <= 4 && w10 + l10 >= 8 -> "Only $w10-$l10 in their last ${w10 + l10}. Slipping."
+                margin >= 8 -> "Winning by ${"%.1f".format(margin)} a night."
+                margin <= 1 -> "Winning close ones: a ${if (margin >= 0) "+" else ""}${"%.1f".format(margin)} margin."
+                else -> "Steady."
+            }
+            return why + (star?.let { " ${it.short}: ${"%.1f".format(it.stats.ppg)} ppg." } ?: "")
+        }
+        val moves = order.mapIndexed { i, t -> t to last.indexOf(t.id).let { if (it < 0) 0 else it - i } }
         val lines = top.mapIndexed { i, t ->
             val before = last.indexOf(t.id).let { if (it < 0) -1 else it + 1 }
             val move = when { before < 0 -> "new"; before > i + 1 -> "up ${before - i - 1}"; before < i + 1 -> "down ${i + 1 - before}"; else -> "—" }
-            val star = lg.rosterOf(t).filter { it.stats.gp > 0 }.maxByOrNull { it.stats.ppg }
-            "${i + 1}. ${t.name} (${t.w}-${t.l}, $move)" + (star?.let { " · ${it.name} ${"%.1f".format(it.stats.ppg)} ppg" } ?: "")
+            "${i + 1}. ${t.name} (${t.w}-${t.l}, $move). ${reason(t)}"
         }
         val u = lg.user
         val mine = order.indexOf(u) + 1
+        val newTop = last.isNotEmpty() && last.first() != top.first().id
         ps.powerLast.clear()
         ps.powerLast += order.map { it.id }
-        val headline = "Power rankings: the ${top.first().name} are No. 1" + if (mine in 1..10) "; ${u.name} at No. $mine" else ""
-        val body = "Week ${lg.day / 7} of the season.\n\n" + lines.joinToString("\n") + "\n\n" +
+        val headline = (if (newTop) "Power rankings: the ${top.first().name} take over No. 1" else "Power rankings: the ${top.first().name} hold No. 1") +
+            if (mine in 1..10) "; ${u.name} at No. $mine" else ""
+        val riser = moves.filter { it.second >= 4 }.maxByOrNull { it.second }
+        val faller = moves.filter { it.second <= -4 }.minByOrNull { it.second }
+        val body = "Week ${lg.day / 7} of the season.\n\n" + lines.joinToString("\n\n") + "\n\n" +
+            (riser?.let { (t, m) -> "Biggest riser: the ${t.name}, up $m to No. ${order.indexOf(t) + 1}. " } ?: "") +
+            (faller?.let { (t, m) -> "Biggest drop: the ${t.name}, down ${-m} to No. ${order.indexOf(t) + 1}. " } ?: "") +
             (if (mine > 10) "The ${u.name} are No. $mine." else "") +
             (order.lastOrNull()?.let { " At the bottom: the ${it.name} (${it.w}-${it.l})." } ?: "")
         lg.news += News(lg.season, lg.day, headline, mine in 1..10, -1, "column", body.trim(), outlet(), top.first().id)

@@ -310,6 +310,7 @@ object NbaPreviews {
             "Our favorite, the ${top.name}, win it all in only ${pct(to.title)} of our simulations, and $contenders teams have at least a 5% shot. The ${ranked[1].name} and ${ranked[2].name} are right there.",
             top.id,
         )
+        reportCard(lg, pv)?.let { out += it }
         // The user's player and his team.
         val hero = lg.playerOrNull(lg.heroId)?.takeIf { it.teamId >= 0 }
         if (hero != null) {
@@ -333,6 +334,7 @@ object NbaPreviews {
                         royRank >= 0 -> ", and he's No. ${royRank + 1} in our Rookie of the Year odds at ${pct(pv.roy[royRank].p)}."
                         else -> "."
                     })
+                    append(" Our projection: ${Analysis.project(lg, hero)}.")
                 },
                 ht.id, hero.id,
             )
@@ -396,6 +398,7 @@ object NbaPreviews {
                 "MVP race",
                 pick(lg, 70, "${p.name} leads the MVP race", "The MVP is ${p.last}'s to lose", "The race starts with ${p.name}"),
                 "${p.name} of the ${lg.team(p.teamId).name} heads our MVP odds at ${pct(o.p)}" + (if (rest.isNotEmpty()) ", ahead of ${rest.joinToString(" and ")}." else ".") +
+                    " We project ${Analysis.project(lg, p)} for him." +
                     (NbaHistory.lastMvp(lg)?.let { m -> if (m == p.name) " He won it last season too: a repeat would put him in rare company." else " Last season's MVP, $m, " +
                         (pv.mvp.indexOfFirst { lg.playerOrNull(it.pid)?.name == m }.takeIf { it >= 0 }?.let { "starts No. ${it + 1} on our board." } ?: "isn't in our top 12 this time.") } ?: ""),
                 p.teamId, p.id,
@@ -481,8 +484,98 @@ object NbaPreviews {
                 }
             }
         }
-        // Stories that rotate from season to season: a few each year, picked by what's there.
+        // Stories that rotate from season to season: each gets a score for how much of a story it is this
+        // year, and the four biggest make the issue (with a little luck, so close calls vary).
         val extra = mutableListOf<Story>()
+        val scores = HashMap<Story, Double>()
+        fun scored(st: Story, score: Double) { extra += st; scores[st] = score }
+        fun nick(team: Team) = team.name.substringAfterLast(' ')
+        val turnovers = lg.teams.associateWith { Analysis.turnover(lg, it) }
+        // New look: the contender, or near-contender, that changed the most.
+        turnovers.entries.filter { it.value != null && pr(it.key).playoffs >= 0.25 }.minByOrNull { it.value!!.returning }?.let { (t, tv) ->
+            if (tv != null && tv.returning <= 0.55) scored(Story("New look", pick(lg, 300, "A whole new ${nick(t)} team", "The ${t.name} start over on the fly", "Meet the new ${t.name}"),
+                "Only ${pct(tv.returning)} of last season's minutes are back in ${t.school}. " +
+                    (tv.departures.take(2).takeIf { it.isNotEmpty() }?.let { d -> "Gone: ${d.joinToString(" and ") { "${it.first.name} (${f1(it.second.s.ppg)} points, now with the ${if (it.first.teamId >= 0) nick(lg.team(it.first.teamId)) else "free-agent pool"})" }}. " } ?: "") +
+                    (tv.arrivals.sortedByDescending { it.ovr }.take(3).takeIf { it.isNotEmpty() }?.let { a -> "In: ${a.joinToString(", ") { it.name }}. " } ?: "") +
+                    "We project ${pr(t).w}-${pr(t).l}; chemistry is the one thing our model can't see.",
+                t.id), (1 - tv.returning) * 10 + 1)
+        }
+        // Run it back: a contender that kept everyone.
+        turnovers.entries.filter { it.value != null && pr(it.key).title >= 0.03 }.maxByOrNull { it.value!!.returning }?.let { (t, tv) ->
+            if (tv != null && tv.returning >= 0.8) scored(Story("Continuity", pick(lg, 301, "The ${t.name} ran it back", "Same team, higher expectations", "Nobody left ${t.school}"),
+                "The ${t.name} return ${pct(tv.returning)} of last season's minutes, the most of any contender. " +
+                    "Last season: ${lastRecord(lg, pv, t)}. This season: ${pr(t).w}-${pr(t).l} in our projection and a title ${often(pr(t).title)}. " +
+                    "Teams that stay together usually get a little better; the question is whether last year's ceiling was high enough.",
+                t.id), tv.returning * 8)
+        }
+        // A closing window: the oldest contender.
+        lg.teams.filter { pr(it).title >= 0.05 }.maxByOrNull { Analysis.rotationAge(lg, it) }?.let { t ->
+            val age = Analysis.rotationAge(lg, t)
+            if (age >= 29.5) scored(Story("The window", pick(lg, 302, "Now or never for the ${t.name}", "The clock is ticking in ${t.school}", "One more run?"),
+                "The ${possessive(t.name)} top eight average ${f1(age)} years old, the oldest of the contenders. " +
+                    "We give them ${pct(pr(t).title)} this season; the odds shrink every year a rotation like that gets older.",
+                t.id), (age - 28) * 2.2)
+        }
+        // A youth movement.
+        lg.teams.minByOrNull { Analysis.rotationAge(lg, it) }?.let { t ->
+            val age = Analysis.rotationAge(lg, t)
+            val kid = lg.rosterOf(t).filter { it.age <= 23 }.maxByOrNull { it.pot }
+            if (age <= 25.5) scored(Story("Youth movement", pick(lg, 303, "The kids are in charge in ${t.school}", "The youngest team in the league", "Growing up in public"),
+                "The ${possessive(t.name)} top eight average ${f1(age)} years old, the youngest in the league. " +
+                    (kid?.let { "${it.name} (${it.age}) has the highest ceiling on the roster, ${Ratings.shownPro(it.pot)} on our board. " } ?: "") +
+                    "We project ${pr(t).w}-${pr(t).l}. The wins matter less than how fast they grow.",
+                t.id, kid?.id ?: -1), (26 - age) * 2.5)
+        }
+        // On paper: the best offense, the best defense, and the gap between them.
+        run {
+            val bestO = lg.teams.maxByOrNull { Analysis.offense(lg, it) }
+            val bestD = lg.teams.maxByOrNull { Analysis.defense(lg, it) }
+            if (bestO != null && bestD != null) {
+                val oRankOfD = Analysis.rank(lg.teams, bestD) { Analysis.offense(lg, it) }
+                val dRankOfO = Analysis.rank(lg.teams, bestO) { Analysis.defense(lg, it) }
+                if (bestO.id == bestD.id) scored(Story("On paper", pick(lg, 304, "The ${nick(bestO)} have it all", "Best offense, best defense", "No weakness in ${bestO.school}"),
+                    "On paper the ${bestO.name} have the league's best offense and its best defense. Teams built like that win titles: we give them ${pct(pr(bestO).title)}.",
+                    bestO.id), 7.0)
+                else scored(Story("On paper", pick(lg, 305, "Offense vs. defense", "The ${nick(bestO)} score; the ${nick(bestD)} stop you", "Two ways to win"),
+                    "The ${bestO.name} have the league's best offense on paper, and their defense ranks ${Previews.ordinal(dRankOfO)}. " +
+                        "The ${bestD.name} are the opposite: the best defense and the ${Previews.ordinal(oRankOfD)}-ranked offense. " +
+                        "We have them at ${pr(bestO).w} and ${pr(bestD).w} wins" + (if (bestO.confId == bestD.confId) ", in the same conference." else "."),
+                    bestO.id), 4.5 + (dRankOfO + oRankOfD) / 10.0)
+            }
+        }
+        // Summer winners and losers: who added the most talent, and who lost the most.
+        run {
+            fun netAdd(tv: Analysis.Turnover) = tv.arrivals.filter { lastLine(lg, it) != null || draftPick(lg, it) != null }.sumOf { (it.ovr - 76).coerceAtLeast(0) } -
+                tv.departures.sumOf { (it.first.ovr - 76).coerceAtLeast(0) }
+            val nets = turnovers.entries.mapNotNull { (t, tv) -> tv?.let { t to netAdd(it) } }
+            nets.maxByOrNull { it.second }?.takeIf { it.second >= 8 }?.let { (t, n) ->
+                val tv = turnovers[t]!!
+                val adds = tv.arrivals.filter { lastLine(lg, it) != null }.sortedByDescending { it.ovr }.take(3)
+                val was = pv.lastWins[t.id]?.takeIf { it >= 0 }
+                scored(Story("Summer winner", pick(lg, 306, "The ${t.name} won the summer", "The ${t.name} reloaded", "Nobody had a better offseason"),
+                    "The ${t.name} added " + (if (adds.isEmpty()) "more talent than anyone" else adds.joinToString(", ") { a ->
+                        "${a.name} (${lastLine(lg, a)?.let { "${f1(it.s.ppg)} points last season" } ?: "a rookie"})" }) + ". " +
+                        (if (was != null) "Last season they won $was; we project ${pr(t).w} now" else "We project ${pr(t).w} wins") + ", with the playoffs ${often(pr(t).playoffs)}.",
+                    t.id, adds.firstOrNull()?.id ?: -1), 4.0 + n / 6.0)
+            }
+            nets.minByOrNull { it.second }?.takeIf { it.second <= -10 }?.let { (t, n) ->
+                val tv = turnovers[t]!!
+                scored(Story("Summer loser", pick(lg, 307, "A rough summer in ${t.school}", "The ${t.name} lost too much", "Where did everybody go?"),
+                    "The ${t.name} lost ${tv.departures.take(3).joinToString(", ") { "${it.first.name}" + if (it.first.teamId >= 0) " (to the ${nick(lg.team(it.first.teamId))})" else "" }}" +
+                        ", and ${f1(tv.lostPpg)} points a game went with them. We project ${pr(t).w}-${pr(t).l}.",
+                    t.id), 4.0 - n / 6.0)
+            }
+        }
+        // The scoring race, by our projected lines.
+        run {
+            val top3 = lg.teams.flatMap { lg.rosterOf(it) }.sortedByDescending { value(lg, it) }.take(30)
+                .map { it to Analysis.project(lg, it) }.sortedByDescending { it.second.ppg }.take(3)
+            if (top3.size == 3) scored(Story("Scoring race", pick(lg, 308, "Who wins the scoring title?", "The race for the scoring crown", "Buckets"),
+                "Our projections: ${top3.joinToString("; ") { (p, l) -> "${p.name} ${f1(l.ppg)}" }} points a game. " +
+                    "${top3[0].first.last} " + (if (top3[0].second.ppg - top3[1].second.ppg >= 2) "has a real cushion." else "leads by a hair, and one hot month changes everything."),
+                top3[0].first.teamId, top3[0].first.id), 4.5)
+        }
+
         // A superteam: three of the league's best 25 on one roster.
         val best = lg.teams.flatMap { lg.rosterOf(it) }.sortedByDescending { value(lg, it) }.take(25)
         best.groupBy { it.teamId }.maxByOrNull { it.value.size }?.takeIf { it.value.size >= 3 }?.let { (tid, ps3) ->
@@ -535,7 +628,8 @@ object NbaPreviews {
                 break
             }
         }
-        out += extra.shuffled(kotlin.random.Random(lg.season * 977L + 5)).take(3)
+        val luck = kotlin.random.Random(lg.season * 977L + 5)
+        out += extra.sortedByDescending { (scores[it] ?: 5.0) + luck.nextDouble() * 2.5 }.take(4)
         // The bottom of the league.
         lg.teams.filter { it.id != u.id }.minByOrNull { pr(it).w }?.let { t ->
             out += Story(
@@ -546,7 +640,38 @@ object NbaPreviews {
                 t.id,
             )
         }
-        return out.take(12)
+        return out.take(14)
+    }
+
+    /**
+     * Last year's issue, graded: our favorite against the real champion, our best call and biggest miss on
+     * wins, how far off we were on average, and where last season's MVP started on our board.
+     */
+    private fun reportCard(lg: League, pv: NbaPreview): Story? {
+        val old = lg.proState?.preview?.takeIf { it.season == lg.season - 1 } ?: return null
+        val (champ, _) = NbaHistory.finalists(lg, lg.season - 1)
+        val fav = old.proj.maxByOrNull { it.value.title }?.let { lg.teams.getOrNull(it.key) } ?: return null
+        val err = lg.teams.mapNotNull { t -> old.proj[t.id]?.w?.let { p -> pv.lastWins[t.id]?.takeIf { it >= 0 }?.let { a -> Triple(t, p, a) } } }
+        if (err.size < 10) return null
+        val avg = err.map { abs(it.second - it.third) }.average()
+        val miss = err.maxByOrNull { abs(it.second - it.third) }!!
+        // A good call is one that took nerve: a team far from .500, or far from where it had been.
+        val call = err.filter { abs(it.third - ProLeague.seasonGames(lg) / 2) >= 10 }.minByOrNull { abs(it.second - it.third) } ?: err.minByOrNull { abs(it.second - it.third) }!!
+        val parts = mutableListOf<String>()
+        parts += "Last fall we made the ${fav.name} our favorite (${pct(old.proj.getValue(fav.id).title)})." + when {
+            champ == null -> ""
+            champ.id == fav.id -> " They delivered."
+            else -> " The ${champ.name} won it instead, a team we gave ${chance(old.proj[champ.id]?.title ?: 0.0)}."
+        }
+        parts += "Our biggest miss: the ${miss.first.name}, projected for ${miss.second} wins. They won ${miss.third}."
+        if (call.first.id != miss.first.id) parts += "Our best call: the ${call.first.name}, ${call.second} projected and ${call.third} won."
+        parts += "On average we missed by ${f1(avg)} wins a team" + when { avg <= 5.5 -> ", a good year for the model."; avg <= 7.5 -> ", about what the best models manage."; else -> ". The league didn't follow the script." }
+        NbaHistory.lastMvp(lg)?.let { m ->
+            val at = old.mvp.indexOfFirst { lg.playerOrNull(it.pid)?.name == m }
+            parts += if (at == 0) "And we had the MVP, $m, at the top of our board." else if (at > 0) "The MVP, $m, started No. ${at + 1} on our board (${pct(old.mvp[at].p)})." else "The MVP, $m, wasn't on our board at all."
+        }
+        return Story("Report card", pick(lg, 299, "How we did last year", "Grading last year's picks", "What we got right, and wrong"), parts.joinToString(" "),
+            (champ ?: fav).id)
     }
 
     private fun bold(lg: League, pv: NbaPreview): List<String> {

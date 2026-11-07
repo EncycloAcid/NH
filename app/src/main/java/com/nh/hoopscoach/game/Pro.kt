@@ -1130,6 +1130,7 @@ object ProSeason {
             lg.seasonAwards.firstOrNull { it.award == "MVP" }?.name ?: "", fmvp?.name ?: "",
             lg.seasonAwards.firstOrNull { it.award == "Rookie of the Year" }?.name ?: "", heroResult,
         )
+        runCatching { Columns.reviewPro(lg) }
         ProCareer.seasonEnd(lg)
         lg.phase = Phase.OFFSEASON
         ps.step = ProStep.REVIEW

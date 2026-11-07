@@ -374,6 +374,8 @@ object Previews {
             top.id,
         )
 
+        collegeReport(lg, pv)?.let { out += it }
+
         // 2. The user's player and team.
         val hero = lg.playerOrNull(lg.heroId)?.takeIf { lg.playerMode && it.teamId >= 0 }
         if (hero != null) {
@@ -487,6 +489,35 @@ object Previews {
             )
         }
 
+        // 4b. Experience against talent: the ranked team that brings everyone back, and the one reloading.
+        if (known) {
+            val top25 = ranked.take(25).mapNotNull { t -> Analysis.turnover(lg, t)?.let { t to it } }
+            top25.maxByOrNull { it.second.returning }?.takeIf { it.second.returning >= 0.7 }?.let { (t, tv) ->
+                out += Story("Experience", pick(lg, 310, "${t.school} brings everybody back", "The most experienced contender", "Old heads at ${t.school}"),
+                    "${t.school} returns ${pct(tv.returning)} of last season's minutes, the most of any team in our Top 25" +
+                        " (${"%.1f".format(tv.backPpg)} points a game back). Experience wins in March: we give them the Final Four ${NbaPreviews.often(odds(pv, t).f4)}.",
+                    t.id)
+            }
+            top25.filter { proj(it.first).nat <= 12 }.minByOrNull { it.second.returning }?.takeIf { it.second.returning <= 0.45 }?.let { (t, tv) ->
+                val newbies = tv.arrivals.sortedByDescending { it.ovr }.take(3)
+                out += Story("Reloading", pick(lg, 311, "${t.school} doesn't rebuild; it reloads", "A new team at ${t.school}, same expectations", "Talent over experience"),
+                    "Only ${pct(tv.returning)} of ${t.school}'s minutes are back, yet we still have them No. ${proj(t).nat}. " +
+                        (if (newbies.isNotEmpty()) "The newcomers carry it: ${newbies.joinToString(", ") { "${it.name} (${if (isTransfer(it)) "transfer from ${cameFrom(lg, it)}" else it.cls})" }}. " else "") +
+                        "Talent like that usually figures it out by February. The question is November.",
+                    t.id, newbies.firstOrNull()?.id ?: -1)
+            }
+        }
+        // 4c. On paper: the best offense and the best defense in the Top 25.
+        run {
+            val top = ranked.take(25)
+            val bestO = top.maxByOrNull { Analysis.offense(lg, it) }
+            val bestD = top.maxByOrNull { Analysis.defense(lg, it) }
+            if (bestO != null && bestD != null && bestO.id != bestD.id) out += Story("On paper", pick(lg, 312, "Offense vs. defense", "Points or stops?", "Two ways to win"),
+                "${bestO.school} has the best offense in our Top 25 on paper; its defense ranks ${ordinal(Analysis.rank(top, bestO) { Analysis.defense(lg, it) })}. " +
+                    "${bestD.school} is the opposite: the best defense, the ${ordinal(Analysis.rank(top, bestD) { Analysis.offense(lg, it) })}-ranked offense. " +
+                    "History says defense travels in March: we give ${bestD.school} the Final Four ${NbaPreviews.often(odds(pv, bestD).f4)}, ${bestO.school} ${NbaPreviews.often(odds(pv, bestO).f4)}.",
+                bestD.id)
+        }
         // 5. Risers and fallers.
         ranked.take(20).filter { t -> lastFor(lg, t)?.let { it.ap == 0 } == true }
             .maxByOrNull { proj(it).w - lastFor(lg, it)!!.w }?.let { t ->
@@ -604,7 +635,53 @@ object Previews {
                 h.id,
             )
         }
-        return out.take(12)
+        return out.take(15)
+    }
+
+    /**
+     * Last year's issue, graded: our preseason No. 1 against the champion, how many conference champions we
+     * called, the biggest conference surprise, our Final Four, and where the Player of the Year started.
+     */
+    private fun collegeReport(lg: League, pv: Preview): Story? {
+        val old = lg.preview?.takeIf { it.season == lg.season - 1 } ?: return null
+        val prev = lg.teams.filter { t -> t.history.any { it.season == lg.season - 1 } }
+        if (prev.size < 50) return null
+        fun lastOf(t: Team) = t.history.lastOrNull { it.season == lg.season - 1 }
+        val champ = CollegeHistory.lastChampion(lg)
+        val no1 = old.proj.entries.firstOrNull { it.value.nat == 1 }?.let { lg.teams.getOrNull(it.key) }
+        // Conference races: our pick for first against who actually finished first in league play.
+        var called = 0
+        var races = 0
+        var surprise: Triple<Team, Int, Int>? = null
+        for (c in lg.confs) {
+            val teams = c.teamIds.map { lg.team(it) }.filter { lastOf(it) != null && old.proj[it.id] != null }
+            if (teams.size < 6) continue
+            races++
+            val finish = teams.sortedWith(compareByDescending<Team> { lastOf(it)!!.cw - lastOf(it)!!.cl }.thenByDescending { lastOf(it)!!.w })
+            val picked = teams.minByOrNull { old.proj.getValue(it.id).confRank }!!
+            if (finish.first().id == picked.id) called++
+            if (c.tier == 0) finish.forEachIndexed { i, t ->
+                val jump = old.proj.getValue(t.id).confRank - (i + 1)
+                if (jump > (surprise?.let { it.second - it.third } ?: 3)) surprise = Triple(t, old.proj.getValue(t.id).confRank, i + 1)
+            }
+        }
+        val deep = setOf("Final Four", "Runner-Up", "National Champion")
+        val f4hits = old.finalFour.count { id -> lg.teams.getOrNull(id)?.let { lastOf(it)?.result in deep } == true }
+        val parts = mutableListOf<String>()
+        if (no1 != null) parts += "Last fall our No. 1 was ${no1.school}." + when {
+            champ == null -> ""
+            champ.id == no1.id -> " They cut down the nets."
+            else -> " ${champ.school} won it all instead" + (old.proj[champ.id]?.nat?.let { ", from No. $it in our poll." } ?: ".") + " ${no1.school} " +
+                (lastOf(no1)?.let { "went ${it.w}-${it.l} and ${lastSeason(it.result)}." } ?: "fell short.")
+        }
+        if (races > 0) parts += "We called $called of $races conference champions."
+        surprise?.let { (t, was, now) -> parts += "Biggest surprise: ${t.school}, picked ${ordinal(was)} in the ${lg.conf(t.confId).abbr}, finished ${ordinal(now)}." }
+        parts += "Our Final Four: $f4hits of 4 got there."
+        lg.players.firstOrNull { p -> p.awards.contains("${lg.season - 1} Nat MVP") }?.let { m ->
+            val at = old.poy.indexOfFirst { it.pid == m.id }
+            parts += if (at == 0) "And we had the Player of the Year, ${m.name}, at the top of our board." else if (at > 0) "The Player of the Year, ${m.name}, started No. ${at + 1} in our odds." else "The Player of the Year, ${m.name}, wasn't in our top eight."
+        }
+        return Story("Report card", pick(lg, 299, "How we did last year", "Grading last year's picks", "What we got right, and wrong"), parts.joinToString(" "), (champ ?: no1)?.id ?: -1)
     }
 
     /** Predictions to argue about: the user's team always, plus five more. */
