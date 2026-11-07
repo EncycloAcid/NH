@@ -755,11 +755,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun posAst(p: Pos) = when (p) { Pos.PG -> 1.25; Pos.SG -> 1.05; Pos.SF -> 1.0; Pos.PF -> 0.95; Pos.C -> 1.1 }
     private fun posBlk(p: Pos) = when (p) { Pos.C -> 2.0; Pos.PF -> 1.4; Pos.SF -> 0.95; Pos.SG -> 0.7; Pos.PG -> 0.6 }
     private fun posFoul(p: Pos) = when (p) { Pos.C -> 1.5; Pos.PF -> 1.3; Pos.SF -> 1.0; Pos.SG -> 0.85; Pos.PG -> 0.75 }
-    private fun posReb(p: Pos) = if (lg.pro) when (p) { Pos.C -> 1.3; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 0.9; Pos.PG -> 0.85 }
+    private fun posReb(p: Pos) = if (lg.pro) when (p) { Pos.C -> 1.12; Pos.PF -> 1.0; Pos.SF -> 1.0; Pos.SG -> 1.0; Pos.PG -> 1.02 }
         else when (p) { Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05 }
 
-    /** Who grabs a rebound: good rebounders and big men most, but guards chase long ones too. */
-    private fun rebounder(side: List<Player>) = Rng.weighted(side) { (it[Attr.REB] / 70.0).pow(2) * posReb(it.pos) * Tendency.reb(it) * spec(it) }
+    /** Size helps on the glass: about 3% a inch either side of 6'6". */
+    private fun heightReb(p: Player) = (1.0 + (p.height - 78) * 0.03).coerceIn(0.8, 1.25)
+
+    /** Who grabs a rebound: good rebounders, big men and tall wings most, but guards chase long ones too. */
+    private fun rebounder(side: List<Player>) = Rng.weighted(side) {
+        (it[Attr.REB] / 70.0).pow(if (lg.pro) 1.6 else 2.0) * posReb(it.pos) * heightReb(it) * Tendency.reb(it) * spec(it)
+    }
 
     /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
     private val teamRebound get() = Rng.chance(if (lg.pro) 0.11 else 0.05)
