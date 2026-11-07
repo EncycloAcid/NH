@@ -68,6 +68,7 @@ object NbaPreviews {
     fun build(lg: League): NbaPreview {
         val ps = lg.proState!!
         val last = lastSeasons(lg)
+        val games = ProLeague.seasonGames(lg).coerceAtLeast(1)
         val proj = simulate(lg)
         val active = lg.teams.flatMap { lg.rosterOf(it) }
         fun projW(p: Player) = proj[p.teamId]?.w ?: 41
@@ -78,15 +79,22 @@ object NbaPreviews {
             val sum = w.sumOf { it.second }.coerceAtLeast(1e-9)
             return w.map { PoyOdds(it.first.id, it.second / sum) }.sortedByDescending { it.p }
         }
-        val games = ProLeague.seasonGames(lg).coerceAtLeast(1)
         val mvp = odds(active.map { it to value(lg, it) + (projW(it) - games / 2.0) * 0.18 }, 2.6, 12)
         val roy = odds(active.filter { it.proYears == 0 }.map { it to it.ovr + (60 - (draftPick(lg, it) ?: 60)) * 0.04 }, 1.8, 10)
         val dpoy = odds(active.map { it to Ratings.defense(it) + it.ovr * 0.25 }, 2.0, 10)
         val sixth = odds(active.filter { p -> lg.rosterOf(lg.team(p.teamId)).sortedByDescending { it.ovr }.indexOf(p) in 5..8 }
             .map { it to it.ovr + (lastLine(lg, it)?.s?.ppg ?: 0.0) * 0.3 }, 1.8, 10)
         val mip = odds(active.filter { it.age <= 25 && it.proYears >= 1 && it.pot > it.ovr }.map { it to it.ovr * 0.6 + (it.pot - it.ovr) * 0.8 }, 2.0, 8)
-        val lastText = lg.teams.mapNotNull { t -> last[t.id]?.let { t.id to "${it.w}-${it.l} · ${it.result.ifEmpty { "Missed playoffs" }}" } }.toMap()
-        val lastWins = lg.teams.associate { t -> t.id to (last[t.id]?.w ?: ps.lastWins[t.id] ?: -1) }
+        // Last season: this league's if it was played here, otherwise the real one (a league that starts from a real season).
+        val hist = lg.teams.associateWith { NbaHistory.last(lg, it) }
+        val lastText = lg.teams.mapNotNull { t ->
+            hist[t]?.let { t.id to "${it.record} · ${it.result.replaceFirstChar { c -> c.uppercase() }}" }
+                ?: last[t.id]?.let { t.id to "${it.w}-${it.l} · ${it.result.ifEmpty { "Missed playoffs" }}" }
+        }.toMap()
+        // Wins on this season's schedule, so a shortened season (1998-99's 50 games) compares fairly.
+        val lastWins = lg.teams.associate { t ->
+            t.id to (hist[t]?.let { y -> (y.w.toDouble() / (y.w + y.l).coerceAtLeast(1) * games).roundToInt() } ?: last[t.id]?.w ?: ps.lastWins[t.id] ?: -1)
+        }
         val base = NbaPreview(lg.season, proj, mvp, roy, dpoy, sixth, mip, last = lastText, lastWins = lastWins)
         return NbaPreview(
             lg.season, proj, mvp, roy, dpoy, sixth, mip,
@@ -208,6 +216,16 @@ object NbaPreviews {
     /** "the Spurs'", "the Heat's". */
     fun possessive(name: String) = if (name.endsWith("s")) "$name'" else "$name's"
 
+    /** Years as a list: "1996, 1997 and 1998". */
+    private fun listOf(years: List<Int>) = if (years.size <= 1) years.joinToString() else years.dropLast(1).joinToString(", ") + " and " + years.last()
+
+    /** Last season's record, with its full-schedule pace when the season was short (1998-99 had 50 games). */
+    private fun lastRecord(lg: League, pv: NbaPreview, t: Team): String {
+        val rec = pv.last[t.id]?.substringBefore(" ·") ?: return "${pv.lastWins[t.id]} wins"
+        val (w, l) = rec.split("-").mapNotNull { it.trim().toIntOrNull() }.let { (it.getOrNull(0) ?: 0) to (it.getOrNull(1) ?: 0) }
+        return if (abs(w + l - ProLeague.seasonGames(lg)) > 5) "$rec (a ${pv.lastWins[t.id]}-win pace over a full season)" else rec
+    }
+
     /** How often, in words: "almost every season", "about one season in six". */
     fun often(p: Double): String = when {
         p >= 0.97 -> "almost every season"
@@ -256,7 +274,7 @@ object NbaPreviews {
     private fun headline(lg: League, pv: NbaPreview): String {
         val top = ranked(lg, pv).first()
         val o = pv.proj.getValue(top.id)
-        val champ = lg.proState?.history?.lastOrNull()?.champion
+        val champ = NbaHistory.finalists(lg, lg.season - 1).first?.id
         val second = ranked(lg, pv).getOrNull(1)
         return when {
             champ == top.id -> pick(lg, 1, "Run it back", "Repeat?", "The champs are still the team to beat", "Defending the throne")
@@ -273,7 +291,9 @@ object NbaPreviews {
         fun pr(t: Team) = pv.proj.getValue(t.id)
         val top = ranked[0]
         val to = pr(top)
-        val champId = ps.history.lastOrNull()?.champion ?: -1
+        // Last season's finalists: this league's, or the real ones in a league's first season.
+        val (lastChamp, lastRunner) = NbaHistory.finalists(lg, lg.season - 1)
+        val champId = lastChamp?.id ?: -1
         val contenders = ranked.count { pr(it).title >= 0.05 }
         val topStar = star(lg, top)
         out += if (to.title >= 0.16) Story(
@@ -375,7 +395,9 @@ object NbaPreviews {
             out += Story(
                 "MVP race",
                 pick(lg, 70, "${p.name} leads the MVP race", "The MVP is ${p.last}'s to lose", "The race starts with ${p.name}"),
-                "${p.name} of the ${lg.team(p.teamId).name} heads our MVP odds at ${pct(o.p)}" + (if (rest.isNotEmpty()) ", ahead of ${rest.joinToString(" and ")}." else "."),
+                "${p.name} of the ${lg.team(p.teamId).name} heads our MVP odds at ${pct(o.p)}" + (if (rest.isNotEmpty()) ", ahead of ${rest.joinToString(" and ")}." else ".") +
+                    (NbaHistory.lastMvp(lg)?.let { m -> if (m == p.name) " He won it last season too: a repeat would put him in rare company." else " Last season's MVP, $m, " +
+                        (pv.mvp.indexOfFirst { lg.playerOrNull(it.pid)?.name == m }.takeIf { it >= 0 }?.let { "starts No. ${it + 1} on our board." } ?: "isn't in our top 12 this time.") } ?: ""),
                 p.teamId, p.id,
             )
         }
@@ -394,7 +416,7 @@ object NbaPreviews {
             out += Story(
                 "On the rise",
                 pick(lg, 90, "The ${t.name} take a leap", "From ${pv.lastWins[t.id]} wins to ${pr(t).w}?"),
-                "The ${t.name} won ${pv.lastWins[t.id]} games last season. We project ${pr(t).w}, $d more, and give them ${chance(pr(t).playoffs)} to make the playoffs. " +
+                "The ${t.name} went ${lastRecord(lg, pv, t)} last season. We project ${pr(t).w}-${pr(t).l}, $d more wins, and give them ${chance(pr(t).playoffs)} to make the playoffs. " +
                     Takes.nba(lg, pv, t, 1, from = 1),
                 t.id,
             )
@@ -403,7 +425,7 @@ object NbaPreviews {
             out += Story(
                 "Falling back",
                 pick(lg, 100, "Trouble for the ${t.name}", "The ${t.name} take a step back"),
-                "${pv.lastWins[t.id]} wins last season, ${pr(t).w} in our projection (${-d} fewer), and the playoffs ${often(pr(t).playoffs)}. " +
+                "${lastRecord(lg, pv, t).replaceFirstChar { it.uppercase() }} last season, ${pr(t).w}-${pr(t).l} in our projection (${-d} fewer wins), and the playoffs ${often(pr(t).playoffs)}. " +
                     Takes.nba(lg, pv, t, 1, from = 1),
                 t.id,
             )
@@ -421,6 +443,43 @@ object NbaPreviews {
                     } },
                 p.teamId, p.id,
             )
+        }
+        // History: a rematch of last June, a dynasty, or a contender's long wait.
+        run {
+            val recent = (1..4).mapNotNull { k -> NbaHistory.finalists(lg, lg.season - k).first?.let { lg.season - k to it } }
+            val dynasty = recent.groupBy { it.second.id }.maxByOrNull { it.value.size }?.takeIf { it.value.size >= 2 }
+            val rematch = lastChamp != null && lastRunner != null && lastChamp.confId != lastRunner.confId &&
+                pr(lastChamp).finals >= 0.15 && pr(lastRunner).finals >= 0.15
+            val waiting = ranked.take(6).filter { pr(it).title >= 0.06 }.map { it to NbaHistory.titles(lg, it) }
+                .maxByOrNull { (_, ts) -> if (ts.isEmpty()) 999 else lg.season - ts.last() }
+            when {
+                dynasty != null -> {
+                    val t = lg.team(dynasty.key)
+                    val years = dynasty.value.map { it.first }.sorted()
+                    val all = NbaHistory.titleWords(NbaHistory.titles(lg, t).size)
+                    out += if (pr(t).title >= 0.05) Story("History", pick(lg, 190, "Is the ${t.name.substringAfterLast(' ')} dynasty still going?", "${years.size} titles in ${lg.season - years.first()} years", "The ${t.name}, again?"),
+                        "The ${t.name} won it all in ${listOf(years)}, $all in all. " +
+                            "This season we give them ${pct(pr(t).title)}" + (if (t.id == top.id) ", the best odds in the league." else ", behind the ${top.name} (${pct(to.title)})."),
+                        t.id)
+                    else Story("History", pick(lg, 194, "Life after the dynasty", "The ${t.name.substringAfterLast(' ')} start over"),
+                        "The ${t.name} won it all in ${listOf(years)}. That team is gone: we project ${pr(t).w}-${pr(t).l} and the playoffs ${often(pr(t).playoffs)}. " +
+                            "The title runs through the ${top.name} now (${pct(to.title)}).",
+                        t.id)
+                }
+                rematch -> out += Story("History", pick(lg, 191, "A Finals rematch?", "${lastChamp!!.name.substringAfterLast(' ')}-${lastRunner!!.name.substringAfterLast(' ')}, part two?"),
+                    "Last June the ${lastChamp!!.name} beat the ${lastRunner!!.name} for the title. Both are back in the Finals in our simulations " +
+                        "(${pct(pr(lastChamp).finals)} and ${pct(pr(lastRunner).finals)}), and they meet again ${often(pr(lastChamp).finals * pr(lastRunner).finals * 1.6)}.",
+                    lastChamp.id)
+                waiting != null -> {
+                    val (t, ts) = waiting
+                    out += Story("History",
+                        if (ts.isEmpty()) pick(lg, 192, "The ${t.name} have never won it all", "Still chasing a first title") else pick(lg, 193, "${lg.season - ts.last()} years and counting", "The ${t.name} want to end the wait"),
+                        (if (ts.isEmpty()) "The franchise has never won a championship. " else "The ${t.name}' last title came in ${ts.last()}, ${NbaHistory.titleWords(ts.size)} in all. ") +
+                            "This team has a real chance to change that: a title ${often(pr(t).title)} in our simulations" +
+                            (NbaHistory.playoffStreak(lg, t).takeIf { it >= 3 }?.let { ", and it's made the playoffs $it years in a row." } ?: "."),
+                        t.id)
+                }
+            }
         }
         // Stories that rotate from season to season: a few each year, picked by what's there.
         val extra = mutableListOf<Story>()
@@ -533,9 +592,11 @@ object NbaPreviews {
         val u = lg.user
         val uo = pv.proj.getValue(u.id)
         val out = mutableListOf<String>()
+        val (fc, fr) = NbaHistory.finalists(lg, lg.season - 1)
         out += pick(lg, 200, "Welcome to the ${lg.season} season. ", "The ${lg.season} season tips off. ", "Basketball is back. ") +
+            (if (fc != null) "Last June the ${fc.name} won it all" + (fr?.let { " over the ${it.name}" } ?: "") + (NbaHistory.lastMvp(lg)?.let { ", and $it was the MVP. " } ?: ". ") else "") +
             "We simulated it $SIMS times, through the playoffs. The ${top.name} won the title in ${pct(to.title)} of them, the most of any team. " +
-            (champ?.let { if (it.id == top.id) "The defending champions are the team to catch." else "The defending champion ${it.name} won it in ${pct(pv.proj.getValue(it.id).title)}." } ?: "")
+            ((champ ?: fc)?.let { if (it.id == top.id) "The defending champions are the team to catch." else "The defending champion ${it.name} won it in ${pct(pv.proj.getValue(it.id).title)}." } ?: "")
         val east = lg.teams.filter { it.confId == 0 }.maxByOrNull { pv.proj.getValue(it.id).finals }
         val west = lg.teams.filter { it.confId == 1 }.maxByOrNull { pv.proj.getValue(it.id).finals }
         if (east != null && west != null) out += "Our Finals: the ${east.name} against the ${west.name}. " +

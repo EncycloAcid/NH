@@ -435,16 +435,35 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 FormerPlayers(vm, lg, t)
                 RivalsList(vm, lg, t)
                 PipelinePanel(vm, lg, t)
-                Section("Seasons")
+                if (lg.pro) FranchiseHistory(lg, t) else CollegeTitles(lg, t)
+                Section(if (lg.pro) "Seasons in this league" else "Seasons")
                 if (t.history.isEmpty()) Empty("No completed seasons yet.")
                 GroupList(t.history.reversed()) { h ->
                     ListRow {
                         Text("${h.season}", style = T.numSm, color = P.sub, modifier = Modifier.width(56.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("${h.w}-${h.l} (${h.cw}-${h.cl})", style = T.bodyB, color = P.ink)
-                            Text("${h.result} · ${h.coach}", style = T.small, color = P.sub)
+                            Text("${h.w}-${h.l}" + if (lg.pro) "" else " (${h.cw}-${h.cl})", style = T.bodyB, color = P.ink)
+                            Text("${h.result} · ${h.coach}", style = T.small, color = if (h.result.contains("Champion")) P.gold else P.sub)
                         }
-                        Text("${h.prestige}", style = T.numSm, color = tier(h.prestige))
+                        if (lg.pro) Text(if (h.ap > 0) "No. ${h.ap}" else "—", style = T.numSm, color = P.sub)
+                        else Text("${h.prestige}", style = T.numSm, color = tier(h.prestige))
+                    }
+                }
+                if (lg.pro) {
+                    // The real seasons before this league began.
+                    val first = com.nh.hoopscoach.game.NbaHistory.firstSeason(lg)
+                    val real = (first - 1 downTo maxOf(1980, first - 15)).mapNotNull { y -> com.nh.hoopscoach.game.NbaHistory.real(y, t.slot)?.let { y to it } }
+                    if (real.isNotEmpty()) {
+                        Section("Before this league")
+                        GroupList(real) { (y, r) ->
+                            ListRow {
+                                Text("$y", style = T.numSm, color = P.sub, modifier = Modifier.width(56.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(r.record, style = T.bodyB, color = P.ink)
+                                    Text(r.result, style = T.small, color = if (r.result == "Champion") P.gold else P.sub)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -502,3 +521,36 @@ private fun unusedStandings(lg: League) = Season.standings(lg, 0)
 
 @Suppress("unused")
 private val unusedShape = CircleShape
+
+
+/** An NBA franchise's history: its titles (the real ones before this league, then this league's) and its run of playoff trips. */
+@Composable
+private fun FranchiseHistory(lg: League, t: Team) {
+    val h = com.nh.hoopscoach.game.NbaHistory
+    val titles = h.titles(lg, t)
+    val streak = h.playoffStreak(lg, t)
+    val misses = h.missStreak(lg, t)
+    Section("Franchise history")
+    Panel {
+        Text(if (titles.isEmpty()) "No championships yet" else h.titleWords(titles.size).replaceFirstChar { it.uppercase() }, style = T.head, color = if (titles.isEmpty()) P.ink else P.gold)
+        if (titles.isNotEmpty()) Text(titles.joinToString(", "), style = T.small, color = P.sub)
+        val last = h.last(lg, t)
+        if (last != null) Text("Last season: ${last.record}, ${h.phrase(last.result)}.", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
+        when {
+            streak >= 2 -> Text("$streak straight playoff trips.", style = T.small, color = P.good)
+            misses >= 2 -> Text("$misses straight seasons without the playoffs.", style = T.small, color = P.bad)
+        }
+    }
+}
+
+/** A college program's national titles: the real ones before this league, then this league's. */
+@Composable
+private fun CollegeTitles(lg: League, t: Team) {
+    val titles = com.nh.hoopscoach.game.CollegeHistory.titles(lg, t)
+    if (titles.isEmpty()) return
+    Section("National titles")
+    Panel {
+        Text(com.nh.hoopscoach.game.CollegeHistory.count(titles.size).replaceFirstChar { it.uppercase() }, style = T.head, color = P.gold)
+        Text(titles.joinToString(", "), style = T.small, color = P.sub)
+    }
+}

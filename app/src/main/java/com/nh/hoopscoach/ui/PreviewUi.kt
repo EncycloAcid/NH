@@ -57,6 +57,7 @@ import com.nh.hoopscoach.game.Preview
 import com.nh.hoopscoach.game.Previews
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Story
+import com.nh.hoopscoach.game.CollegeHistory
 import com.nh.hoopscoach.game.Team
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -540,11 +541,11 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
                 OddsCell("Title", o.title, ink, Modifier.weight(1f), scale = 0.5)
             }
             Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (Previews.hasLastSeason(lg)) Row(verticalAlignment = Alignment.CenterVertically) {
                 StarterDots(st, ink)
                 Spacer(Modifier.width(10.dp))
                 Text("$st of 5 starters back · ${f1(ppg)} ppg returning", style = T.small, color = P.sub)
-            }
+            } else Text(CollegeHistory.line(lg, t), style = T.small, color = P.sub)
             if (star != null) {
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.clickable { vm.openPlayer(star.id) }, verticalAlignment = Alignment.CenterVertically) {
@@ -804,7 +805,7 @@ private fun LazyListScope.transfers(vm: GameViewModel, lg: League, pv: Preview) 
         // Good programs that lost the most.
         val rebuild = lg.teams.filter { lastAp(lg, it) > 0 || it.prestige >= 70 }
             .map { it to Previews.returning(lg, it) }.sortedWith(compareBy({ it.second.first }, { it.second.second })).take(5)
-        if (rebuild.isNotEmpty()) {
+        if (rebuild.isNotEmpty() && Previews.hasLastSeason(lg)) {
             Section("Starting over")
             GroupList(rebuild) { (t, back) ->
                 ListRow(onClick = { vm.push(Route.TeamPage(t.id)) }) {
@@ -1020,14 +1021,20 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OddsCell("Final Four", o.f4, ink, Modifier.weight(1f))
                     OddsCell("Title", o.title, ink, Modifier.weight(1f))
+                    val known = Previews.hasLastSeason(lg)
                     Column(Modifier.weight(1f)) {
-                        Text("STARTERS BACK", style = T.label.copy(fontSize = 9.sp), color = P.sub, maxLines = 1)
-                        Text("$st of 5", style = T.numSm.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
-                        Spacer(Modifier.height(4.dp))
-                        StarterDots(st, ink)
+                        if (known) {
+                            Text("STARTERS BACK", style = T.label.copy(fontSize = 9.sp), color = P.sub, maxLines = 1)
+                            Text("$st of 5", style = T.numSm.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
+                            Spacer(Modifier.height(4.dp))
+                            StarterDots(st, ink)
+                        } else {
+                            Text("NATIONAL TITLES", style = T.label.copy(fontSize = 9.sp), color = P.sub, maxLines = 1)
+                            Text("${CollegeHistory.titles(lg, u).size}", style = T.numSm.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
+                        }
                     }
                 }
-                Text("${f1(ppg)} points a game return from last season.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 10.dp))
+                Text(if (Previews.hasLastSeason(lg)) "${f1(ppg)} points a game return from last season." else CollegeHistory.line(lg, u), style = T.small, color = P.sub, modifier = Modifier.padding(top = 10.dp))
                 if (u.gp > 0) {
                     val confPart = if (u.cw + u.cl > 0) ", ${Previews.ordinal(Season.standings(lg, u.confId).indexOf(u) + 1)} in the ${lg.conf(u.confId).abbr}" else ""
                     Text("So far: ${u.record}${if (u.ap > 0) ", AP No. ${u.ap}" else ""}$confPart.", style = T.small, color = P.accent, modifier = Modifier.padding(top = 4.dp))

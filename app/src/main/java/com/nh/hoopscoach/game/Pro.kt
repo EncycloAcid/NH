@@ -1104,6 +1104,8 @@ object ProSeason {
         val fmvp = bySeries?.first ?: lg.rosterOf(champ).filter { it.tourney.gp > 0 }.maxByOrNull { it.tourney.ppg + it.tourney.rpg * 0.7 + it.tourney.apg * 0.9 + it.ovr * 0.05 }
         if (fmvp != null) give(lg, "Finals MVP", fmvp, champ, bySeries?.let { NbaAwards.seriesLine(it.second) } ?: Awards.line(fmvp))
         for (t in lg.teams) ps.lastWins[t.id] = t.w
+        // Every team keeps its season (record, how it ended, its seed and coach), for its history and the next preview.
+        for (t in lg.teams) if (t.history.none { it.season == lg.season }) t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, resultFor(lg, t.id), 0, 0, ps.seeds[t.id] ?: 0, lg.coachOf(t).name)
         for (p in lg.rosterOf(champ)) p.awards += "${lg.season} Champion"
         val r = lg.road
         if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) {

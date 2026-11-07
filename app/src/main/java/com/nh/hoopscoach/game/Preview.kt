@@ -301,6 +301,9 @@ object Previews {
     private fun <T> pick(lg: League, salt: Int, vararg options: T): T =
         options[kotlin.random.Random(lg.season * 1_000_003L + salt).nextInt(options.size)]
 
+    /** Whether the league has a last season to talk about (a new league's first season doesn't). */
+    fun hasLastSeason(lg: League): Boolean = lg.players.any { p -> p.career.any { it.season == lg.season - 1 && it.cls != PRO_YEAR && it.s.gp > 0 } }
+
     /** Returning starters (out of five) and points a game back from last season. */
     fun returning(lg: League, t: Team): Pair<Int, Double> {
         val back = lg.rosterOf(t).mapNotNull { p -> p.career.lastOrNull()?.takeIf { it.teamId == t.id && it.season == lg.season - 1 } }
@@ -330,7 +333,7 @@ object Previews {
     private fun coverHeadline(lg: League, pv: Preview): String {
         val top = ranked(lg, pv)[0]
         val o = odds(pv, top)
-        val champ = lg.history.lastOrNull()?.champion?.takeIf { it >= 0 }
+        val champ = CollegeHistory.lastChampion(lg)?.id
         return when {
             champ == top.id -> pick(lg, 1, "Repeat?", "Run it back", "Two in a row?")
             o.title < 0.12 -> pick(lg, 2, "Wide open", "Anyone's year", "Up for grabs")
@@ -344,7 +347,9 @@ object Previews {
         val out = mutableListOf<Story>()
         val u = lg.user
         fun proj(t: Team) = pv.proj.getValue(t.id)
+        val known = hasLastSeason(lg)
         fun backLine(t: Team): String {
+            if (!known) return ""
             val (st, ppg) = returning(lg, t)
             return "It brings back $st of 5 starters and ${"%.1f".format(ppg)} points a game from last season."
         }
@@ -354,7 +359,8 @@ object Previews {
         val to = odds(pv, top)
         val contenders = ranked.count { odds(pv, it).title >= 0.05 }
         val topStar = star(lg, top)
-        val repeat = if (lg.history.lastOrNull()?.champion == top.id) "The defending champions start where they finished. " else ""
+        val lastChamp = CollegeHistory.lastChampion(lg)
+        val repeat = if (lastChamp?.id == top.id) "The defending champions start where they finished. " else ""
         out += if (to.title >= 0.12) Story(
             "The favorite",
             pick(lg, 10, "${top.school} is the team to beat", "Everyone is chasing ${top.school}", "${top.school}'s title to lose"),
@@ -412,7 +418,7 @@ object Previews {
         )
 
         // 3. The defending champion.
-        lg.history.lastOrNull()?.champion?.takeIf { it >= 0 && it != top.id }?.let { lg.team(it) }?.let { c ->
+        lastChamp?.takeIf { it.id != top.id }?.let { c ->
             val r = proj(c).nat
             val co = odds(pv, c)
             out += Story(
@@ -422,9 +428,45 @@ object Previews {
                     r <= 25 -> pick(lg, 41, "${c.school} defends its crown", "The champs reload at ${c.school}")
                     else -> pick(lg, 42, "${c.school} starts over", "Life after the title at ${c.school}")
                 },
-                "${backLine(c)} We have the defending champions at No. $r, with ${NbaPreviews.chance(co.title)} to win it all again.",
+                "${backLine(c)} We have the defending champions at No. $r, with ${NbaPreviews.chance(co.title)} to win it all again.".trim(),
                 c.id,
             )
+        }
+
+        // History: a dynasty in this league, a contender chasing its first title, a blue blood's long wait.
+        run {
+            val recent = lg.history.filter { it.season >= lg.season - 4 }.mapNotNull { h -> h.champion.takeIf { it >= 0 }?.let { h.season to it } }
+            val dynasty = recent.groupBy { it.second }.maxByOrNull { it.value.size }?.takeIf { it.value.size >= 2 }
+            val firsts = ranked.take(5).filter { CollegeHistory.titles(lg, it).isEmpty() && odds(pv, it).title >= 0.04 }
+            val waits = ranked.take(12).map { it to CollegeHistory.titles(lg, it) }.filter { (_, ts) -> ts.size >= 2 && lg.season - ts.last() >= 20 }
+            val bluest = ranked.take(15).map { it to CollegeHistory.titles(lg, it) }.filter { it.second.size >= 4 }.maxByOrNull { it.second.size }
+            when {
+                dynasty != null -> {
+                    val t = lg.team(dynasty.key)
+                    val years = dynasty.value.map { it.first }.sorted()
+                    out += Story("History", pick(lg, 160, "A ${t.school} dynasty?", "${t.school} is building something", "Can anyone stop ${t.school}?"),
+                        "${t.school} won it all in ${years.joinToString(" and ")}: ${CollegeHistory.count(CollegeHistory.titles(lg, t).size)} in all now. " +
+                            "We have them No. ${proj(t).nat}, with ${NbaPreviews.chance(odds(pv, t).title)} at another.", t.id)
+                }
+                firsts.isNotEmpty() -> {
+                    val t = firsts.first()
+                    out += Story("History", pick(lg, 161, "${t.school} chases its first title", "No banner yet at ${t.school}", "Is this ${t.school}'s year?"),
+                        "${t.school} has never won a national title. This team is good enough to: No. ${proj(t).nat} in our poll, the Final Four ${NbaPreviews.often(odds(pv, t).f4)} " +
+                            "and a title ${NbaPreviews.often(odds(pv, t).title)} in our simulations." +
+                            (bluest?.takeIf { it.first.id != t.id }?.let { (b, ts) -> " The blue bloods are waiting: ${b.school} has ${CollegeHistory.count(ts.size)} and is No. ${proj(b).nat}." } ?: ""),
+                        t.id)
+                }
+                waits.isNotEmpty() -> {
+                    val (t, ts) = waits.maxBy { (_, x) -> lg.season - x.last() }
+                    out += Story("History", pick(lg, 162, "${lg.season - ts.last()} years and counting at ${t.school}", "${t.school} wants the old days back"),
+                        "${CollegeHistory.line(lg, t)} We pick them No. ${proj(t).nat}, with the Final Four ${NbaPreviews.often(odds(pv, t).f4)}.", t.id)
+                }
+                bluest != null -> {
+                    val (t, ts) = bluest
+                    out += Story("History", pick(lg, 163, "Blue blood: ${t.school}", "${t.school} and its banners"),
+                        "${CollegeHistory.line(lg, t)} Banner No. ${ts.size + 1}? We give them ${NbaPreviews.chance(odds(pv, t).title)} from No. ${proj(t).nat}.", t.id)
+                }
+            }
         }
 
         // 4. The closest race in a power conference.
@@ -440,7 +482,7 @@ object Previews {
                 pick(lg, 50, "The ${c.abbr} is a coin flip", "A two-team race in the ${c.abbr}", "${a.school} or ${b.school}?"),
                 "${a.school} wins the ${c.abbr} in ${pct(odds(pv, a).conf)} of our simulations, ${b.school} in ${pct(odds(pv, b).conf)}." +
                     (if (days.isNotEmpty()) " They meet ${days.joinToString(" and ")}." else "") +
-                    " ${Takes.college(lg, pv, a, 1, from = 1)}",
+                    " ${Takes.college(lg, pv, if (a.id == top.id) b else a, 1, from = 1)}",
                 a.id,
             )
         }
@@ -532,7 +574,8 @@ object Previews {
             out += Story(
                 "Last dance",
                 pick(lg, 130, "One last ride for ${p.name}", "${p.name} came back for this", "${p.last}'s final chapter"),
-                "${p.name} (${p.posLabel}) averaged ${"%.1f".format(last?.s?.ppg ?: 0.0)} points last season at ${lg.team(p.teamId).school}. " +
+                (if (last != null && last.season == lg.season - 1 && last.s.gp > 0) "${p.name} (${p.posLabel}) averaged ${"%.1f".format(last.s.ppg)} points last season at ${lg.team(p.teamId).school}. "
+                else "${p.name} (${p.posLabel}) is a senior with one more shot at ${lg.team(p.teamId).school}. ") +
                     "He came back for a senior year, and ${lg.team(p.teamId).school} has ${NbaPreviews.chance(odds(pv, lg.team(p.teamId)).f4)} at the Final Four.",
                 p.teamId, p.id,
             )
@@ -575,7 +618,7 @@ object Previews {
         pool += "${lg.team(pv.sleeper).school} beats a top-10 team before conference play."
         ranked.getOrNull(4)?.let { pool += "${it.school} loses in the first weekend of March." }
         pv.bids.maxByOrNull { it.value }?.let { (c, b) -> pool += "The ${lg.conf(c).abbr} sends ${b.roundToInt() + 2} teams to the NCAA Tournament." }
-        lg.history.lastOrNull()?.champion?.takeIf { it >= 0 }?.let { lg.team(it) }?.let { c -> pool += "${c.school} doesn't make the Sweet 16." }
+        CollegeHistory.lastChampion(lg)?.let { c -> pool += "${c.school} doesn't make the Sweet 16." }
         lg.teams.filter { lg.conf(it.confId).tier >= 1 }.maxByOrNull { odds(pv, it).f4 }?.let { t -> pool += "${t.school} crashes the Final Four out of the ${lg.conf(t.confId).abbr}." }
         ranked[0].let { t -> if (odds(pv, t).conf < 0.6) pool += "${t.school} doesn't win the ${lg.conf(t.confId).abbr}." }
         lg.players.filter { it.teamId >= 0 && (it.career.lastOrNull()?.s?.ppg ?: 0.0) >= 17 }.maxByOrNull { it.career.last().s.ppg }?.let { p ->
@@ -599,7 +642,7 @@ object Previews {
     fun editorsLetter(lg: League, pv: Preview): List<String> {
         val ranked = ranked(lg, pv)
         val top = ranked[0]
-        val champ = lg.history.lastOrNull()?.champion?.takeIf { it >= 0 }?.let { lg.team(it) }
+        val champ = CollegeHistory.lastChampion(lg)
         val u = lg.user
         val mine = pv.proj.getValue(u.id)
         val to = odds(pv, top)
@@ -656,7 +699,8 @@ object Previews {
         val bad = scouting(lg, t).second
         val nc = newcomer(lg, t)
         val out = mutableListOf<String>()
-        out += if (st <= 2) "Who replaces the production? Only $st starters and ${"%.1f".format(ppg)} points a game are back."
+        out += if (!hasLastSeason(lg)) "Who leads this group? Everyone starts from zero, and the pecking order is up for grabs."
+        else if (st <= 2) "Who replaces the production? Only $st starters and ${"%.1f".format(ppg)} points a game are back."
         else "Can a veteran group take the next step? $st starters and ${"%.1f".format(ppg)} points a game return."
         out += "Can they fix their ${bad[0].lowercase()}? It's the weakest part of their game."
         if (nc != null) out += "Is ${nc.name} ready? He's the newcomer with the most to give."
