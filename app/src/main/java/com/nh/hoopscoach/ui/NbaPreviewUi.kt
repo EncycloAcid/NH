@@ -52,10 +52,15 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private fun nbaPages(lg: League) = listOf(
+/** The issue's pages: the fixed ones, with this year's three features after the storylines. */
+private fun nbaPageIds(pv: NbaPreview) = listOf("cover", "inside", "stories") + pv.features.indices.map { "f$it" } +
+    listOf("power", "title", "conf0", "conf1", "awards", "best", "offseason", "rookies", "report", "picks")
+
+private fun nbaPages(lg: League, pv: NbaPreview) = listOf(
     "Cover" to "Season Preview",
     "Inside" to "In this issue",
     "Storylines" to "What to watch",
+) + pv.features.map { "Feature" to it.title } + listOf(
     "Power rankings" to "All 30, one to thirty",
     "The title race" to "Who can win it all",
     "Conference call" to lg.conf(0).name,
@@ -80,7 +85,8 @@ private fun proLast(lg: League, p: Player): String {
 fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { NbaPreviews.current(lg) }
     if (pv == null) { vm.back(); return }
-    val list = nbaPages(lg)
+    val list = nbaPages(lg, pv)
+    val ids = nbaPageIds(pv)
     val pager = rememberPagerState { list.size }
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
@@ -108,20 +114,21 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
                 LazyColumn(Modifier.fillMaxSize().background(P.bg)) {
                     val (kicker, title) = list[page]
                     if (page > 0) item { PageHead(kicker, title, page + 1) }
-                    when (page) {
-                        0 -> nbaCover(lg, pv, list.size) { go(1) }
-                        1 -> nbaContents(lg, pv, list, go)
-                        2 -> nbaStories(vm, lg, pv)
-                        3 -> powerRankings(vm, lg, pv)
-                        4 -> nbaTitleRace(vm, lg, pv)
-                        5 -> conference(vm, lg, pv, 0)
-                        6 -> conference(vm, lg, pv, 1)
-                        7 -> awardRaces(vm, lg, pv)
-                        8 -> topPlayers(vm, lg)
-                        9 -> offseason(vm, lg)
-                        10 -> rookies(vm, lg, pv)
-                        11 -> nbaTeamReport(vm, lg, pv)
-                        else -> nbaPredictions(vm, lg, pv)
+                    when (val id = ids[page]) {
+                        "cover" -> nbaCover(lg, pv, list.size) { go(1) }
+                        "inside" -> nbaContents(lg, pv, list, go)
+                        "stories" -> nbaStories(vm, lg, pv)
+                        "power" -> powerRankings(vm, lg, pv)
+                        "title" -> nbaTitleRace(vm, lg, pv)
+                        "conf0" -> conference(vm, lg, pv, 0)
+                        "conf1" -> conference(vm, lg, pv, 1)
+                        "awards" -> awardRaces(vm, lg, pv)
+                        "best" -> topPlayers(vm, lg)
+                        "offseason" -> offseason(vm, lg)
+                        "rookies" -> rookies(vm, lg, pv)
+                        "report" -> nbaTeamReport(vm, lg, pv)
+                        "picks" -> nbaPredictions(vm, lg, pv)
+                        else -> pv.features.getOrNull(id.removePrefix("f").toIntOrNull() ?: -1)?.let { featurePage(vm, lg, it) }
                     }
                     item {
                         Text(
@@ -144,7 +151,48 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
 
 // ---------- cover and contents ----------
 
+/** The user's team in the cover's corner. */
+@Composable
+private fun NbaUserBox(lg: League, pv: NbaPreview) {
+    val u = lg.user
+    val uo = proj(pv, u)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TeamBadge(u, 40.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
+            Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}", style = T.bodyB, color = Color.White, maxLines = 2)
+            Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+}
+
 private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRead: () -> Unit) {
+    // This year's cover design: a feature on the biggest story, or the two-horse race, or the classic favorite cover.
+    val ranked = NbaPreviews.ranked(lg, pv)
+    val story = pv.cover
+    val subject = story?.let { lg.teams.getOrNull(it.teamId) }
+    if (pv.coverStyle == 1 && story != null && subject != null) {
+        item {
+            val lines = pv.stories.filter { it !== story && it.head != story.head && it.kicker != "Your team" }.take(3).map { it.kicker to it.head }
+            FeatureCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
+                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead) { NbaUserBox(lg, pv) }
+        }
+        return
+    }
+    if (pv.coverStyle == 2 && ranked.size >= 2) {
+        item {
+            val a = ranked[0]
+            val b = ranked[1]
+            val lines = pv.stories.filter { it.teamId != a.id && it.teamId != b.id && it.kicker != "Your team" }.take(3).map { it.kicker to it.head }
+            VersusCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", pv.headline.ifEmpty { "Two teams, one title" }, a, b, proj(pv, a).title, proj(pv, b).title,
+                "Projected ${proj(pv, a).w}-${proj(pv, a).l}", "Projected ${proj(pv, b).w}-${proj(pv, b).l}", lines, count, onRead) { NbaUserBox(lg, pv) }
+        }
+        return
+    }
     item {
         val top = NbaPreviews.ranked(lg, pv).first()
         val star = NbaPreviews.star(lg, top)
@@ -663,7 +711,7 @@ fun NbaPreviewCard(vm: GameViewModel, lg: League) {
     val top = NbaPreviews.ranked(lg, pv).firstOrNull() ?: return
     Section("Season preview")
     Panel(color = P.hero, onClick = { vm.push(Route.NbaPreview) }) {
-        Text("THE ${pv.season} PRESEASON ISSUE · ${nbaPages(lg).size} PAGES", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+        Text("THE ${pv.season} PRESEASON ISSUE · ${nbaPages(lg, pv).size} PAGES", style = T.label, color = P.onHero.copy(alpha = 0.8f))
         Text("${u.name.uppercase()}: ${o.w}-${o.l}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onHero)
         Spacer(Modifier.height(4.dp))
         Text("Playoff odds ${odd(o.playoffs)}, title odds ${odd(o.title)}. The ${top.name} are the favorites. Plus storylines, power rankings, award races and the rookie class.", style = T.small, color = P.onHero.copy(alpha = 0.9f))

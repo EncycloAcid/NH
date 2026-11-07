@@ -54,6 +54,10 @@ class Preview(
     val poy: List<PoyOdds> = emptyList(),
     /** The cover headline. */
     val headline: String = "",
+    /** This year's three feature pages, the cover's lead story (null: the favorite) and the cover's design. */
+    val features: List<Feature> = emptyList(),
+    val cover: Story? = null,
+    val coverStyle: Int = 0,
 )
 
 object Previews {
@@ -146,10 +150,12 @@ object Previews {
             marquee = marquee, hotSeat = hotSeat, odds = odds, bids = bids, poy = poy,
         )
         val stories = storylines(lg, base)
+        val (cover, style) = Features.collegeCover(lg, base, stories)
         return Preview(
             base.season, base.proj, base.allAmerica, base.freshmen, base.transfers, base.breakouts, base.confPoy, base.finalFour, base.sleeper,
             3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, boldPredictions(lg, base),
-            odds = odds, bids = bids, stories = stories, poy = poy, headline = coverHeadline(lg, base),
+            odds = odds, bids = bids, stories = stories, poy = poy, headline = cover?.head ?: coverHeadline(lg, base),
+            features = Features.college(lg, base), cover = cover, coverStyle = style,
         )
     }
 

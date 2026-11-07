@@ -35,6 +35,10 @@ class NbaPreview(
     val lastWins: Map<Int, Int> = emptyMap(),
     /** The issue opens by itself once, at the start of the season. */
     var opened: Boolean = false,
+    /** This year's three feature pages, the cover's lead story (null: the favorite) and the cover's design. */
+    val features: List<Feature> = emptyList(),
+    val cover: Story? = null,
+    val coverStyle: Int = 0,
 )
 
 object NbaPreviews {
@@ -96,9 +100,12 @@ object NbaPreviews {
             t.id to (hist[t]?.let { y -> (y.w.toDouble() / (y.w + y.l).coerceAtLeast(1) * games).roundToInt() } ?: last[t.id]?.w ?: ps.lastWins[t.id] ?: -1)
         }
         val base = NbaPreview(lg.season, proj, mvp, roy, dpoy, sixth, mip, last = lastText, lastWins = lastWins)
+        val stories = storylines(lg, base)
+        val (cover, style) = Features.nbaCover(lg, base, stories)
         return NbaPreview(
             lg.season, proj, mvp, roy, dpoy, sixth, mip,
-            stories = storylines(lg, base), bold = bold(lg, base), headline = headline(lg, base), last = lastText, lastWins = lastWins,
+            stories = stories, bold = bold(lg, base), headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
+            features = Features.nba(lg, base), cover = cover, coverStyle = style,
         )
     }
 

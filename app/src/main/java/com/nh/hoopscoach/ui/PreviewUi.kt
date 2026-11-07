@@ -63,10 +63,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /** The pages of the issue: section kicker and headline. */
-private fun pages(lg: League) = listOf(
+private fun pageIds(pv: Preview) = listOf("cover", "inside", "stories") + pv.features.indices.map { "f$it" } +
+    listOf("title", "top5", "top25", "aa", "positions", "freshmen", "transfers", "breakouts", "confdepth", "power", "midmajors", "report", "coaches", "games", "picks")
+
+private fun pages(lg: League, pv: Preview) = listOf(
     "Cover" to "Preseason Preview",
     "Inside" to "In this issue",
     "Storylines" to "What to watch",
+) + pv.features.map { "Feature" to it.title } + listOf(
     "The title race" to "Who can win it all",
     "The rankings" to "Top 25: Nos. 1-5",
     "The rankings" to "Top 25: Nos. 6-25",
@@ -119,7 +123,8 @@ private fun lastAp(lg: League, t: Team): Int = t.history.lastOrNull()?.takeIf { 
 @Composable
 fun PreviewScreen(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { Previews.current(lg) }
-    val list = pages(lg)
+    val list = pages(lg, pv)
+    val ids = pageIds(pv)
     val pager = rememberPagerState { list.size }
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
@@ -149,25 +154,26 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
                 LazyColumn(Modifier.fillMaxSize().background(P.bg)) {
                     val (kicker, title) = list[page]
                     if (page > 0) item { PageHead(kicker, title, page + 1) }
-                    when (page) {
-                        0 -> cover(lg, pv, list.size) { go(1) }
-                        1 -> contents(lg, pv, list, go)
-                        2 -> storylines(vm, lg, pv)
-                        3 -> titleRace(vm, lg, pv)
-                        4 -> topFive(vm, lg, pv)
-                        5 -> restOfTop25(vm, lg, pv)
-                        6 -> allAmerica(vm, lg, pv)
-                        7 -> positions(vm, lg)
-                        8 -> freshmen(vm, lg, pv)
-                        9 -> transfers(vm, lg, pv)
-                        10 -> breakouts(vm, lg, pv)
-                        11 -> item { ConferenceDepth(vm, lg, pv, lg.user.confId) }
-                        12 -> powerRankings(vm, lg, pv)
-                        13 -> midMajors(vm, lg, pv)
-                        14 -> teamReport(vm, lg, pv)
-                        15 -> coaches(vm, lg, pv)
-                        16 -> gamesToWatch(vm, lg, pv)
-                        else -> predictions(vm, lg, pv)
+                    when (val id = ids[page]) {
+                        "cover" -> cover(lg, pv, list.size) { go(1) }
+                        "inside" -> contents(lg, pv, list, go)
+                        "stories" -> storylines(vm, lg, pv)
+                        "title" -> titleRace(vm, lg, pv)
+                        "top5" -> topFive(vm, lg, pv)
+                        "top25" -> restOfTop25(vm, lg, pv)
+                        "aa" -> allAmerica(vm, lg, pv)
+                        "positions" -> positions(vm, lg)
+                        "freshmen" -> freshmen(vm, lg, pv)
+                        "transfers" -> transfers(vm, lg, pv)
+                        "breakouts" -> breakouts(vm, lg, pv)
+                        "confdepth" -> item { ConferenceDepth(vm, lg, pv, lg.user.confId) }
+                        "power" -> powerRankings(vm, lg, pv)
+                        "midmajors" -> midMajors(vm, lg, pv)
+                        "report" -> teamReport(vm, lg, pv)
+                        "coaches" -> coaches(vm, lg, pv)
+                        "games" -> gamesToWatch(vm, lg, pv)
+                        "picks" -> predictions(vm, lg, pv)
+                        else -> pv.features.getOrNull(id.removePrefix("f").toIntOrNull() ?: -1)?.let { featurePage(vm, lg, it) }
                     }
                     item {
                         Text(
@@ -268,7 +274,49 @@ internal fun Movement(now: Int, last: Int) {
 
 // ---------- 1: cover ----------
 
+/** The user's team in the cover's corner. */
+@Composable
+private fun CollegeUserBox(lg: League, pv: Preview) {
+    val u = lg.user
+    val mine = pv.proj.getValue(u.id)
+    val uo = odds(pv, u)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TeamBadge(u, 40.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
+            Text("${u.school}: No. ${mine.nat}, ${Previews.ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}", style = T.bodyB, color = Color.White, maxLines = 2)
+            Text("NCAA ${odd(uo.ncaa)} · ${lg.conf(u.confId).abbr} title ${odd(uo.conf)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+        }
+    }
+}
+
 private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () -> Unit) {
+    // This year's cover design: a feature on the biggest story, the two-horse race, or the classic No. 1 cover.
+    val story = pv.cover
+    val subject = story?.let { lg.teams.getOrNull(it.teamId) }
+    if (pv.coverStyle == 1 && story != null && subject != null) {
+        item {
+            val lines = pv.stories.filter { it.head != story.head && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
+            FeatureCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
+                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead) { CollegeUserBox(lg, pv) }
+        }
+        return
+    }
+    val rk = ranked(lg, pv)
+    if (pv.coverStyle == 2 && rk.size >= 2) {
+        item {
+            val a = rk[0]
+            val b = rk[1]
+            val lines = pv.stories.filter { it.teamId != a.id && it.teamId != b.id && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
+            VersusCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", pv.headline.ifEmpty { "Two teams, one title" }, a, b, odds(pv, a).title, odds(pv, b).title,
+                "No. 1 · ${pv.proj.getValue(a.id).w}-${pv.proj.getValue(a.id).l}", "No. 2 · ${pv.proj.getValue(b.id).w}-${pv.proj.getValue(b.id).l}", lines, count, onRead) { CollegeUserBox(lg, pv) }
+        }
+        return
+    }
     item {
         val top = topTeam(lg, pv)
         val star = Previews.star(lg, top)
@@ -1310,7 +1358,7 @@ fun PreviewCard(vm: GameViewModel, lg: League) {
     val o = pv.odds[u.id]
     Section("Season preview")
     Panel(color = P.hero, onClick = { vm.push(Route.Preview) }) {
-        Text("THE ${pv.season} PRESEASON ISSUE · ${pages(lg).size} PAGES", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+        Text("THE ${pv.season} PRESEASON ISSUE · ${pages(lg, pv).size} PAGES", style = T.label, color = P.onHero.copy(alpha = 0.8f))
         Text("${u.school.uppercase()} PICKED ${Previews.ordinal(pr.confRank).uppercase()} IN THE ${lg.conf(u.confId).abbr}", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.onHero)
         Spacer(Modifier.height(4.dp))
         Text(
