@@ -23,17 +23,28 @@ object SocialAccounts {
         return all.firstOrNull { it.type == type && it.name.equals(name, ignoreCase = true) }
     }
 
-    /** A real account for a kind of post: highlights, analysts, insiders (the college game has its own). */
+    /** Outlets that only cover the pros, or only the college game: neither turns up at the other level. */
+    private val NBA_ONLY = setOf("The Athletic NBA", "NBA on ESPN", "NBA TV", "TNT Sports", "NBA on NBC", "NBA on Prime", "NBA 2K")
+    private val COLLEGE_ONLY = setOf("ACC Network", "CBS Sports CBB", "FOX College Hoops")
+    /** Clip and highlight pages: they post the play, not an opinion. */
+    private val CLIPS = setOf("House of Highlights", "Ballislife", "Overtime", "SLAM", "Bleacher Report", "StatMuse", "NBA 2K", "Barstool Sports")
+
+    /**
+     * A real account for a kind of post, at the right level: "media" (outlets), "highlights" (clip pages and
+     * the networks that air the games), "analyst" (outlets and people with takes), "person" (analysts who
+     * are people, for first-person takes) and "insider" (the college game has its own).
+     */
     fun pick(lg: League, kind: String): Account? {
         if (!today(lg)) return null
-        val types = when (kind) {
-            "media" -> listOf("media")
-            "analyst" -> if (lg.pro) listOf("analyst", "media") else listOf("cbb analyst", "cbb analytics", "bracketology")
-            "insider" -> if (lg.pro) listOf("insider") else listOf("cbb insider", "recruiting")
+        val wrongLevel = if (lg.pro) COLLEGE_ONLY else NBA_ONLY
+        val pool = when (kind) {
+            "media" -> all.filter { it.type == "media" }
+            "highlights" -> all.filter { it.type == "media" && (it.name in CLIPS || it.name in (if (lg.pro) setOf("NBA on ESPN", "NBA TV", "TNT Sports", "NBA on Prime") else setOf("CBS Sports CBB", "FOX College Hoops", "ESPN"))) }
+            "analyst" -> if (lg.pro) all.filter { it.type == "analyst" || (it.type == "media" && it.name !in CLIPS) } else all.filter { it.type in listOf("cbb analyst", "cbb analytics", "bracketology") }
+            "person" -> if (lg.pro) all.filter { it.type == "analyst" } else all.filter { it.type in listOf("cbb analyst", "cbb analytics", "bracketology") && it.name != "Ken Pomeroy" }
+            "insider" -> all.filter { it.type in (if (lg.pro) listOf("insider") else listOf("cbb insider", "recruiting")) }
             else -> return null
-        }
-        // Woj retired in 2024; the rest are fair game.
-        val pool = all.filter { it.type in types && it.handle != "wojespn" }
+        }.filter { it.handle != "wojespn" && it.name !in wrongLevel } // Woj retired in 2024; the rest are fair game.
         return if (pool.isEmpty()) null else Rng.pick(pool)
     }
 

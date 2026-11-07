@@ -68,6 +68,8 @@ object Reactions {
 
     /** Reactions for every story since the last pass. */
     fun pass(lg: League) {
+        // His own feed: posts for anything new in his career (player mode).
+        runCatching { Feed.watch(lg) }
         // An older save: start with the latest stories rather than the whole archive.
         if (lg.newsSeen == 0 && lg.news.size > 40) lg.newsSeen = lg.news.size - 12
         var i = lg.newsSeen.coerceIn(0, lg.news.size)
@@ -256,19 +258,20 @@ object Reactions {
         val t = lg.teams.firstOrNull { line.startsWith("The ${it.name} fire ") } ?: return
         val old = line.substringAfter(" fire ").substringBefore(" after ")
         val record = line.substringAfter(" after a ").substringBefore(" season")
-        val newCoach = lg.coachOf(t)
+        // The replacement, once the team has hired one (the hire can be its own story a step later).
+        val newCoach = lg.coachOf(t).takeIf { it.teamId == t.id && it.name != old }
         val ins = insider(lg)
-        val body = "The ${t.name} have fired head coach $old after a $record season, sources told ${ins.who}. ${newCoach.name} takes over, " +
-            "and he brings a ${t.plan.offense.label.lowercase()} offense and a ${t.plan.defense.label.lowercase()} defense.\n\n" +
+        val body = "The ${t.name} have fired head coach $old after a $record season, sources told ${ins.who}. " +
+            (newCoach?.let { "${it.name} takes over, and he brings a ${t.plan.offense.label.lowercase()} offense and a ${t.plan.defense.label.lowercase()} defense." } ?: "The search for a replacement starts now.") + "\n\n" +
             end("The new staff inherits a roster led by ${lg.rosterOf(t).maxByOrNull { it.ovr }?.name ?: "a young core"}")
         val star = lg.rosterOf(t).maxByOrNull { it.ovr }
         val out = listOfNotNull(
             star?.let { r(lg, player(lg, it, t), Rng.pick(listOf("Coach ${old.substringAfterLast(' ')} gave me my shot. Love that man, forever.", "Tough business. Thank you, Coach.", "We let him down. That's on us as players.")), t, 1.5, 0) },
             r(lg, analyst(lg), if (t.winPct < 0.35) "It was time. That roster needed a new voice." else Rng.pick(listOf("Harsh. I'm not sure the coach was the problem.", "Coaches get fired. Rosters get them fired.")), null, 1.0, 0),
             r(lg, fan(lg, t), if (t.winPct < 0.4) Rng.pick(listOf("FINALLY.", "About time. Now fix the roster.", "Fresh start. I'm in.")) else Rng.pick(listOf("Didn't deserve that.", "We just fired the wrong guy.")), t, 0.8, if (t.winPct < 0.4) 1 else -1),
-            r(lg, fan(lg, t), "${newCoach.last}? Never heard of him. Prove me wrong.", t, 0.5, 0),
+            newCoach?.let { r(lg, fan(lg, t), "${it.last}? Never heard of him. Prove me wrong.", t, 0.5, 0) },
         )
-        report(lg, i, n, "The ${t.name} fire $old; ${newCoach.name} takes over", body, "${ins.who} · ${if (lg.pro) "NBA Insider" else "Hoops Wire"}", t.id, -1, out)
+        report(lg, i, n, "The ${t.name} fire $old" + (newCoach?.let { "; ${it.name} takes over" } ?: ""), body, "${ins.who} · ${if (lg.pro) "NBA Insider" else "Hoops Wire"}", t.id, -1, out)
     }
 
     private fun signing(lg: League, i: Int, n: News) {

@@ -750,6 +750,15 @@ class RoadState(
     /** His social feed (newest last), and when the last award-race column ran (season * 1000 + day). */
     val feed: MutableList<Post> = mutableListOf(),
     var lastColumn: Int = 0,
+    /** What his feed has already covered: awards on his record, his team and level, his deal, his best scoring night, career-point milestones. */
+    var seenAwards: Int = -1,
+    var seenTeam: Int = -2,
+    var seenPro: Boolean = false,
+    var seenDeal: String = "",
+    var bestPts: Int = -1,
+    var seenPoints: Int = -1,
+    /** When each press topic was last asked (season * 1000 + day), so the same questions don't come every week. */
+    val pressAsked: MutableMap<String, Int> = mutableMapOf(),
     /** Leadership (0-100): seasons as a starter, winning beyond the projection, and how he talks; 60 and up, he's a captain. */
     var leadership: Int = 15,
     /** Practice this season: total effort (0 rest to 1 extra work each day) and days, and the last summer's growth, explained. */

@@ -26,17 +26,31 @@ object Media {
         return "$name · $outlet"
     }
 
-    fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1) {
+    /** Someone posting: a real account (with its avatar) or a made-up one. */
+    class Voice(val name: String, val handle: String, val avatar: String = "", val verified: Boolean = true)
+
+    /**
+     * A post on his feed. Team, league and clip posts use the real accounts where the pack has them (today's
+     * game only); the generic "NBA Insider" becomes a real insider. Posts from a [Voice] keep their account.
+     */
+    fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1, avatar: String = "") {
         val r = lg.road ?: return
-        // Real accounts where the pack has one: the team's own, highlight and media accounts, analysts and insiders, the league.
-        val acct = if (name == "NBA") SocialAccounts.league(lg) else when (kind) {
-            "team" -> SocialAccounts.forTeam(lg, name)
-            "media", "analyst", "insider" -> SocialAccounts.pick(lg, kind)
+        // Nobody posts the exact same thing twice in a row of posts.
+        if (r.feed.takeLast(40).any { it.text == text }) return
+        val acct = if (avatar.isNotEmpty()) null else when {
+            kind == "league" || name == "NBA" || name == "NCAA" -> SocialAccounts.league(lg)
+            kind == "team" -> SocialAccounts.forTeam(lg, name)
+            kind == "media" -> SocialAccounts.pick(lg, "highlights")
+            kind == "insider" && handle == "nbainsider" -> SocialAccounts.pick(lg, "insider")
             else -> null
         }
-        r.feed += Post(lg.season, lg.day, acct?.name ?: name, acct?.handle ?: handle, kind, text, max(likes, 3), acct?.verified ?: verified, gameId, acct?.avatar ?: "")
+        // Made-up names for the league account in eras before social media, at the right level.
+        val shown = acct?.name ?: if (kind == "league" && !lg.pro) "NCAA March Madness" else name
+        r.feed += Post(lg.season, lg.day, shown, acct?.handle ?: handle, kind, text, max(likes, 3), acct?.verified ?: verified, gameId, acct?.avatar ?: avatar)
         if (r.feed.size > 80) r.feed.subList(0, r.feed.size - 80).clear()
     }
+
+    fun say(lg: League, v: Voice, kind: String, text: String, likes: Int) = post(lg, v.name, v.handle, kind, text, likes, v.verified, avatar = v.avatar)
 
     /** Likes as a share of his following, with some luck. */
     fun likes(lg: League, share: Double): Int {
@@ -44,9 +58,20 @@ object Media {
         return (f * share * (0.5 + Rng.d())).roundToInt()
     }
 
-    private fun fanHandle(t: Team) = Rng.pick(listOf("${t.mascot.replace(" ", "")}Nation", "${t.abbr}Faithful", "${t.school.replace(" ", "")}Hoops", "Die-hard${t.mascot.replace(" ", "")}", "${t.abbr}TilIDie"))
-    private fun fanName() = Rng.pick(listOf("Big ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} ${Rng.pick(Names.last).first()}.", "Courtside ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} from section 112"))
-    private fun hater() = Rng.pick(listOf("Hot Takes Only" to "hottakes_only", "Overrated Watch" to "overratedwatch", "Real Hoops Fan" to "realhoopsfan_", "Bench Mob" to "benchmob99"))
+    fun fanHandle(t: Team) = Rng.pick(listOf("${t.mascot.replace(" ", "")}Nation", "${t.abbr}Faithful", "${t.school.replace(" ", "")}Hoops", "Die-hard${t.mascot.replace(" ", "")}", "${t.abbr}TilIDie"))
+    fun fanName() = Rng.pick(listOf("Big ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} ${Rng.pick(Names.last).first()}.", "Courtside ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} from section ${Rng.range(101, 330)}"))
+    fun hater() = Rng.pick(listOf("Hot Takes Only" to "hottakes_only", "Overrated Watch" to "overratedwatch", "Real Hoops Fan" to "realhoopsfan_", "Bench Mob" to "benchmob99"))
+
+    /** An analyst with a first-person take: a real one (a person, not an outlet) or one of the made-up regulars. */
+    fun pundit(lg: League): Voice {
+        if (Rng.chance(if (lg.pro) 0.35 else 0.6)) SocialAccounts.pick(lg, "person")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
+        val (n, h) = Rng.pick(ANALYSTS)
+        return Voice(n, h)
+    }
+
+    /** An insider: a real one at his level, or a made-up one. */
+    fun insider(lg: League): Voice = SocialAccounts.pick(lg, "insider")?.let { Voice(it.name, it.handle, it.avatar, it.verified) }
+        ?: if (lg.pro) Voice("NBA Insider", "nbainsider") else Voice("Hoops Insider", "hoopsinsider")
 
     /** His box line for a game, if the box score was kept. */
     private fun boxLine(g: Game, pid: Int): StatLine? = g.box?.let { b -> (b.home + b.away).firstOrNull { it.pid == pid }?.s }
@@ -54,86 +79,9 @@ object Media {
     // ---------- after a game ----------
 
     fun afterGame(lg: League, g: Game, line: GameLogEntry, won: Boolean, winner: Boolean, stakes: String, duel: Duel?) {
-        val h = lg.hero ?: return
-        val r = lg.road ?: return
-        val t = lg.team(h.teamId)
-        val opp = lg.team(g.opp(t.id))
-        val us = g.scoreFor(t.id)
-        val them = g.scoreAgainst(t.id)
-        val box = boxLine(g, h.id)
-        val shots = box?.let { " on ${it.fgm}-of-${it.fga} shooting" } ?: ""
-        val doubleDouble = listOf(line.pts, line.reb, line.ast).count { it >= 10 }
-        val big = line.pts >= 28 || doubleDouble >= 2 || winner
-        val bad = line.min >= 20 && line.pts <= 6
-        val careerHigh = line.pts >= 15 && h.log.dropLast(1).all { it.pts < line.pts } && h.log.size >= 5
-
-        // The team account always posts the final.
-        post(lg, "${t.school} ${t.mascot}", "${t.abbr}${if (lg.pro) "" else "Hoops"}", "team",
-            "FINAL: ${t.mascot} $us, ${opp.mascot} $them. ${h.last}: ${line.pts} PTS, ${line.reb} REB, ${line.ast} AST" + if (stakes.isNotEmpty()) ". $stakes." else ".",
-            likes(lg, 0.004), verified = true, gameId = g.id)
-
-        if (winner) {
-            val (n, hd) = Rng.pick(HIGHLIGHTS)
-            post(lg, n, hd, "media", "${h.name.uppercase()} WITH THE GAME-WINNER. ${t.mascot} ${us}, ${opp.mascot} ${them}.", likes(lg, 0.06), verified = true, gameId = g.id)
-        }
-        if (big) {
-            post(lg, fanName(), fanHandle(t), "fan", Rng.pick(listOf(
-                "${h.last} is HIM. ${line.pts} tonight and it never felt close.",
-                "Put some respect on ${h.first}'s name. ${line.pts}-${line.reb}-${line.ast}.",
-                "Every time I doubt ${h.last} he does THIS.",
-                "We have a star. ${h.last} with ${line.pts}. Say it with me.",
-            )), likes(lg, 0.012))
-            val (an, ah) = Rng.pick(ANALYSTS)
-            val ppg = h.stats.ppg
-            post(lg, an, ah, "analyst", Rng.pick(listOf(
-                "${h.last} tonight: ${line.pts} points$shots. He's at ${"%.1f".format(ppg)} a game this year. The jump is real.",
-                "Watched the tape on ${h.last}. The footwork on his drives is ahead of his age. ${line.pts} points was not a fluke.",
-                "${h.last} ${line.pts}/${line.reb}/${line.ast} against ${opp.school}. Teams are going to have to game-plan for him now.",
-            )), likes(lg, 0.006), verified = true)
-        }
-        if (careerHigh) {
-            post(lg, "${t.school} ${t.mascot}", "${t.abbr}${if (lg.pro) "" else "Hoops"}", "team", "Career high for ${h.first} ${h.last}: ${line.pts} points.", likes(lg, 0.008), verified = true)
-        }
-        if (bad) {
-            val (hn, hh) = hater()
-            post(lg, hn, hh, "hater", Rng.pick(listOf(
-                "${h.last} disappeared tonight. ${line.pts} points in ${line.min} minutes. Overrated.",
-                "Where was ${h.last}? Asking for the whole ${t.school} fan base.",
-                "${h.last} hype train just derailed. ${line.pts} points.",
-            )), likes(lg, 0.004))
-            post(lg, fanName(), fanHandle(t), "fan", "Bad night for ${h.last}. Everybody has them. He bounces back. Always does.", likes(lg, 0.002))
-        } else if (!won && !big && Rng.chance(0.5)) {
-            post(lg, fanName(), fanHandle(t), "fan", Rng.pick(listOf(
-                "Tough one. ${opp.mascot} wanted it more tonight.",
-                if (them - us > 15) "That was ugly. Moving on." else "Lost a close one. Get it back next time.",
-                "Need more of ${h.last} in the fourth quarter. Just saying.",
-            )), likes(lg, 0.002))
-        }
-        // A brash persona draws doubters; a humble one draws love.
-        if (r.persona >= 4 && Rng.chance(0.25)) {
-            val (hn, hh) = hater()
-            post(lg, hn, hh, "hater", "All that talk from ${h.last} and ${if (won) "they barely won" else "they lost"}. Let your game do the talking.", likes(lg, 0.003))
-        } else if (r.persona <= -4 && won && Rng.chance(0.4)) {
-            post(lg, fanName(), fanHandle(t), "fan", "Love how ${h.last} carries himself. Never about him. Always the team.", likes(lg, 0.003))
-        }
-        if (won && Rng.chance(if (big) 0.6 else 0.2)) {
-            lg.rosterOf(t).filter { it.id != h.id }.maxByOrNull { boxLine(g, it.id)?.pts ?: 0 }?.let { mate ->
-                post(lg, mate.name, mate.name.replace(" ", "").replace(".", "").lowercase(), "teammate", Rng.pick(listOf(
-                    "My brother ${h.last} different. Proud of this group.",
-                    "Locked in. W. On to the next.",
-                    "${h.first} cooking. Just get him the ball.",
-                )), likes(lg, 0.005), verified = lg.pro)
-            }
-        }
-        if (duel != null) Rival.player(lg)?.let { rv ->
-            post(lg, rv.name, rv.name.replace(" ", "").lowercase(), "rival", if (duel.won) Rng.pick(listOf(
-                "Good battle tonight. See you next time.",
-                "Respect to ${h.last}. Next one's mine.",
-            )) else Rng.pick(listOf(
-                "Told y'all. ${duel.him} to ${duel.me}.",
-                "Same result every time. ${duel.him}-${duel.me}.",
-            )), likes(lg, 0.01), verified = true)
-        }
+        if (lg.hero == null || lg.road == null) return
+        Feed.game(lg, g, line, won, winner, stakes, duel)
+        val big = line.pts >= 28 || listOf(line.pts, line.reb, line.ast).count { it >= 10 } >= 2 || winner
         if (big || winner || stakes.isNotEmpty() || lg.rivalry(g) != null) article(lg, g, line, won, winner, stakes, duel)
     }
 
@@ -198,7 +146,7 @@ object Media {
         val short = a.text.trimEnd('.').let { if (it.length > 60) it.take(57) + "..." else it }
         val outlet = q.reporter.substringAfter(" · ", Rng.pick(OUTLETS))
         // Bold answers and the big topics make the news, but not every day.
-        val headlineTopic = q.topic in listOf("Game-winner", "Rival", "Trade talk", "Award race", "Contract year")
+        val headlineTopic = q.topic in listOf("Game-winner", "Rival", "Old team", "Award race", "Rookie race", "All-Star", "Contract year", "Draft stock", "Season over", "Senior night", "New team", "Playoffs")
         val recent = lg.news.any { it.kind == "quote" && it.season == lg.season && lg.day - it.day < 5 }
         if (!recent && (headlineTopic || (a.persona > 0 && Rng.chance(0.6)))) {
             val body = "Asked ${q.prompt.replaceFirstChar { it.lowercase() }.trimEnd('?', '.').let { "“$it”" }}, ${h.name} didn't hesitate.\n\n" +
@@ -210,17 +158,20 @@ object Media {
             lg.news += News(lg.season, lg.day, "${h.last} on ${q.topic.lowercase()}: “$short”", true, q.gameId, "quote", body, outlet)
         }
         when {
-            a.persona > 0 -> {
-                post(lg, fanName(), fanHandle(t), "fan", "“${short}” — that's my guy. Confidence is everything.", likes(lg, 0.008))
-                if (Rng.chance(0.5)) {
-                    val (hn, hh) = hater()
-                    post(lg, hn, hh, "hater", "“${short}” Okay, ${h.last}. Let's see it.", likes(lg, 0.006))
-                }
+            // A bold answer gets quoted back at him, by a fan or a doubter (not every time).
+            a.persona > 0 && Rng.chance(0.6) -> if (Rng.chance(0.55)) post(lg, fanName(), fanHandle(t), "fan", Rng.pick(listOf(
+                "“$short” ${h.last} doesn't hold back. I like it.",
+                "${h.last} after the game: “$short” Confidence.",
+                "“$short” Somebody print that on a shirt.",
+            )), likes(lg, 0.008)) else {
+                val (hn, hh) = hater()
+                post(lg, hn, hh, "hater", Rng.pick(listOf("“$short” Okay, ${h.last}. Let's see it.", "Bold words from ${h.last}: “$short” Back it up.", "“$short” Screenshot this one for later.")), likes(lg, 0.006))
             }
-            a.persona < 0 -> {
-                val (an, ah) = Rng.pick(ANALYSTS)
-                post(lg, an, ah, "analyst", "Listen to how ${h.last} talks about his teammates. That's how winning players sound.", likes(lg, 0.004), verified = true)
-            }
+            a.persona < 0 && Rng.chance(0.3) -> say(lg, pundit(lg), "analyst", Rng.pick(listOf(
+                "Listen to how ${h.last} talks about his teammates. That's how winning players sound.",
+                "${h.last} deflects credit every time. Coaches love that.",
+                "Mature answer from ${h.last}. The talent is obvious; the head is what makes it last.",
+            )), likes(lg, 0.004))
             else -> {}
         }
     }

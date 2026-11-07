@@ -635,7 +635,7 @@ object Market {
                 if (roundLog.none { it.contains(p.name) }) roundLog += line
                 val leaving = lg.teams.getOrNull(fc.fromTeamId)?.let { ", leaving the ${it.name}" } ?: ""
                 lg.news += News(lg.season, 0, "Free agency: $line$leaving", winTeam.id == me || fc.fromTeamId == me)
-                if (Trades.value(p) >= 8) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.salary * p.contractYears)} deal with the ${winTeam.name}, per sources.", Media.likes(lg, 0.04), verified = true)
+                if (Trades.value(p) >= 8 && Feed.mine(lg, winTeam.id, fc.fromTeamId)) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.salary * p.contractYears)} deal with the ${winTeam.name}, per sources.", Media.likes(lg, 0.04), verified = true)
             } else if (winTeam.id == fc.fromTeamId && Trades.value(p) >= 8) {
                 val line = "${p.name} re-signs with the ${winTeam.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.salary)} a season"
                 ps.faMoves += line
@@ -784,7 +784,7 @@ object Market {
                         val line = "${p.name} (${Ratings.shownPro(p.ovr)}) signs with the ${best.team.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.pay)} a season"
                         ps.faMoves += line
                         lg.news += News(lg.season, 0, "Free agency: $line, leaving the ${lg.team(c.from).name}", best.team.id == me || c.from == me)
-                        if (Trades.value(p) >= 8) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.pay * p.contractYears)} deal with the ${best.team.name}, per sources.", Media.likes(lg, 0.04), verified = true)
+                        if (Trades.value(p) >= 8 && Feed.mine(lg, best.team.id, c.from)) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.pay * p.contractYears)} deal with the ${best.team.name}, per sources.", Media.likes(lg, 0.04), verified = true)
                     } else if (best.team.id == c.from && Trades.value(p) >= 8) ps.faMoves += "${p.name} re-signs with the ${best.team.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.pay)} a season"
                     for (b in c.bids) committed[b.team.id] = (committed[b.team.id] ?: 0) - b.pay
                 }
