@@ -451,7 +451,7 @@ private fun GrowthTab(p: Player) {
             Text("${p.xp} / ${Ratings.xpNeeded()}", style = T.small, color = P.ink)
         }
         Spacer(Modifier.height(6.dp))
-        Bar(p.xp.toFloat() / Ratings.xpNeeded(), Modifier.fillMaxWidth(), height = 8.dp)
+        Bar(p.xp.toFloat() / Ratings.xpNeeded(), Modifier.fillMaxWidth(), height = 10.dp, wavy = true)
         Spacer(Modifier.height(10.dp))
         Text("${p.seasonLevels} level-ups this season · ${p.careerLevels} career" + if (p.banked > 0) " · ${p.banked} banked" else "", style = T.small, color = P.sub)
     }

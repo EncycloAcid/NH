@@ -82,6 +82,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var rev by mutableIntStateOf(0)
         private set
     var busy by mutableStateOf<String?>(null)
+    /** How far along a long sim is (0 to 1), when its length is known, and a line on where it stands. */
+    var progress by mutableStateOf<Float?>(null)
+    var progressNote by mutableStateOf("")
         private set
     var tab by mutableStateOf(Tab.TODAY)
     val stack = mutableStateListOf<Route>()
@@ -189,10 +192,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val lg = league ?: return
         if (busy != null) return
         busy = label
+        progress = null
+        progressNote = ""
         viewModelScope.launch {
             delay(60) // let the UI leave any screen that reads the league
             mutex.withLock { withContext(Dispatchers.Default) { block(lg) } }
             busy = null
+            progress = null
+            progressNote = ""
             bump()
         }
     }
@@ -465,10 +472,19 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         heavy("Simulating") { com.nh.hoopscoach.game.Sim.playDay(it) }
     }
 
-    fun simUntil(label: String, stop: (League) -> Boolean) = heavy(label) { lg ->
+    /**
+     * Sim day by day until [stop]. With [days] (how many days it should take), the loading screen
+     * shows a progress bar; either way it shows the day and the user's record as it goes.
+     */
+    fun simUntil(label: String, days: Int? = null, stop: (League) -> Boolean) = heavy(label) { lg ->
         var guard = 0
+        var done = 0
         while (!Season.seasonOver(lg) && guard++ < 200) {
             com.nh.hoopscoach.game.Sim.playDay(lg)
+            done++
+            val note = "Day ${lg.day} · ${lg.user.w}-${lg.user.l}"
+            val p = days?.takeIf { it > 1 }?.let { (done.toFloat() / it).coerceIn(0f, 1f) }
+            withContext(Dispatchers.Main) { progress = p; progressNote = note }
             if (stop(lg)) break
         }
     }
@@ -476,10 +492,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun simDays(n: Int) {
         val lg = league ?: return
         val target = lg.day + n
-        simUntil("Simulating") { it.day >= target || it.phase != Phase.REGULAR }
+        simUntil("Simulating", n) { it.day >= target || it.phase != Phase.REGULAR }
     }
 
-    fun simToPhase(phase: Phase, label: String) = simUntil(label) { it.phase == phase }
+    /** Days left in the regular season: up to the last regular-season game on the schedule. */
+    fun regularDaysLeft(lg: League): Int? =
+        lg.games.filter { !it.played && (it.type == com.nh.hoopscoach.game.GameType.CONF || it.type == com.nh.hoopscoach.game.GameType.NONCONF) }
+            .maxOfOrNull { it.day }?.let { it - lg.day + 1 }?.takeIf { it > 1 }
+
+    fun simToPhase(phase: Phase, label: String, days: Int? = null) = simUntil(label, days) { it.phase == phase }
 
     fun beginOffseason() = heavy("Heading into the offseason") { Offseason.begin(it) }
 

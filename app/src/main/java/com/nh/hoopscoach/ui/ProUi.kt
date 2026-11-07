@@ -344,13 +344,13 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
                     val deadline = com.nh.hoopscoach.game.Trades.deadlineDay(lg)
                     // Stop the day before, so there's still time to ask for a trade.
                     if (lg.day < deadline - 1) AppMenuItem("Sim to the trade deadline", "${games(gamesBefore(deadline - 1))} away · stops in time to make a move", MenuIcons.Swap) {
-                        pick { vm.simUntil("Simulating to the trade deadline") { it.day >= deadline - 1 || it.phase != Phase.REGULAR } }
+                        pick { vm.simUntil("Simulating to the trade deadline", deadline - 1 - lg.day) { it.day >= deadline - 1 || it.phase != Phase.REGULAR } }
                     }
                     if (lg.day < ProLeague.allStarDay(lg)) AppMenuItem("Sim to the All-Star break", "${games(gamesBefore(ProLeague.allStarDay(lg)))} away", MenuIcons.Star) {
-                        pick { vm.simUntil("Simulating to the All-Star break") { it.day >= ProLeague.allStarDay(it) } }
+                        pick { vm.simUntil("Simulating to the All-Star break", ProLeague.allStarDay(lg) - lg.day) { it.day >= ProLeague.allStarDay(it) } }
                     }
                     AppMenuItem("Sim to the playoffs", "${games(gamesBefore(ProLeague.lastDay(lg) + 1))} left, then the play-in", MenuIcons.Bracket) {
-                        pick { vm.simToPhase(Phase.PLAYOFFS, "Simulating the regular season") }
+                        pick { vm.simToPhase(Phase.PLAYOFFS, "Simulating the regular season", ProLeague.lastDay(lg) - lg.day + 1) }
                     }
                     AppMenuDivider()
                 }
@@ -862,7 +862,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                 Text("Training focus: ${h.focus.label}", style = T.bodyB, color = P.ink)
                 Text(if (h.age >= 30) "From 30 on, summers take a little off. A personal trainer slows it down." else "Every level-up raises its three ratings. You grow until you reach your potential.", style = T.small, color = P.sub)
                 Spacer(Modifier.height(8.dp))
-                Bar(h.xp / com.nh.hoopscoach.game.Ratings.xpNeeded().toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
+                Bar(h.xp / com.nh.hoopscoach.game.Ratings.xpNeeded().toFloat(), Modifier.fillMaxWidth(), height = 10.dp, wavy = true)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallButton("Training focus", Modifier.weight(1f), primary = true) { vm.push(Route.Focus(h.id)) }

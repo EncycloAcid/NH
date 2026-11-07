@@ -342,7 +342,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                 Text("Training focus: ${h.focus.label}", style = T.bodyB, color = P.ink)
                 Text("Every level-up raises its three ratings. Minutes and production earn XP.", style = T.small, color = P.sub)
                 Spacer(Modifier.height(8.dp))
-                Bar(h.xp / Ratings.xpNeeded().toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
+                Bar(h.xp / Ratings.xpNeeded().toFloat(), Modifier.fillMaxWidth(), height = 10.dp, wavy = true)
                 Spacer(Modifier.height(4.dp))
                 Text("${h.xp} / ${Ratings.xpNeeded()} XP to the next level", style = T.small, color = P.sub)
                 Spacer(Modifier.height(10.dp))
@@ -745,7 +745,7 @@ internal fun MediaPanel(lg: League) {
         )
         Road.nextMilestone(lg)?.let { (need, pay) ->
             Spacer(Modifier.height(8.dp))
-            Bar(r.followers / need.toFloat(), Modifier.fillMaxWidth(), height = 6.dp)
+            Bar(r.followers / need.toFloat(), Modifier.fillMaxWidth(), height = 10.dp, wavy = true)
             Spacer(Modifier.height(4.dp))
             Text("Next sponsor at ${Road.count(need)} followers: ${money(pay)} for one post.", style = T.small, color = P.sub)
         }

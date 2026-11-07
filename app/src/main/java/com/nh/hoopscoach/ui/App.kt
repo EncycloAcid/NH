@@ -78,7 +78,7 @@ fun App(vm: GameViewModel) {
             val busy = vm.busy
             when {
                 vm.loading -> BusyScreen("Loading")
-                busy != null -> BusyScreen(busy)
+                busy != null -> BusyScreen(busy, vm.progress, vm.progressNote)
                 lg == null -> NewGameScreen(vm)
                 // A pro league shows ratings on a 2K-style scale.
                 else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v })) { Shell(vm, lg) }
@@ -215,7 +215,7 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
                         if (lg.phase == Phase.REGULAR) {
                             AppMenuItem("Sim one week", "The next 7 days", MenuIcons.Week) { pick { vm.simDays(7) } }
                             AppMenuItem("Sim to the conference tournament", "$left regular-season ${if (left == 1) "game" else "games"} left", MenuIcons.Calendar) {
-                                pick { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season") }
+                                pick { vm.simToPhase(Phase.CONF_TOURNEY, "Simulating the regular season", Schedule.REG_DAYS - lg.day + 1) }
                             }
                         }
                         if (lg.phase != Phase.NCAA) AppMenuItem("Sim to Selection Sunday", "Conference tournaments, then the bracket", MenuIcons.Bracket) {
@@ -264,19 +264,25 @@ private fun NavBar(vm: GameViewModel) {
     }
 }
 
+/**
+ * Work in progress: the Material 3 loading indicator, what's happening, and for a sim of known
+ * length a wavy progress bar with the day and the record so far.
+ */
 @Composable
-fun BusyScreen(label: String) {
-    val spin = rememberInfiniteTransition(label = "spin")
-    val sweep by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900), RepeatMode.Restart), label = "a")
-    val accent = P.accent
-    val track = P.line
+fun BusyScreen(label: String, progress: Float? = null, note: String = "") {
     Column(Modifier.fillMaxSize().background(P.bg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Canvas(Modifier.size(54.dp)) {
-            drawCircle(track, size.minDimension / 2 - 4f, style = Stroke(8f))
-            drawArc(accent, sweep, 90f, false, topLeft = Offset(4f, 4f), size = androidx.compose.ui.geometry.Size(size.width - 8f, size.height - 8f), style = Stroke(8f, cap = StrokeCap.Round))
+        LoadingIndicator(size = 64.dp)
+        Spacer(Modifier.height(20.dp))
+        Text("$label…", style = T.bodyB, color = P.ink)
+        if (progress != null) {
+            Spacer(Modifier.height(14.dp))
+            Bar(progress, Modifier.width(220.dp), height = 10.dp, wavy = true)
+            Spacer(Modifier.height(8.dp))
+            Text("${(progress * 100).toInt()}%" + if (note.isNotEmpty()) " · $note" else "", style = T.small, color = P.sub)
+        } else if (note.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(note, style = T.small, color = P.sub)
         }
-        Spacer(Modifier.height(18.dp))
-        Text("$label…", style = T.bodyB, color = P.sub)
     }
 }
 

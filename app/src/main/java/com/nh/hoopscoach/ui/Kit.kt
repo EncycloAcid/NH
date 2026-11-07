@@ -247,13 +247,6 @@ fun Tag(text: String, color: Color, modifier: Modifier = Modifier, filled: Boole
     }
 }
 
-@Composable
-fun Bar(fraction: Float, modifier: Modifier = Modifier, color: Color = P.accent, track: Color = P.surface2, height: Dp = 6.dp) {
-    Box(modifier.height(height).clip(RoundedCornerShape(height)).background(track)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(height).clip(RoundedCornerShape(height)).background(color))
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HoopsSlider(value: Float, onValueChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float>, modifier: Modifier = Modifier, enabled: Boolean = true, onFinished: () -> Unit = {}) {
