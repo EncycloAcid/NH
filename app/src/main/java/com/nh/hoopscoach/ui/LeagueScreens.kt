@@ -107,11 +107,11 @@ private fun LazyListScope.polls(vm: GameViewModel, lg: League) {
         Section(if (lg.user.gp == 0) "Preseason AP Top 25" else "AP Top 25")
         GroupList(ap) { t -> RankRow(vm, lg, "${t.ap}", t, t.record, "NET ${t.net}") }
         Section("NET rankings · top 50")
-        GroupList(lg.teams.sortedBy { it.net }.take(50)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "PWR ${Rankings.power(t)}") }
+        GroupList(lg.teams.sortedBy { it.net }.take(50)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "Power #${Rankings.powerRank(lg, t)}") }
         val u = lg.user
         if (u.net > 50) {
             Spacer(Modifier.height(10.dp))
-            GroupList(listOf(u)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "PWR ${Rankings.power(t)}") }
+            GroupList(listOf(u)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "Power #${Rankings.powerRank(lg, t)}") }
         }
     }
 }

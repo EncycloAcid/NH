@@ -92,7 +92,7 @@ fun TeamRings(lg: League, t: Team) {
             RingStat("Overall", Gameplan.teamRating(lg, t))
             RingStat("Offense", Gameplan.teamRating(lg, t) { Ratings.offense(it) })
             RingStat("Defense", Gameplan.teamRating(lg, t) { Ratings.defense(it) })
-            RingStat("Power", Rankings.power(t))
+            RingStat("Power", Rankings.power(lg, t))
             RingStat("Prestige", t.prestige)
         }
     }

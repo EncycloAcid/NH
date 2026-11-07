@@ -425,13 +425,15 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
                 GroupList(games, inset = 52.dp) { g ->
                     val opp = lg.team(g.opp(u.id))
                     ListRow(onClick = if (g.played) ({ vm.push(Route.Box(g.id)) }) else null) {
-                        if (g.played) ResultDot(g.winner() == u.id) else Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) { Text("${g.day}", style = T.small, color = P.faint) }
+                        // Played: the result. Still to come: the opponent's logo, and his record in small type so it doesn't read as a score.
+                        if (g.played) ResultDot(g.winner() == u.id) else TeamBadge(opp, 26.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("${g.site(u.id)} ${opp.name}", style = T.body, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (g.label.isNotEmpty()) Text(g.label, style = T.small, color = P.accent)
                         }
-                        Text(if (g.played) "${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)}" else "${opp.w}-${opp.l}", style = T.numSm, color = if (g.played) P.ink else P.faint)
+                        if (g.played) Text("${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)}", style = T.numSm, color = P.ink)
+                        else Text("${opp.w}-${opp.l}", style = T.small, color = P.sub)
                     }
                 }
             }
@@ -1151,7 +1153,11 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
             Panel(color = P.hero) {
-                Text("${h.proYears} PRO ${if (h.proYears == 1) "SEASON" else "SEASONS"}", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                Text(
+                    if (h.teamId >= 0 && !r.retired) (if (h.proYears == 0) "ROOKIE SEASON" else "${ordinal(h.proYears + 1).uppercase()} PRO SEASON")
+                    else "${h.proYears} PRO ${if (h.proYears == 1) "SEASON" else "SEASONS"}",
+                    style = T.label, color = P.onHero.copy(alpha = 0.8f),
+                )
                 Text(if (r.draftPick > 0) "NO. ${r.draftPick} PICK" else "UNDRAFTED", style = T.hero.copy(fontSize = 32.sp), color = P.onHero)
                 val track = if (ProCareer.hofScore(lg) >= 18) " · On a Hall of Fame track" else ""
                 Text("${r.rings} ${if (r.rings == 1) "ring" else "rings"} · ${r.allStars} All-Star · ${r.mvps} MVP$track", style = T.small, color = P.onHero.copy(alpha = 0.9f))
@@ -1509,7 +1515,7 @@ fun ProEnding(vm: GameViewModel, lg: League) {
             ScreenHeader("Road to the League", "Career complete", null)
             Panel(color = P.hero) {
                 Text("RETIRED · ${ProCareer.hofVerdict(lg).uppercase()}", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text("${h?.proYears ?: 0} PRO SEASONS", style = T.hero, color = P.onHero)
+                Text("${h?.proYears ?: 0} PRO ${if (h?.proYears == 1) "SEASON" else "SEASONS"}", style = T.hero, color = P.onHero)
                 Text(r.ending, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }

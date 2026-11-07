@@ -149,7 +149,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
                     Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
                         style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
-                    Text(n.text, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
+                    Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
                         color = ink, modifier = Modifier.padding(top = 6.dp))
                     if (byline != null) Text("By $byline", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
                         color = faded, modifier = Modifier.padding(top = 6.dp))
@@ -186,6 +186,9 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     }
 }
 
+/** A headline as shown: "No. 1" never breaks across lines. */
+fun headline(text: String): String = text.replace("No. ", "No.\u00A0")
+
 /** A headline row: tap it to read the story (a small "Read" tag says there is one). */
 @Composable
 fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
@@ -194,7 +197,7 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             NewsTag(n)
-            Text(n.text, style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
+            Text(headline(n.text), style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
             if (n.body.isNotEmpty()) Text("${n.source.ifEmpty { "Story" }} · Read", style = T.small, color = P.accent)
         }
     }
@@ -264,7 +267,7 @@ private fun TopStory(vm: GameViewModel, lg: League, n: News) {
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (p != null) { PlayerJersey(p, if (p.teamId >= 0) lg.team(p.teamId) else t, 64.dp); Spacer(Modifier.width(12.dp)) }
-            Text(n.text, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = fg, modifier = Modifier.weight(1f))
+            Text(headline(n.text), style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = fg, modifier = Modifier.weight(1f))
         }
         n.body.split("\n\n").firstOrNull()?.let {
             Spacer(Modifier.height(8.dp))

@@ -1,6 +1,9 @@
 package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -190,10 +193,10 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             }
         }
         item {
-            val news = lg.news.filter { it.season == lg.season }.takeLast(8).reversed()
+            val news = lg.news.filter { it.season == lg.season }.takeLast(6).reversed()
             if (news.isNotEmpty()) {
                 Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
-                GroupList(news) { n -> ListRow { Text(n.text, style = T.small, color = if (n.mine) P.ink else P.sub, modifier = Modifier.weight(1f)) } }
+                GroupList(news, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -632,15 +635,49 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
 @Composable
 fun NbaCoachCareer(vm: GameViewModel, lg: League) {
     val c = lg.userCoach
+    val u = lg.user
+    val nba = c.history.filter { it.teamId >= 0 }
+    val college = c.history.filter { it.teamId < 0 }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader("Career", c.name, "Head coach · ${lg.user.name}")
+            ScreenHeader("Head coach · age ${c.age}", c.name, "${u.name} · ${ordinal(NbaCoach.seasonsHere(lg) + 1)} season") {
+                IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
+            }
             Panel {
-                Row {
-                    Stat("Record", "${c.w}-${c.l}", Modifier.weight(1f), style = T.numSm)
-                    Stat("Playoffs", "${c.tourneys}", Modifier.weight(1f), style = T.numSm)
-                    Stat("Titles", "${c.titles}", Modifier.weight(1f), if (c.titles > 0) P.gold else P.ink, T.numSm)
-                    Stat("Job", "${c.security}", Modifier.weight(1f), style = T.numSm)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CoachBadge(c.first, c.last, 60.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${c.w}-${c.l}", style = T.hero, color = P.ink)
+                        Text("NBA record" + if (c.w + c.l > 0) " · ${"%.3f".format(c.winPct).removePrefix("0")}" else "", style = T.small, color = P.sub)
+                    }
+                    Ring(c.rating, 58.dp, label = "RATING", textSize = 20.sp)
+                }
+                Spacer(Modifier.height(14.dp))
+                StatRow(
+                    listOf(
+                        Triple("Seasons", "${nba.size}", null), Triple("Playoffs", "${c.tourneys}", null),
+                        Triple("Titles", "${c.titles}", if (c.titles > 0) P.gold else null), Triple("Teams", "${nba.map { it.teamId }.toSet().size.coerceAtLeast(1)}", null),
+                    ),
+                    style = T.numSm,
+                )
+            }
+            Section("Job security")
+            Panel {
+                val col = securityColor(c.security)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(NbaCoach.securityLabel(c.security), style = T.head, color = col, modifier = Modifier.weight(1f))
+                    Text("${c.security}/100", style = T.numSm, color = P.sub)
+                }
+                Spacer(Modifier.height(8.dp))
+                Bar(c.security / 100f, Modifier.fillMaxWidth(), color = col, height = 8.dp)
+                Spacer(Modifier.height(8.dp))
+                Text("The owner expects the preseason projection. Wins above it, playoff series and titles raise it; falling short lowers it.", style = T.small, color = P.sub)
+            }
+            Section("Coaching skills")
+            Panel {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Ring(c.off, 46.dp, label = "OFF"); Ring(c.def, 46.dp, label = "DEF"); Ring(c.rec, 46.dp, label = "REC"); Ring(c.dev, 46.dp, label = "DEV")
                 }
             }
             lg.proState?.collegeResume?.takeIf { it.isNotEmpty() }?.let {
@@ -649,24 +686,42 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
             }
             PlayingPast(lg)
             Section("Season by season")
-            if (c.history.isEmpty()) Panel { Text("Your first season is under way.", style = T.body, color = P.sub) }
-            GroupList(c.history.reversed()) { h ->
+            val rows = mutableListOf<@Composable () -> Unit>()
+            if (lg.phase != Phase.OFFSEASON && nba.none { it.season == lg.season }) rows += {
                 ListRow {
-                    Text("${h.season}", style = T.numSm, color = P.accent, modifier = Modifier.width(56.dp))
+                    TeamBadge(u, 32.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(h.team, style = T.bodyB, color = P.ink, maxLines = 1)
-                        Text(h.result.ifEmpty { "—" }, style = T.small, color = if (h.result == "Champion") P.gold else P.sub)
+                        Text("${u.name} · ${u.w}-${u.l}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("In progress", style = T.small, color = P.accent)
                     }
-                    Text("${h.w}-${h.l}", style = T.numSm, color = P.ink)
+                    Text("${lg.season}", style = T.numSm, color = P.sub)
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            for (h in c.history.reversed()) rows += {
+                ListRow {
+                    if (h.teamId >= 0) TeamBadge(lg.team(h.teamId), 32.dp)
+                    else Box(Modifier.size(32.dp).background(P.surface2, CircleShape), contentAlignment = Alignment.Center) {
+                        Text("NCAA", style = T.label.copy(fontSize = 8.sp), color = P.sub)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${h.team} · ${h.w}-${h.l}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(h.result.ifEmpty { "—" }, style = T.small, color = if (h.result.contains("Champion")) P.gold else P.sub)
+                    }
+                    Text("${h.season}", style = T.numSm, color = P.sub)
+                }
+            }
+            if (rows.isEmpty()) Panel { Text("Your first season starts after the summer.", style = T.body, color = P.sub) }
+            GroupList(rows) { it() }
+            if (college.isNotEmpty()) Text("NCAA rows are your college seasons.", style = T.small.copy(fontSize = 12.sp), color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+            Spacer(Modifier.height(20.dp))
             Box(Modifier.padding(horizontal = Gutter)) { SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() } }
             Spacer(Modifier.height(24.dp))
         }
     }
-    @Suppress("UNUSED_VARIABLE") val unused = GameType.NCAA to Ratings
 }
+
 
 
 /** The latest projection for the user's team, and how it's made. */
@@ -681,9 +736,16 @@ fun ProjectionLines(lg: League) {
         Stat("Playoffs", odd(o.playoffs), Modifier.weight(1f), style = T.numSm)
         Stat("Title", odd(o.title), Modifier.weight(1f), style = T.numSm)
     }
-    Text(
-        (if (ps.liveDay > 0) "Updated day ${ps.liveDay}" + (pre?.let { ". Preseason: ${it.w}-${it.l}" } ?: "") + ". " else "") +
-            "We play the rest of the season 400 times: games already played count as they finished, the rest go by each team's strength now (its best eight players, plus every result so far). It updates every week, and after trades.",
-        style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.padding(top = 6.dp),
+    var how by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (ps.liveDay > 0) "Updated day ${ps.liveDay}" + (pre?.let { " · preseason ${it.w}-${it.l}" } ?: "") else "Preseason projection",
+            style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.weight(1f),
+        )
+        Text(if (how) "Hide" else "How we project", style = T.small.copy(fontSize = 12.sp), color = P.accent, modifier = Modifier.clickable { how = !how })
+    }
+    if (how) Text(
+        "We play the rest of the season 400 times: games already played count as they finished, the rest go by each team's strength now (its best eight players, plus every result so far). It updates every week, and after trades.",
+        style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.padding(top = 4.dp),
     )
 }

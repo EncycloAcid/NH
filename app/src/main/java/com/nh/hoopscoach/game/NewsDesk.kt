@@ -110,20 +110,34 @@ object NewsDesk {
         lg.news += News(lg.season, lg.day, headline, t.id == lg.userTeamId, n.gameId, "game", body, outlet(), t.id, p.id)
     }
 
-    /** Long winning and losing streaks make the news when they hit a round number. */
+    /**
+     * Long winning and losing streaks make the news when they hit a round number: the user's team
+     * always, and otherwise the best-known team on each kind of streak that day (one each), so a
+     * night of low-major losing streaks doesn't fill the page.
+     */
     private fun streaks(lg: League) {
         if (lg.phase != Phase.REGULAR) return
         val played = lg.games.filter { it.played && it.day == lg.day }.flatMap { listOf(it.home, it.away) }.toSet()
-        for (t in lg.teams) {
-            if (t.id !in played) continue
+        val hits = lg.teams.filter { t ->
+            if (t.id !in played) return@filter false
             val s = t.streak
-            val win = s >= 7 && (s == 7 || s % 3 == 1)
-            val lose = s <= -8 && (s == -8 || s % 4 == 0)
-            if (!win && !lose) continue
+            (s >= 7 && (s == 7 || s % 3 == 1)) || (s <= -8 && (s == -8 || s % 4 == 0) && (lg.pro || s <= -10 || t.id == lg.userTeamId))
+        }
+        val known = { t: Team -> if (lg.pro) t.elo else t.prestige * 20.0 + t.elo / 10 }
+        val pick = hits.filter { it.id == lg.userTeamId } +
+            listOfNotNull(hits.filter { it.id != lg.userTeamId && it.streak > 0 }.maxByOrNull(known)) +
+            listOfNotNull(hits.filter { it.id != lg.userTeamId && it.streak < 0 }.maxByOrNull(known))
+        for (t in pick) {
+            val s = t.streak
+            val win = s > 0
+            // "The Knicks win", but "Gonzaga wins": school names are singular.
+            val (w, l, has) = if (lg.pro) Triple("win", "lose", "have") else Triple("wins", "loses", "has")
+            val the = if (lg.pro) "The " else ""
             val star = lg.rosterOf(t).filter { it.stats.gp > 0 }.maxByOrNull { it.stats.ppg }
-            val headline = if (win) "${name(lg, t)} win ${s} straight" else "${name(lg, t)} lose ${-s} in a row"
-            val body = (if (win) "The ${name(lg, t)} have won ${s} games in a row and sit at ${t.w}-${t.l}." else "The ${name(lg, t)} have dropped ${-s} straight and fall to ${t.w}-${t.l}.") +
-                (star?.let { "\n\n${it.name} leads them at ${"%.1f".format(it.stats.ppg)} points a game." } ?: "") +
+            val headline = if (win) "${name(lg, t)} $w $s straight" else "${name(lg, t)} $l ${-s} in a row"
+            val body = (if (win) "$the${name(lg, t)} $has won $s games in a row and ${if (lg.pro) "sit" else "sits"} at ${t.w}-${t.l}."
+                else "$the${name(lg, t)} $has dropped ${-s} straight and ${if (lg.pro) "fall" else "falls"} to ${t.w}-${t.l}.") +
+                (star?.let { "\n\n${it.name} leads ${if (lg.pro) "them" else "the ${t.mascot}"} at ${"%.1f".format(it.stats.ppg)} points a game." } ?: "") +
                 (if (win) "\n\n“We're not thinking about the streak,” coach ${lg.coachOf(t).last} said. “Just the next one.”"
                 else "\n\n“Nobody's feeling sorry for us,” coach ${lg.coachOf(t).last} said. “We have to find a way.”")
             lg.news += News(lg.season, lg.day, headline, t.id == lg.userTeamId, -1, "team", body, outlet(), t.id)

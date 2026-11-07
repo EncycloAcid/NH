@@ -264,7 +264,7 @@ fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
     lines.forEach { total.add(it.s) }
     Panel(padding = PaddingValues(vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            Column(Modifier.width(128.dp).padding(start = 14.dp)) {
+            Column(Modifier.width(144.dp).padding(start = 14.dp)) {
                 Text("PLAYER", style = T.label, color = P.sub, modifier = Modifier.height(28.dp).padding(top = 8.dp))
                 lines.forEach { l ->
                     Row(Modifier.height(38.dp).clickable { vm.openPlayer(l.pid) }, verticalAlignment = Alignment.CenterVertically) {

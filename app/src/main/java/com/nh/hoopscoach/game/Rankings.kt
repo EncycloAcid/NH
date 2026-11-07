@@ -1,5 +1,7 @@
 package com.nh.hoopscoach.game
 
+import kotlin.math.roundToInt
+
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.pow
@@ -78,7 +80,12 @@ object Rankings {
         for (ev in lg.events) for (id in ev.teams) lg.team(id).expWins += 1.0
     }
 
-    fun power(t: Team): Int = (50 + (t.elo - 1500) / 9).toInt().coerceIn(1, 99)
+    /** Where a team's strength (its Elo) ranks in the league, 1 the best. */
+    fun powerRank(lg: League, t: Team): Int = lg.teams.count { it.elo > t.elo } + 1
+
+    /** Strength on a 1-99 scale by where it ranks: the best team 99, the middle of the league about 50. */
+    fun power(lg: League, t: Team): Int =
+        (99 - (powerRank(lg, t) - 1) * 98.0 / (lg.teams.size - 1).coerceAtLeast(1)).roundToInt().coerceIn(1, 99)
 
     /** Quadrant thresholds scaled to this league's size. */
     fun quadrant(lg: League, oppNet: Int, site: String): Int {
