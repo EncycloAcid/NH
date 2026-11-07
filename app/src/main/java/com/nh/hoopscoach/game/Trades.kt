@@ -99,6 +99,8 @@ object Trades {
             val to = if (fromA.any { it.id == lg.heroId }) b else a
             Alerts.add(lg, "You've been traded", "You're headed to the ${to.name}. New team, new role: check the Me tab.", "trade")
         }
+        val beforeA = ProLeague.teamValue(lg, a)
+        val beforeB = ProLeague.teamValue(lg, b)
         for (p in fromA) move(lg, p, a, b)
         for (p in fromB) move(lg, p, b, a)
         for (t in listOf(a, b)) {
@@ -107,6 +109,9 @@ object Trades {
             Gameplan.autoAllocate(lg, t)
         }
         ps.moved += (fromA + fromB).map { it.id }
+        // The trade changes how good each team is (on top of how it has played).
+        a.elo += (ProLeague.teamValue(lg, a) - beforeA) * ProLeague.ELO_PER_POINT
+        b.elo += (ProLeague.teamValue(lg, b) - beforeB) * ProLeague.ELO_PER_POINT
         // Picks change hands too.
         val pickNamesA = picksA.map { Picks.label(lg, it) }
         val pickNamesB = picksB.map { Picks.label(lg, it) }

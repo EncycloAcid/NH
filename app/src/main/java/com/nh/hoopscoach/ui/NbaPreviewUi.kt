@@ -208,6 +208,12 @@ private fun LazyListScope.nbaContents(lg: League, pv: NbaPreview, list: List<Pai
             NbaPreviews.letter(lg, pv).forEachIndexed { i, para -> Text(para, style = if (i == 0) T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(vertical = 4.dp)) }
             Text("— The editors", style = T.small.copy(fontStyle = FontStyle.Italic), color = P.sub, modifier = Modifier.padding(top = 4.dp))
         }
+        Section("How we project")
+        Panel {
+            Text("Every team gets a strength rating from its roster: its eight best players, the best counting most. We play the whole season 400 times from those ratings and the real schedule, through the play-in, every playoff series and the Finals. A team's projected record is its average; the win range covers 8 seasons in 10.", style = T.small, color = P.ink)
+            Spacer(Modifier.height(6.dp))
+            Text("It's tuned against how seasons really play out in the game: projections miss by about 7 wins on average, about what real preseason models miss by in the NBA. Once the season starts, every result moves a team's strength, trades change it, and the projection is re-run each week.", style = T.small, color = P.sub)
+        }
         Section("Contents")
         GroupList(list.withIndex().drop(2).toList()) { (i, pg) ->
             ListRow(onClick = { go(i) }) {

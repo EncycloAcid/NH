@@ -640,13 +640,22 @@ object ProLeague {
         }
     }
 
-    /** Team strength, for win probability and home edge: the top eight players matter most. */
+    /** A roster's strength: the top eight players, the best counting most. */
+    fun teamValue(lg: League, t: Team): Double {
+        val top = lg.rosterOf(t).map { it.ovr }.sortedDescending().take(8)
+        if (top.isEmpty()) return 85.0
+        return top.mapIndexed { i, o -> o * (1.0 - i * 0.07) }.sum() / top.indices.sumOf { 1.0 - it * 0.07 }
+    }
+
+    /**
+     * Strength points per point of roster value. Calibrated against simulated seasons: at 28 the
+     * projections bunched every team between 38 and 48 wins while real results spread 2.4 times wider.
+     */
+    const val ELO_PER_POINT = 72.0
+
+    /** Team strength, for win probability and projections (it moves with every result during the season). */
     fun rateTeams(lg: League) {
-        for (t in lg.teams) {
-            val top = lg.rosterOf(t).map { it.ovr }.sortedDescending().take(8)
-            val v = top.mapIndexed { i, o -> o * (1.0 - i * 0.07) }.sum() / top.indices.sumOf { 1.0 - it * 0.07 }
-            t.elo = 1500 + (v - 91) * 28
-        }
+        for (t in lg.teams) t.elo = 1500 + (teamValue(lg, t) - 91) * ELO_PER_POINT
     }
 
     /** Game 83: one more against a natural rival. */
@@ -785,6 +794,8 @@ object ProSeason {
             Phase.REGULAR -> {
                 upkeep(lg)
                 NewsDesk.endOfDay(lg)
+                // Every week the projection is re-run from the results so far.
+                if (lg.day % 7 == 0) lg.proState?.let { ps -> ps.live = NbaPreviews.project(lg); ps.liveDay = lg.day }
                 NbaCup.endOfDay(lg)
                 NbaAwards.endOfDay(lg)
                 Rumors.daily(lg)
@@ -1152,6 +1163,8 @@ object ProSeason {
         // The preseason magazine, from 400 simulated seasons.
         val pv = NbaPreviews.build(lg)
         ps.preview = pv
+        ps.live = emptyMap()
+        ps.liveDay = 0
         if (NbaCoach.active(lg)) ps.expect = pv.proj[lg.userTeamId]?.w ?: (ProLeague.seasonGames(lg) / 2)
         NbaPreviews.ranked(lg, pv).firstOrNull()?.let { top ->
             lg.news += News(lg.season, 0, "The ${lg.season} season preview is out: the ${top.name} are the title favorites, and we project the ${lg.user.name} at ${pv.proj[lg.user.id]?.w ?: 0}-${pv.proj[lg.user.id]?.l ?: 0}")

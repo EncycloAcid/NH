@@ -331,8 +331,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         busy = "Heading to the NBA"
         viewModelScope.launch {
             delay(60)
-            val pro = mutex.withLock {
-                withContext(Dispatchers.Default) { com.nh.hoopscoach.game.NbaCoach.fromCollege(college, slot).also { com.nh.hoopscoach.game.ProCareer.next(it) } }
+            val pro = runCatching {
+                mutex.withLock {
+                    withContext(Dispatchers.Default) { com.nh.hoopscoach.game.NbaCoach.fromCollege(college, slot).also { com.nh.hoopscoach.game.ProCareer.next(it) } }
+                }
+            }.getOrElse { e ->
+                android.util.Log.e("Hoops", "NBA move failed", e)
+                busy = null
+                toast("Couldn't make the move to the NBA: ${e.message ?: e.javaClass.simpleName}")
+                return@launch
             }
             stack.clear()
             sheet = null
@@ -470,9 +477,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun simOffseason() = heavy("Simulating the offseason") {
-        Offseason.autoComplete(it)
+        val stopped = Offseason.autoComplete(it, stopForNba = true)
         wrapPage = 0
         tab = Tab.TODAY
+        if (stopped) toast("NBA teams are calling: decide on their offers before you sim ahead")
     }
 
     // ---------- live games ----------

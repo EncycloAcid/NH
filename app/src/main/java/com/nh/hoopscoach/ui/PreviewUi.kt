@@ -350,6 +350,12 @@ private fun LazyListScope.contents(lg: League, pv: Preview, list: List<Pair<Stri
             }
             Text("— The editors", style = T.small.copy(fontStyle = FontStyle.Italic), color = P.sub, modifier = Modifier.padding(top = 4.dp))
         }
+        Section("How we project")
+        Panel {
+            Text("Every team gets a strength rating from its roster (its best players, weighted) and its coach. We play the season 400 times from those ratings and the real schedule: conference tournaments, a 68-team field and the bracket. Projected records are the average; the win range covers 8 seasons in 10.", style = T.small, color = P.ink)
+            Spacer(Modifier.height(6.dp))
+            Text("Tuned against how seasons really play out in the game, the projections miss by about 2 to 3 wins on average. During the season every result moves a team's strength, and your Program panel shows where your season is heading.", style = T.small, color = P.sub)
+        }
         Section("Contents")
         GroupList(list.withIndex().drop(2).toList()) { (i, pg) ->
             ListRow(onClick = { go(i) }) {

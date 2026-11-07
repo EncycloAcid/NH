@@ -167,6 +167,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
                 }
                 Spacer(Modifier.height(8.dp))
                 GrowBar(c.security / 100f, Modifier.fillMaxWidth(), securityColor(c.security), 8.dp)
+                ProjectionLines(lg)
                 if (lg.phase == Phase.REGULAR) {
                     val dl = Trades.deadlineDay(lg)
                     Text(if (lg.day <= dl) "Trade deadline: day $dl. Make deals on the Trades tab." else "The trade deadline has passed.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))
@@ -534,4 +535,24 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
         }
     }
     @Suppress("UNUSED_VARIABLE") val unused = GameType.NCAA to Ratings
+}
+
+
+/** The latest projection for the user's team, and how it's made. */
+@Composable
+fun ProjectionLines(lg: League) {
+    val ps = lg.proState ?: return
+    val o = com.nh.hoopscoach.game.NbaPreviews.latest(lg)[lg.userTeamId] ?: return
+    val pre = ps.preview?.takeIf { it.season == lg.season }?.proj?.get(lg.userTeamId)
+    Spacer(Modifier.height(10.dp))
+    Row {
+        Stat(if (ps.liveDay > 0) "Projected now" else "Projected", "${o.w}-${o.l}", Modifier.weight(1f), style = T.numSm)
+        Stat("Playoffs", odd(o.playoffs), Modifier.weight(1f), style = T.numSm)
+        Stat("Title", odd(o.title), Modifier.weight(1f), style = T.numSm)
+    }
+    Text(
+        (if (ps.liveDay > 0) "Updated day ${ps.liveDay}" + (pre?.let { ". Preseason: ${it.w}-${it.l}" } ?: "") + ". " else "") +
+            "We play the rest of the season 400 times: games already played count as they finished, the rest go by each team's strength now (its best eight players, plus every result so far). It updates every week, and after trades.",
+        style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.padding(top = 6.dp),
+    )
 }

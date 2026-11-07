@@ -35,7 +35,8 @@ object Rankings {
 
     fun seedElo(lg: League, carryOver: Boolean) {
         for (t in lg.teams) {
-            val fresh = 1500 + (strength(lg, t) - 70) * 28
+            // Calibrated against simulated seasons (28 left the projections a little bunched).
+            val fresh = 1500 + (strength(lg, t) - 70) * 32
             t.elo = if (carryOver) fresh * 0.75 + t.elo * 0.25 else fresh
         }
     }

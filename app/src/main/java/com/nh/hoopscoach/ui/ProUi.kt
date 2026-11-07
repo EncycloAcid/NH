@@ -143,6 +143,10 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         item { HeroTodayCard(vm, lg) }
         if (lg.phase == Phase.REGULAR) item { NbaPreviewCard(vm, lg) }
+        if (lg.phase == Phase.REGULAR && u.w + u.l >= 7) item {
+            Section("Season outlook")
+            Panel { ProjectionLines(lg) }
+        }
         // In the playoffs, where your series stands comes first.
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         Season.userGameToday(lg)?.let { g ->

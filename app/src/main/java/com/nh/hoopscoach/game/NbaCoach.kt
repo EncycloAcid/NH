@@ -78,6 +78,15 @@ object NbaCoach {
         val v = judge(lg, other, give, get, givePicks, getPicks)
         if (!v.ok || !canTrade(lg)) return v
         Trades.execute(lg, lg.user, other, give, get, picksA = givePicks, picksB = getPicks)
+        // A new roster, a new target: the owner re-sets his expectation to the new projection.
+        val ps = lg.proState
+        if (ps != null && lg.phase == Phase.REGULAR) {
+            ps.live = NbaPreviews.project(lg)
+            ps.liveDay = lg.day
+            val before = ps.expect
+            ps.expect = ps.live[lg.userTeamId]?.w ?: ps.expect
+            if (ps.expect != before) lg.news += News(lg.season, lg.day, "After the trade, the ${lg.user.name}' owner now expects about ${ps.expect} wins (was $before)", true)
+        }
         return v
     }
 
@@ -109,6 +118,7 @@ object NbaCoach {
         os.nbaOffers.clear()
         os.nbaOffers += teamsFor(lg.season).shuffled(Rng.r).take(n).map { it.slot }
         lg.news += News(lg.season, lg.day, "NBA teams call ${c.name}", true)
+        Alerts.add(lg, "NBA teams are calling", "${os.nbaOffers.size} NBA ${if (os.nbaOffers.size == 1) "team wants" else "teams want"} you as head coach. You'll find the offers on the Career decision step of the offseason.", "")
     }
 
     /**

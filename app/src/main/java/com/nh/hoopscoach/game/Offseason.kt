@@ -366,16 +366,22 @@ object Offseason {
         return lg
     }
 
-    /** Runs every offseason step with default choices. Used by tests and "sim offseason". */
-    fun autoComplete(lg: League) {
+    /**
+     * Runs every offseason step with default choices. Used by tests and "sim offseason". With
+     * [stopForNba], it stops at the career decision when NBA teams have called: that one is the user's.
+     * Returns true if it stopped there.
+     */
+    fun autoComplete(lg: League, stopForNba: Boolean = false): Boolean {
         if (lg.phase == Phase.WRAP_UP) begin(lg)
         var guard = 0
         while (lg.phase == Phase.OFFSEASON && guard++ < 20) {
             val os = lg.offseason ?: break
+            if (stopForNba && os.step == OffStep.CAREER && os.nbaOffers.isNotEmpty()) return true
             if (os.step == OffStep.CAREER && os.fired) Coaching.acceptOffer(lg, os.offers.first().teamId)
             if (os.step == OffStep.RECRUITING) Recruiting.autoPlan(lg)
             advance(lg)
         }
+        return false
     }
 }
 

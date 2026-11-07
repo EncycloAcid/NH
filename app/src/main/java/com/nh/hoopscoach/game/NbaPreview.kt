@@ -95,6 +95,15 @@ object NbaPreviews {
 
     // ---------- the simulations ----------
 
+    /** The projection now: games played count as they finished, the rest are simulated from current strength. */
+    fun project(lg: League): Map<Int, NbaProj> = simulate(lg)
+
+    /** The latest projection: the weekly one in season, otherwise the preseason one. */
+    fun latest(lg: League): Map<Int, NbaProj> {
+        val ps = lg.proState ?: return emptyMap()
+        return ps.live.takeIf { it.isNotEmpty() && ps.liveDay > 0 } ?: ps.preview?.takeIf { it.season == lg.season }?.proj ?: emptyMap()
+    }
+
     private fun simulate(lg: League): Map<Int, NbaProj> {
         val n = lg.teams.size
         val rnd = kotlin.random.Random(lg.season * 6271L + n * 17L)

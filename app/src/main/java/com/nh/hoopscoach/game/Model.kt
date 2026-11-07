@@ -946,6 +946,9 @@ class ProState(
     var collegeResume: String = "",
     /** Last week's power rankings, best first, for movement. */
     val powerLast: MutableList<Int> = mutableListOf(),
+    /** The projection re-run during the season (results so far, current strength), and the day it was run. */
+    var live: Map<Int, NbaProj> = emptyMap(),
+    var liveDay: Int = 0,
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
