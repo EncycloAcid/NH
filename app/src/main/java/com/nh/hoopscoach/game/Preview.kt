@@ -15,6 +15,13 @@ class Odds(val conf: Double, val ncaa: Double, val s16: Double, val f4: Double, 
 @Serializable
 class Story(val kicker: String, val head: String, val body: String, val teamId: Int = -1, val pid: Int = -1)
 
+/**
+ * A bold prediction, in a form the season can check: what kind of call it is, the team or player it's
+ * about and the numbers in it. Graded when the season ends (see [Receipts]).
+ */
+@Serializable
+class Call(val kind: String, val team: Int = -1, val pid: Int = -1, val n: Int = 0, val m: Int = 0)
+
 /** A player's share of the Player of the Year odds. */
 @Serializable
 class PoyOdds(val pid: Int, val p: Double)
@@ -58,6 +65,10 @@ class Preview(
     val features: List<Feature> = emptyList(),
     val cover: Story? = null,
     val coverStyle: Int = 0,
+    /** The bold predictions as checkable calls (same order as [bold]), and how they went: 1 right, 0 wrong, -1 can't tell. */
+    val calls: List<Call> = emptyList(),
+    var graded: List<Int> = emptyList(),
+    var outcomes: List<String> = emptyList(),
 )
 
 object Previews {
@@ -67,6 +78,9 @@ object Previews {
     /** Built once per season, when the schedule is set. */
     fun build(lg: League): Preview {
         val n = lg.teams.size
+        // The magazine projects what its writers see, not the truth (see Receipts.bias), so it can be wrong.
+        val lean = Receipts.bias(lg)
+        fun seen(t: Team) = t.elo + lean[t.id]
         val games = IntArray(n)
         val confGames = IntArray(n)
         val confWins = DoubleArray(n)
@@ -75,7 +89,7 @@ object Previews {
             games[g.home]++
             games[g.away]++
             if (g.type == GameType.CONF) {
-                val p = Rankings.winProbFor(lg, g, g.home)
+                val p = Rankings.shift(Rankings.winProbFor(lg, g, g.home), lean[g.home] - lean[g.away])
                 confWins[g.home] += p
                 confWins[g.away] += 1 - p
                 confGames[g.home]++
@@ -83,14 +97,14 @@ object Previews {
             }
         }
         for (ev in lg.events) for (id in ev.teams) games[id] += 2
-        val byElo = lg.teams.sortedByDescending { it.elo }
+        val byElo = lg.teams.sortedByDescending { seen(it) }
         val nat = HashMap<Int, Int>()
         byElo.forEachIndexed { i, t -> nat[t.id] = i + 1 }
-        val (odds, bids, mean) = simulate(lg)
+        val (odds, bids, mean) = simulate(lg, lean)
         // Predicted finish: projected conference wins (the simulations agree), then the better team.
         val confRank = HashMap<Int, Int>()
         for (c in lg.confs) {
-            c.teamIds.map { lg.team(it) }.sortedWith(compareByDescending<Team> { confWins[it.id].roundToInt() }.thenByDescending { odds.getValue(it.id).conf }.thenByDescending { it.elo })
+            c.teamIds.map { lg.team(it) }.sortedWith(compareByDescending<Team> { confWins[it.id].roundToInt() }.thenByDescending { odds.getValue(it.id).conf }.thenByDescending { seen(it) })
                 .forEachIndexed { i, t -> confRank[t.id] = i + 1 }
         }
         // Projected records: the simulations' average, so they agree with the odds and win ranges.
@@ -137,7 +151,7 @@ object Previews {
         }.sortedByDescending { it.prestige }.take(5).map { it.id }
         // Player of the Year odds: the best players on the best teams.
         val poyScores = active.sortedByDescending { value(it) }.take(14).map { p ->
-            p to value(p) + (lg.team(p.teamId).elo - 1500) / 45.0 + (p.career.lastOrNull()?.s?.ppg ?: 0.0) * 0.15
+            p to value(p) + (seen(lg.team(p.teamId)) - 1500) / 45.0 + (p.career.lastOrNull()?.s?.ppg ?: 0.0) * 0.15
         }
         val top = poyScores.maxOfOrNull { it.second } ?: 0.0
         val weights = poyScores.map { it.first to kotlin.math.exp((it.second - top) / 3.5) }
@@ -151,10 +165,11 @@ object Previews {
         )
         val stories = storylines(lg, base)
         val (cover, style) = Features.collegeCover(lg, base, stories)
+        val calls = boldPredictions(lg, base)
         return Preview(
             base.season, base.proj, base.allAmerica, base.freshmen, base.transfers, base.breakouts, base.confPoy, base.finalFour, base.sleeper,
-            3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, boldPredictions(lg, base),
-            odds = odds, bids = bids, stories = stories, poy = poy, headline = cover?.head ?: coverHeadline(lg, base),
+            3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, calls.first,
+            calls = calls.second, odds = odds, bids = bids, stories = stories, poy = poy, headline = cover?.head ?: coverHeadline(lg, base),
             features = Features.college(lg, base), cover = cover, coverStyle = style,
         )
     }
@@ -181,17 +196,17 @@ object Previews {
      * conference tournaments (top eight), a 68-team field (conference winners plus the best
      * at-large résumés) and the bracket. Returns every team's odds and each conference's bids.
      */
-    private fun simulate(lg: League): Triple<Map<Int, Odds>, Map<Int, Double>, DoubleArray> {
+    private fun simulate(lg: League, lean: DoubleArray): Triple<Map<Int, Odds>, Map<Int, Double>, DoubleArray> {
         val n = lg.teams.size
         val rnd = kotlin.random.Random(lg.season * 7919L + n * 31L)
-        val elo = DoubleArray(n) { lg.team(it).elo }
+        val elo = DoubleArray(n) { lg.team(it).elo + lean[it] }
         val reg = lg.games.filter { it.type == GameType.NONCONF || it.type == GameType.CONF || it.type == GameType.EVENT }
         val home = IntArray(reg.size) { reg[it].home }
         val away = IntArray(reg.size) { reg[it].away }
         val isConf = BooleanArray(reg.size) { reg[it].type == GameType.CONF }
         val pHome = DoubleArray(reg.size) { i ->
             val g = reg[i]
-            if (g.played) (if (g.hs > g.aws) 1.0 else 0.0) else Rankings.winProbFor(lg, g, g.home)
+            if (g.played) (if (g.hs > g.aws) 1.0 else 0.0) else Rankings.shift(Rankings.winProbFor(lg, g, g.home), lean[g.home] - lean[g.away])
         }
         val mean = DoubleArray(n)
         for (i in reg.indices) { mean[home[i]] += pHome[i]; mean[away[i]] += 1 - pHome[i] }
@@ -687,38 +702,41 @@ object Previews {
             val at = old.poy.indexOfFirst { it.pid == m.id }
             parts += if (at == 0) "And we had the Player of the Year, ${m.name}, at the top of our board." else if (at > 0) "The Player of the Year, ${m.name}, started No. ${at + 1} in our odds." else "The Player of the Year, ${m.name}, wasn't in our top eight."
         }
+        Receipts.paragraph(old.bold, old.graded, old.outcomes, nextYear = true)?.let { parts += it }
         return Story("Report card", pick(lg, 299, "How we did last year", "Grading last year's picks", "What we got right, and wrong"), parts.joinToString(" "), (champ ?: no1)?.id ?: -1)
     }
 
     /** Predictions to argue about: the user's team always, plus five more. */
-    private fun boldPredictions(lg: League, pv: Preview): List<String> {
+    private fun boldPredictions(lg: League, pv: Preview): Pair<List<String>, List<Call>> {
         val ranked = ranked(lg, pv)
-        val pool = mutableListOf<String>()
+        val pool = mutableListOf<Pair<String, Call>>()
+        fun add(text: String, c: Call) { pool += text to c }
         lg.playerOrNull(pv.freshmen.firstOrNull() ?: -1)?.let { f ->
-            pool += "${f.name} wins National Freshman of the Year and is a top-five pick in the draft."
+            add("${f.name} wins National Freshman of the Year.", Call("C_AWARD", pid = f.id, n = 2))
         }
-        pool += "${lg.team(pv.cinderella).school} wins two NCAA Tournament games."
-        pool += "${lg.team(pv.sleeper).school} beats a top-10 team before conference play."
-        ranked.getOrNull(4)?.let { pool += "${it.school} loses in the first weekend of March." }
-        pv.bids.maxByOrNull { it.value }?.let { (c, b) -> pool += "The ${lg.conf(c).abbr} sends ${b.roundToInt() + 2} teams to the NCAA Tournament." }
-        CollegeHistory.lastChampion(lg)?.let { c -> pool += "${c.school} doesn't make the Sweet 16." }
-        lg.teams.filter { lg.conf(it.confId).tier >= 1 }.maxByOrNull { odds(pv, it).f4 }?.let { t -> pool += "${t.school} crashes the Final Four out of the ${lg.conf(t.confId).abbr}." }
-        ranked[0].let { t -> if (odds(pv, t).conf < 0.6) pool += "${t.school} doesn't win the ${lg.conf(t.confId).abbr}." }
+        add("${lg.team(pv.cinderella).school} wins two NCAA Tournament games.", Call("C_NCAA_WINS", pv.cinderella, n = 2))
+        add("${lg.team(pv.sleeper).school} finishes in the top 25 of the NET.", Call("C_NET", pv.sleeper, n = 25))
+        ranked.getOrNull(4)?.let { add("${it.school} loses in the first weekend of March.", Call("C_FIRST_WEEKEND", it.id)) }
+        pv.bids.maxByOrNull { it.value }?.let { (c, b) -> add("The ${lg.conf(c).abbr} sends ${b.roundToInt() + 2} teams to the NCAA Tournament.", Call("C_BIDS", c, n = b.roundToInt() + 2)) }
+        CollegeHistory.lastChampion(lg)?.let { c -> add("${c.school} doesn't make the Sweet 16.", Call("C_NO_S16", c.id)) }
+        lg.teams.filter { lg.conf(it.confId).tier >= 1 }.maxByOrNull { odds(pv, it).f4 }?.let { t -> add("${t.school} crashes the Final Four out of the ${lg.conf(t.confId).abbr}.", Call("C_F4", t.id)) }
+        ranked[0].let { t -> if (odds(pv, t).conf < 0.6) add("${t.school} doesn't win the ${lg.conf(t.confId).abbr}.", Call("C_NO_CONF", t.id)) }
         lg.players.filter { it.teamId >= 0 && (it.career.lastOrNull()?.s?.ppg ?: 0.0) >= 17 }.maxByOrNull { it.career.last().s.ppg }?.let { p ->
-            pool += "${p.name} leads the country in scoring at better than 24 points a game."
+            add("${p.name} leads the country in scoring at better than 24 points a game.", Call("C_SCORING", pid = p.id, n = 24))
         }
         lg.teams.filter { it.id != lg.userTeamId && newCoach(lg, it) }.maxByOrNull { it.prestige }?.let { t ->
-            pool += "${t.school} makes the NCAA Tournament in ${lg.coachOf(t).last}'s first season."
+            add("${t.school} makes the NCAA Tournament in ${lg.coachOf(t).last}'s first season.", Call("C_NCAA", t.id))
         }
         val picked = pool.shuffled(kotlin.random.Random(lg.season * 31L + 7)).take(5)
         val u = lg.user
         val mine = pv.proj.getValue(u.id)
         val own = when {
-            mine.nat <= 10 -> "${u.school} wins the ${lg.conf(u.confId).abbr} by two games."
-            mine.nat <= 45 -> "${u.school} finishes ahead of where we picked it in the ${lg.conf(u.confId).abbr}."
-            else -> "${u.school} pulls off at least one upset over a ranked team."
+            mine.nat <= 10 -> "${u.school} wins the ${lg.conf(u.confId).abbr} by two games." to Call("C_CONF_BY", u.id, n = 2)
+            mine.nat <= 45 -> "${u.school} finishes ahead of where we picked it in the ${lg.conf(u.confId).abbr}." to Call("C_CONF_BEAT", u.id, n = mine.confRank)
+            else -> "${u.school} finishes above .500 in the ${lg.conf(u.confId).abbr}." to Call("C_CONF_500", u.id)
         }
-        return picked + own
+        val all = picked + own
+        return all.map { it.first } to all.map { it.second }
     }
 
     /** The editor's letter at the front of the issue. */

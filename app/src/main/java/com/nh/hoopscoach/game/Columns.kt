@@ -145,6 +145,7 @@ object Columns {
 
     fun reviewPro(lg: League) {
         val ps = lg.proState ?: return
+        runCatching { Receipts.gradePro(lg) }
         val champ = lg.teams.getOrNull(ps.champion) ?: return
         val finals = ps.series.firstOrNull { it.round == 4 }
         val runner = finals?.let { lg.team(if (it.hi == champ.id) it.lo else it.hi) }
@@ -167,12 +168,14 @@ object Columns {
                     "Our preseason favorite, ${the(lg, fav)}, went ${fav.record}: ${resultWords(fav.history.lastOrNull { it.season == lg.season }?.result ?: "")}."
             }
         }
+        ps.preview?.takeIf { it.season == lg.season }?.let { pv -> Receipts.paragraph(pv.bold, pv.graded, pv.outcomes, nextYear = false)?.let { parts += it } }
         val head = pick(lg, 10, "${lg.season} in review: the ${nick(lg, champ)}' year", "The season in review: ${champ.name}, champions", "Looking back at ${lg.season}: how the ${nick(lg, champ)} won it all")
         lg.news += News(lg.season, lg.day, head, champ.id == lg.userTeamId, -1, "column", parts.joinToString("\n\n"), byline(lg, 99), champ.id, mvp?.pid ?: -1)
     }
 
     fun reviewCollege(lg: League) {
         val ncaa = lg.ncaa ?: return
+        runCatching { Receipts.gradeCollege(lg) }
         val champ = lg.teams.getOrNull(ncaa.champion) ?: return
         val runner = ncaa.rounds.getOrNull(5)?.firstOrNull { it >= 0 && it != ncaa.champion }?.let { lg.team(it) }
         val withAward = { code: String -> lg.players.firstOrNull { p -> p.awards.contains("${lg.season} $code") } }
@@ -196,6 +199,7 @@ object Columns {
                     "Our preseason No. 1, ${no1.school}, ${Previews.lastSeason(no1.history.lastOrNull { it.season == lg.season }?.result ?: "")}."
             }
         }
+        lg.preview?.takeIf { it.season == lg.season }?.let { pv -> Receipts.paragraph(pv.bold, pv.graded, pv.outcomes, nextYear = false)?.let { parts += it } }
         val head = pick(lg, 11, "${lg.season} in review: ${champ.school}'s year", "The season in review: ${champ.school}, champions", "Looking back at ${lg.season}: how ${champ.school} won it all")
         lg.news += News(lg.season, lg.day, head, champ.id == lg.userTeamId, -1, "column", parts.joinToString("\n\n"), byline(lg, 98), champ.id, withAward("Nat MVP")?.id ?: -1)
     }

@@ -1334,15 +1334,7 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
                 Text(v, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
             }
         }
-        if (pv.bold.isNotEmpty()) {
-            Section("Bold predictions")
-            GroupList(pv.bold.withIndex().toList()) { (i, text) ->
-                ListRow {
-                    Text("${i + 1}", style = T.num.copy(fontSize = 22.sp), color = P.accent, modifier = Modifier.width(34.dp))
-                    Text(text, style = T.body, color = P.ink, modifier = Modifier.weight(1f))
-                }
-            }
-        }
+        if (pv.bold.isNotEmpty()) BoldPredictions(pv.bold, pv.graded, pv.outcomes)
         Text("See you in March.", style = T.title.copy(fontSize = 26.sp), color = P.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
     }
 }

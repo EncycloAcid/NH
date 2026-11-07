@@ -165,3 +165,27 @@ internal fun VersusCover(
         Text("$count pages · swipe to open →", style = T.bodyB, color = P.gold, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
     }
 }
+
+/**
+ * The bold predictions; once the season is over, each one marked right or wrong, with what really
+ * happened and the tally at the top.
+ */
+@Composable
+internal fun BoldPredictions(bold: List<String>, graded: List<Int>, outcomes: List<String>) {
+    val done = graded.count { it >= 0 }
+    Section(if (done > 0) "Bold predictions · ${graded.count { it == 1 }} of $done right" else "Bold predictions")
+    GroupList(bold.withIndex().toList()) { (i, text) ->
+        val g = graded.getOrNull(i) ?: -1
+        ListRow {
+            Text("${i + 1}", style = T.num.copy(fontSize = 22.sp), color = when (g) { 1 -> P.good; 0 -> P.bad; else -> P.accent }, modifier = Modifier.width(34.dp))
+            Column(Modifier.weight(1f)) {
+                Text(text, style = T.body, color = if (g == 0) P.sub else P.ink)
+                outcomes.getOrNull(i)?.takeIf { g >= 0 && it.isNotEmpty() }?.let { Text(it, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp)) }
+            }
+            if (g >= 0) {
+                Spacer(Modifier.width(8.dp))
+                Tag(if (g == 1) "RIGHT" else "WRONG", if (g == 1) P.good else P.bad)
+            }
+        }
+    }
+}

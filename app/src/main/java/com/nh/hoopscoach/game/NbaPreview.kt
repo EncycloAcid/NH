@@ -39,6 +39,10 @@ class NbaPreview(
     val features: List<Feature> = emptyList(),
     val cover: Story? = null,
     val coverStyle: Int = 0,
+    /** The bold predictions as checkable calls (same order as [bold]), and how they went: 1 right, 0 wrong, -1 can't tell. */
+    val calls: List<Call> = emptyList(),
+    var graded: List<Int> = emptyList(),
+    var outcomes: List<String> = emptyList(),
 )
 
 object NbaPreviews {
@@ -73,7 +77,8 @@ object NbaPreviews {
         val ps = lg.proState!!
         val last = lastSeasons(lg)
         val games = ProLeague.seasonGames(lg).coerceAtLeast(1)
-        val proj = simulate(lg)
+        // The magazine projects what its writers see, not the truth (see Receipts.bias), so it can be wrong.
+        val proj = simulate(lg, Receipts.bias(lg))
         val active = lg.teams.flatMap { lg.rosterOf(it) }
         fun projW(p: Player) = proj[p.teamId]?.w ?: 41
         fun odds(cands: List<Pair<Player, Double>>, temp: Double, n: Int): List<PoyOdds> {
@@ -102,9 +107,10 @@ object NbaPreviews {
         val base = NbaPreview(lg.season, proj, mvp, roy, dpoy, sixth, mip, last = lastText, lastWins = lastWins)
         val stories = storylines(lg, base)
         val (cover, style) = Features.nbaCover(lg, base, stories)
+        val calls = bold(lg, base)
         return NbaPreview(
             lg.season, proj, mvp, roy, dpoy, sixth, mip,
-            stories = stories, bold = bold(lg, base), headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
+            stories = stories, bold = calls.first, calls = calls.second, headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
             features = Features.nba(lg, base), cover = cover, coverStyle = style,
         )
     }
@@ -120,15 +126,16 @@ object NbaPreviews {
         return ps.live.takeIf { it.isNotEmpty() && ps.liveDay > 0 } ?: ps.preview?.takeIf { it.season == lg.season }?.proj ?: emptyMap()
     }
 
-    private fun simulate(lg: League): Map<Int, NbaProj> {
+    private fun simulate(lg: League, bias: DoubleArray? = null): Map<Int, NbaProj> {
         val n = lg.teams.size
         val rnd = kotlin.random.Random(lg.season * 6271L + n * 17L)
         val era = Eras.of(lg)
-        val elo = DoubleArray(n) { lg.team(it).elo }
+        fun lean(t: Int) = bias?.getOrNull(t) ?: 0.0
+        val elo = DoubleArray(n) { lg.team(it).elo + lean(it) }
         val reg = lg.games.filter { it.type == GameType.CONF || it.type == GameType.NONCONF }
         val home = IntArray(reg.size) { reg[it].home }
         val away = IntArray(reg.size) { reg[it].away }
-        val pHome = DoubleArray(reg.size) { i -> val g = reg[i]; if (g.played) (if (g.hs > g.aws) 1.0 else 0.0) else Rankings.winProbFor(lg, g, g.home) }
+        val pHome = DoubleArray(reg.size) { i -> val g = reg[i]; if (g.played) (if (g.hs > g.aws) 1.0 else 0.0) else Rankings.shift(Rankings.winProbFor(lg, g, g.home), lean(g.home) - lean(g.away)) }
         val played = IntArray(n)
         for (g in reg) { played[g.home]++; played[g.away]++ }
         val maxW = 100
@@ -677,41 +684,46 @@ object NbaPreviews {
             val at = old.mvp.indexOfFirst { lg.playerOrNull(it.pid)?.name == m }
             parts += if (at == 0) "And we had the MVP, $m, at the top of our board." else if (at > 0) "The MVP, $m, started No. ${at + 1} on our board (${pct(old.mvp[at].p)})." else "The MVP, $m, wasn't on our board at all."
         }
+        Receipts.paragraph(old.bold, old.graded, old.outcomes, nextYear = true)?.let { parts += it }
         return Story("Report card", pick(lg, 299, "How we did last year", "Grading last year's picks", "What we got right, and wrong"), parts.joinToString(" "),
             (champ ?: fav).id)
     }
 
-    private fun bold(lg: League, pv: NbaPreview): List<String> {
-        val ps = lg.proState ?: return emptyList()
+    private fun bold(lg: League, pv: NbaPreview): Pair<List<String>, List<Call>> {
+        val ps = lg.proState ?: return emptyList<String>() to emptyList()
         val ranked = ranked(lg, pv)
         fun pr(t: Team) = pv.proj.getValue(t.id)
-        val pool = mutableListOf<String>()
-        ranked.first().let { if (pr(it).finals < 0.55) pool += "The ${it.name} don't make the Finals." }
-        ranked.getOrNull(7)?.let { pool += "The ${it.name} reach the conference finals." }
-        lg.teams.minByOrNull { pr(it).w }?.let { if (pr(it).w <= 26) pool += "The ${it.name} win fewer than 20 games." }
-        pv.roy.firstOrNull()?.let { o -> lg.playerOrNull(o.pid)?.let { pool += "${it.name} averages 20 points as a rookie." } }
-        pv.mip.firstOrNull()?.let { o -> lg.playerOrNull(o.pid)?.let { pool += "${it.name} wins Most Improved Player." } }
-        if (Eras.of(lg).playIn) pool += "A team from the play-in wins a first-round series."
-        ps.history.lastOrNull()?.champion?.takeIf { it >= 0 }?.let { pool += "The ${lg.team(it).name} lose in the first round." }
-        pv.mvp.getOrNull(3)?.let { o -> lg.playerOrNull(o.pid)?.let { pool += "${it.name} wins MVP." } }
-        ranked.first().let { if (pr(it).w >= 58) pool += "The ${it.name} win 65 games." }
-        lg.teams.filter { pr(it).playoffs in 0.15..0.4 }.maxByOrNull { pr(it).playoffs }?.let { pool += "The ${it.name} make the playoffs." }
-        lg.teams.filter { pr(it).playoffs >= 0.85 && pr(it).title < 0.05 }.minByOrNull { pr(it).playoffs }?.let { pool += "The ${it.name} miss the playoffs." }
-        pv.roy.getOrNull(2)?.let { o -> lg.playerOrNull(o.pid)?.let { pool += "${it.name} wins Rookie of the Year." } }
-        pv.dpoy.getOrNull(1)?.let { o -> lg.playerOrNull(o.pid)?.let { pool += "${it.name} wins Defensive Player of the Year." } }
+        val pool = mutableListOf<Pair<String, Call>>()
+        fun add(text: String, c: Call) { pool += text to c }
+        ranked.first().let { if (pr(it).finals < 0.55) add("The ${it.name} don't make the Finals.", Call("NO_FINALS", it.id)) }
+        ranked.getOrNull(7)?.let { add("The ${it.name} reach the conference finals.", Call("CONF_FINALS", it.id)) }
+        lg.teams.minByOrNull { pr(it).w }?.let { if (pr(it).w <= 26) add("The ${it.name} win fewer than 20 games.", Call("UNDER_W", it.id, n = 20)) }
+        pv.roy.firstOrNull()?.let { o -> lg.playerOrNull(o.pid)?.let { add("${it.name} averages 20 points as a rookie.", Call("PPG", pid = it.id, n = 20)) } }
+        pv.mip.firstOrNull()?.let { o -> lg.playerOrNull(o.pid)?.let { add("${it.name} wins Most Improved Player.", Call("AWARD", pid = it.id, n = 5)) } }
+        if (Eras.of(lg).playIn) add("A team from the play-in wins a first-round series.", Call("PLAYIN_SERIES"))
+        ps.history.lastOrNull()?.champion?.takeIf { it >= 0 }?.let { add("The ${lg.team(it).name} lose in the first round.", Call("FIRST_ROUND_EXIT", it)) }
+        pv.mvp.getOrNull(3)?.let { o -> lg.playerOrNull(o.pid)?.let { add("${it.name} wins MVP.", Call("AWARD", pid = it.id, n = 1)) } }
+        ranked.first().let { if (pr(it).w >= 58) add("The ${it.name} win 65 games.", Call("OVER_W", it.id, n = 65)) }
+        lg.teams.filter { pr(it).playoffs in 0.15..0.4 }.maxByOrNull { pr(it).playoffs }?.let { add("The ${it.name} make the playoffs.", Call("PLAYOFFS", it.id)) }
+        lg.teams.filter { pr(it).playoffs >= 0.85 && pr(it).title < 0.05 }.minByOrNull { pr(it).playoffs }?.let { add("The ${it.name} miss the playoffs.", Call("MISS_PLAYOFFS", it.id)) }
+        pv.roy.getOrNull(2)?.let { o -> lg.playerOrNull(o.pid)?.let { add("${it.name} wins Rookie of the Year.", Call("AWARD", pid = it.id, n = 2)) } }
+        pv.dpoy.getOrNull(1)?.let { o -> lg.playerOrNull(o.pid)?.let { add("${it.name} wins Defensive Player of the Year.", Call("AWARD", pid = it.id, n = 3)) } }
         lg.teams.flatMap { lg.rosterOf(it) }.mapNotNull { p -> lastLine(lg, p)?.let { p to it.s.ppg } }.sortedByDescending { it.second }.getOrNull(1)
-            ?.let { (p, _) -> pool += "${p.name} wins the scoring title." }
-        pool += "A No. ${if (Eras.of(lg).playIn) 7 else 8} seed knocks out a No. ${if (Eras.of(lg).playIn) 2 else 1} seed."
-        val picked = pool.distinct().shuffled(kotlin.random.Random(lg.season * 37L + 3)).take(6)
+            ?.let { (p, _) -> add("${p.name} wins the scoring title.", Call("SCORING_TITLE", pid = p.id)) }
+        val (hiSeed, loSeed) = if (Eras.of(lg).playIn) 2 to 7 else 1 to 8
+        add("A No. $loSeed seed knocks out a No. $hiSeed seed.", Call("SEED_UPSET", n = hiSeed, m = loSeed))
+        val picked = pool.distinctBy { it.first }.shuffled(kotlin.random.Random(lg.season * 37L + 3)).take(6)
         val hero = lg.playerOrNull(lg.heroId)?.takeIf { it.teamId >= 0 }
         val own = when {
             hero == null -> null
-            hero.proYears == 0 -> "${hero.name} makes the All-Rookie First Team."
-            pv.mvp.take(3).any { it.pid == hero.id } -> "${hero.name} wins MVP."
-            pv.mvp.any { it.pid == hero.id } -> "${hero.name} makes an All-NBA team."
-            else -> "${hero.name} sets a career high in points per game."
+            hero.proYears == 0 -> "${hero.name} makes the All-Rookie First Team." to Call("HONOR", pid = hero.id, n = 1)
+            pv.mvp.take(3).any { it.pid == hero.id } -> "${hero.name} wins MVP." to Call("AWARD", pid = hero.id, n = 1)
+            pv.mvp.any { it.pid == hero.id } -> "${hero.name} makes an All-NBA team." to Call("HONOR", pid = hero.id, n = 2)
+            else -> "${hero.name} sets a career high in points per game." to
+                Call("CAREER_PPG", pid = hero.id, n = (hero.career.filter { it.cls == PRO_YEAR }.maxOfOrNull { it.s.ppg } ?: 0.0).times(10).roundToInt())
         }
-        return picked + listOfNotNull(own)
+        val all = picked + listOfNotNull(own)
+        return all.map { it.first } to all.map { it.second }
     }
 
     /** The editor's letter. */
