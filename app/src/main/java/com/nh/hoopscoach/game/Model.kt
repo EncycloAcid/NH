@@ -749,6 +749,8 @@ class RoadState(
     val pressLog: MutableList<String> = mutableListOf(),
     /** His social feed (newest last), and when the last award-race column ran (season * 1000 + day). */
     val feed: MutableList<Post> = mutableListOf(),
+    /** Around the league: the day's stories and what people said about them (the Social screen's second tab). */
+    val leagueFeed: MutableList<Post> = mutableListOf(),
     var lastColumn: Int = 0,
     /** What his feed has already covered: awards on his record, his team and level, his deal, his best scoring night, career-point milestones. */
     var seenAwards: Int = -1,
@@ -1147,6 +1149,8 @@ class Post(
     val likes: Int, val verified: Boolean = false, val gameId: Int = -1,
     /** A real account's avatar (assets/social/<avatar>.webp), or empty. */
     val avatar: String = "",
+    /** The story it's about (a headline in the news), for the league feed: tap to read it. */
+    val re: String = "",
 )
 
 @Serializable

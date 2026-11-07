@@ -76,7 +76,7 @@ object Staffing {
             else "The ${t.name} hire ${c.name} as head coach (${t.plan.offense.label}, ${t.plan.defense.label})"
         ps?.staffMoves?.add(line)
         lg.news += News(lg.season, 0, "Coaching change: $line", t.id == lg.userTeamId || poachedFrom?.id == lg.userTeamId)
-        if (Feed.mine(lg, t.id, poachedFrom?.id ?: -1)) Media.post(lg, "NBA Insider", "nbainsider", "insider", "The ${t.name} are hiring ${c.name} as head coach, per sources.", Media.likes(lg, 0.02), verified = true)
+        Media.post(lg, "NBA Insider", "nbainsider", "insider", "The ${t.name} are hiring ${c.name} as head coach, per sources.", Media.likes(lg, 0.02), verified = true, league = !Feed.mine(lg, t.id, poachedFrom?.id ?: -1))
         if (t.id == lg.userTeamId) Alerts.add(lg, "New coach", "${c.name} takes over the ${t.name}. He runs a ${t.plan.offense.label} offense and plays ${t.plan.defense.label}. Roles may change: check the Me tab.", "")
     }
 

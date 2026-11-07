@@ -33,10 +33,12 @@ object Media {
      * A post on his feed. Team, league and clip posts use the real accounts where the pack has them (today's
      * game only); the generic "NBA Insider" becomes a real insider. Posts from a [Voice] keep their account.
      */
-    fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1, avatar: String = "") {
+    fun post(lg: League, name: String, handle: String, kind: String, text: String, likes: Int, verified: Boolean = false, gameId: Int = -1, avatar: String = "",
+             league: Boolean = false, re: String = "") {
         val r = lg.road ?: return
+        val feed = if (league) r.leagueFeed else r.feed
         // Nobody posts the exact same thing twice in a row of posts.
-        if (r.feed.takeLast(40).any { it.text == text }) return
+        if (feed.takeLast(40).any { it.text == text }) return
         val acct = if (avatar.isNotEmpty()) null else when {
             kind == "league" || name == "NBA" || name == "NCAA" -> SocialAccounts.league(lg)
             kind == "team" -> SocialAccounts.forTeam(lg, name)
@@ -46,8 +48,9 @@ object Media {
         }
         // Made-up names for the league account in eras before social media, at the right level.
         val shown = acct?.name ?: if (kind == "league" && !lg.pro) "NCAA March Madness" else name
-        r.feed += Post(lg.season, lg.day, shown, acct?.handle ?: handle, kind, text, max(likes, 3), acct?.verified ?: verified, gameId, acct?.avatar ?: avatar)
-        if (r.feed.size > 80) r.feed.subList(0, r.feed.size - 80).clear()
+        feed += Post(lg.season, lg.day, shown, acct?.handle ?: handle, kind, text, max(likes, 3), acct?.verified ?: verified, gameId, acct?.avatar ?: avatar, re)
+        val keep = if (league) 150 else 80
+        if (feed.size > keep) feed.subList(0, feed.size - keep).clear()
     }
 
     fun say(lg: League, v: Voice, kind: String, text: String, likes: Int) = post(lg, v.name, v.handle, kind, text, likes, v.verified, avatar = v.avatar)

@@ -27,7 +27,7 @@ object Rumors {
                     "The ${b.name} are looking for help at ${p.pos}; ${p.name} of the ${s.name} is on their list",
                 ))
                 lg.news += News(lg.season, lg.day, "Rumor: $text", s.id == lg.userTeamId || b.id == lg.userTeamId)
-                if (Feed.mine(lg, s.id, b.id)) Media.post(lg, INSIDER, HANDLE, "insider", "$text, per league sources.", Media.likes(lg, 0.02), verified = true)
+                Media.post(lg, INSIDER, HANDLE, "insider", "$text, per league sources.", Media.likes(lg, 0.02), verified = true, league = !Feed.mine(lg, s.id, b.id))
             }
         }
         // About him: when he's unhappy or has asked out, the phones ring.
@@ -56,7 +56,7 @@ object Rumors {
         val a = lg.team(t.teamA)
         val b = lg.team(t.teamB)
         val text = "The ${a.name} are trading ${t.toB.joinToString(" and ")} to the ${b.name} for ${t.toA.joinToString(" and ")}"
-        if (t.hero || Feed.mine(lg, a.id, b.id)) Media.post(lg, INSIDER, HANDLE, "insider", "BREAKING: $text.", Media.likes(lg, if (t.hero) 0.12 else 0.03), verified = true)
+        Media.post(lg, INSIDER, HANDLE, "insider", "BREAKING: $text.", Media.likes(lg, if (t.hero) 0.12 else 0.03), verified = true, league = !(t.hero || Feed.mine(lg, a.id, b.id)))
         if (t.teamA == lg.userTeamId || t.teamB == lg.userTeamId) {
             val got = if (t.teamA == lg.userTeamId) t.toA else t.toB
             Media.post(lg, "${lg.user.mascot} Nation", "${lg.user.abbr.lowercase()}nation", "fan",

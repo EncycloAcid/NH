@@ -51,17 +51,21 @@ private fun kindColor(kind: String) = when (kind) {
     "insider" -> P.accent
     "self" -> P.accent
     "league" -> P.gold
+    "news" -> P.ink
+    "player" -> P.gold
+    "coach" -> P.accent
+    "recruit" -> P.good
     else -> P.sub
 }
 
 private fun kindLabel(kind: String) = when (kind) {
-    "team" -> "Team"; "media" -> "Highlights"; "analyst" -> "Analyst"; "rival" -> "Your rival"; "teammate" -> "Teammate"; "hater" -> "Doubter"; "insider" -> "Insider"; "self" -> "You"; "league" -> "League"; else -> "Fan"
+    "team" -> "Team"; "media" -> "Highlights"; "analyst" -> "Analyst"; "rival" -> "Your rival"; "teammate" -> "Teammate"; "hater" -> "Doubter"; "insider" -> "Insider"; "self" -> "You"; "league" -> "League"; "news" -> "News"; "player" -> "Player"; "coach" -> "Coach"; "recruit" -> "Recruit"; else -> "Fan"
 }
 
-/** One post: avatar, name with a check if verified, handle and day, the text, and the likes. */
+/** One post: avatar, name with a check if verified, handle and day, the text, and the likes. [onOpen] opens the story it's about. */
 @Composable
-fun PostRow(p: Post) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
+fun PostRow(p: Post, onOpen: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
         val initials = p.name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }
         // A real account shows its avatar; everyone else their initials.
         val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -78,13 +82,16 @@ fun PostRow(p: Post) {
                 Spacer(Modifier.width(6.dp))
                 Text("@${p.handle}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
-            Text(p.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 2.dp))
+            // A reply to a story says which one (the outlet's own post is the story).
+            if (p.re.isNotEmpty() && p.kind != "news") Text("on: ${headline(p.re)}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
+            Text(p.text, style = if (p.kind == "news") T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(top = 2.dp))
             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.7f), modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(Road.count(p.likes), style = T.small, color = P.sub)
                 Spacer(Modifier.width(10.dp))
                 Text("${kindLabel(p.kind)} · day ${p.day}", style = T.small, color = P.faint)
+                if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
             }
         }
     }
@@ -96,24 +103,88 @@ fun SocialStrip(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val posts = r.feed.filter { it.season == lg.season }.takeLast(2).reversed()
     if (posts.isEmpty()) return
-    Section("Social · ${Road.count(r.followers)} followers", action = "See all", onAction = { vm.push(Route.Social) })
+    Section("Social · ${Road.count(r.followers)} followers", action = "See all", onAction = { vm.socialTab = 0; vm.push(Route.Social) })
     GroupList(posts, inset = 60.dp) { p -> PostRow(p) }
+    // The latest big story around the league, a tap away from that tab.
+    r.leagueFeed.lastOrNull { it.kind == "news" && it.season == lg.season }?.let { n ->
+        Spacer(Modifier.height(8.dp))
+        GroupList(listOf(n)) { p ->
+            ListRow(onClick = { vm.socialTab = 1; vm.push(Route.Social) }) {
+                Column(Modifier.weight(1f)) {
+                    Text("AROUND THE LEAGUE · ${p.name.uppercase()}", style = T.label.copy(fontSize = 10.sp), color = P.sub, maxLines = 1)
+                    Text(headline(p.re.ifEmpty { p.text }), style = T.bodyB, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("${r.leagueFeed.count { it.re == p.re && it.re.isNotEmpty() } - 1} reactions · see the league feed", style = T.small, color = P.accent)
+                }
+            }
+        }
+    }
 }
 
-/** The whole feed, newest first. */
+/** Where a league post goes when tapped: the story it's about, if it's still in the news. */
+private fun storyClick(vm: GameViewModel, lg: League, p: Post): (() -> Unit)? {
+    if (p.re.isEmpty()) return null
+    val n = lg.news.lastOrNull { it.text == p.re && it.season == p.season } ?: return null
+    return newsClick(vm, lg, n)
+}
+
+/** The feed in two tabs: what people say about you, and what's happening around the league. Newest first. */
 @Composable
 fun SocialScreen(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
+    var kind by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize()) {
-        BackBar("Social", "${Road.count(r.followers)} followers · what people are saying about you", onBack = { vm.back() })
+        BackBar("Social", "${Road.count(r.followers)} followers", onBack = { vm.back() })
         LazyColumn(Modifier.weight(1f)) {
-            val posts = r.feed.reversed()
-            if (posts.isEmpty()) item { Panel { Text("Nothing yet. Play a game and the internet will have opinions.", style = T.body, color = P.sub) } }
-            else item {
-                Spacer(Modifier.height(8.dp))
-                GroupList(posts, inset = 60.dp) { p -> PostRow(p) }
-                Spacer(Modifier.height(16.dp))
+            item {
+                Spacer(Modifier.height(6.dp))
+                Segmented(listOf("You", "Around the league"), vm.socialTab, { vm.socialTab = it })
             }
+            if (vm.socialTab == 0) {
+                val posts = r.feed.reversed()
+                if (posts.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("Nothing yet. Play a game and the internet will have opinions.", style = T.body, color = P.sub) } }
+                else item {
+                    Spacer(Modifier.height(8.dp))
+                    GroupList(posts, inset = 60.dp) { p -> PostRow(p) }
+                }
+            } else {
+                val all = r.leagueFeed.reversed()
+                // Trending: the stories people engaged with most over the last few days.
+                val recent = all.filter { it.season == lg.season && lg.day - it.day <= (if (lg.pro) 7 else 3) && it.re.isNotEmpty() }
+                val trending = recent.groupBy { it.re }.map { (re, ps) -> re to ps.sumOf { it.likes } }.sortedByDescending { it.second }.take(3)
+                if (trending.isNotEmpty()) item {
+                    Section("Trending")
+                    GroupList(trending, inset = 46.dp) { (re, likes) ->
+                        val open = storyClick(vm, lg, all.first { it.re == re })
+                        ListRow(onClick = open) {
+                            Text("${trending.indexOfFirst { it.first == re } + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(22.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(headline(re), style = T.bodyB, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text("${Road.count(likes)} likes · ${all.count { it.re == re }} posts", style = T.small, color = P.sub)
+                            }
+                        }
+                    }
+                }
+                // Filters: everything, the stories themselves, or what people said.
+                item {
+                    Spacer(Modifier.height(10.dp))
+                    Chips(listOf("Everything", "Stories", "Players & coaches", "Analysts & insiders", "Fans"), kind, { kind = it })
+                }
+                val shown = all.filter { p ->
+                    when (kind) {
+                        1 -> p.kind == "news"
+                        2 -> p.kind in setOf("player", "coach", "recruit", "teammate")
+                        3 -> p.kind in setOf("analyst", "insider", "media", "league")
+                        4 -> p.kind in setOf("fan", "hater")
+                        else -> true
+                    }
+                }.take(100)
+                if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("Nothing here yet. Sim a few days and the league will start talking.", style = T.body, color = P.sub) } }
+                else item {
+                    Spacer(Modifier.height(8.dp))
+                    GroupList(shown, inset = 60.dp) { p -> PostRow(p, storyClick(vm, lg, p)) }
+                }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 }

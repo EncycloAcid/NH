@@ -76,9 +76,41 @@ object Reactions {
         while (i < lg.news.size) {
             val n = lg.news[i]
             if (n.reactions.isEmpty()) runCatching { react(lg, i, n) }
+            // In a player's career, the story and the best of what people said go on the league feed.
+            if (lg.road != null) runCatching { toLeagueFeed(lg, lg.news[i]) }
             i++
         }
         lg.newsSeen = lg.news.size
+    }
+
+    /**
+     * A story on the "Around the league" feed: the outlet posts the headline (and its first lines), then
+     * the most-liked reactions follow, each tied to the story so a tap opens it. His own stories stay on
+     * his own feed; rumors are already there from the insider.
+     */
+    private fun toLeagueFeed(lg: League, n: News) {
+        val r = lg.road ?: return
+        if (n.mine || n.pid == lg.heroId || n.kind == "recap" || n.text.startsWith("Rumor:")) return
+        if (r.leagueFeed.any { it.re == n.text && it.season == n.season }) return
+        val outlet = n.source.substringAfter(" · ", "").ifEmpty { if (lg.pro) Rng.pick(listOf("Hoops Wire", "The Rim", "Baseline Sports")) else Rng.pick(listOf("Hoops Wire", "The Daily Dribble", "Courtside Report")) }
+        val lede = n.body.substringBefore("\n\n").substringAfter(" — ").let { if (it.length > 150) it.take(147).substringBeforeLast(' ') + "…" else it }
+        val big = n.kind in setOf("trade", "series", "upset", "buzzer") || n.reactions.sumOf { it.likes } > 30_000
+        val out = mutableListOf<Post>()
+        out += Post(n.season, n.day, outlet, outlet.replace(" ", ""), "news", if (lede.isNotEmpty() && lede != n.text) "${n.text}. $lede" else n.text,
+            (n.reactions.maxOfOrNull { it.likes } ?: likes(lg, null, if (big) 2.0 else 0.6)) * 2, true, n.gameId, re = n.text)
+        for (x in n.reactions.sortedByDescending { it.likes }.take(if (big) 3 else 2)) {
+            val kind = when {
+                x.role.endsWith(" fan") || x.role == "Fan" -> "fan"
+                x.role.startsWith("Analyst") -> "analyst"
+                x.role.contains("nsider") -> "insider"
+                x.role.endsWith("head coach") -> "coach"
+                x.role == "Recruit" || x.role == "Transfer" -> "recruit"
+                else -> "player"
+            }
+            out += Post(n.season, n.day, x.who, x.who.replace(" ", "").replace(".", "").lowercase(), kind, x.text, x.likes, x.verified, n.gameId, x.avatar, re = n.text)
+        }
+        r.leagueFeed += out
+        if (r.leagueFeed.size > 150) r.leagueFeed.subList(0, r.leagueFeed.size - 150).clear()
     }
 
     private fun gameOf(lg: League, n: News) = if (n.gameId >= 0) lg.games.firstOrNull { it.id == n.gameId && it.played } else null
