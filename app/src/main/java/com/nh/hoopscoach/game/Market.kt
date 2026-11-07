@@ -364,6 +364,14 @@ object Market {
             }
         }
 
+        val inPool = pool.map { it.first.id }.toMutableSet()
+        for (p in lg.players) {
+            if (p.teamId < 0 && p.id !in keep && p.id !in inPool) {
+                pool += Triple(p, -1, false)
+                inPool += p.id
+            }
+        }
+
         val me = lg.userTeamId
         val sortedPool = pool.sortedByDescending { Trades.value(it.first) }
         for ((p, from, isRfa) in sortedPool) {
@@ -625,7 +633,8 @@ object Market {
                 val line = "${p.name} (${Ratings.shownPro(p.ovr)}) signs with the ${winTeam.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.salary)} a season"
                 ps.faMoves += line
                 if (roundLog.none { it.contains(p.name) }) roundLog += line
-                lg.news += News(lg.season, 0, "Free agency: $line, leaving the ${lg.team(fc.fromTeamId).name}", winTeam.id == me || fc.fromTeamId == me)
+                val leaving = lg.teams.getOrNull(fc.fromTeamId)?.let { ", leaving the ${it.name}" } ?: ""
+                lg.news += News(lg.season, 0, "Free agency: $line$leaving", winTeam.id == me || fc.fromTeamId == me)
                 if (Trades.value(p) >= 8) Media.post(lg, "NBA Insider", "nbainsider", "insider", "${p.name} has agreed to a ${p.contractYears}-year, ${Road.dollars(best.salary * p.contractYears)} deal with the ${winTeam.name}, per sources.", Media.likes(lg, 0.04), verified = true)
             } else if (winTeam.id == fc.fromTeamId && Trades.value(p) >= 8) {
                 val line = "${p.name} re-signs with the ${winTeam.name}: ${p.contractYears} ${if (p.contractYears == 1) "year" else "years"}, ${Road.dollars(best.salary)} a season"

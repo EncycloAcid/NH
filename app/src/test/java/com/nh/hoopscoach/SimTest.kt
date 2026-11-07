@@ -380,7 +380,7 @@ class SimTest {
 
     @Test
     fun nbaCoachTradingAndFreeAgency() {
-        Rng.seed(77L)
+        Rng.r = Random(77)
         val lg = com.nh.hoopscoach.game.ProLeague.coachLeague(2027, "BOS", "Brad", "Stevens")
         val u = lg.user
         assertTrue(com.nh.hoopscoach.game.NbaCoach.active(lg))
@@ -425,7 +425,7 @@ class SimTest {
 
         // Execute a trade with 25% salary retention and Top-10 pick protection
         val shopDeal = com.nh.hoopscoach.game.TradeFinder.shop(lg, role).firstOrNull()
-        assertNotNull("Shop finds at least one deal", shopDeal)
+        assertTrue("Shop finds at least one deal", shopDeal != null)
         if (shopDeal != null) {
             val retMap = mapOf(role.id to 25)
             val verdict = com.nh.hoopscoach.game.NbaCoach.trade(
