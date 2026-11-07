@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.FaCase
+import com.nh.hoopscoach.game.DraftNight
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Market
 import com.nh.hoopscoach.game.NbaCoach
@@ -1273,6 +1274,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
     var negotiatePlayer by remember { mutableStateOf<Player?>(null) }
     var negotiateIsExtension by remember { mutableStateOf(false) }
     var actionBanner by remember { mutableStateOf<String?>(null) }
+    val draftUi = rememberDraftUi()
 
     if (ps.fired) {
         LazyColumn(Modifier.fillMaxSize()) {
@@ -1302,6 +1304,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
     }
 
     val step = ps.step
+    val draftOn = step == ProStep.DRAFT && ps.draftNight?.done == false
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             item {
@@ -1309,7 +1312,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     "${lg.season} · Offseason",
                     when (step) {
                         ProStep.REVIEW -> "Season Review"
-                        ProStep.DRAFT -> "Draft & Contracts"
+                        ProStep.DRAFT -> if (draftOn) "Draft Night" else "Draft & Contracts"
                         ProStep.FREE_AGENCY -> "Free agency"
                         ProStep.SUMMER -> "Training Camp"
                     },
@@ -1346,7 +1349,8 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     Text("Next: the draft lottery, rookie selections, team options, qualifying offers, and contract extensions.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 10.dp))
                 }
 
-                ProStep.DRAFT -> {
+                ProStep.DRAFT -> if (draftOn) draftNightItems(vm, lg, ps.draftNight!!, draftUi) else {
+                    ps.draftNight?.let { dn -> item { DraftRecap(vm, lg, dn) } }
                     item {
                         val rookies = lg.rosterOf(u).filter { it.proYears == 0 }
                         Section("Your Draft Class")
@@ -1495,13 +1499,14 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
             PrimaryButton(
                 when {
                     step == ProStep.REVIEW -> "Lottery and draft"
+                    draftOn -> "Sim the rest of the draft"
                     step == ProStep.DRAFT -> "Open free agency"
                     faActive -> "Finish free agency"
                     step == ProStep.FREE_AGENCY -> "Training camp"
                     else -> "Start the season"
                 },
                 Modifier.fillMaxWidth(),
-            ) { vm.proNext() }
+            ) { if (draftOn) vm.draftSim("Finishing the draft") { DraftNight.simRest(it) } else vm.proNext() }
         }
     }
 

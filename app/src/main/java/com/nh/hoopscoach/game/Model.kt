@@ -904,6 +904,32 @@ class ProSeasonSummary(
 
 enum class ProStep { REVIEW, DRAFT, FREE_AGENCY, SUMMER }
 
+/** A draft prospect on Draft Night: the player (not on a team yet), his place on the consensus board, his school and college line, and how well the user has scouted him. */
+@Serializable
+class Prospect(
+    val p: Player, val rank: Int, val school: String, val line: String,
+    /** Hidden: how far the first look misses his real overall and ceiling (scouting closes the gap). */
+    val noiseO: Int, val noiseP: Int,
+    /** 0 to 3 visits by the user's scouts. */
+    var scout: Int = 0,
+)
+
+/** One pick made on Draft Night, with its grade (where he was on the board against where he went). */
+@Serializable
+class DraftPickMade(val pick: Int, val teamId: Int, val pid: Int, val name: String, val pos: String, val rank: Int, val grade: String)
+
+/** The NBA coach's Draft Night, in progress: the order (a team for each pick), the prospects left, the picks made, scouting points. */
+@Serializable
+class DraftState(
+    val season: Int,
+    val order: MutableList<Int>,
+    val prospects: MutableList<Prospect>,
+    var at: Int = 0,
+    val log: MutableList<DraftPickMade> = mutableListOf(),
+    var scoutPoints: Int = 10,
+    var done: Boolean = false,
+)
+
 /** Pro league state that the college game doesn't have. */
 @Serializable
 class ProState(
@@ -915,6 +941,8 @@ class ProState(
     var champion: Int = -1,
     val history: MutableList<ProSeasonSummary> = mutableListOf(),
     var step: ProStep = ProStep.FREE_AGENCY,
+    /** Draft Night, while the NBA coach's draft is on (null once free agency opens, and in player careers). */
+    var draftNight: DraftState? = null,
     /** Rookies the user's team drafted this summer, and the order the lottery set. */
     val draftedByUser: MutableList<Int> = mutableListOf(),
     val retiredThisSummer: MutableList<String> = mutableListOf(),

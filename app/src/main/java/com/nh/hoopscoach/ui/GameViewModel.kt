@@ -338,6 +338,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Draft-night work that picks many players at once (simming to the user's pick, or the rest of the draft). */
+    fun draftSim(label: String, block: (League) -> Unit) = heavy(label) { block(it) }
+
     /** One step through the pro offseason. */
     fun proNext() {
         val ps = league?.proState ?: return

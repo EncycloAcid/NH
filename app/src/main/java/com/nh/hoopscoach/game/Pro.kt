@@ -1357,17 +1357,14 @@ object ProCareer {
                 newYear(lg)
                 ps.moved.clear()
                 Trades.draftDay(lg)
-                draft(lg)
-                Picks.ensure(lg)
-                Trades.summer(lg)
-                Market.prepareOffseasonContracts(lg)
-                // His own free agents: the good ones are on the list to bring back.
-                ps.userKeep.clear()
-                ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 || it.clause == "QO" }.map { it.id }
-                ps.userOffers.clear()
+                // Draft Night: the lottery, then the user drafts (DraftNight.finish does what follows the draft).
+                DraftNight.open(lg)
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
+                // Skipping ahead never loses the draft: whatever's left is picked first.
+                if (ps.draftNight?.done == false) DraftNight.simRest(lg)
+                ps.draftNight = null
                 Market.open(lg)
                 ps.step = ProStep.FREE_AGENCY
                 TradeFinder.makeOffers(lg)
@@ -1379,6 +1376,25 @@ object ProCareer {
             }
             ProStep.SUMMER -> ProSeason.startSeason(lg)
         }
+    }
+
+    /** What follows the draft in a coaching career: rosters trimmed, picks topped up, summer trades, contracts, his keep list. */
+    internal fun afterCoachDraft(lg: League) {
+        val ps = lg.proState!!
+        // Teams keep their first-round picks.
+        val firstRound = lg.players.filter { p -> p.awards.any { a -> a.startsWith("${lg.season} Draft #") && (a.substringAfter("#").toIntOrNull() ?: 99) <= lg.teams.size } }.map { it.id }.toSet()
+        for (t in lg.teams) {
+            ProLeague.trim(lg, t, firstRound)
+            while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
+        }
+        lg.reindex()
+        Picks.ensure(lg)
+        Trades.summer(lg)
+        Market.prepareOffseasonContracts(lg)
+        // His own free agents: the good ones are on the list to bring back.
+        ps.userKeep.clear()
+        ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 || it.clause == "QO" }.map { it.id }
+        ps.userOffers.clear()
     }
 
     /** A year older for everyone; some veterans retire. */
@@ -1406,20 +1422,28 @@ object ProCareer {
     }
 
     /** Sixty rookies, worst teams first. The rival arrives here if he stayed in college. */
-    private fun draft(lg: League) {
+    /**
+     * Lottery night: the 14 teams that missed the playoffs draw for the top four picks, worst odds-on; the
+     * rest go by record. Returns the order of the first round, by the team each pick started with.
+     */
+    internal fun lotteryOrder(lg: League): MutableList<Int> {
         val ps = lg.proState!!
-        val r = lg.road
         val byRecord = lg.teams.sortedWith(compareBy<Team> { it.winPct }.thenBy { it.elo }).map { it.id }
-        // Lottery night: the 14 teams that missed the playoffs draw for the top four picks, worst odds-on.
         val inPlayoffs = ps.series.filter { it.round >= 1 }.flatMap { listOf(it.hi, it.lo) }.toSet()
         val lotteryTeams = byRecord.filter { it !in inPlayoffs }.take(14)
         val drawn = Lottery.draw(lotteryTeams, Eras.of(lg))
         ps.lotteryPre.apply { clear(); addAll(lotteryTeams) }
         ps.lotteryPicks.apply { clear(); addAll(drawn) }
         ps.lotterySeason = lg.season
-        val order = (drawn + byRecord.filter { it !in drawn }).toMutableList()
         lg.news += News(lg.season, lg.day, "Lottery night: the ${lg.team(drawn.first()).name} win the No. 1 pick" +
             (if (lotteryTeams.indexOf(drawn.first()) > 2) ", jumping from No. ${lotteryTeams.indexOf(drawn.first()) + 1}" else ""), drawn.first() == lg.userTeamId)
+        return (drawn + byRecord.filter { it !in drawn }).toMutableList()
+    }
+
+    private fun draft(lg: League) {
+        val ps = lg.proState!!
+        val r = lg.road
+        val order = lotteryOrder(lg)
         // Two rounds: 60 picks with 30 teams, fewer in a smaller league.
         val picks = minOf(60, 2 * lg.teams.size)
         val rookies = mutableListOf<Pair<Pos, Int>>()
