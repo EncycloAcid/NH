@@ -1001,7 +1001,7 @@ class ProState(
     val faCases: MutableList<FaCase> = mutableListOf(),
     val faUsedMle: MutableList<Int> = mutableListOf(),
     val faWatchlist: MutableList<Int> = mutableListOf(),
-    val pendingRfaMatches: MutableList<FaCase> = mutableListOf(),
+    val pendingRfaMatches: MutableMap<Int, ContractBid> = mutableMapOf(),
 )
 
 /** Dead cap from retaining up to 50% of a contract in a trade or stretching a buyout. */

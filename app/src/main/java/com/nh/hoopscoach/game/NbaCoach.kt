@@ -318,12 +318,12 @@ object NbaCoach {
     fun deadlineStep(lg: League): List<String> {
         val ps = lg.proState ?: return emptyList()
         if (!canTrade(lg)) return emptyList()
-        val beforeSize = ps.moved.size
+        val beforeSize = ps.trades.size
         if (Rng.chance(0.75)) Trades.minor(lg)
         if (ps.deadlineHour >= 4 && Rng.chance(0.5)) Trades.deadline(lg)
         TradeFinder.makeOffers(lg)
         ps.deadlineHour = (ps.deadlineHour + 1).coerceIn(1, 6)
-        val newDeals = ps.moved.drop(beforeSize)
+        val newDeals = ps.trades.drop(beforeSize).map { Trades.describe(lg, it) }
         val offerMsg = if (ps.tradeOffers.isNotEmpty()) "${ps.tradeOffers.size} active trade offers on your desk" else "Phones are quiet this hour"
         return listOf("Deadline Hour ${ps.deadlineHour}/6 · $offerMsg") + newDeals
     }
