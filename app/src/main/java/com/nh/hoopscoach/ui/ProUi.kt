@@ -513,15 +513,25 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
     }
     val rounds = (0..4).filter { r -> ps.series.any { it.round == r } }
     val sel = if (vm.proRound in rounds) vm.proRound else rounds.last()
+    // The new look: the banner, then the bracket (or the series round by round).
     item {
-        if (ps.champion >= 0) {
-            Panel(color = P.hero) {
-                Text("${lg.season} CHAMPIONS", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text(lg.team(ps.champion).name.uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
-                ps.series.firstOrNull { it.round == 4 }?.let { f -> Text(ProSeason.seriesStatus(lg, f), style = T.small, color = P.onHero.copy(alpha = 0.9f)) }
-            }
-            Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
+        PlayoffHeader(lg)
+        Spacer(Modifier.height(12.dp))
+        Segmented(listOf("Bracket", "Series"), vm.playoffView, { vm.playoffView = it })
+    }
+    if (vm.playoffView == 0) {
+        item {
+            Spacer(Modifier.height(6.dp))
+            if (ps.series.any { it.round >= 1 }) PlayoffBracket(vm, lg)
+            else Panel(Modifier.padding(top = 8.dp)) { Text("The bracket fills in once the play-in is done.", style = T.body, color = P.sub) }
+            Text("Tap a matchup for its games. Lines light up as teams advance.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
         }
+        item { PlayInStrip(lg) }
+        return
+    }
+    item {
+        Spacer(Modifier.height(10.dp))
         Segmented(rounds.map { ROUND_SHORT[it] }, rounds.indexOf(sel), { vm.proRound = rounds[it] })
         Spacer(Modifier.height(4.dp))
     }
@@ -549,7 +559,7 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
 internal fun PlayoffCard(vm: GameViewModel, lg: League) {
     val u = lg.user
     val s = userSeries(lg)
-    Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = { vm.proRound = -1; vm.leagueTab = 1; vm.select(Tab.LEAGUE) })
+    Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = { vm.proRound = -1; vm.playoffView = 0; vm.leagueTab = 1; vm.select(Tab.LEAGUE) })
     Panel {
         val seed = ProSeason.seed(lg, u.id)
         if (s == null && seed > 0) {

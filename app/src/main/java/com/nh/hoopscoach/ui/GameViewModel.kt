@@ -100,6 +100,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var teamTab by mutableIntStateOf(0)
     /** The playoff round shown on the bracket page; -1 follows the current round. */
     var proRound by mutableIntStateOf(-1)
+    /** The Playoffs tab: 0 the bracket, 1 the series round by round. */
+    var playoffView by mutableIntStateOf(0)
     var leagueConf by mutableIntStateOf(-1)
     var leagueTab by mutableIntStateOf(0)
     /** The pro Me tab's page (You, Team, Growth, Media) and how free-agent offers are sorted. */
