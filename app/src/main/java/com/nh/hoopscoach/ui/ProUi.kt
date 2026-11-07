@@ -22,7 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -1555,8 +1557,37 @@ fun ProEnding(vm: GameViewModel, lg: League) {
             }
         }
         if (r.retired) item {
+            val nba = lg.proState?.jobOffers.orEmpty().map { lg.team(it) }
+            if (nba.isNotEmpty()) {
+                Section("What's next: an NBA bench")
+                Text("NBA teams want you as head coach, starting this offseason in this same league: your old teammates and rivals, the draft and free agency ahead. Your playing career stays on your résumé.",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+                GroupList(nba, inset = 16.dp) { t ->
+                    var ask by remember { mutableStateOf(false) }
+                    val mine = t.id in r.proTeams
+                    ListRow(onClick = { ask = true }) {
+                        TeamBadge(t, 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1)
+                            Text(if (mine) "Your old team wants you on its bench" else "Last season ${t.w}-${t.l} · looking for a new voice",
+                                style = T.small, color = if (mine) P.gold else P.sub, maxLines = 1)
+                        }
+                        SmallButton("Coach", primary = true) { ask = true }
+                    }
+                    if (ask) AlertDialog(
+                        onDismissRequest = { ask = false }, containerColor = P.surface,
+                        title = { Text("Coach the ${t.name}?", style = T.head, color = P.ink) },
+                        text = { Text("You'll go straight from playing to the ${t.name}' bench: their roster, payroll and an owner with expectations. This save becomes your NBA coaching career.", style = T.body, color = P.sub) },
+                        confirmButton = { TextButton({ ask = false; vm.retireToNba(t.id) }) { Text("Take the job", color = P.accent) } },
+                        dismissButton = { TextButton({ ask = false }) { Text("Not yet", color = P.sub) } },
+                    )
+                }
+            }
+        }
+        if (r.retired) item {
             val jobs = remember(lg) { com.nh.hoopscoach.game.Afterward.coachingJobs(lg) }
-            Section("What's next: coaching")
+            Section("Or coach in college")
             Text("Programs want you on the sideline. Taking a job starts your coaching career the next season, with your name, your reputation and your playing career on your résumé. Win in college and NBA teams call: your NBA name gets those calls sooner, and your old team often calls first.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
             GroupList(jobs, inset = 16.dp) { j ->
                 ListRow(onClick = { vm.retireToCoach(j.school) }) {

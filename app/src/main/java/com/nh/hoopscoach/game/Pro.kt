@@ -1722,6 +1722,8 @@ object ProCareer {
         }
         Afterward.retireNumbers(lg)
         lg.news += News(lg.season, lg.day, "${h.name} announces his retirement", true)
+        // NBA teams call about their bench; colleges call too (the ending screen lists both).
+        lg.proState?.jobOffers?.let { it.clear(); it += NbaCoach.retiredOffers(lg) }
     }
 }
 

@@ -298,6 +298,26 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** A retired pro goes straight to an NBA bench: this league becomes his coaching career. */
+    fun retireToNba(teamId: Int) {
+        val lg = league ?: return
+        if (busy != null || lg.road?.retired != true) return
+        busy = "Taking over the ${lg.team(teamId).name}"
+        viewModelScope.launch {
+            delay(60)
+            val ok = runCatching {
+                mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.NbaCoach.fromRetirement(lg, teamId) } }
+            }.onFailure { e -> android.util.Log.e("Hoops", "NBA bench move failed", e) }.isSuccess
+            stack.clear()
+            sheet = null
+            live = null
+            tab = Tab.TODAY
+            busy = null
+            if (!ok) toast("Couldn't take the job. Your save is unchanged.")
+            bump()
+        }
+    }
+
     /** One step through the pro offseason. */
     fun proNext() {
         val ps = league?.proState ?: return

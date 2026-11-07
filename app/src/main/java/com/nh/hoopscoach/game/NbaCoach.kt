@@ -203,6 +203,65 @@ object NbaCoach {
         Alerts.add(lg, "You've been fired", "The ${u.name} have let you go after a ${u.w}-${u.l} season. ${ps.jobOffers.size} teams with openings have called.", "")
     }
 
+    // ---------- from the court ----------
+
+    /**
+     * A retired player's NBA head-coaching offers, made the day he retires: losing teams looking for a
+     * new voice, one to three by how big a name he was (a legend can land a good team too), and the
+     * team he finished with often wants him on its bench.
+     */
+    fun retiredOffers(lg: League): List<Int> {
+        if (lg.road == null || !lg.pro) return emptyList()
+        val tier = Lifetime.name(Lifetime.fromPlayer(lg))
+        val n = when (tier) { 2 -> 3; 1 -> 2; else -> 1 }
+        val out = mutableListOf<Int>()
+        val last = lg.hero?.lastTeam ?: -1
+        if (last in lg.teams.indices && Rng.chance(when (tier) { 2 -> 0.8; 1 -> 0.5; else -> 0.25 })) out += last
+        val pool = lg.teams.sortedBy { it.winPct }.take(if (tier == 2) 20 else 10).map { it.id }.filter { it !in out }.shuffled(Rng.r)
+        out += pool.take((n - out.size).coerceAtLeast(0))
+        return out
+    }
+
+    /**
+     * Straight from the court to the bench: the league he played in becomes his coaching career. He
+     * replaces [teamId]'s coach, his playing career goes on his résumé, and the offseason carries on
+     * from where he retired.
+     */
+    fun fromRetirement(lg: League, teamId: Int) {
+        val h = lg.hero ?: return
+        val ps = lg.proState ?: return
+        if (lg.road == null) return
+        lg.playedAs = Lifetime.fromPlayer(lg)
+        val legacy = AllTime.heroScore(lg)
+        val peak = h.ovrHistory.maxOrNull() ?: h.ovr
+        AllTime.freeze(lg, h) // he stays on the all-time list as a retired player
+        val t = lg.team(teamId)
+        runCatching { lg.coachOf(t) }.getOrNull()?.let { old -> old.teamId = -1; old.isUser = false }
+        lg.coaches.forEach { it.isUser = false }
+        val c = Coach(lg.nextCoachId++, h.first, h.last, h.age + 1, t.id,
+            (55 + (peak - 85) * 2.5).roundToInt().coerceIn(55, 92), (52 + (peak - 85) * 2.0).roundToInt().coerceIn(50, 88),
+            (60 + legacy / 3).roundToInt().coerceIn(60, 95), 62, Rng.int(0, 1_000_000), isUser = true, security = 65)
+        lg.coaches += c
+        t.coachId = c.id
+        lg.userCoachId = c.id
+        lg.userTeamId = t.id
+        lg.mode = GameMode.COACH
+        lg.road = null
+        lg.heroId = -1
+        ps.fired = false
+        ps.jobOffers.clear()
+        ps.tradeOffers.clear()
+        ps.userOffers.clear()
+        ps.userKeep.clear()
+        ps.expect = -1
+        // Past the draft already (he retired when nobody called): his free agents are up now.
+        if (ps.step != ProStep.REVIEW) ps.userKeep += expiring(lg).filter { Trades.value(it) >= 1.5 }.map { it.id }
+        Gameplan.autoAllocate(lg, t)
+        val was = lg.playedAs?.proTeams?.contains(t.name) == true
+        lg.news += News(lg.season, lg.day, "From the court to the bench: the ${t.name} name ${h.name} head coach" +
+            if (was) ", back with a team he played for" else "", true)
+    }
+
     /** A new job: he takes over [teamId], whose coach is let go. */
     fun takeJob(lg: League, teamId: Int) {
         val ps = lg.proState ?: return
