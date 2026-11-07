@@ -25,10 +25,29 @@ object Market {
         }
         val usedMle = mutableSetOf<Int>()
         val unsigned = mutableListOf<Player>()
+        // Coaching a team: the user decides his own team's bids (who he brings back, who he offers).
+        val coach = NbaCoach.active(lg)
+        val me = lg.userTeamId
+        ps.userMoves.clear()
         for ((p, from) in pool.sortedByDescending { Trades.value(it.first) }) {
             val ask = ProCareer.marketValue(lg, p)
             val bids = lg.teams.filter { it.roster.size < ProLeague.MAX_ROSTER }.mapNotNull { t ->
                 val bird = t.id == from
+                if (coach && t.id == me) {
+                    val room = Payroll.room(lg, t)
+                    return@mapNotNull when {
+                        bird && p.id in ps.userKeep -> Bid(t, minOf((ask / 10) * 10, ProCareer.maxSalary(lg, p.proYears)), true, false)
+                        !bird && p.id in ps.userOffers -> {
+                            val pay = ps.userOffers.getValue(p.id)
+                            when {
+                                room >= pay -> Bid(t, pay, false, false)
+                                pay <= Payroll.mle(lg) && t.id !in usedMle -> Bid(t, pay, false, true)
+                                else -> null
+                            }
+                        }
+                        else -> null
+                    }
+                }
                 // His old team wants a good young player back more than an aging one; a rebuilding team lets veterans walk.
                 if (bird && !Rng.chance(keepChance(lg, t, p))) return@mapNotNull null
                 val room = Payroll.room(lg, t)
@@ -44,6 +63,15 @@ object Market {
             val best = bids.maxByOrNull { b ->
                 val ahead = lg.rosterOf(b.team).count { it.pos == p.pos && it.ovr > p.ovr }
                 b.pay / ask.toDouble() + b.team.winPct * 0.6 + (if (ahead == 0) 0.3 else if (ahead == 1) 0.15 else 0.0) + (if (b.bird) 0.1 else 0.0) + Rng.d() * 0.15
+            }
+            if (coach && (from == me || p.id in ps.userOffers)) {
+                ps.userMoves += when {
+                    best?.team?.id == me && from == me -> "${p.name} re-signs: ${Road.dollars(best.pay)} a season"
+                    best?.team?.id == me -> "${p.name} signs with you: ${Road.dollars(best.pay)} a season"
+                    from == me && p.id !in ps.userKeep -> "${p.name} moves on" + (best?.let { " to the ${it.team.name}" } ?: "")
+                    from == me -> "${p.name} leaves" + (best?.let { " for the ${it.team.name} (${Road.dollars(it.pay)})" } ?: "")
+                    else -> "${p.name} turns you down" + (best?.let { " for the ${it.team.name}" } ?: "")
+                }
             }
             if (best == null) { unsigned += p; continue }
             sign(lg, p, best.team, best.pay)
@@ -66,6 +94,8 @@ object Market {
             Gameplan.autoAllocate(lg, t)
         }
         Payroll.sign(lg)
+        ps.userKeep.clear()
+        ps.userOffers.clear()
         lg.reindex()
     }
 

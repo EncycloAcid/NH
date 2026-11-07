@@ -138,6 +138,83 @@ object ProLeague {
     }
 
     /**
+     * An NBA coaching career: the real league of [first] (the season it ends, 1987 to 2026; later means
+     * today's league), coaching the team in [slot]. The first season starts from training camp.
+     */
+    /** The teams of [first]'s league (the season it ends), dressed in that season's names and colors. */
+    fun seasonTeams(first: Int): List<Team> {
+        val today = first > DATA_SEASON || !RealSeasons.has(first)
+        val startList = if (today) null else EraData.teams(first)
+        val teams = mutableListOf<Team>()
+        for (f in TEAMS) {
+            val fr = startList?.firstOrNull { it.slot == f.abbr }
+            if (startList != null && fr == null) continue
+            val t = Team(teams.size, f.city, f.name, f.abbr, f.conf, f.market, f.primary, f.secondary, LOGO)
+            t.arena = 17_500 + (f.market - 55) * 80
+            t.fans = 55.0 + (f.market - 55) * 0.6
+            t.legacy = f.market.toDouble()
+            t.buzz = 45.0
+            t.slot = f.abbr
+            if (fr != null) Franchises.dress(t, fr)
+            teams += t
+        }
+        return teams
+    }
+
+    fun coachLeague(first: Int, slot: String, coachFirst: String, coachLast: String): League {
+        val today = first > DATA_SEASON || !RealSeasons.has(first)
+        val era = if (today) Era.TODAY else NbaCoach.eraFor(first)
+        val startList = if (today) null else EraData.teams(first)
+        val confs = listOf(
+            Conference(0, "Eastern Conference", "EAST", 0, mutableListOf()),
+            Conference(1, "Western Conference", "WEST", 0, mutableListOf()),
+        )
+        val teams = seasonTeams(first).toMutableList()
+        for (t in teams) confs[t.confId].teamIds += t.id
+        val lg = League(
+            season = (if (today) DATA_SEASON + 1 else first) - 1, teams = teams, players = mutableListOf(), coaches = mutableListOf(), confs = confs,
+            userTeamId = 0, userCoachId = 0, nextPlayerId = 1, nextCoachId = 1,
+        )
+        lg.mode = GameMode.COACH
+        lg.level = Level.PRO
+        lg.heroId = -1
+        lg.proState = ProState(era = era.name, realTeams = startList != null)
+        for (t in teams) {
+            val c = Coach(lg.nextCoachId++, Rng.pick(Names.first), Rng.pick(Names.last), Rng.range(38, 66), t.id,
+                Rng.range(55, 92), Rng.range(55, 92), Rng.range(40, 80), Rng.range(50, 90), Rng.int(0, 1_000_000))
+            lg.coaches += c
+            t.coachId = c.id
+        }
+        if (today) {
+            for (t in teams) for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
+        } else fillReal(lg, first)
+        for (t in lg.teams) {
+            trim(lg, t)
+            while (t.roster.size < ROSTER) makePro(lg, scarcest(lg, t), Rng.range(80, 85), Rng.range(23, 31), t)
+            Gameplan.autoAllocate(lg, t)
+        }
+        lg.reindex()
+        rateTeams(lg)
+        val u = lg.teams.firstOrNull { it.slot == slot } ?: lg.teams.first()
+        lg.userTeamId = u.id
+        val c = lg.coachOf(u)
+        c.first = coachFirst
+        c.last = coachLast
+        c.isUser = true
+        c.age = 42
+        c.security = 70
+        lg.userCoachId = c.id
+        lg.phase = Phase.OFFSEASON
+        lg.day = 0
+        lg.proState!!.step = ProStep.SUMMER
+        lg.news += News(lg.season, 0, "${c.name} is the new head coach of the ${u.name}", true)
+        RecordBook.seed(lg)
+        Payroll.sign(lg)
+        Picks.ensure(lg)
+        return lg
+    }
+
+    /**
      * Draft Night, before the pro league exists: the order the pro teams pick in. Weak teams pick
      * first, and the league is later built so that holds. Every pick gets its pro team's name.
      */
@@ -211,6 +288,12 @@ object ProLeague {
             for (t in teams) {
                 for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
             }
+        } else if (RealSeasons.has(firstSeason(college, era, inEra))) {
+            // The real rosters of the season he arrives (an era career), or of the era's first season: every
+            // player on the team he really opened that season with. His college classmates come in below.
+            val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
+            val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
+            fillReal(lg, firstSeason(college, era, inEra), heroClass + stillInSchool + hero.name)
         } else {
             // The era's stars on their real teams, and generated players around them. Clubs that didn't exist yet are all generated.
             val stars = Eras.stars(era)
@@ -234,7 +317,7 @@ object ProLeague {
         // (the players still in college, or drafted with him, come in below as his classmates instead).
         val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
         val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
-        if (inEra) for (y in era.year..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
+        if (inEra && !RealSeasons.has(firstSeason(college, era, inEra))) for (y in era.year..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
         // Picks go by the order planned on Draft Night, to the team in that franchise's place.
         val eraList = if (inEra) EraData.teams(college.season + 1) else null
         fun teamFor(pick: Int): Team {
@@ -378,6 +461,62 @@ object ProLeague {
         return p
     }
 
+    /** The first pro season of a league built from [college]: the season after his last (an era career), or the era's own. */
+    private fun firstSeason(college: League, era: Era, inEra: Boolean) = if (inEra) college.season + 1 else era.year
+
+    /** A real player of [season]'s league: his real 2K card when one is near that season, otherwise rated from his numbers. */
+    private val cards: Map<String, EraData.Star> by lazy {
+        Era.entries.flatMap { EraData.stars(it) }.associateBy { it.id }
+    }
+
+    /**
+     * The real rosters of [season] (the year it ends): each player on the team he opened that season with,
+     * up to [REAL_ROSTER] per team by minutes, rated from his 2K card when one is within a season (or his
+     * numbers that season), with his real ceiling when he was drafted in the data, his photo when there's
+     * one, and his real seasons before this one. Players named in [skip] arrive another way.
+     */
+    fun fillReal(lg: League, season: Int, skip: Set<String> = emptySet()) {
+        val bySlot = lg.teams.associateBy { it.slot }
+        val photos = Era.entries.flatMap { EraData.stars(it) }.filter { it.photo.isNotEmpty() }.associate { it.id to it.photo }
+        val lines = RealSeasons.season(season).filter { it.name !in skip }
+        for ((slot, group) in lines.groupBy { RealSeasons.slotOf(it.first) }) {
+            val t = bySlot[slot] ?: continue
+            for (l in group.sortedByDescending { it.mpg * it.g }.take(REAL_ROSTER)) {
+                val card = cards[l.id]?.takeIf { c -> kotlin.math.abs((if (c.era == Era.TODAY) 2027 else c.era.year) - season) <= 1 }
+                val today = if (season >= 2026) EraData.today(l.name) else null
+                val ovr = when {
+                    today != null -> Ratings.proInternal(today.ovr)
+                    card != null -> card.ovr
+                    else -> Ratings.proInternal(RealSeasons.rating2k(l))
+                }
+                val pos = card?.pos ?: RealSeasons.pos(l)
+                val p = makePro(lg, pos, proOverall(ovr), l.age, t)
+                val parts = l.name.split(" ", limit = 2)
+                p.first = parts[0]
+                p.last = parts.getOrElse(1) { "" }
+                p.country = null
+                EraData.shape(p, today?.attrs ?: card?.attrs ?: RealSeasons.profile(l), proOverall(ovr))
+                p.style = EraData.styleFor(p)
+                p.focus = p.style
+                // Young players grow toward what they became, when the draft data knows it.
+                val peak = EraData.pickOf(l.id)?.peak ?: 0
+                p.pot = when {
+                    today != null -> maxOf(p.ovr, Ratings.proInternal(today.pot))
+                    peak > p.ovr && l.age <= 27 -> peak.coerceAtMost(99)
+                    else -> (p.ovr + (25 - l.age).coerceAtLeast(0) * 1.2).roundToInt().coerceIn(p.ovr, 99)
+                }
+                (photos[l.id] ?: NbaData.PLAYERS.firstOrNull { it.name == l.name }?.photo)?.let { p.photo = it }
+                val past = RealSeasons.careerBefore(l.id, season)
+                p.proYears = past.size
+                RealSeasons.addCareer(p, past)
+                EraData.pickOf(l.id)?.let { pk -> p.highSchool = pk.college.ifEmpty { p.highSchool }; p.awards += "${pk.year} Draft #${pk.pick}" }
+            }
+        }
+        // Short benches get generated players.
+        for (t in lg.teams) while (t.roster.size < ROSTER) makePro(lg, scarcest(lg, t), Rng.range(80, 85), Rng.range(23, 31), t)
+        lg.reindex()
+    }
+
     /** The season of the real roster data (2025-26). */
     const val DATA_SEASON = 2026
 
@@ -437,8 +576,9 @@ object ProLeague {
             p.style = EraData.styleFor(p)
             p.focus = p.style
         }
-        // Most of today's players came into the league at 19 or 20.
+        // Most of today's players came into the league at 19 or 20. Their real seasons through 2025-26 are on their record.
         p.proYears = (np.age - 20).coerceIn(0, 22)
+        RealSeasons.addCareer(p, RealSeasons.careerByName(np.name, DATA_SEASON + 1))
         val parts = np.name.split(" ", limit = 2)
         p.first = parts[0]
         p.last = parts.getOrElse(1) { "" }
@@ -967,6 +1107,7 @@ object ProSeason {
         // The preseason magazine, from 400 simulated seasons.
         val pv = NbaPreviews.build(lg)
         ps.preview = pv
+        if (NbaCoach.active(lg)) ps.expect = pv.proj[lg.userTeamId]?.w ?: (ProLeague.seasonGames(lg) / 2)
         NbaPreviews.ranked(lg, pv).firstOrNull()?.let { top ->
             lg.news += News(lg.season, 0, "The ${lg.season} season preview is out: the ${top.name} are the title favorites, and we project the ${lg.user.name} at ${pv.proj[lg.user.id]?.w ?: 0}-${pv.proj[lg.user.id]?.l ?: 0}")
         }
@@ -1050,6 +1191,11 @@ object ProCareer {
     fun age(lg: League) = lg.hero?.age ?: 0
 
     fun seasonEnd(lg: League) {
+        if (NbaCoach.active(lg)) {
+            for (p in lg.players) if (p.teamId >= 0 || p.stats.gp > 0 || p.tourney.gp > 0) p.proYears++
+            NbaCoach.seasonEnd(lg)
+            return
+        }
         val r = lg.road ?: return
         val h = lg.playerOrNull(lg.heroId) ?: return
         val t = lg.team(h.teamId)
@@ -1084,6 +1230,7 @@ object ProCareer {
     /** Moves the pro offseason one step: review, draft, free agency, summer, then the new season. */
     fun next(lg: League) {
         val ps = lg.proState ?: return
+        if (NbaCoach.active(lg)) { coachNext(lg); return }
         val r = lg.road ?: return
         if (r.ended) return
         when (ps.step) {
@@ -1131,10 +1278,40 @@ object ProCareer {
         }
     }
 
+    /** The offseason when the user coaches the team: the owner's verdict, the draft, free agency, camp. */
+    private fun coachNext(lg: League) {
+        val ps = lg.proState!!
+        if (ps.fired) return
+        when (ps.step) {
+            ProStep.REVIEW -> {
+                Staffing.offseason(lg)
+                newYear(lg)
+                ps.moved.clear()
+                draft(lg)
+                Picks.ensure(lg)
+                Trades.summer(lg)
+                // His own free agents: the good ones are on the list to bring back.
+                ps.userKeep.clear()
+                ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 }.map { it.id }
+                ps.userOffers.clear()
+                ps.step = ProStep.DRAFT
+            }
+            ProStep.DRAFT -> {
+                Market.run(lg)
+                ps.step = ProStep.FREE_AGENCY
+            }
+            ProStep.FREE_AGENCY -> {
+                if (ps.history.isNotEmpty()) summer(lg)
+                ps.step = ProStep.SUMMER
+            }
+            ProStep.SUMMER -> ProSeason.startSeason(lg)
+        }
+    }
+
     /** A year older for everyone; some veterans retire. */
     private fun newYear(lg: League) {
         val ps = lg.proState!!
-        val r = lg.road!!
+        val r = lg.road
         for (p in lg.players) p.age++
         for (t in lg.teams) for (pid in t.roster.toList()) {
             val p = lg.player(pid)
@@ -1145,7 +1322,7 @@ object ProCareer {
             AllTime.freeze(lg, p)
             t.roster.remove(pid)
             lg.removePlayer(p)
-            if (p.id == r.rivalId) {
+            if (r != null && p.id == r.rivalId) {
                 r.rivalLeft = "retired in ${lg.season}"
                 p.teamId = -1
                 p.left = "Retired in ${lg.season}"
@@ -1158,7 +1335,7 @@ object ProCareer {
     /** Sixty rookies, worst teams first. The rival arrives here if he stayed in college. */
     private fun draft(lg: League) {
         val ps = lg.proState!!
-        val r = lg.road!!
+        val r = lg.road
         val byRecord = lg.teams.sortedWith(compareBy<Team> { it.winPct }.thenBy { it.elo }).map { it.id }
         // Lottery night: the 14 teams that missed the playoffs draw for the top four picks, worst odds-on.
         val inPlayoffs = ps.series.filter { it.round >= 1 }.flatMap { listOf(it.hi, it.lo) }.toSet()
@@ -1184,15 +1361,15 @@ object ProCareer {
         ps.draftedByUser.clear()
         // Past eras draft the real class of that year (1986 to 2026): names, colleges, ceilings and photos.
         val names = lg.players.map { it.name }.toSet()
-        val real = if (Eras.of(lg) != Era.TODAY) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
+        val real = if (Eras.of(lg) != Era.TODAY || lg.season <= ProLeague.DATA_SEASON) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
         for (i in 0 until picks) {
             // A traded first-round pick goes to the team that owns it.
             val t = lg.team(if (i < order.size) Picks.owner(lg, lg.season, order[i]) else order[i % order.size])
             val p = if (i == rivalSlot && rival != null) {
                 ProLeague.joinPro(lg, rival, t, rival.year + 1)
-                r.rivalPick = i + 1
-                r.rivalDraft = lg.season
-                r.rivalLeft = "went No. ${i + 1} in the ${lg.season} draft"
+                r?.rivalPick = i + 1
+                r?.rivalDraft = lg.season
+                r?.rivalLeft = "went No. ${i + 1} in the ${lg.season} draft"
                 ps.pendingRival = null
                 lg.news += News(lg.season, 0, "Your rival ${rival.name} goes No. ${i + 1} to the ${t.name}. He's coming for you.", true)
                 rival

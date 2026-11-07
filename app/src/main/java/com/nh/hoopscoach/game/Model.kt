@@ -931,6 +931,15 @@ class ProState(
     val execs: MutableMap<Int, String> = mutableMapOf(),
     /** This season's preseason magazine. */
     var preview: NbaPreview? = null,
+    /** NBA coach mode: the user's own expiring players he wants back, his free-agent offers (player id to salary), */
+    val userKeep: MutableList<Int> = mutableListOf(),
+    val userOffers: MutableMap<Int, Int> = mutableMapOf(),
+    /** the owner's target for this season (projected wins), and whether he's just been fired (with the teams that called). */
+    var expect: Int = -1,
+    var fired: Boolean = false,
+    val jobOffers: MutableList<Int> = mutableListOf(),
+    /** This summer's results for the user's team: who signed, re-signed or left. */
+    val userMoves: MutableList<String> = mutableListOf(),
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */

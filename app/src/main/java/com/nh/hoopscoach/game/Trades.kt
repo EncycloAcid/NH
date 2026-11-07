@@ -236,7 +236,8 @@ object Trades {
 
     /** Sellers move a good veteran to a contender for younger pieces. */
     fun aiTrades(lg: League, count: Int) {
-        val ranked = lg.teams.sortedBy { it.winPct + it.elo / 10_000.0 }
+        // Coaching a team: the AI never trades the user's players without him.
+        val ranked = lg.teams.filter { !(NbaCoach.active(lg) && it.id == lg.userTeamId) }.sortedBy { it.winPct + it.elo / 10_000.0 }
         // A team with a star (the user's player at 90 or better) builds around him: it buys, it never sells.
         val starTeam = lg.playerOrNull(lg.heroId)?.takeIf { it.teamId >= 0 && it.ovr >= 90 }?.let { lg.team(it.teamId) }
         val sellers = ranked.take(12).filter { it.id != starTeam?.id }
@@ -274,7 +275,11 @@ object Trades {
 
     /** The deadline: AI teams deal, then his own team decides on him (an open request gets settled too). */
     fun deadline(lg: League) {
-        val r = lg.road ?: return
+        val r = lg.road ?: run {
+            aiTrades(lg, Rng.range(4, 8))
+            lg.news += News(lg.season, lg.day, "The trade deadline passes", false)
+            return
+        }
         aiTrades(lg, Rng.range(4, 8))
         if (r.suitors.isNotEmpty()) {
             dealHero(lg, r.suitors.first(), asked = true)

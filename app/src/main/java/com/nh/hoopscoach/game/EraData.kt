@@ -58,6 +58,9 @@ object EraData {
         }
     }
 
+    /** Every NBA 2K27 overall in today's league, best first. */
+    fun todayOveralls(): List<Int> = today.values.map { it.ovr }.sortedDescending()
+
     /** [name]'s NBA 2K27 card, if the ratings file has him. */
     fun today(name: String): Card? = today[name]
 

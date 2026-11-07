@@ -79,7 +79,7 @@ fun proPace(rank: Int) = when {
     else -> "Outside the award races"
 }
 
-private fun proPhase(lg: League): String {
+internal fun proPhase(lg: League): String {
     val ps = lg.proState
     return when (lg.phase) {
         Phase.REGULAR -> when (lg.day) {
@@ -103,7 +103,7 @@ private fun seedText(lg: League, t: Team): String {
 }
 
 /** The series the user's team is in right now (or the last one it played). */
-private fun userSeries(lg: League): Series? = ProSeason.lastSeries(lg, lg.userTeamId)
+internal fun userSeries(lg: League): Series? = ProSeason.lastSeries(lg, lg.userTeamId)
 
 private fun seriesLine(lg: League, s: Series, from: Int): String {
     val mine = if (s.hi == from) s.hiWins else s.loWins
@@ -118,7 +118,7 @@ private fun seriesLine(lg: League, s: Series, from: Int): String {
     }
 }
 
-private fun teamLine(lg: League, t: Team) = "${t.w}-${t.l} · ${seedText(lg, t)}"
+internal fun teamLine(lg: League, t: Team) = "${t.w}-${t.l} · ${seedText(lg, t)}"
 
 // ---------- Today ----------
 
@@ -264,7 +264,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
 }
 
 @Composable
-private fun MatchSide(lg: League, t: Team, modifier: Modifier) {
+internal fun MatchSide(lg: League, t: Team, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         TeamBadge(t, 56.dp)
         Spacer(Modifier.height(6.dp))
@@ -274,7 +274,7 @@ private fun MatchSide(lg: League, t: Team, modifier: Modifier) {
 }
 
 @Composable
-private fun StandingRow(vm: GameViewModel, lg: League, rank: Int, t: Team, leader: Team) {
+internal fun StandingRow(vm: GameViewModel, lg: League, rank: Int, t: Team, leader: Team) {
     val mine = t.id == lg.userTeamId
     val gb = ((leader.w - t.w) + (t.l - leader.l)) / 2.0
     ListRow(modifier = if (mine) Modifier.background(P.accentSoft) else Modifier) {
@@ -538,7 +538,7 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
 
 /** Today's playoff card: your round, the series, the games so far and where the next one is. */
 @Composable
-private fun PlayoffCard(vm: GameViewModel, lg: League) {
+internal fun PlayoffCard(vm: GameViewModel, lg: League) {
     val u = lg.user
     val s = userSeries(lg)
     Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = { vm.proRound = -1; vm.leagueTab = 1; vm.select(Tab.LEAGUE) })

@@ -18,7 +18,8 @@ object Staffing {
                 missed -> 0.08
                 else -> 0.02
             }
-            if (Rng.chance(fire)) newCoach(lg, t)
+            // Coaching an NBA team: the user's job is decided by the owner (NbaCoach), not here.
+            if (Rng.chance(fire) && !(NbaCoach.active(lg) && t.id == lg.userTeamId)) newCoach(lg, t)
             if (t.winPct < 0.35 && Rng.chance(0.25)) {
                 val old = ps.execs[t.id] ?: NbaAwards.executive(lg, t)
                 val name = "${Rng.pick(Names.first)} ${Rng.pick(Names.last)}"

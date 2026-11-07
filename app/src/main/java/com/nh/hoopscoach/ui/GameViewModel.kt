@@ -323,6 +323,24 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** An NBA coaching career: [year]'s real league (the season it ends), coaching the team in [slot]. */
+    fun startNbaCoach(year: Int, slot: String, first: String, last: String) {
+        if (busy != null) return
+        busy = "Building the ${if (year >= 2027) "league" else "${year - 1}-${(year % 100).toString().padStart(2, '0')} league"}"
+        viewModelScope.launch {
+            val lg = withContext(Dispatchers.Default) {
+                com.nh.hoopscoach.game.ProLeague.coachLeague(year, slot, first, last).also { com.nh.hoopscoach.game.ProCareer.next(it) }
+            }
+            draft = null
+            roadHero = null
+            league = lg
+            tab = Tab.TODAY
+            stack.clear()
+            busy = null
+            bump()
+        }
+    }
+
     fun startCareer(teamId: Int, first: String, last: String) {
         val d = draft ?: return
         busy = "Setting up your first season"

@@ -347,17 +347,21 @@ fun NewGameScreen(vm: GameViewModel) {
                 Text("NEW CAREER", style = T.label, color = P.accent)
                 Text("HOOPS DYNASTY", style = T.hero.copy(fontSize = 46.sp, lineHeight = 46.sp), color = P.ink)
                 Text(
-                    if (mode == 0) "Take over any of ${lg.teams.size} Division I programs. Recruit, coach, develop and build a dynasty."
-                    else "Road to the League: create a high school senior, pick a school, earn your minutes and chase the draft.",
+                    when (mode) {
+                        0 -> "Take over any of ${lg.teams.size} Division I programs. Recruit, coach, develop and build a dynasty."
+                        1 -> "Road to the League: create a high school senior, pick a school, earn your minutes and chase the draft."
+                        else -> "Coach an NBA team: today's league or any season since 1986-87, with that year's real rosters. Set the rotation, make trades, win over the owner."
+                    },
                     style = T.body, color = P.sub,
                 )
             }
             if (vm.roadHero == null) {
                 Spacer(Modifier.height(8.dp))
-                Segmented(listOf("Coach a program", "Play as a player"), mode, { mode = it })
+                Segmented(listOf("Coach college", "Play", "Coach NBA"), mode, { mode = it })
             }
         }
         if (mode == 1) { RoadNewGame(vm, lg, header); return@Column }
+        if (mode == 2) { NbaCoachNewGame(vm, header); return@Column }
         LazyColumn(Modifier.weight(1f)) {
             item {
                 header()

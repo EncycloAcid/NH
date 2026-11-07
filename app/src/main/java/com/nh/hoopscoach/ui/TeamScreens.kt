@@ -165,7 +165,7 @@ fun traitColor(t: Trait): Color = when (t) {
 
 // ---------- lineup ----------
 
-private fun LazyListScope.lineup(vm: GameViewModel, lg: League, t: Team) {
+internal fun LazyListScope.lineup(vm: GameViewModel, lg: League, t: Team) {
     item {
         Section("Game plan", action = if (t.plan.auto) "Auto ✓" else "Auto-set", onAction = {
             vm.act { Gameplan.autoAllocate(it, it.user); it.user.plan.auto = true }

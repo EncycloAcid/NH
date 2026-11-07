@@ -112,7 +112,13 @@ private fun Shell(vm: GameViewModel, lg: League) {
         val route = vm.stack.lastOrNull()
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (route == null) {
-                if (lg.pro) when (vm.tab) {
+                if (com.nh.hoopscoach.game.NbaCoach.active(lg)) when (vm.tab) {
+                    Tab.TODAY -> NbaCoachToday(vm, lg)
+                    Tab.TEAM -> NbaCoachTeam(vm, lg)
+                    Tab.RECRUIT -> NbaTradeScreen(vm, lg)
+                    Tab.LEAGUE -> ProLeagueScreen(vm, lg)
+                    Tab.CAREER -> NbaCoachCareer(vm, lg)
+                } else if (lg.pro) when (vm.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> ProTeamScreen(vm, lg)
                     Tab.RECRUIT -> ProHeroScreen(vm, lg)
@@ -240,7 +246,8 @@ private fun NavBar(vm: GameViewModel) {
             for (t in Tab.entries) {
                 val icon = when (t) { Tab.TODAY -> NavIcons.Today; Tab.TEAM -> NavIcons.Team; Tab.RECRUIT -> NavIcons.Recruit; Tab.LEAGUE -> NavIcons.League; Tab.CAREER -> NavIcons.Career }
                 val sel = vm.tab == t
-                val label = if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
+                val label = if (t == Tab.RECRUIT && vm.league?.let { com.nh.hoopscoach.game.NbaCoach.active(it) } == true) "Trades"
+                    else if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { vm.select(t) }.padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
