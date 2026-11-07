@@ -256,7 +256,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         if (r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
         val news = lg.news.filter { it.season >= lg.season - 1 }.takeLast(6).reversed()
         if (news.isNotEmpty()) item {
-            Section("Around the league")
+            Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
             GroupList(news, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
         }
         item { Spacer(Modifier.height(16.dp)) }
@@ -1234,7 +1234,7 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
             GroupList(reel.reversed()) { e -> ReelRow(e) }
         }
         ps.history.lastOrNull { it.season == lg.season }?.let { s ->
-            Section("Around the league")
+            Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
             Panel {
                 Text("Champions: ${lg.team(s.champion).name}", style = T.bodyB, color = P.ink)
                 Text("Finals MVP ${s.finalsMvp} · MVP ${s.mvp} · Rookie of the Year ${s.roy}", style = T.small, color = P.sub)

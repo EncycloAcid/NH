@@ -784,6 +784,7 @@ object ProSeason {
         when (lg.phase) {
             Phase.REGULAR -> {
                 upkeep(lg)
+                NewsDesk.endOfDay(lg)
                 NbaCup.endOfDay(lg)
                 NbaAwards.endOfDay(lg)
                 Rumors.daily(lg)
@@ -793,6 +794,7 @@ object ProSeason {
             }
             Phase.PLAYOFFS -> {
                 updateSeries(lg)
+                NewsDesk.endOfDay(lg)
                 if (lg.proState!!.champion >= 0) { endSeason(lg); return }
             }
             else -> return
@@ -808,7 +810,8 @@ object ProSeason {
             Ratings.addXp(p, (3 * Ratings.devRate(p, Coaching.devOf(lg.coachOf(t)))).roundToInt())
             ProLeague.rookieCap(lg, p)
         }
-        if (lg.day % 7 == 0) for (t in lg.teams) Gameplan.autoAllocate(lg, t)
+        // Weekly rotation tune-ups, except a rotation the user set himself when he coaches the team.
+        if (lg.day % 7 == 0) for (t in lg.teams) if (!(NbaCoach.active(lg) && t.id == lg.userTeamId && !t.plan.auto)) Gameplan.autoAllocate(lg, t)
     }
 
     fun standings(lg: League, conf: Int): List<Team> =

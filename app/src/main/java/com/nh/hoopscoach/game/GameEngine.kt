@@ -966,6 +966,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             tot.gp = 1
             if (counts) t.totals.add(tot)
         }
+        NewsDesk.note(lg, game, teams, lines, score)
         if (counts) {
             teams[0].opp.add(lastTotals(1))
             teams[1].opp.add(lastTotals(0))

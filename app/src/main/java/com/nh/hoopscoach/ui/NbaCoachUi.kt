@@ -190,7 +190,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
         item {
             val news = lg.news.filter { it.season == lg.season }.takeLast(8).reversed()
             if (news.isNotEmpty()) {
-                Section("Around the league")
+                Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
                 GroupList(news) { n -> ListRow { Text(n.text, style = T.small, color = if (n.mine) P.ink else P.sub, modifier = Modifier.weight(1f)) } }
             }
             Spacer(Modifier.height(20.dp))
@@ -391,7 +391,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     Text("Projected ${ps.expect} wins. Job security: ${NbaCoach.securityLabel(c.security).lowercase()} (${c.security}).", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
                 ps.history.lastOrNull()?.let { h ->
-                    Section("Around the league")
+                    Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
                     Panel {
                         Text("Champion: ${lg.teams.getOrNull(h.champion)?.name ?: "—"}", style = T.bodyB, color = P.ink)
                         if (h.mvp.isNotEmpty()) Text("MVP: ${h.mvp}", style = T.small, color = P.sub)
@@ -466,7 +466,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                 if (ps.userMoves.isEmpty()) Panel { Text("No changes to your roster in free agency.", style = T.body, color = P.sub) }
                 GroupList(ps.userMoves) { line -> ListRow { Text(line, style = T.body, color = P.ink, modifier = Modifier.weight(1f)) } }
                 if (ps.faMoves.isNotEmpty()) {
-                    Section("Around the league")
+                    Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
                     GroupList(ps.faMoves.take(12)) { line -> ListRow { Text(line, style = T.small, color = P.sub, modifier = Modifier.weight(1f)) } }
                 }
                 Section("Your roster · ${lg.rosterOf(u).size} players")

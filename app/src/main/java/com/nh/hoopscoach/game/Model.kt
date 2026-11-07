@@ -486,6 +486,8 @@ class News(
     val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "",
     /** A short article behind the headline, and the outlet that ran it. */
     val body: String = "", val source: String = "",
+    /** The team and player the story is about, for its picture and links. */
+    val teamId: Int = -1, val pid: Int = -1,
 ) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
@@ -942,6 +944,8 @@ class ProState(
     val userMoves: MutableList<String> = mutableListOf(),
     /** A coach who came up from college: his college record in a line. */
     var collegeResume: String = "",
+    /** Last week's power rankings, best first, for movement. */
+    val powerLast: MutableList<Int> = mutableListOf(),
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */

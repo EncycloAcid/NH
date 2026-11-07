@@ -77,8 +77,7 @@ object NbaCoach {
     fun trade(lg: League, other: Team, give: List<Player>, get: List<Player>, givePicks: List<PickAsset>, getPicks: List<PickAsset>): Verdict {
         val v = judge(lg, other, give, get, givePicks, getPicks)
         if (!v.ok || !canTrade(lg)) return v
-        val t = Trades.execute(lg, lg.user, other, give, get, picksA = givePicks, picksB = getPicks)
-        lg.news += News(lg.season, lg.day, "Trade: " + Trades.describe(lg, t), true)
+        Trades.execute(lg, lg.user, other, give, get, picksA = givePicks, picksB = getPicks)
         return v
     }
 

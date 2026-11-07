@@ -252,7 +252,7 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
 private fun Headlines(vm: GameViewModel, lg: League) {
     val items = lg.news.filter { it.season == lg.season }.takeLast(6).reversed()
     if (items.isEmpty()) return
-    Section("Around the league")
+    Section("Around the league", action = "All news", onAction = { vm.push(Route.News) })
     GroupList(items, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
 }
 

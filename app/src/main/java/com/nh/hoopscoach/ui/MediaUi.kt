@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Post
@@ -144,20 +147,38 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         color = ink, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
-                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
+                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
                         style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
                     Text(n.text, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
                         color = ink, modifier = Modifier.padding(top = 6.dp))
                     if (byline != null) Text("By $byline", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
                         color = faded, modifier = Modifier.padding(top = 6.dp))
+                    // The picture: the player the story is about, or his team.
+                    val pic = lg.playerOrNull(n.pid)
+                    val team = lg.teams.getOrNull(n.teamId)
+                    if (pic != null || team != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(team?.let { Color(it.primary).copy(alpha = 0.18f) } ?: faded.copy(alpha = 0.1f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 72.dp) else if (team != null) TeamBadge(team, 60.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(pic?.name ?: team?.name ?: "", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp), color = ink)
+                                Text(if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}" else team?.let { "${it.w}-${it.l}" } ?: "",
+                                    style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 13.sp), color = faded)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
                     }
                 }
-                if (n.gameId >= 0 && lg.games.any { it.id == n.gameId && it.box != null }) {
-                    Spacer(Modifier.height(16.dp))
-                    SecondaryButton("Box score", Modifier.fillMaxWidth()) { vm.push(Route.Box(n.gameId)) }
+                Column(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Spacer(Modifier.height(8.dp))
+                    if (n.gameId >= 0 && lg.games.any { it.id == n.gameId && it.box != null }) SecondaryButton("Box score", Modifier.fillMaxWidth()) { vm.push(Route.Box(n.gameId)) }
+                    lg.playerOrNull(n.pid)?.let { pl -> SecondaryButton("${pl.name}'s page", Modifier.fillMaxWidth()) { vm.openPlayer(pl.id) } }
+                    lg.teams.getOrNull(n.teamId)?.let { tm -> SecondaryButton("${tm.name} team page", Modifier.fillMaxWidth()) { vm.push(Route.TeamPage(tm.id)) } }
+                    SecondaryButton("All news", Modifier.fillMaxWidth()) { vm.push(Route.News) }
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -180,3 +201,76 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
 }
 
 @Suppress("unused") private val keepColor = Color.Unspecified
+
+// ---------- the news page ----------
+
+/** Which stories a filter shows. */
+private fun newsFilter(lg: League, n: News, f: Int): Boolean = when (f) {
+    1 -> n.mine || n.teamId == lg.userTeamId
+    2 -> n.kind in setOf("game", "recap", "article", "series", "upset", "buzzer", "moment", "rivalry") || n.rivalry
+    3 -> n.kind == "trade" || n.text.startsWith("Free agency") || n.text.startsWith("Front office") || n.text.startsWith("Coaching change") || n.text.contains(" signs ")
+    4 -> n.kind == "column" || n.kind == "quote"
+    else -> true
+}
+
+/** The news page: the top story up front, then everything, newest first, with filters. */
+@Composable
+fun NewsScreen(vm: GameViewModel, lg: League) {
+    var filter by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val all = lg.news.filter { it.season >= lg.season - 1 }.reversed()
+    val shown = all.filter { newsFilter(lg, it, filter) }
+    // The top story: the newest real article, the user's first.
+    val top = shown.take(25).filter { it.body.isNotEmpty() }.maxByOrNull { (if (it.mine) 2 else 0) + (if (it.kind in setOf("trade", "series", "game")) 1 else 0) + it.day / 1000.0 + it.season }
+    Column(Modifier.fillMaxSize()) {
+        BackBar("News", "${lg.season} season · ${all.size} stories", onBack = { vm.back() })
+        LazyColumn(Modifier.weight(1f)) {
+            item {
+                Spacer(Modifier.height(6.dp))
+                Segmented(listOf("All", "Your team", "Games", "Moves", "Columns"), filter, { filter = it }, scroll = true)
+            }
+            if (top != null) item {
+                Spacer(Modifier.height(10.dp))
+                TopStory(vm, lg, top)
+            }
+            if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("No stories here yet.", style = T.body, color = P.sub) } }
+            val byDay = shown.filter { it !== top }.take(120).groupBy { it.season * 1000 + it.day }
+            byDay.forEach { (key, list) ->
+                item {
+                    Section(if (key / 1000 != lg.season) "Last season" else if (key % 1000 == 0) "Preseason" else "Day ${key % 1000}")
+                    GroupList(list, inset = 34.dp) { n -> HeadlineRow(vm, lg, n) }
+                }
+            }
+            item { Spacer(Modifier.height(20.dp)) }
+        }
+    }
+}
+
+/** The lead story: its picture, headline and opening paragraph. */
+@Composable
+private fun TopStory(vm: GameViewModel, lg: League, n: News) {
+    val t = lg.teams.getOrNull(n.teamId)
+    val p = lg.playerOrNull(n.pid)
+    val primary = t?.let { Color(it.primary) } ?: P.hero
+    val fg = onColor(primary)
+    Column(
+        Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(primary, androidx.compose.ui.graphics.lerp(primary, Color.Black, 0.5f))))
+            .clickable { newsClick(vm, lg, n)?.invoke() }.padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("TOP STORY · ${n.source.substringAfter(" · ", n.source).ifEmpty { "News" }.uppercase()}", style = T.label, color = fg.copy(alpha = 0.8f), modifier = Modifier.weight(1f), maxLines = 1)
+            if (t != null) TeamBadge(t, 30.dp)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (p != null) { PlayerJersey(p, if (p.teamId >= 0) lg.team(p.teamId) else t, 64.dp); Spacer(Modifier.width(12.dp)) }
+            Text(n.text, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = fg, modifier = Modifier.weight(1f))
+        }
+        n.body.split("\n\n").firstOrNull()?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, style = T.small, color = fg.copy(alpha = 0.9f), maxLines = 4, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Read the story →", style = T.bodyB, color = fg)
+    }
+}

@@ -43,6 +43,12 @@ fun NewsTag(n: News) {
         n.kind == "upset" -> "UPSET ALERT" to P.bad
         n.kind == "buzzer" -> "BUZZER-BEATER" to P.gold
         n.kind == "moment" -> "MARCH MOMENT" to P.accent
+        n.kind == "game" -> "BIG NIGHT" to P.gold
+        n.kind == "recap" -> "GAME STORY" to P.accent
+        n.kind == "series" -> "PLAYOFFS" to P.bad
+        n.kind == "trade" -> "TRADE" to P.good
+        n.kind == "column" -> "COLUMN" to P.sub
+        n.kind == "team" -> "STREAK" to P.warn
         else -> return
     }
     Tag(label, color)

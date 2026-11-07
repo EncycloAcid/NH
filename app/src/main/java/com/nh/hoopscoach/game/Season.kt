@@ -56,6 +56,7 @@ object Season {
     }
 
     private fun endOfDay(lg: League) {
+        if (lg.phase == Phase.REGULAR || lg.phase == Phase.CONF_TOURNEY || lg.phase == Phase.NCAA) NewsDesk.endOfDay(lg)
         when (lg.phase) {
             Phase.REGULAR -> {
                 dailyUpkeep(lg)

@@ -114,6 +114,7 @@ object Trades {
         Picks.move(lg, picksB, a)
         val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, fromA.map { it.name } + pickNamesA, fromB.map { it.name } + pickNamesB, hero)
         ps.trades += trade
+        NewsDesk.trade(lg, trade, a, b, fromA, fromB, pickNamesA, pickNamesB)
         Rumors.breaking(lg, trade)
         if (ps.trades.size > 200) ps.trades.removeAt(0)
         lg.reindex()
@@ -215,7 +216,7 @@ object Trades {
         r.tradeNote = (if (asked) "You got your wish: " else "You've been traded: ") +
             "the ${from.name} send you to the ${to.name} for ${back.joinToString(" and ") { it.name }}."
         Road.sync(lg)
-        lg.news += News(lg.season, lg.day, "Trade: ${h.name} to the ${to.name}; ${back.joinToString(" and ") { it.name }} to the ${from.name}", true)
+        // The trade's write-up comes from execute().
         return true
     }
 
@@ -249,8 +250,7 @@ object Trades {
             val keep = (listOf(lg.heroId) + lg.rosterOf(starTeam).filter { it.id != lg.heroId }.sortedByDescending { value(it) }.take(1).map { it.id }).toSet()
             val pack = bundle(lg, starTeam, value(vet), 0.7, 1.35, keep) ?: continue
             if (!Payroll.tradeWorks(lg, starTeam, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            val trade = execute(lg, seller, starTeam, listOf(vet), pack, picksB = sweetener(lg, seller, starTeam))
-            lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
+            execute(lg, seller, starTeam, listOf(vet), pack, picksB = sweetener(lg, seller, starTeam))
             made++
             break
         }
@@ -267,8 +267,7 @@ object Trades {
             val keep = lg.rosterOf(buyer).sortedByDescending { value(it) }.take(2).map { it.id }.toSet()
             val pack = bundle(lg, buyer, target, 0.75, 1.3, keep) ?: continue
             if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            val trade = execute(lg, seller, buyer, listOf(vet), pack, picksB = sweetener(lg, seller, buyer))
-            if (seller.id == lg.userTeamId || buyer.id == lg.userTeamId) lg.news += News(lg.season, lg.day, "Trade: " + describe(lg, trade), true)
+            execute(lg, seller, buyer, listOf(vet), pack, picksB = sweetener(lg, seller, buyer))
             made++
         }
     }
