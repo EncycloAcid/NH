@@ -191,7 +191,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
-                    Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr}", style = T.bodyB, color = Color.White, maxLines = 2)
+                    Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}", style = T.bodyB, color = Color.White, maxLines = 2)
                     Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
                 }
             }
@@ -252,7 +252,7 @@ private fun LazyListScope.powerRankings(vm: GameViewModel, lg: League, pv: NbaPr
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(pv.last[t.id]?.let { "Last season: $it" } ?: lg.conf(t.confId).abbr, style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(pv.last[t.id]?.let { "Last season: $it" } ?: lg.conf(t.confId).name, style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("${o.w}-${o.l}", style = T.numSm.copy(fontSize = 17.sp), color = P.ink)

@@ -14,7 +14,11 @@ import kotlin.math.roundToInt
 object NewsDesk {
     private val OUTLETS = listOf("Hoops Wire", "The Daily Dribble", "Courtside Report", "Baseline Sports", "The Rim", "Fast Break Network", "Above the Break")
     private val WRITERS = listOf("Dana Marsh", "Theo Banks", "Rae Whitfield", "Marcus Lyle", "Jules Ortega", "Priya Shah", "Cal Benton", "Nora Quinn")
-    private fun outlet() = "${Rng.pick(WRITERS)} · ${Rng.pick(OUTLETS)}"
+    /** A byline: each writer has one outlet (two cover for Hoops Wire), so the names stay with their papers. */
+    private fun outlet(): String {
+        val i = Rng.int(0, WRITERS.size - 1)
+        return "${WRITERS[i]} · ${OUTLETS[i % OUTLETS.size]}"
+    }
     private val DAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
     /** A player's night, noted when the game is committed. */
@@ -53,6 +57,16 @@ object NewsDesk {
     }
 
     private fun name(lg: League, t: Team) = if (lg.pro) t.name else t.school
+    /** A team in a sentence: "the Boston Celtics", but "Kentucky". */
+    private fun the(lg: League, t: Team) = if (lg.pro) "the ${t.name}" else t.school
+    private fun The(lg: League, t: Team) = the(lg, t).replaceFirstChar { it.uppercase() }
+    /** A dateline is the home city (or school): "BOSTON —", "KENTUCKY —". */
+    private fun dateline(t: Team) = t.school.uppercase()
+    /** "(9 rebounds, 5 assists)", leaving out the zeros. */
+    private fun extras(reb: Int, ast: Int): String {
+        val parts = listOfNotNull(if (reb > 0) "$reb ${if (reb == 1) "rebound" else "rebounds"}" else null, if (ast > 0) "$ast ${if (ast == 1) "assist" else "assists"}" else null)
+        return if (parts.isEmpty()) "" else " (${parts.joinToString(", ")})"
+    }
     private fun nick(lg: League, t: Team) = if (lg.pro) t.name.substringAfterLast(' ') else t.mascot
 
     // ---------- every night ----------
@@ -88,9 +102,9 @@ object NewsDesk {
             else -> "goes for ${s.pts} and ${s.reb}"
         }
         val headline = "${p.last} $what as ${nick(lg, t)} ${if (n.won) "beat" else "fall to"} ${nick(lg, opp)} ${max(n.us, n.them)}-${minOf(n.us, n.them)}"
-        val dateline = name(lg, if (home) t else opp).uppercase()
+        val place = dateline(if (home) t else opp)
         val body = buildList {
-            add("$dateline — ${p.name} had ${line(s)} on ${s.fgm}-of-${s.fga} shooting, and the ${name(lg, t)} ${if (n.won) "beat" else "lost to"} the ${name(lg, opp)} ${n.us}-${n.them} on ${DAYS[(lg.day + lg.season) % 7]} night.")
+            add("$place — ${p.name} had ${line(s)} on ${s.fgm}-of-${s.fga} shooting, and ${the(lg, t)} ${if (n.won) "beat" else "lost to"} ${the(lg, opp)} ${n.us}-${n.them} on ${DAYS[(lg.day + lg.season) % 7]} night.")
             add(when {
                 s.pts >= 50 -> "It's the kind of night people remember: only a handful of players ever get to 50."
                 s.pts >= 40 && !n.won -> "It wasn't enough. ${p.last} did everything he could, and the ${nick(lg, t)} still came up short."
@@ -168,10 +182,10 @@ object NewsDesk {
             else -> "${nick(lg, opp)} beat ${nick(lg, u)} $them-$us" + (theirs?.let { " as ${last(it)} scores ${it.s.pts}" } ?: "")
         }
         val body = buildList {
-            add("${name(lg, if (g.home == u.id) u else opp).uppercase()} — The ${name(lg, u)} ${if (won) "beat" else "lost to"} the ${name(lg, opp)} $us-$them" +
-                (top?.let { ", with ${it.name} scoring ${it.s.pts} (${it.s.reb} rebounds, ${it.s.ast} assists)" } ?: "") + ".")
+            add("${dateline(if (g.home == u.id) u else opp)} — ${The(lg, u)} ${if (won) "beat" else "lost to"} ${the(lg, opp)} $us-$them" +
+                (top?.let { ", with ${it.name} scoring ${it.s.pts}${extras(it.s.reb, it.s.ast)}" } ?: "") + ".")
             mine.drop(1).take(2).filter { it.s.pts >= 10 }.takeIf { it.isNotEmpty() }?.let { o -> add(o.joinToString(" and ") { "${it.name} added ${it.s.pts}" } + ".") }
-            theirs?.let { add("${it.name} led the ${name(lg, opp)} with ${it.s.pts}.") }
+            theirs?.let { add("${it.name} led ${the(lg, opp)} with ${it.s.pts}.") }
             add("The ${nick(lg, u)} are ${u.w}-${u.l}" + when { u.streak >= 3 -> ", winners of ${u.streak} straight."; u.streak <= -3 -> " and have lost ${-u.streak} in a row."; else -> "." })
             add(if (won) Rng.pick(listOf("“I liked our energy,” coach ${coach.last} said. “We defended and shared it.”", "“Good win. Now we get ready for the next one,” coach ${coach.last} said."))
                 else Rng.pick(listOf("“We'll learn from it,” coach ${coach.last} said. “That one's on me.”", "“Not good enough,” coach ${coach.last} said. “We have to be sharper.”")))

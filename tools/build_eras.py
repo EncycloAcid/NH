@@ -205,6 +205,8 @@ for season in range(1986, 2028):
         if slot == 'CHA' and season >= 2005: known = [n for n in known if n[0] >= 2005] or known
         if not known: known = sorted(names.get(slot, []))[:1]
         _, abbr, full = known[-1]
+        # Charlotte: the Bobcats through 2013-14, the Hornets again from 2014-15 (the draft lists lag or lead a year).
+        if slot == 'CHA' and season >= 2005: abbr, full = ('CHA', 'Charlotte Bobcats') if season <= 2014 else ('CHO', 'Charlotte Hornets')
         city, nick = (full[:-len(' Trail Blazers')], 'Trail Blazers') if full.endswith('Trail Blazers') else full.rsplit(' ', 1)
         team_rows.append([str(season), slot, abbr, city, nick])
 with open(f'{RES}/teams.tsv', 'w', encoding='utf-8') as f:

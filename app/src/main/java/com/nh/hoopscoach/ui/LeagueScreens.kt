@@ -107,11 +107,13 @@ private fun LazyListScope.polls(vm: GameViewModel, lg: League) {
         Section(if (lg.user.gp == 0) "Preseason AP Top 25" else "AP Top 25")
         GroupList(ap) { t -> RankRow(vm, lg, "${t.ap}", t, t.record, "NET ${t.net}") }
         Section("NET rankings · top 50")
-        GroupList(lg.teams.sortedBy { it.net }.take(50)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "Power #${Rankings.powerRank(lg, t)}") }
+        // The NET list says where each team is ranked in the poll (its power rank only when it differs).
+        fun extra(t: com.nh.hoopscoach.game.Team) = when { t.ap > 0 -> "AP #${t.ap}"; Rankings.powerRank(lg, t) != t.net -> "Power #${Rankings.powerRank(lg, t)}"; else -> null }
+        GroupList(lg.teams.sortedBy { it.net }.take(50)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, extra(t)) }
         val u = lg.user
         if (u.net > 50) {
             Spacer(Modifier.height(10.dp))
-            GroupList(listOf(u)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, "Power #${Rankings.powerRank(lg, t)}") }
+            GroupList(listOf(u)) { t -> RankRow(vm, lg, "${t.net}", t, t.record, extra(t)) }
         }
     }
 }

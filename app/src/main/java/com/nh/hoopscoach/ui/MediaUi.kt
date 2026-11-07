@@ -206,9 +206,19 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Column(Modifier.weight(1f)) {
             NewsTag(n)
             Text(headline(n.text), style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
-            val said = if (n.reactions.isEmpty()) "" else "${n.reactions.size} ${if (n.reactions.size == 1) "reaction" else "reactions"}"
-            if (n.body.isNotEmpty()) Text("${n.source.ifEmpty { "Story" }} · Read" + (if (said.isEmpty()) "" else " · $said"), style = T.small, color = P.accent)
-            else if (said.isNotEmpty()) Text(said, style = T.small, color = P.accent)
+            // One line under the headline: the byline (shortened if it must), then the reactions and "Read", never wrapped.
+            val said = if (n.reactions.isEmpty()) null else "${n.reactions.size}\u00A0${if (n.reactions.size == 1) "reaction" else "reactions"}"
+            if (n.body.isNotEmpty() || said != null) Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (n.body.isNotEmpty()) Text(n.source.ifEmpty { "Story" }, style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (said != null) {
+                    if (n.body.isNotEmpty()) Text("  ·  ", style = T.small, color = P.faint)
+                    Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.6f), modifier = Modifier.size(11.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text(said, style = T.small, color = P.sub, maxLines = 1, softWrap = false)
+                }
+                Text("  ·  ", style = T.small, color = P.faint)
+                Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent, maxLines = 1, softWrap = false)
+            }
         }
     }
 }

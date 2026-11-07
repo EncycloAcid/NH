@@ -55,6 +55,12 @@ fun TodayScreen(vm: GameViewModel, lg: League) {
 }
 
 fun recordLine(lg: League, t: Team): String {
+    // The pros have no polls or NET: their record, conference record and place in the conference.
+    if (lg.pro) {
+        val conf = lg.conf(t.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }
+        val pos = com.nh.hoopscoach.game.ProSeason.standings(lg, t.confId).indexOfFirst { it.id == t.id } + 1
+        return listOfNotNull(t.record, "${t.confRecord} $conf", if (t.gp > 0 && pos > 0) "${ordinal(pos)} in the $conf" else null).joinToString("  ·  ")
+    }
     val parts = mutableListOf("${t.record}", "${t.confRecord} ${lg.conf(t.confId).abbr}")
     if (t.ap > 0) parts += "AP #${t.ap}"
     if (t.gp > 0) parts += "NET ${t.net}"

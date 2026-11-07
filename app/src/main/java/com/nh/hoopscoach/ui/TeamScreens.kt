@@ -141,7 +141,8 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 }
             }
             Text(
-                "${p.posLabel} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
+                // Pros show their age (every pro is a "PRO"); college players their class.
+                "${p.posLabel} · ${if (p.year == com.nh.hoopscoach.game.PRO_YEAR) "age ${p.age}" else p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
                 style = T.small, color = P.sub, maxLines = 1,
             )
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
@@ -404,7 +405,7 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
     var tab by remember(teamId) { mutableIntStateOf(0) }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            BackBar(t.name, "${lg.conf(t.confId).name} · ${prestigeLabel(t.prestige)}", onBack = { vm.back() })
+            BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() })
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 TeamBadge(t, 64.dp)
                 Spacer(Modifier.width(14.dp))
@@ -417,7 +418,7 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             }
             TeamRings(lg, t)
             Spacer(Modifier.height(12.dp))
-            Segmented(listOf("Roster", "Schedule", "History", "Program"), tab, { tab = it })
+            Segmented(listOf("Roster", "Schedule", "History", if (lg.pro) "Franchise" else "Program"), tab, { tab = it })
         }
         when (tab) {
             0 -> rosterList(vm, lg, t, mine = t.id == lg.userTeamId)

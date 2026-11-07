@@ -531,7 +531,8 @@ internal fun RivalPanel(vm: GameViewModel, lg: League) {
                 Text("YOU", style = T.label, color = P.accent, modifier = Modifier.width(64.dp), textAlign = TextAlign.End)
                 Text(rv.last.uppercase(), style = T.label, color = P.sub, modifier = Modifier.width(84.dp), textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            RivalRow("Overall", "${h.ovr}", "${rv.ovr}", h.ovr.compareTo(rv.ovr))
+            // On the scale every other screen shows (the pros' 2K scale), not the engine's.
+            RivalRow("Overall", "${shown(h.ovr)}", "${shown(rv.ovr)}", h.ovr.compareTo(rv.ovr))
             if (h.stats.gp > 0 || rv.stats.gp > 0) RivalRow("Points per game", "%.1f".format(h.stats.ppg), "%.1f".format(rv.stats.ppg), h.stats.ppg.compareTo(rv.stats.ppg))
             val myRace = Rival.raceRank(lg, h)
             val hisRace = Rival.raceRank(lg, rv)
@@ -559,6 +560,7 @@ internal fun RivalPanel(vm: GameViewModel, lg: League) {
         Text(
             when {
                 next != null -> "Next meeting: ${if (next.home == h.teamId) "vs" else "at"} ${if (lg.pro) lg.team(rv.teamId).name else lg.team(rv.teamId).school}. Win the duel and your following grows faster."
+                active != null && lg.pro -> if (lg.phase == com.nh.hoopscoach.game.Phase.REGULAR) "No meeting left on the schedule. You may still cross paths in the playoffs." else "The new schedule will say when you meet."
                 active != null -> "No meeting on the schedule. You may still cross paths in March."
                 lg.pro -> if (r.rivalLeft.isEmpty()) "He's still in college. He'll be in the league next year." else "His career is over. Yours isn't."
                 else -> "He's gone pro. Now it's your turn."

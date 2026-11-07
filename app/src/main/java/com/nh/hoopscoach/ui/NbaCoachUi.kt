@@ -317,7 +317,7 @@ private fun TradeFinderPage(vm: GameViewModel, lg: League) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = P.ink)
-            Text("${lg.team(p.teamId).name} · ${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.tier(p)}", style = T.small, color = P.sub, maxLines = 1)
+            Text("${lg.team(p.teamId).name} · ${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${tierWords(Trades.tier(p))}", style = T.small, color = P.sub, maxLines = 1)
         }
         Ring(p.ovr, 40.dp, textSize = 14.sp)
     } }
@@ -471,7 +471,7 @@ private fun TradeRow(lg: League, p: Player, picked: Boolean, onClick: () -> Unit
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${if (p.teamId >= 0 && p.teamId != lg.userTeamId) lg.team(p.teamId).abbr + " · " else ""}${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.tier(p)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+            Text("${if (p.teamId >= 0 && p.teamId != lg.userTeamId) lg.team(p.teamId).abbr + " · " else ""}${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${tierWords(Trades.tier(p))}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
         }
         Ring(p.ovr, 36.dp, textSize = 13.sp)
         Spacer(Modifier.width(6.dp))
@@ -656,8 +656,9 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(14.dp))
                 StatRow(
                     listOf(
-                        Triple("Seasons", "${nba.size}", null), Triple("Playoffs", "${c.tourneys}", null),
-                        Triple("Titles", "${c.titles}", if (c.titles > 0) P.gold else null), Triple("Teams", "${nba.map { it.teamId }.toSet().size.coerceAtLeast(1)}", null),
+                        Triple(if (nba.size == 1) "Season" else "Seasons", "${nba.size}", null), Triple("Playoffs", "${c.tourneys}", null),
+                        Triple(if (c.titles == 1) "Title" else "Titles", "${c.titles}", if (c.titles > 0) P.gold else null),
+                        nba.map { it.teamId }.toSet().size.coerceAtLeast(1).let { n -> Triple(if (n == 1) "Team" else "Teams", "$n", null) },
                     ),
                     style = T.numSm,
                 )
@@ -750,3 +751,7 @@ fun ProjectionLines(lg: League) {
         style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.padding(top = 4.dp),
     )
 }
+
+/** A trade tier as the rows show it: "Starter value", so a bench player rated as one doesn't read as a starter. */
+fun tierWords(tier: String) = if (tier == "Franchise") "Franchise piece" else "$tier value"
+

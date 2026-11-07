@@ -99,7 +99,7 @@ object NbaCup {
         book(lg, 1, ps.cupQfDay)
         val u = lg.userTeamId
         lg.news += News(lg.season, lg.day,
-            if (u in ps.cupSeeds) "The ${lg.user.name} are in the NBA Cup quarterfinals as the No. ${ps.cupSeeds[u]} seed in the ${lg.conf(lg.user.confId).abbr}"
+            if (u in ps.cupSeeds) "The ${lg.user.name} are in the NBA Cup quarterfinals as the No. ${ps.cupSeeds[u]} seed in the ${lg.conf(lg.user.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}"
             else "NBA Cup: the knockout round is set. The ${lg.user.name} didn't make it", u in ps.cupSeeds)
     }
 

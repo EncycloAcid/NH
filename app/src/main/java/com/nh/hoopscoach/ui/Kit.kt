@@ -559,6 +559,10 @@ fun grade(v: Int): String = when {
     v >= 88 -> "A+"; v >= 84 -> "A"; v >= 80 -> "A-"; v >= 77 -> "B+"; v >= 73 -> "B"; v >= 70 -> "B-"
     v >= 66 -> "C+"; v >= 62 -> "C"; v >= 58 -> "C-"; v >= 54 -> "D+"; v >= 50 -> "D"; else -> "F"
 }
+/** A pro franchise's standing, in the pros' words. */
+fun franchiseLabel(p: Int) = when {
+    p >= 90 -> "Marquee franchise"; p >= 78 -> "Big market"; p >= 64 -> "Established"; p >= 50 -> "Mid-market"; else -> "Small market"
+}
 fun prestigeLabel(p: Int) = when {
     p >= 90 -> "Blueblood"; p >= 78 -> "Power program"; p >= 64 -> "Contender"; p >= 50 -> "Rising"; p >= 35 -> "Rebuilding"; else -> "Underdog"
 }
