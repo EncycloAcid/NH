@@ -97,9 +97,15 @@ private fun Shell(vm: GameViewModel, lg: League) {
     // The preseason magazine opens by itself once, before the first game of every season.
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview
-        if (lg.phase == Phase.REGULAR && pv != null && pv.season == lg.season && !pv.opened && lg.user.gp == 0) {
+        if (!lg.pro && lg.phase == Phase.REGULAR && pv != null && pv.season == lg.season && !pv.opened && lg.user.gp == 0) {
             pv.opened = true
             vm.push(Route.Preview)
+        }
+        // The NBA's issue opens the same way, before the first game of each pro season.
+        val nba = lg.proState?.preview
+        if (lg.pro && lg.phase == Phase.REGULAR && nba != null && nba.season == lg.season && !nba.opened && lg.user.w + lg.user.l == 0 && lg.road?.ended != true) {
+            nba.opened = true
+            vm.push(Route.NbaPreview)
         }
     }
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -148,6 +154,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.CoachDev -> CoachDevScreen(vm, lg)
         is Route.WrapUp -> WrapUpFlow(vm, lg)
         is Route.Preview -> PreviewScreen(vm, lg)
+        is Route.NbaPreview -> NbaPreviewScreen(vm, lg)
         is Route.EditPlayer -> EditPlayerScreen(vm, lg, r.playerId)
         is Route.RecruitPreview -> RecruitPreviewScreen(vm, lg)
         is Route.Social -> SocialScreen(vm, lg)

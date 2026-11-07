@@ -50,6 +50,7 @@ sealed interface Route {
     data object CoachDev : Route
     data object WrapUp : Route
     data object Preview : Route
+    data object NbaPreview : Route
     data class EditPlayer(val playerId: Int) : Route
     data object RecruitPreview : Route
     data object Social : Route

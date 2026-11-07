@@ -964,6 +964,12 @@ object ProSeason {
         ProCareer.paySalary(lg)
         val h = lg.hero
         if (h != null) lg.news += News(lg.season, 0, "${h.name} opens his ${ordinalWord(h.proYears + 1)} pro season with the ${lg.user.name}", true)
+        // The preseason magazine, from 400 simulated seasons.
+        val pv = NbaPreviews.build(lg)
+        ps.preview = pv
+        NbaPreviews.ranked(lg, pv).firstOrNull()?.let { top ->
+            lg.news += News(lg.season, 0, "The ${lg.season} season preview is out: the ${top.name} are the title favorites, and we project the ${lg.user.name} at ${pv.proj[lg.user.id]?.w ?: 0}-${pv.proj[lg.user.id]?.l ?: 0}")
+        }
     }
 
     private fun ordinalWord(n: Int) = when (n) { 1 -> "first"; 2 -> "second"; 3 -> "third"; 4 -> "fourth"; 5 -> "fifth"; 6 -> "sixth"; 7 -> "seventh"; 8 -> "eighth"; 9 -> "ninth"; 10 -> "tenth"; else -> "${n}th" }

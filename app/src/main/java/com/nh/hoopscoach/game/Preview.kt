@@ -409,7 +409,7 @@ object Previews {
                     r <= 25 -> pick(lg, 41, "${c.school} defends its crown", "The champs reload at ${c.school}")
                     else -> pick(lg, 42, "${c.school} starts over", "Life after the title at ${c.school}")
                 },
-                "${backLine(c)} We have the defending champions at No. $r, with a ${pct(co.title)} chance to win it all again.",
+                "${backLine(c)} We have the defending champions at No. $r, with ${NbaPreviews.chance(co.title)} to win it all again.",
                 c.id,
             )
         }
@@ -497,7 +497,7 @@ object Previews {
                 "Hot seat",
                 pick(lg, 110, "${c.name} needs a big year", "Pressure builds at ${t.school}", "March or bust for ${c.last}"),
                 "${t.school} has missed the NCAA Tournament ${if (dry >= 2) "$dry straight seasons" else "last season"}. " +
-                    "We project ${proj(t).w}-${proj(t).l} and give them a ${pct(odds(pv, t).ncaa)} chance to get back.",
+                    "We project ${proj(t).w}-${proj(t).l} and give them ${NbaPreviews.chance(odds(pv, t).ncaa)} to get back.",
                 t.id,
             )
         }
@@ -518,7 +518,7 @@ object Previews {
                 "Last dance",
                 pick(lg, 130, "One last ride for ${p.name}", "${p.name} came back for this", "${p.last}'s final chapter"),
                 "${p.name} (${p.posLabel}) averaged ${"%.1f".format(last?.s?.ppg ?: 0.0)} points last season at ${lg.team(p.teamId).school}. " +
-                    "He came back for a senior year, and ${lg.team(p.teamId).school} has a ${pct(odds(pv, lg.team(p.teamId)).f4)} shot at the Final Four.",
+                    "He came back for a senior year, and ${lg.team(p.teamId).school} has ${NbaPreviews.chance(odds(pv, lg.team(p.teamId)).f4)} at the Final Four.",
                 p.teamId, p.id,
             )
         }
@@ -598,7 +598,7 @@ object Previews {
         val ff = pv.finalFour.map { lg.team(it).school }
         out += "Our Final Four: ${ff.dropLast(1).joinToString(", ")} and ${ff.last()}. ${lg.team(pv.sleeper).school} is the team nobody wants to see in March" +
             (pv.stories.firstOrNull { it.kicker == "Freshman phenom" }?.let { s -> lg.playerOrNull(s.pid)?.let { ", and ${it.name} is the freshman everyone will be talking about." } } ?: ".")
-        out += "${u.school} comes in at No. ${mine.nat}, picked ${ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}, with a ${pct(odds(pv, u).ncaa)} chance at the NCAA Tournament. Turn to the team report for the full breakdown."
+        out += "${u.school} comes in at No. ${mine.nat}, picked ${ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}, with ${NbaPreviews.chance(odds(pv, u).ncaa)} at the NCAA Tournament. Turn to the team report for the full breakdown."
         return out
     }
 

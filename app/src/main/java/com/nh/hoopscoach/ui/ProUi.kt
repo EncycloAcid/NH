@@ -142,6 +142,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { HeroTodayCard(vm, lg) }
+        if (lg.phase == Phase.REGULAR) item { NbaPreviewCard(vm, lg) }
         // In the playoffs, where your series stands comes first.
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         Season.userGameToday(lg)?.let { g ->
@@ -442,6 +443,9 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", "The League", null)
             Segmented(listOf("Standings", "Playoffs", "Cup", "Leaders", "Awards", "History"), tab, { vm.leagueTab = it }, scroll = true)
+            if (lg.phase != Phase.OFFSEASON && lg.proState?.preview?.season == lg.season) {
+                Text("Season preview ›", style = T.bodyB, color = P.accent, modifier = Modifier.clickable { vm.push(Route.NbaPreview) }.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
+            }
             Spacer(Modifier.height(8.dp))
         }
         when (tab) {

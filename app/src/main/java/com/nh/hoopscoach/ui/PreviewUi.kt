@@ -90,7 +90,7 @@ private fun ranked(lg: League, pv: Preview): List<Team> = pv.proj.entries.sorted
 private fun players(lg: League, ids: List<Int>): List<Player> = ids.mapNotNull { lg.playerOrNull(it) }.filter { it.teamId >= 0 }
 
 /** Odds as a short label: "<1%", "37%". */
-private fun odd(v: Double): String = when {
+internal fun odd(v: Double): String = when {
     v >= 0.995 -> "99%"
     v < 0.01 -> "<1%"
     else -> "${(v * 100).toInt()}%"
@@ -190,7 +190,7 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
 // ---------- shared pieces ----------
 
 @Composable
-private fun PageHead(kicker: String, title: String, page: Int) {
+internal fun PageHead(kicker: String, title: String, page: Int) {
     Column(Modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 12.dp, bottom = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.background(P.accent).padding(horizontal = 8.dp, vertical = 3.dp)) { Text(kicker.uppercase(), style = T.label, color = P.onAccent) }
@@ -209,13 +209,13 @@ private fun PageHead(kicker: String, title: String, page: Int) {
 }
 
 @Composable
-private fun Deck(text: String) {
+internal fun Deck(text: String) {
     Text(text, style = T.body.copy(fontStyle = FontStyle.Italic), color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 8.dp, bottom = 4.dp))
 }
 
 /** A bar that fills in when the page comes into view. */
 @Composable
-private fun GrowBar(fraction: Float, modifier: Modifier = Modifier, color: Color = P.accent, height: Dp = 6.dp, track: Color = P.surface2) {
+internal fun GrowBar(fraction: Float, modifier: Modifier = Modifier, color: Color = P.accent, height: Dp = 6.dp, track: Color = P.surface2) {
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val f by animateFloatAsState(if (shown) fraction.coerceIn(0f, 1f) else 0f, tween(800, easing = FastOutSlowInEasing), label = "grow")
@@ -224,7 +224,7 @@ private fun GrowBar(fraction: Float, modifier: Modifier = Modifier, color: Color
 
 /** One number over a filling bar: "FINAL FOUR 41%". */
 @Composable
-private fun OddsCell(label: String, v: Double, color: Color, modifier: Modifier = Modifier, scale: Double = 1.0) {
+internal fun OddsCell(label: String, v: Double, color: Color, modifier: Modifier = Modifier, scale: Double = 1.0) {
     Column(modifier) {
         Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.sub, maxLines = 1)
         Text(odd(v), style = T.numSm.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
@@ -235,7 +235,7 @@ private fun OddsCell(label: String, v: Double, color: Color, modifier: Modifier 
 
 /** Five dots: returning starters. */
 @Composable
-private fun StarterDots(n: Int, color: Color) {
+internal fun StarterDots(n: Int, color: Color) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(5) { i -> Box(Modifier.size(10.dp).clip(CircleShape).background(if (i < n) color else P.line)) }
     }
@@ -243,7 +243,7 @@ private fun StarterDots(n: Int, color: Color) {
 
 /** A colored band in a team's colors, for headers. */
 @Composable
-private fun TeamBand(t: Team, modifier: Modifier = Modifier, content: @Composable (fg: Color, accent: Color) -> Unit) {
+internal fun TeamBand(t: Team, modifier: Modifier = Modifier, content: @Composable (fg: Color, accent: Color) -> Unit) {
     val primary = Color(t.primary)
     val secondary = Color(t.secondary)
     val fg = onColor(primary)
@@ -254,7 +254,7 @@ private fun TeamBand(t: Team, modifier: Modifier = Modifier, content: @Composabl
 }
 
 @Composable
-private fun Movement(now: Int, last: Int) {
+internal fun Movement(now: Int, last: Int) {
     val (text, color) = when {
         last < 0 -> "—" to P.faint
         last == 0 -> "NEW" to P.accent
@@ -328,7 +328,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
 }
 
 @Composable
-private fun CoverLine(kicker: String, text: String, fg: Color, accent: Color) {
+internal fun CoverLine(kicker: String, text: String, fg: Color, accent: Color) {
     Row(Modifier.padding(vertical = 5.dp).height(IntrinsicSize.Min)) {
         Box(Modifier.width(3.dp).fillMaxHeight().background(accent))
         Spacer(Modifier.width(10.dp))
@@ -378,7 +378,7 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
 }
 
 @Composable
-private fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Boolean) {
+internal fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Boolean) {
     val t = lg.teams.getOrNull(s.teamId)
     val open = when {
         s.pid >= 0 && lg.playerOrNull(s.pid) != null -> ({ vm.openPlayer(s.pid) })
@@ -1081,7 +1081,7 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
             Text("Right column: our chance to win each game.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
         }
         Section("The bottom line")
-        Panel { Text("${Previews.blurb(lg, u)} We see a ${pr.w}-${pr.l} team that finishes ${Previews.ordinal(pr.confRank)} in the ${lg.conf(u.confId).abbr}, with a ${Previews.pct(o.ncaa)} chance at the NCAA Tournament. ${Previews.expectation(pr.nat)}.", style = T.body, color = P.ink) }
+        Panel { Text("${Previews.blurb(lg, u)} We see a ${pr.w}-${pr.l} team that finishes ${Previews.ordinal(pr.confRank)} in the ${lg.conf(u.confId).abbr}, with ${com.nh.hoopscoach.game.NbaPreviews.chance(o.ncaa)} at the NCAA Tournament. ${Previews.expectation(pr.nat)}.", style = T.body, color = P.ink) }
     }
 }
 

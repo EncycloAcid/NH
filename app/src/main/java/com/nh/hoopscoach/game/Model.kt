@@ -929,6 +929,8 @@ class ProState(
     /** Future first-round picks and who owns them; each team's general manager. */
     val picks: MutableList<PickAsset> = mutableListOf(),
     val execs: MutableMap<Int, String> = mutableMapOf(),
+    /** This season's preseason magazine. */
+    var preview: NbaPreview? = null,
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
