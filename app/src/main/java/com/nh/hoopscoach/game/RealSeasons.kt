@@ -93,8 +93,43 @@ object RealSeasons {
         seasons.keys.associateWith { s -> (ref / teamPpg(s).coerceAtLeast(1.0)).coerceIn(0.8, 1.35) }
     }
 
-    /** A season's numbers as one score: fit to NBA 2K27's ratings of the 2025-26 players (about two points off on average). */
-    private fun raw(l: Line): Double {
+    /** A player's season impact from the advanced pages: minutes, and Box Plus/Minus and Win Shares per 48, minutes-weighted over his stints. */
+    private class Impact(val mp: Double, val bpm: Double, val ws48: Double)
+
+    private val impacts: Map<Int, Map<String, Impact>> by lazy {
+        val text = RealSeasons::class.java.getResourceAsStream("/eras/advanced.tsv")?.bufferedReader(Charsets.UTF_8)?.use { it.readLines() } ?: return@lazy emptyMap()
+        fun d(s: String) = s.toDoubleOrNull() ?: 0.0
+        class Acc { var mp = 0.0; var bpm = 0.0; var ws48 = 0.0 }
+        val acc = HashMap<Int, HashMap<String, Acc>>()
+        for (l in text) {
+            if (l.isBlank() || l.startsWith("#")) continue
+            val f = l.split("|")
+            if (f.size < 16) continue
+            val season = f[0].toIntOrNull() ?: continue
+            val mp = d(f[4])
+            val a = acc.getOrPut(season) { HashMap() }.getOrPut(f[1]) { Acc() }
+            a.mp += mp; a.bpm += mp * d(f[14]); a.ws48 += mp * d(f[11])
+        }
+        acc.mapValues { (_, m) -> m.mapValues { (_, a) -> Impact(a.mp, a.bpm, a.ws48) } }
+    }
+
+    /**
+     * How much a season's impact adds to its score: Box Plus/Minus and Win Shares per 48, each steadied
+     * toward a replacement-level player by 600 minutes so a hot week doesn't make a star. With it, a
+     * season's team strengths track the real teams (a 0.91 correlation with their Win Shares across
+     * 1986-87 to 2025-26, up from 0.54 on the box score alone): the 1999-00 Lakers are the 1999-00 Lakers.
+     */
+    private fun impactScore(l: Line): Double {
+        val a = impacts[l.season]?.get(l.id) ?: return 0.0
+        val bpm = (a.bpm - 2.0 * 600) / (a.mp + 600)
+        val ws48 = (a.ws48 + 0.05 * 600) / (a.mp + 600)
+        return 0.8 * bpm + 50.0 * ws48
+    }
+
+    /** A season's numbers as one score: fit to NBA 2K27's ratings of the 2025-26 players (about two points off on average), plus its real impact. */
+    private fun raw(l: Line): Double = box(l) + impactScore(l)
+
+    private fun box(l: Line): Double {
         val g = l.g.coerceAtLeast(1).toDouble()
         val games = (season(l.season).maxOfOrNull { it.g } ?: 82).coerceAtLeast(1)
         var v = 66.71 - 0.223 * l.mpg + 0.743 * l.ppg + 0.386 * l.rpg + 0.536 * l.apg + 0.973 * l.spg + 1.273 * l.bpg +

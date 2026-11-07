@@ -213,14 +213,20 @@ object Previews {
         val cwins = IntArray(n)
         val score = DoubleArray(n)
         val order16 = seedOrder(16)
+        // Each simulated season every team gets its form for the year (see Rankings.SEASON_FORM_SD), less as the season goes on.
+        val base = elo.copyOf()
+        val left = reg.count { !it.played }.toDouble() / reg.size.coerceAtLeast(1)
+        val sd = Rankings.SEASON_FORM_SD * kotlin.math.sqrt(left)
+        val form = DoubleArray(n)
         repeat(SIMS) {
+            for (t in 0 until n) { form[t] = Rankings.gauss(rnd) * sd; elo[t] = base[t] + form[t] }
             wins.fill(0); cwins.fill(0)
             for (i in reg.indices) {
-                val w = if (rnd.nextDouble() < pHome[i]) home[i] else away[i]
+                val w = if (rnd.nextDouble() < Rankings.shift(pHome[i], form[home[i]] - form[away[i]])) home[i] else away[i]
                 wins[w]++
                 if (isConf[i]) cwins[w]++
             }
-            for (t in 0 until n) repeat(extra[t]) { if (rnd.nextDouble() < pExtra[t]) wins[t]++ }
+            for (t in 0 until n) repeat(extra[t]) { if (rnd.nextDouble() < Rankings.shift(pExtra[t], form[t])) wins[t]++ }
             for (t in 0 until n) {
                 hist[t][wins[t].coerceAtMost(maxGames - 1)]++
                 // A team that beats its projection moves up the committee's board.
@@ -352,8 +358,8 @@ object Previews {
         out += if (to.title >= 0.12) Story(
             "The favorite",
             pick(lg, 10, "${top.school} is the team to beat", "Everyone is chasing ${top.school}", "${top.school}'s title to lose"),
-            repeat + "${top.school} wins the national title in ${pct(to.title)} of our simulations and reaches the Final Four in ${pct(to.f4)}." +
-                (topStar?.let { " ${it.name} (${it.posLabel}, ${it.cls}) leads a team we project to go ${proj(top).w}-${proj(top).l}." } ?: ""),
+            repeat + "${top.school} wins the national title in ${pct(to.title)} of our simulations and reaches the Final Four in ${pct(to.f4)}; " +
+                "${ranked[1].school} is next at ${pct(odds(pv, ranked[1]).title)}. We project ${proj(top).w}-${proj(top).l}. " + Takes.college(lg, pv, top, 2, from = 1),
             top.id,
         ) else Story(
             "Wide open",
@@ -392,9 +398,16 @@ object Previews {
         }
         out += Story(
             if (lg.playerMode) "Your team" else "Your program", head,
-            "We have ${u.school} at No. ${up.nat}, ${ordinal(up.confRank)} in the ${lg.conf(u.confId).abbr} and ${up.w}-${up.l} (somewhere between ${uo.lo} and ${uo.hi} wins). " +
-                "NCAA Tournament: ${pct(uo.ncaa)}. ${lg.conf(u.confId).abbr} title: ${pct(uo.conf)}. " + backLine(u) +
-                (if (!lg.playerMode) " Coach ${lg.userCoach.last}'s job security: ${lg.userCoach.security}/100." else ""),
+            "We have ${u.school} at No. ${up.nat}, ${ordinal(up.confRank)} in the ${lg.conf(u.confId).abbr} and ${up.w}-${up.l} (${uo.lo} to ${uo.hi} wins). " +
+                "They make the NCAA Tournament ${NbaPreviews.often(uo.ncaa)}" +
+                (if (uo.s16 >= 0.05) ", reach the Sweet 16 ${NbaPreviews.often(uo.s16)}" else "") +
+                (if (uo.conf >= 0.02) " and win the ${lg.conf(u.confId).abbr} ${NbaPreviews.often(uo.conf)}." else ", and a league title would be a surprise.") +
+                " " + (if (u.id == top.id) backLine(u) else Takes.college(lg, pv, u, 2, from = 1)) +
+                (if (!lg.playerMode) " " + when {
+                    lg.userCoach.security >= 75 -> "Coach ${lg.userCoach.last} has all the job security he needs."
+                    lg.userCoach.security >= 45 -> "Coach ${lg.userCoach.last} is safe, but the boosters expect progress."
+                    else -> "Coach ${lg.userCoach.last} needs a good year: his job security is ${lg.userCoach.security}/100."
+                } else ""),
             u.id,
         )
 
@@ -420,12 +433,14 @@ object Previews {
             if (two.size < 2) null else Triple(c, two, odds(pv, two[1]).conf / odds(pv, two[0]).conf.coerceAtLeast(0.01))
         }.filter { odds(pv, it.second[0]).conf >= 0.2 }.maxByOrNull { it.third }?.takeIf { it.third >= 0.6 }?.let { (c, two, _) ->
             val (a, b) = two
-            val days = lg.games.filter { it.type == GameType.CONF && it.involves(a.id) && it.involves(b.id) }.map { "game ${it.day}" }
+            val days = lg.games.filter { it.type == GameType.CONF && it.involves(a.id) && it.involves(b.id) }.sortedBy { it.day }
+                .map { g -> "${if (g.home == a.id) "at ${a.school}" else "at ${b.school}"} (game ${g.day})" }
             out += Story(
                 "Conference race",
                 pick(lg, 50, "The ${c.abbr} is a coin flip", "A two-team race in the ${c.abbr}", "${a.school} or ${b.school}?"),
                 "${a.school} wins the ${c.abbr} in ${pct(odds(pv, a).conf)} of our simulations, ${b.school} in ${pct(odds(pv, b).conf)}." +
-                    if (days.isNotEmpty()) " They meet in ${days.joinToString(" and ")}." else "",
+                    (if (days.isNotEmpty()) " They meet ${days.joinToString(" and ")}." else "") +
+                    " ${Takes.college(lg, pv, a, 1, from = 1)}",
                 a.id,
             )
         }
@@ -541,7 +556,8 @@ object Previews {
             out += Story(
                 "Rivalry",
                 pick(lg, 150, "${a.school} at ${h.school}: circle it", "Bad blood: ${a.school} vs ${h.school}"),
-                "${lg.rivalry(g)!!.title} comes on game ${g.day}, with ${a.school} at No. ${proj(a).nat} and ${h.school} at No. ${proj(h).nat}.",
+                "${lg.rivalry(g)!!.title.let { if (it.equals("Rivalry", true)) "The rivalry game" else it }} is game ${g.day} of the season: No. ${proj(a).nat} ${a.school} visits No. ${proj(h).nat} ${h.school}" +
+                    Rankings.winProbFor(lg, g, h.id).let { p -> if (p in 0.4..0.6) ", and our numbers call it a coin flip." else ", and we like ${if (p > 0.5) h.school else a.school} at ${(maxOf(p, 1 - p) * 100).toInt()}%." },
                 h.id,
             )
         }

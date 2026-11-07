@@ -80,6 +80,27 @@ object Rankings {
         for (ev in lg.events) for (id in ev.teams) lg.team(id).expWins += 1.0
     }
 
+    /**
+     * How much a team's strength over a whole season can differ from its preseason rating (injuries,
+     * breakouts, slumps), in Elo: the projections draw each team's form for each simulated season, so
+     * favorites aren't sure things and the win ranges are as wide as real preseason misses (8 to 10 wins
+     * in the NBA). In season it shrinks with the games left.
+     */
+    const val SEASON_FORM_SD = 60.0
+
+    /** [p] (a win chance) with [delta] Elo added to the side it's for. */
+    fun shift(p: Double, delta: Double): Double {
+        if (p <= 0.0 || p >= 1.0 || delta == 0.0) return p
+        val d = 400.0 * kotlin.math.log10(p / (1 - p)) + delta
+        return 1.0 / (1.0 + Math.pow(10.0, -d / 400.0))
+    }
+
+    /** A standard normal draw from [rnd]. */
+    fun gauss(rnd: kotlin.random.Random): Double {
+        val u = rnd.nextDouble().coerceAtLeast(1e-12)
+        return kotlin.math.sqrt(-2.0 * kotlin.math.ln(u)) * kotlin.math.cos(2 * Math.PI * rnd.nextDouble())
+    }
+
     /** Where a team's strength (its Elo) ranks in the league, 1 the best. */
     fun powerRank(lg: League, t: Team): Int = lg.teams.count { it.elo > t.elo } + 1
 
