@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -376,7 +378,7 @@ fun NbaTradeScreen(vm: GameViewModel, lg: League) {
         retainMine.clear(); retainTheirs.clear(); protMine.clear(); protTheirs.clear()
     }
 
-    fun loadDeal(d: TradeFinder.Deal, msg: String = "Loaded deal with the ${d.other.name} into Builder.") {
+    fun loadDeal(d: TradeFinder.Deal, msg: String = "The ${d.other.name} deal is in the builder. Change anything you like.") {
         otherId = d.other.id
         clearBuilder()
         give.addAll(d.give.map { it.id })
@@ -403,8 +405,8 @@ fun NbaTradeScreen(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader(
                 "Front office · ${Needs.direction(lg, lg.user).label}",
-                "Trade Center",
-                if (open) "Team OVR ${TradeFinder.overall(lg, lg.user)} · ${Payroll.status(lg, lg.user)} · Needs: ${Needs.needsOf(lg, lg.user).joinToString(", ") { it.label }}"
+                "Trade center",
+                if (open) "Team overall ${TradeFinder.overall(lg, lg.user)} · ${Payroll.status(lg, lg.user)} · Needs: ${Needs.needsOf(lg, lg.user).joinToString(", ") { it.label }}"
                 else if (lg.phase == Phase.REGULAR) "The trade deadline has passed. Trades open again in the offseason."
                 else "Trades open after the season review.",
             )
@@ -419,14 +421,14 @@ fun NbaTradeScreen(vm: GameViewModel, lg: League) {
                 Panel(color = P.hero) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("TRADE DEADLINE COUNTDOWN · HOUR ${ps.deadlineHour}/6", style = T.label, color = P.onHero.copy(alpha = 0.85f))
+                            Text("TRADE DEADLINE · HOUR ${ps.deadlineHour} OF 6", style = T.label, color = P.onHero.copy(alpha = 0.85f))
                             Text(
-                                if (lg.day == Trades.deadlineDay(lg)) "Deadline Day! Final hours to make a move."
-                                else "${Trades.deadlineDay(lg) - lg.day} day(s) until the Trade Deadline (Day ${Trades.deadlineDay(lg)}).",
+                                if (lg.day == Trades.deadlineDay(lg)) "Deadline day. Last chance to make a move."
+                                else "${(Trades.deadlineDay(lg) - lg.day).let { if (it == 1) "1 day" else "$it days" }} until the trade deadline (day ${Trades.deadlineDay(lg)}).",
                                 style = T.bodyB, color = P.onHero,
                             )
                         }
-                        SmallButton("Advance 1 Hr", primary = true, enabled = ps.deadlineHour < 6) {
+                        SmallButton("Next hour", primary = true, enabled = ps.deadlineHour < 6) {
                             vm.act { l -> deadlineFeed = NbaCoach.deadlineStep(l) }
                         }
                     }
@@ -478,7 +480,7 @@ fun NbaTradeScreen(vm: GameViewModel, lg: League) {
                 TradeOffersPage(
                     vm = vm, lg = lg,
                     offers = offers,
-                    onEditInBuilder = { d -> loadDeal(d, "Loaded offer from the ${d.other.name} to counter or edit.") },
+                    onEditInBuilder = { d -> loadDeal(d, "The ${d.other.name} offer is in the builder: counter it or change it.") },
                 )
             }
         }
@@ -508,7 +510,7 @@ private fun TradeBuilder(
     val sortedTeams = remember(lg.teams.size, u.id) { lg.teams.filter { it.id != u.id }.sortedBy { it.name } }
     val other = lg.teams.getOrNull(otherId)?.takeIf { it.id != u.id }
 
-    Section("Trade Partner")
+    Section("Trade partner")
     Panel {
         Picker(
             "Partner",
@@ -554,7 +556,7 @@ private fun TradeBuilder(
     val inSal = gt.sumOf { Trades.effectiveSalary(lg, it, retainTheirs[it.id] ?: 0) }
 
     // BLM 27 Live Trade Value Bar & Controls Card
-    Section("Trade Value & Cap Check", action = if (give.isNotEmpty() || get.isNotEmpty() || givePicks.isNotEmpty() || getPicks.isNotEmpty()) "Clear" else null, onAction = {
+    Section("Value and cap check", action = if (give.isNotEmpty() || get.isNotEmpty() || givePicks.isNotEmpty() || getPicks.isNotEmpty()) "Clear" else null, onAction = {
         give.clear(); get.clear(); givePicks.clear(); getPicks.clear()
         retainMine.clear(); retainTheirs.clear(); protMine.clear(); protTheirs.clear()
         onStatus(null)
@@ -572,7 +574,7 @@ private fun TradeBuilder(
                 Text("YOU OFFER", style = T.label.copy(fontSize = 10.sp), color = P.sub)
                 Text("${v.givePts} pts", style = T.numSm, color = if (v.ok) P.good else P.ink)
             }
-            Tag(if (v.ok) "ACCEPTED" else if (v.givePts == 0 && v.getPts == 0) "SELECT ASSETS" else "REJECTED", if (v.ok) P.good else if (v.givePts == 0 && v.getPts == 0) P.sub else P.bad)
+            Tag(if (v.ok) "THEY'D ACCEPT" else if (v.givePts == 0 && v.getPts == 0) "PICK PLAYERS" else "NOT ENOUGH YET", if (v.ok) P.good else if (v.givePts == 0 && v.getPts == 0) P.sub else P.bad)
             Column(horizontalAlignment = Alignment.End) {
                 Text("${other.abbr} WANTS", style = T.label.copy(fontSize = 10.sp), color = P.sub)
                 Text("${v.getPts} pts", style = T.numSm, color = P.ink)
@@ -595,7 +597,7 @@ private fun TradeBuilder(
         status?.let { Text(it, style = T.small, color = P.accent, modifier = Modifier.padding(top = 4.dp)) }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryButton("Auto-Balance", Modifier.weight(1f)) {
+            SecondaryButton("Balance it", Modifier.weight(1f)) {
                 val gSet = give.toMutableSet()
                 val tSet = get.toMutableSet()
                 val gpSet = givePicks.toMutableSet()
@@ -607,7 +609,7 @@ private fun TradeBuilder(
                 getPicks.clear(); getPicks.addAll(tpSet)
                 onStatus(msg)
             }
-            PrimaryButton("Propose Trade", Modifier.weight(1f), enabled = v.ok) {
+            PrimaryButton("Propose trade", Modifier.weight(1f), enabled = v.ok) {
                 vm.act { l ->
                     val partner = l.team(other.id)
                     val res = NbaCoach.trade(
@@ -618,7 +620,7 @@ private fun TradeBuilder(
                         l.proState?.picks.orEmpty().filter { Picks.key(it) in getPicks && it.owner == partner.id },
                         retainMine.toMap(), retainTheirs.toMap(), protMine.toMap(), protTheirs.toMap(),
                     )
-                    onStatus(if (res.ok) "Trade completed with the ${partner.name}!" else res.text)
+                    onStatus(if (res.ok) "Done. The trade with the ${partner.name} is official." else res.text)
                     if (res.ok) l.proState?.tradeOffers?.removeAll { o -> o.teamId == partner.id }
                 }
                 give.clear(); get.clear(); givePicks.clear(); getPicks.clear()
@@ -866,17 +868,17 @@ private fun TradeBlockPage(
         0 -> {
             val myNeeds = Needs.needsOf(lg, u)
             val mySurplus = Needs.surplusPositions(lg, u)
-            Section("Your Team Needs & Direction", action = "Auto-Detect", onAction = { vm.act { Needs.autoDetectBlock(it, it.user) } })
+            Section("Your needs and direction", action = "Suggest", onAction = { vm.act { Needs.autoDetectBlock(it, it.user) } })
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Direction:", style = T.small, color = P.sub)
                     val dir = Needs.direction(lg, u)
                     Tag(dir.label.uppercase(), P.accent)
                     Spacer(Modifier.weight(1f))
-                    Text("Tap positions to customize", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                    Text("Tap a position to change it", style = T.small.copy(fontSize = 11.sp), color = P.faint)
                 }
                 Spacer(Modifier.height(10.dp))
-                Text("POSITIONAL NEEDS (AI OFFERS TARGET THESE)", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                Text("POSITIONS YOU NEED (TEAMS OFFER FOR THESE)", style = T.label.copy(fontSize = 10.sp), color = P.sub)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (pos in Pos.entries) {
@@ -905,35 +907,37 @@ private fun TradeBlockPage(
                 }
             }
 
-            Section("Your Roster · Mark Block or Untouchable")
+            Section("Your roster: shop or protect")
             GroupList(lg.rosterOf(u).sortedByDescending { it.ovr }) { p ->
                 val onBlock = Needs.isOnBlock(lg, u, p)
                 val untouch = Needs.isUntouchable(lg, u, p)
-                ListRow(onClick = { vm.openPlayer(p.id) }) {
-                    PlayerJersey(p, u, 36.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · ${Trades.points(lg, p)} pts", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                // The player on one line, his three buttons on the next, so names never get squeezed.
+                Column {
+                    ListRow(onClick = { vm.openPlayer(p.id) }) {
+                        PlayerJersey(p, u, 36.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))} · trade value ${Trades.points(lg, p)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                        }
+                        Ring(p.ovr, 32.dp, textSize = 12.sp)
                     }
-                    Ring(p.ovr, 32.dp, textSize = 12.sp)
-                    Spacer(Modifier.width(6.dp))
-                    SmallButton(if (onBlock) "On Block" else "Block", primary = onBlock) {
-                        vm.act { Needs.toggleBlock(it, it.user, p.id) }
+                    Row(Modifier.fillMaxWidth().padding(start = 60.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SmallButton(if (onBlock) "On the block" else "Put on block", primary = onBlock) {
+                            vm.act { Needs.toggleBlock(it, it.user, p.id) }
+                        }
+                        SmallButton(if (untouch) "Untouchable" else "Protect", danger = untouch) {
+                            vm.act { Needs.toggleUntouchable(it, it.user, p.id) }
+                        }
+                        SmallButton("Find offers") { onShopPlayer(p.id) }
                     }
-                    Spacer(Modifier.width(4.dp))
-                    SmallButton(if (untouch) "Locked" else "Lock", danger = untouch) {
-                        vm.act { Needs.toggleUntouchable(it, it.user, p.id) }
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    SmallButton("Shop") { onShopPlayer(p.id) }
                 }
             }
         }
         1 -> {
             val otherTeams = lg.teams.filter { it.id != u.id }.sortedBy { it.name }
             val t = lg.teams.getOrNull(inspectTeamId)?.takeIf { it.id != u.id } ?: otherTeams.first()
-            Section("Inspect Team Trade Block")
+            Section("See their block")
             Panel {
                 Picker("Team", t.name, otherTeams.map { it.name to "${it.w}-${it.l} · ${Needs.direction(lg, it).label}" }) { i ->
                     inspectTeamId = otherTeams[i].id
@@ -949,7 +953,7 @@ private fun TradeBlockPage(
                         Text("${t.name} (${t.w}-${t.l})", style = T.bodyB, color = P.ink)
                         Text("${dir.label} · ${Payroll.status(lg, t)}", style = T.small, color = P.sub)
                     }
-                    SmallButton("Build Deal", primary = true) { onStartTradeWith(t.id, null) }
+                    SmallButton("Build deal", primary = true) { onStartTradeWith(t.id, null) }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text("Needs: ${needs.joinToString(", ") { it.label }.ifEmpty { "None" }} · Surplus: ${surplus.joinToString(", ") { it.label }.ifEmpty { "None" }}", style = T.small, color = P.ink)
@@ -990,7 +994,7 @@ private fun TradeBlockPage(
         else -> {
             var posFilter by remember { mutableIntStateOf(0) }
             Spacer(Modifier.height(6.dp))
-            Chips(listOf("All", "PG", "SG", "SF", "PF", "C", "Fits Need"), posFilter, { posFilter = it })
+            Chips(listOf("All", "PG", "SG", "SF", "PF", "C", "Fits a need"), posFilter, { posFilter = it })
             val allOnBlock = lg.teams.filter { it.id != u.id }.flatMap { t ->
                 val bIds = Needs.onBlockIds(lg, t)
                 lg.rosterOf(t).filter { it.id in bIds }
@@ -1047,7 +1051,7 @@ private fun TradeFinderPage(
     val u = lg.user
 
     Spacer(Modifier.height(10.dp))
-    Chips(listOf("Shop My Player", "Find a Player", "Fits My Needs", "Cap Relief / Dumps"), mode, {
+    Chips(listOf("Shop my player", "Find a player", "Fits my needs", "Cap relief"), mode, {
         mode = it
         pick = -1
         onClearInitial()
@@ -1140,7 +1144,7 @@ private fun TradeOffersPage(
     offers: List<Pair<com.nh.hoopscoach.game.TradeOffer, TradeFinder.Deal>>,
     onEditInBuilder: (TradeFinder.Deal) -> Unit,
 ) {
-    Section("Incoming Trade Offers (${offers.size})", action = "Solicit Offers", onAction = { vm.act { TradeFinder.makeOffers(it) } })
+    Section("Incoming Trade Offers (${offers.size})", action = "Ask for offers", onAction = { vm.act { TradeFinder.makeOffers(it) } })
     if (offers.isEmpty()) {
         Panel {
             Text(
@@ -1204,9 +1208,9 @@ private fun DealCard(
                 SmallButton("Decline", danger = true, onClick = onDecline)
             }
             if (onEditInBuilder != null) {
-                SecondaryButton("Edit in Builder", Modifier.weight(1f)) { onEditInBuilder(d) }
+                SecondaryButton("Edit", Modifier.weight(1f)) { onEditInBuilder(d) }
             }
-            PrimaryButton("Make Trade", Modifier.weight(1f)) {
+            PrimaryButton("Make trade", Modifier.weight(1f)) {
                 vm.act { l ->
                     val t = l.team(d.other.id)
                     val r = NbaCoach.trade(
@@ -1260,6 +1264,7 @@ private fun ImpactRow(label: String, i: TradeFinder.Impact) {
 
 // ---------- BLM 27 Offseason, Contract Extensions & Multi-Round Free Agency ----------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
     val ps = lg.proState ?: return
@@ -1305,7 +1310,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     when (step) {
                         ProStep.REVIEW -> "Season Review"
                         ProStep.DRAFT -> "Draft & Contracts"
-                        ProStep.FREE_AGENCY -> "Free Agency Frenzy"
+                        ProStep.FREE_AGENCY -> "Free agency"
                         ProStep.SUMMER -> "Training Camp"
                     },
                     "Coach ${c.name} · ${u.name} · ${Payroll.status(lg, u)}",
@@ -1353,7 +1358,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     item {
                         Section("Expiring Contracts, Options & Extensions")
                         Text(
-                            "Exercise or decline Team Options (TO), tender Qualifying Offers (QO) to keep matching rights on Restricted Free Agents, or negotiate immediate multi-year extensions before Free Agency opens.",
+                            "Pick up or decline team options, make qualifying offers to keep the right to match offers for restricted free agents, or extend players now, before free agency opens.",
                             style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp),
                         )
                         val exp = NbaCoach.expiring(lg)
@@ -1369,43 +1374,43 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                                     Column(Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            if (p.clause.isNotEmpty()) Tag(Payroll.clauseShort(p.clause), if (p.clause == "TO" || p.clause == "QO") P.good else P.accent)
+                                            if (p.clause.isNotEmpty()) Tag(Payroll.clauseShort(p.clause).uppercase(), if (p.clause == "TO" || p.clause == "QO") P.good else P.accent)
                                         }
-                                        Text("${p.posLabel} · age ${p.age} · now ${Road.dollars(curSal)} · asks ${Market.desiredYears(p)}y/${Road.dollars(ask)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                                        Text("${p.posLabel} · age ${p.age} · makes ${Road.dollars(curSal)} · asks ${Market.desiredYears(p)} yr, ${Road.dollars(ask)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
                                     }
                                     Ring(p.ovr, 34.dp, textSize = 12.sp)
                                 }
-                                Row(
+                                FlowRow(
                                     Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 10.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     when (p.clause) {
                                         "TO" -> {
-                                            SmallButton("Exercise TO (${Road.dollars(curSal)})", primary = true) {
+                                            SmallButton("Pick up option (${Road.dollars(curSal)})", primary = true) {
                                                 vm.act { actionBanner = Market.decideTeamOption(it, p, true) }
                                             }
-                                            SmallButton("Decline TO", danger = true) {
+                                            SmallButton("Decline option", danger = true) {
                                                 vm.act { actionBanner = Market.decideTeamOption(it, p, false) }
                                             }
                                         }
                                         "RFA", "QO" -> {
                                             val qoSal = ((curSal * 1.25).roundToInt() / 10 * 10).coerceIn(ProCareer.minSalary(lg, p.proYears), ProCareer.maxSalary(lg, p.proYears))
                                             val hasQo = p.clause == "QO"
-                                            SmallButton(if (hasQo) "QO Tendered (${Road.dollars(qoSal)})" else "Tender QO (${Road.dollars(qoSal)})", primary = hasQo) {
+                                            SmallButton(if (hasQo) "Qualifying offer made (${Road.dollars(qoSal)})" else "Qualifying offer (${Road.dollars(qoSal)})", primary = hasQo) {
                                                 vm.act { actionBanner = Market.tenderQualifyingOffer(it, p, !hasQo) }
                                             }
-                                            SmallButton("Negotiate Extension") {
+                                            SmallButton("Extend") {
                                                 negotiateIsExtension = true
                                                 negotiatePlayer = p
                                             }
                                         }
                                         else -> {
-                                            SmallButton("Negotiate Extension", primary = true) {
+                                            SmallButton("Extend", primary = true) {
                                                 negotiateIsExtension = true
                                                 negotiatePlayer = p
                                             }
-                                            SmallButton(if (keep) "Auto-Bid in FA ✓" else "Let Test Market") {
+                                            SmallButton(if (keep) "We'll bid in free agency" else "Let him test the market") {
                                                 vm.act {
                                                     if (keep) it.proState!!.userKeep.remove(p.id) else it.proState!!.userKeep.add(p.id)
                                                 }
@@ -1418,12 +1423,12 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     }
                     if (ps.userMoves.isNotEmpty()) {
                         item {
-                            Section("Pre-Market Moves")
+                            Section("Before the market opens")
                             GroupList(ps.userMoves) { line -> ListRow { Text(line, style = T.small, color = P.ink, modifier = Modifier.weight(1f)) } }
                         }
                     }
                     item {
-                        Section("Upcoming Free Agent Class Preview")
+                        Section("Next summer's free agents")
                         Text(
                             "Star players across the NBA with expiring contracts. Tap any player to add them to your Watchlist for Free Agency Round 1.",
                             style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp),
@@ -1446,7 +1451,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         if (Needs.fitsNeed(lg, u, p)) Tag("NEED", P.good)
-                                        Tag("${eval.pct}% INT", interestColor(eval.pct))
+                                        Tag("${eval.pct}% INTEREST", interestColor(eval.pct))
                                     }
                                     Text("${lg.team(p.teamId).abbr} · ${p.posLabel} · age ${p.age} · asks ${Market.desiredYears(p)}y/${Road.dollars(ask)}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
                                 }
@@ -1489,11 +1494,11 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
             val faActive = step == ProStep.FREE_AGENCY && ps.faRound in 1..Market.ROUNDS
             PrimaryButton(
                 when {
-                    step == ProStep.REVIEW -> "Lottery and draft →"
-                    step == ProStep.DRAFT -> "Open Free Agency Frenzy →"
-                    faActive -> "Finish Free Agency & Go to Camp →"
-                    step == ProStep.FREE_AGENCY -> "Training camp →"
-                    else -> "Start the season →"
+                    step == ProStep.REVIEW -> "Lottery and draft"
+                    step == ProStep.DRAFT -> "Open free agency"
+                    faActive -> "Finish free agency"
+                    step == ProStep.FREE_AGENCY -> "Training camp"
+                    else -> "Start the season"
                 },
                 Modifier.fillMaxWidth(),
             ) { vm.proNext() }
@@ -1560,7 +1565,7 @@ private fun FreeAgencyFrenzyView(
                     style = T.label, color = if (inProgress) P.accent else P.good,
                 )
                 Text(
-                    if (inProgress) "Negotiate offers, outbid rival GMs, then advance to the next round."
+                    if (inProgress) "Make offers, outbid other teams, then move to the next round."
                     else "All free agents have signed or training camp rosters are set.",
                     style = T.small, color = P.sub,
                 )
@@ -1571,23 +1576,23 @@ private fun FreeAgencyFrenzyView(
         Row {
             Stat("Cap Space", Road.dollars(room.coerceAtLeast(0)), Modifier.weight(1f), if (room > 0) P.good else P.sub, T.numSm)
             Stat("MLE", if (mleUsed) "Used" else Road.dollars(Payroll.mle(lg)), Modifier.weight(1f), if (mleUsed) P.faint else P.ink, T.numSm)
-            Stat("My Bids", "${myActiveCases.size}", Modifier.weight(1f), P.accent, T.numSm)
+            Stat("Your offers", "${myActiveCases.size}", Modifier.weight(1f), P.accent, T.numSm)
             Stat("Available", "${unsignedCases.size}", Modifier.weight(1f), style = T.numSm)
         }
         if (inProgress) {
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PrimaryButton("Advance Round (${ps.faRound}/${Market.ROUNDS}) →", Modifier.weight(1.3f)) {
+                PrimaryButton("Next round (${ps.faRound} of ${Market.ROUNDS})", Modifier.weight(1.3f)) {
                     vm.act { l ->
                         val events = Market.runRound(l)
                         lastRoundEvents = events
                         if (events.isNotEmpty()) onBanner("Round ${ps.faRound - 1} complete: ${events.first()}")
                     }
                 }
-                SecondaryButton("Sim All", Modifier.weight(0.7f)) {
+                SecondaryButton("Sim the rest", Modifier.weight(0.7f)) {
                     vm.act { l ->
                         Market.finish(l)
-                        onBanner("Simulated remaining Free Agency rounds.")
+                        onBanner("Free agency simmed to the end.")
                     }
                 }
             }
@@ -1613,10 +1618,10 @@ private fun FreeAgencyFrenzyView(
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(p.name, style = T.bodyB, color = P.ink)
-                            Tag("RFA OFFER SHEET", P.warn)
+                            Tag("OFFER SHEET", P.warn)
                         }
                         Text(
-                            "The ${other.name} signed ${p.last} to ${sheet.years}y / ${Road.dollars(sheet.salary)}/yr${if (sheet.clause.isNotEmpty()) " (${Payroll.clauseShort(sheet.clause)})" else ""}.",
+                            "The ${other.name} signed ${p.last} for ${sheet.years} ${if (sheet.years == 1) "year" else "years"}, ${Road.dollars(sheet.salary)} a year${if (sheet.clause.isNotEmpty()) " (${Payroll.clauseShort(sheet.clause)})" else ""}.",
                             style = T.small, color = P.ink,
                         )
                     }
@@ -1624,10 +1629,10 @@ private fun FreeAgencyFrenzyView(
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PrimaryButton("Match Offer Sheet", Modifier.weight(1f)) {
+                    PrimaryButton("Match the offer sheet", Modifier.weight(1f)) {
                         vm.act { l -> onBanner(Market.resolveRfaMatch(l, pid, true)) }
                     }
-                    SecondaryButton("Let Walk", Modifier.weight(1f)) {
+                    SecondaryButton("Let him walk", Modifier.weight(1f)) {
                         vm.act { l -> onBanner(Market.resolveRfaMatch(l, pid, false)) }
                     }
                 }
@@ -1647,9 +1652,9 @@ private fun FreeAgencyFrenzyView(
     when (tab) {
         0 -> {
             Spacer(Modifier.height(8.dp))
-            Chips(listOf("All Pos", "PG", "SG", "SF", "PF", "C"), posFilter, { posFilter = it })
+            Chips(listOf("All positions", "PG", "SG", "SF", "PF", "C"), posFilter, { posFilter = it })
             Spacer(Modifier.height(6.dp))
-            Chips(listOf("All FAs", "Fits Need", "Your Bird FAs", "RFA", "Watchlist"), typeFilter, { typeFilter = it })
+            Chips(listOf("Everyone", "Fits a need", "Yours (Bird rights)", "RFA", "Watchlist"), typeFilter, { typeFilter = it })
             Spacer(Modifier.height(6.dp))
             Chips(listOf("Sort: OVR", "Sort: Interest", "Sort: Ask", "Sort: Most Bids"), sortMode, { sortMode = it })
 
@@ -1714,8 +1719,8 @@ private fun FreeAgencyFrenzyView(
             GroupList(ps.userMoves.reversed()) { line ->
                 ListRow { Text(line, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f)) }
             }
-            Section("League Signings Ticker (${ps.faMoves.size})", action = "All news", onAction = { vm.push(Route.News) })
-            if (ps.faMoves.isEmpty()) Panel { Text("Major signings will appear here as each round resolves.", style = T.small, color = P.sub) }
+            Section("Signings around the league (${ps.faMoves.size})", action = "All news", onAction = { vm.push(Route.News) })
+            if (ps.faMoves.isEmpty()) Panel { Text("Big signings show up here as each round finishes.", style = T.small, color = P.sub) }
             GroupList(ps.faMoves.reversed().take(25)) { line ->
                 ListRow { Text(line, style = T.small, color = P.sub, modifier = Modifier.weight(1f)) }
             }
@@ -1747,22 +1752,22 @@ private fun FaMarketRow(
             PlayerJersey(p, prevTeam, 40.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Tag(if (fc.restricted) "RFA" else "UFA", if (fc.restricted) P.warn else P.sub)
-                    if (fc.fromTeamId == u.id) Tag("BIRD", P.accent)
-                    if (Needs.fitsNeed(lg, u, p)) Tag("NEED", P.good)
-                    Tag("${eval.pct}% INT", interestColor(eval.pct))
+                Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Tag("${eval.pct}% INTERESTED", interestColor(eval.pct))
+                    if (fc.restricted) Tag("RESTRICTED", P.warn)
+                    if (fc.fromTeamId == u.id) Tag("YOUR PLAYER", P.accent)
+                    if (Needs.fitsNeed(lg, u, p)) Tag("FITS A NEED", P.good)
                 }
                 Text(
-                    "${p.posLabel} · age ${p.age} · Asks ${fc.askYears}y / ${Road.dollars(fc.askSalary)}/yr${if (askCl.isNotEmpty()) " ($askCl)" else ""}",
+                    "${p.posLabel} · age ${p.age} · asks ${fc.askYears} ${if (fc.askYears == 1) "year" else "years"}, ${Road.dollars(fc.askSalary)} a year${if (askCl.isNotEmpty()) " ($askCl)" else ""}",
                     style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1,
                 )
                 val bidLine = when {
                     leader == null -> "No offers yet"
-                    leader.teamId == u.id -> "YOU LEAD: ${leader.years}y / ${Road.dollars(leader.salary)}/yr (${fc.bids.size} offer${if (fc.bids.size == 1) "" else "s"})"
-                    myBid != null -> "${lg.team(leader.teamId).abbr} leads (${leader.years}y/${Road.dollars(leader.salary)}) · Your bid: ${myBid.years}y/${Road.dollars(myBid.salary)}"
-                    else -> "${fc.bids.size} offer${if (fc.bids.size == 1) "" else "s"} · ${lg.team(leader.teamId).abbr} leads (${leader.years}y/${Road.dollars(leader.salary)})"
+                    leader.teamId == u.id -> "Your offer leads: ${leader.years} yr, ${Road.dollars(leader.salary)} a year (${fc.bids.size} offer${if (fc.bids.size == 1) "" else "s"})"
+                    myBid != null -> "${lg.team(leader.teamId).name} lead (${leader.years} yr, ${Road.dollars(leader.salary)}) · yours: ${myBid.years} yr, ${Road.dollars(myBid.salary)}"
+                    else -> "${fc.bids.size} offer${if (fc.bids.size == 1) "" else "s"} · the ${lg.team(leader.teamId).name} lead (${leader.years} yr, ${Road.dollars(leader.salary)})"
                 }
                 Text(
                     bidLine,
@@ -1896,7 +1901,7 @@ private fun ContractNegotiationDialog(
                     SmallButton("Min") { salary = minSal }
                     SmallButton("-1M") { salary = (salary - 1_000).coerceAtLeast(minSal) }
                     SmallButton("-250K") { salary = (salary - 250).coerceAtLeast(minSal) }
-                    SmallButton("Match Ask", primary = true) { salary = eval.effectiveAsk }
+                    SmallButton("Match his ask", primary = true) { salary = eval.effectiveAsk }
                     SmallButton("+250K") { salary = (salary + 250).coerceAtMost(maxSal) }
                     SmallButton("+1M") { salary = (salary + 1_000).coerceAtMost(maxSal) }
                     if (!isExtension && Payroll.room(lg, u) < maxSal && u.id !in lg.proState?.faUsedMle.orEmpty()) {
@@ -1906,8 +1911,8 @@ private fun ContractNegotiationDialog(
                 }
 
                 // Contract Clause
-                Text("OPTION / CLAUSE", style = T.label.copy(fontSize = 10.sp), color = P.sub)
-                val clauses = listOf("" to "None", "PO" to "Player Opt", "TO" to "Team Opt", "NTC" to "No-Trade")
+                Text("CONTRACT OPTION", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                val clauses = listOf("" to "None", "PO" to "Player", "TO" to "Team", "NTC" to "No-trade")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for ((code, lbl) in clauses) {
                         val sel = clause == code
@@ -1944,7 +1949,7 @@ private fun ContractNegotiationDialog(
                 if (!eval.legal) {
                     Text(eval.illegalReason, style = T.small, color = P.bad)
                 } else if (isExtension && eval.pct < 52) {
-                    Text("Needs at least 52% interest to sign an extension right now.", style = T.small, color = P.warn)
+                    Text("He needs to be at least 52% interested to sign an extension now.", style = T.small, color = P.warn)
                 }
             }
         },
@@ -1954,7 +1959,7 @@ private fun ContractNegotiationDialog(
                 onClick = { onSubmit(salary, years, clause, structure) },
             ) {
                 Text(
-                    if (isExtension) "Offer Extension" else "Submit Offer",
+                    if (isExtension) "Offer extension" else "Make offer",
                     style = T.bodyB,
                     color = if (eval.legal) P.accent else P.faint,
                 )

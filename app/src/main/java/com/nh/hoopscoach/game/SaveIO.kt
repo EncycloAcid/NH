@@ -42,6 +42,10 @@ object SaveIO {
         return fixed
     }
 
+    /** A whole league as text, to keep inside another save. */
+    fun pack(lg: League): String = java.util.Base64.getEncoder().encodeToString(encode(lg))
+    fun unpack(text: String): League = decode(java.util.Base64.getDecoder().decode(text))
+
     fun decode(bytes: ByteArray): League {
         val text = GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes().toString(Charsets.UTF_8) }
         val lg = json.decodeFromString(League.serializer(), text)

@@ -190,7 +190,7 @@ object Market {
                 val maxCanOffer = maxOf(minSal, avail, if (!mleUsed) mleLimit else 0)
                 InterestEval(
                     pct, label, factors, effectiveAsk, "Over cap", false,
-                    "Over the cap: max you can offer without Bird rights is ${Road.dollars(maxCanOffer)} (${if (!mleUsed && maxCanOffer == mleLimit) "MLE" else "cap room"}).",
+                    "Over the cap: the most you can offer without Bird rights is ${Road.dollars(maxCanOffer)} (${if (!mleUsed && maxCanOffer == mleLimit) "the mid-level exception" else "cap room"}).",
                 )
             }
         }
@@ -239,13 +239,13 @@ object Market {
             p.contractYears = 2
             p.clause = ""
             ps.userKeep.remove(p.id)
-            ps.userMoves += "Exercised Team Option on ${p.name} (${Road.dollars(sal)})"
-            "Exercised ${p.name}'s ${Road.dollars(sal)} team option for next season."
+            ps.userMoves += "Picked up ${p.name}'s team option (${Road.dollars(sal)})"
+            "Picked up ${p.name}'s ${Road.dollars(sal)} team option for next season."
         } else {
             p.contractYears = 1
             p.clause = ""
             ps.userKeep.remove(p.id)
-            ps.userMoves += "Declined Team Option on ${p.name} — becomes UFA"
+            ps.userMoves += "Declined ${p.name}'s team option: he becomes a free agent"
             "Declined ${p.name}'s team option. He will become an unrestricted free agent."
         }
     }
@@ -253,20 +253,20 @@ object Market {
     /** Tenders or withdraws a Qualifying Offer (`QO`) for a Restricted Free Agent (`RFA`) on the user's roster. */
     fun tenderQualifyingOffer(lg: League, p: Player, tender: Boolean): String {
         val ps = lg.proState ?: return ""
-        if (p.teamId != lg.userTeamId || p.clause !in listOf("RFA", "QO")) return "${p.name} is not eligible for a Qualifying Offer."
+        if (p.teamId != lg.userTeamId || p.clause !in listOf("RFA", "QO")) return "${p.name} can't get a qualifying offer."
         val qo = ((Payroll.salaryOf(lg, p) * 1.25).roundToInt() / 10 * 10)
             .coerceIn(ProCareer.minSalary(lg, p.proYears), ProCareer.maxSalary(lg, p.proYears))
         return if (tender) {
             p.clause = "QO"
             ps.userKeep += p.id
-            ps.userMoves.removeAll { it.contains(p.name) && it.contains("Qualifying Offer") }
-            ps.userMoves += "Tendered Qualifying Offer to ${p.name} (${Road.dollars(qo)} RFA)"
-            "Tendered ${Road.dollars(qo)} Qualifying Offer to ${p.name}. You have the right to match any offer sheet."
+            ps.userMoves.removeAll { it.contains(p.name) && it.contains("ualifying") }
+            ps.userMoves += "Qualifying offer to ${p.name} (${Road.dollars(qo)}): you can match any offer he signs"
+            "Made ${p.name} a ${Road.dollars(qo)} qualifying offer. You can match any offer sheet he signs."
         } else {
             p.clause = "RFA"
             ps.userKeep.remove(p.id)
-            ps.userMoves.removeAll { it.contains(p.name) && it.contains("Qualifying Offer") }
-            "Withdrew Qualifying Offer for ${p.name}. Without a QO he will enter unrestricted free agency."
+            ps.userMoves.removeAll { it.contains(p.name) && it.contains("ualifying") }
+            "Withdrew the qualifying offer for ${p.name}. He'll be an unrestricted free agent."
         }
     }
 
@@ -589,7 +589,7 @@ object Market {
                     // User's RFA signed an AI offer sheet — let the user decide whether to match!
                     ps.pendingRfaMatches[p.id] = best
                     fc.statusNote = "Offer sheet from ${lg.team(best.teamId).abbr}: ${best.years}y/${Road.dollars(best.salary)}"
-                    val msg = "RFA Offer Sheet: ${p.name} signed a ${best.years}y, ${Road.dollars(best.salary)}/yr sheet with the ${lg.team(best.teamId).name} — Match or Let Walk!"
+                    val msg = "Offer sheet: ${p.name} signed for ${best.years} ${if (best.years == 1) "year" else "years"}, ${Road.dollars(best.salary)} a year with the ${lg.team(best.teamId).name}. Match it or let him walk."
                     roundLog += msg
                     continue
                 } else if (fc.fromTeamId != me && origTeam.roster.size < ProLeague.MAX_ROSTER) {
@@ -600,7 +600,7 @@ object Market {
                         fc.statusNote = "${origTeam.abbr} matched (${best.years}y/${Road.dollars(best.salary)})"
                         signPlayer(lg, p, origTeam, best.salary, best.years, best.clause, best.structure)
                         if (best.teamId == me) {
-                            val line = "The ${origTeam.name} matched your ${Road.dollars(best.salary)}/yr offer sheet for RFA ${p.name}"
+                            val line = "The ${origTeam.name} matched your ${Road.dollars(best.salary)}-a-year offer sheet for ${p.name}"
                             ps.userMoves += line
                             roundLog += line
                         }

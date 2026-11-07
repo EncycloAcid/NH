@@ -298,7 +298,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             val college = mutex.withLock {
                 withContext(Dispatchers.Default) {
                     val start = pro.season + com.nh.hoopscoach.game.Afterward.yearsAway(pro)
-                    com.nh.hoopscoach.game.Afterward.becomeCoach(pro, com.nh.hoopscoach.game.LeagueGen.newLeague(start), school)
+                    com.nh.hoopscoach.game.Afterward.becomeCoach(pro, com.nh.hoopscoach.game.LeagueGen.newLeague(start), school).also {
+                        // His NBA world comes along, so an NBA job later returns to the league he played in.
+                        if (pro.pro) it.proWorld = runCatching { com.nh.hoopscoach.game.SaveIO.pack(pro) }.getOrDefault("")
+                    }
                 }
             }
             stack.clear()

@@ -371,7 +371,10 @@ object NbaCoach {
     fun fromCollege(college: League, slot: String): League {
         val c = college.userCoach
         val first = firstSeasonAfter(college.season)
-        val pro = ProLeague.coachLeague(first.coerceAtMost(ProLeague.DATA_SEASON + 1), slot, c.first, c.last)
+        // A former player goes back to the league he played in, carried forward to the year he arrives:
+        // the same teams, his old teammates and rivals (older now, or retired), the draft classes since.
+        val world = college.proWorld.takeIf { it.isNotEmpty() }?.let { runCatching { SaveIO.unpack(it) }.getOrNull() }
+        val pro = if (world != null) backTo(world, first, slot, c) else ProLeague.coachLeague(first.coerceAtMost(ProLeague.DATA_SEASON + 1), slot, c.first, c.last)
         // Past today's data, the league ages forward to the year he arrives.
         val gap = first - (pro.season + 1)
         if (gap > 0) ProLeague.ageForward(pro, gap)
@@ -386,6 +389,39 @@ object NbaCoach {
         pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
         pro.news += News(pro.season, 0, "${pc.name} leaves ${college.user.school} for the ${pro.user.name}", true)
         return pro
+    }
+
+    /** The league he played in, made ready for him to coach the team in [slot] in season [first]. */
+    private fun backTo(lg: League, first: Int, slot: String, c: Coach): League {
+        val ps = lg.proState!!
+        lg.proWorld = ""
+        val t = lg.teams.firstOrNull { it.slot == slot } ?: lg.teams.first()
+        lg.coaches.forEach { it.isUser = false }
+        runCatching { lg.coachOf(t) }.getOrNull()?.let { it.teamId = -1 }
+        val me = Coach(lg.nextCoachId++, c.first, c.last, c.age, t.id, c.off, c.def, c.rec, c.dev, c.look, isUser = true, security = 70)
+        lg.coaches += me
+        t.coachId = me.id
+        lg.userCoachId = me.id
+        lg.userTeamId = t.id
+        lg.mode = GameMode.COACH
+        lg.road = null
+        lg.heroId = -1
+        // Where a new coaching league starts: the summer before his first season.
+        lg.phase = Phase.OFFSEASON
+        lg.day = 0
+        ps.step = ProStep.SUMMER
+        ps.fired = false
+        ps.jobOffers.clear()
+        ps.tradeOffers.clear()
+        ps.userOffers.clear()
+        ps.userKeep.clear()
+        ps.expect = -1
+        // The years he spent in college pass here too: everyone ages, the old guard retires, new classes arrive.
+        val years = first - 1 - lg.season
+        if (years > 0) ProLeague.ageForward(lg, years)
+        for (tm in lg.teams) Gameplan.autoAllocate(lg, tm)
+        Picks.ensure(lg)
+        return lg
     }
 
     // ---------- the owner ----------

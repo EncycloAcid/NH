@@ -1244,6 +1244,8 @@ class League(
     var newsSeen: Int = 0,
     /** A coach who played first (Road to the League): his playing career, carried from save to save. */
     var playedAs: PlayedAs? = null,
+    /** The NBA league he played in, packed (SaveIO.pack) while he coaches in college, so a later NBA job returns to the same world. */
+    var proWorld: String = "",
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

@@ -58,17 +58,18 @@ object Payroll {
         "PO" -> "Player Option"
         "TO" -> "Team Option"
         "NTC" -> "No-Trade Clause"
-        "RFA" -> "Restricted FA"
+        "RFA" -> "Restricted free agent"
         "QO" -> "Qualifying Offer"
         else -> "None"
     }
 
+    /** A clause in a few plain words: "player option", "team option", "no-trade", "restricted", "qualifying offer". */
     fun clauseShort(clause: String): String = when (clause) {
-        "PO" -> "PO"
-        "TO" -> "TO"
-        "NTC" -> "NTC"
-        "RFA" -> "RFA"
-        "QO" -> "RFA·QO"
+        "PO" -> "player option"
+        "TO" -> "team option"
+        "NTC" -> "no-trade"
+        "RFA" -> "restricted"
+        "QO" -> "qualifying offer"
         else -> ""
     }
 
