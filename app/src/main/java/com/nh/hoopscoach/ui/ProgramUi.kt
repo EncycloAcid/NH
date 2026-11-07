@@ -271,7 +271,9 @@ fun ProgramNumbers(vm: GameViewModel, lg: League, t: Team) {
             // Where the record is heading: wins so far, plus each game left at today's odds.
             val left = lg.games.filter { !it.played && it.involves(t.id) && (it.type == com.nh.hoopscoach.game.GameType.CONF || it.type == com.nh.hoopscoach.game.GameType.NONCONF || it.type == com.nh.hoopscoach.game.GameType.EVENT) }
             val projW = t.w + left.sumOf { com.nh.hoopscoach.game.Rankings.winProbFor(lg, it, t.id) }.roundToInt()
-            BrandLine("Projected", "$projW-${t.w + t.l + left.size - projW} in the regular season: your record so far, plus every game left at today's odds. It moves with every result.")
+            val projL = t.w + t.l + left.size - projW
+            BrandLine("Projected", com.nh.hoopscoach.game.Takes.collegePulse(lg, t, projW, projL)
+                ?: "$projW-$projL in the regular season: your record so far, plus every game left at today's odds. It moves with every result.")
             BrandLine(
                 "This season",
                 "On pace to earn $now, for ${if (d >= 0) "+" else "−"}${abs(d)} Prestige. A Sweet 16 run would make it ${if (s16 >= 0) "+" else "−"}${abs(s16)}." +

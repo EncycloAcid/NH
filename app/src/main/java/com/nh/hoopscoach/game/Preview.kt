@@ -632,25 +632,7 @@ object Previews {
     }
 
     /** Why a team can win it all, and why it might not. */
-    fun case(lg: League, pv: Preview, t: Team): Pair<String, String> {
-        val (good, bad) = scouting(lg, t)
-        val (st, _) = returning(lg, t)
-        val s = star(lg, t)
-        val nc = newcomer(lg, t)
-        val forIt = buildString {
-            append(pick(lg, 300 + t.id, "Few teams can match their ", "They're as good as anyone at ", "It starts with "))
-            append("${good[0].lowercase()} and ${good[1].lowercase()}")
-            append(if (s != null) ", and ${s.name} is a matchup problem every night." else ".")
-            if (st >= 4) append(" With $st starters back, they know who they are.")
-            else if (nc != null) append(" ${nc.name} gives them a new dimension.")
-        }
-        val against = buildString {
-            append(pick(lg, 400 + t.id, "The worry is ", "Watch the ", "Opponents will test their "))
-            append("${bad[0].lowercase()}")
-            append(if (st <= 2) ", and only $st starters return." else ", and ${bad[1].lowercase()} could be exposed in March.")
-        }
-        return forIt to against
-    }
+    fun case(lg: League, pv: Preview, t: Team): Pair<String, String> = Takes.collegeCase(lg, pv, t)
 
     /** Three questions the user's team has to answer. */
     fun questions(lg: League, pv: Preview, t: Team): List<String> {

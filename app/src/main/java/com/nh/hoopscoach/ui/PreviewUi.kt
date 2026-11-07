@@ -462,6 +462,8 @@ private fun LazyListScope.titleRace(vm: GameViewModel, lg: League, pv: Preview) 
                     }
                     Spacer(Modifier.height(6.dp))
                     GrowBar((o.title / max).toFloat(), Modifier.fillMaxWidth().padding(start = 30.dp), teamInk(t), 6.dp)
+                    if (o.title >= 0.04) Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.collegeEdge(lg, pv, t) }, style = T.small.copy(fontSize = 12.sp), color = P.sub,
+                        modifier = Modifier.padding(start = 30.dp, top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -624,12 +626,10 @@ private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             }
         }
         val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
-        val star = Previews.star(lg, t)
-        val nc = Previews.newcomer(lg, t)
+        val take = remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, t, 3) }
         Column(Modifier.padding(start = 74.dp, top = 6.dp)) {
-            if (last != null) Text("Last season: ${last.w}-${last.l}, ${last.result.ifEmpty { "no postseason" }}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (star != null) Text("Star: ${star.name} (${star.posLabel}, ${star.cls})", style = T.small, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (nc != null) Text("New: ${nc.name} (${if (Previews.isTransfer(nc)) "from ${Previews.cameFrom(lg, nc)}" else "freshman"})", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (last != null) Text("Last season: ${last.w}-${last.l}, ${last.result.ifEmpty { "no postseason" }}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(take, style = T.small, color = P.ink, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
@@ -898,7 +898,8 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
             }
             Spacer(Modifier.height(5.dp))
             GrowBar((o.conf / max).toFloat(), Modifier.fillMaxWidth().padding(start = 66.dp), teamInk(t), 4.dp)
-            if (star != null) Text("${star.name} (${star.posLabel}, ${star.cls}) leads the way.", style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
+            val take = remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, t, 2, from = 1) }
+            Text(take.ifEmpty { star?.let { "${it.name} (${it.posLabel}, ${it.cls}) leads the way." } ?: "" }, style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
         }
     }
     Text("Right column: chance to win the regular-season title.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
@@ -961,6 +962,7 @@ private fun LazyListScope.midMajors(vm: GameViewModel, lg: League, pv: Preview) 
                 Column(Modifier.weight(1f)) {
                     Text(pick.school, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (poy != null) Text("POY: ${poy.name}, ${lg.team(poy.teamId).abbr}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(remember(pick.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, pick, 1) }, style = T.small.copy(fontSize = 12.sp), color = P.ink)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(odd(odds(pv, pick).ncaa), style = T.numSm.copy(fontSize = 15.sp), color = P.ink)
@@ -1087,7 +1089,7 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
             Text("Right column: our chance to win each game.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
         }
         Section("The bottom line")
-        Panel { Text("${Previews.blurb(lg, u)} We see a ${pr.w}-${pr.l} team that finishes ${Previews.ordinal(pr.confRank)} in the ${lg.conf(u.confId).abbr}, with ${com.nh.hoopscoach.game.NbaPreviews.chance(o.ncaa)} at the NCAA Tournament. ${Previews.expectation(pr.nat)}.", style = T.body, color = P.ink) }
+        Panel { Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.collegeBottom(lg, pv, u) }, style = T.body, color = P.ink) }
     }
 }
 

@@ -736,6 +736,7 @@ fun ProjectionLines(lg: League) {
         Stat("Playoffs", odd(o.playoffs), Modifier.weight(1f), style = T.numSm)
         Stat("Title", odd(o.title), Modifier.weight(1f), style = T.numSm)
     }
+    com.nh.hoopscoach.game.Takes.nbaPulse(lg, lg.user)?.let { Text(it, style = T.small, color = P.ink, modifier = Modifier.padding(top = 8.dp)) }
     var how by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(

@@ -259,7 +259,7 @@ private fun LazyListScope.powerRankings(vm: GameViewModel, lg: League, pv: NbaPr
                         Text("TITLE ${odd(o.title)}", style = T.label.copy(fontSize = 8.sp), color = P.faint)
                     }
                 }
-                NbaPreviews.star(lg, t)?.let { s -> Text("Best player: ${s.name} (${s.posLabel})", style = T.small, color = P.sub, modifier = Modifier.padding(start = 72.dp, top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 3) }, style = T.small, color = P.ink, modifier = Modifier.padding(start = 72.dp, top = 4.dp))
             }
         }
     }
@@ -292,6 +292,8 @@ private fun LazyListScope.nbaTitleRace(vm: GameViewModel, lg: League, pv: NbaPre
                     }
                     Spacer(Modifier.height(6.dp))
                     GrowBar((o.title / max).toFloat(), Modifier.fillMaxWidth().padding(start = 38.dp), teamInk(t), 6.dp)
+                    if (o.title >= 0.04) Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaEdge(lg, pv, t) }, style = T.small.copy(fontSize = 12.sp), color = P.sub,
+                        modifier = Modifier.padding(start = 38.dp, top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -358,7 +360,7 @@ private fun LazyListScope.conference(vm: GameViewModel, lg: League, pv: NbaPrevi
                     }
                     Spacer(Modifier.height(5.dp))
                     GrowBar(o.playoffs.toFloat(), Modifier.fillMaxWidth().padding(start = 66.dp), teamInk(t), 4.dp)
-                    NbaPreviews.star(lg, t)?.let { s -> Text("${s.name} (${s.posLabel}) leads the way.", style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 2, from = 1) }, style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
                 }
             }
         }
@@ -573,11 +575,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
         }
         Section("The bottom line")
         Panel {
-            Text(
-                "We see a ${o.w}-${o.l} team, about ${Previews.ordinal(o.seed.roundToInt())} in the ${lg.conf(u.confId).name}, with ${NbaPreviews.chance(o.playoffs)} at the playoffs and ${NbaPreviews.chance(o.title)} at the title." +
-                    (NbaPreviews.star(lg, u)?.let { " It goes as far as ${it.name} takes it." } ?: ""),
-                style = T.body, color = P.ink,
-            )
+            Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = T.body, color = P.ink)
         }
     }
 }
