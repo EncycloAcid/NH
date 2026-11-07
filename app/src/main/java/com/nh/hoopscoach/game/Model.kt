@@ -3,7 +3,10 @@ package com.nh.hoopscoach.game
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
-enum class Pos { PG, SG, SF, PF, C }
+enum class Pos {
+    PG, SG, SF, PF, C;
+    val label: String get() = name
+}
 
 /** The ten player attributes, stored in this order inside [Player.attrs]. */
 enum class Attr(val short: String, val label: String) {
@@ -257,6 +260,10 @@ class Player(
     var photo: String = "",
     /** A second position he can play (a neighbor of his first), or null. */
     var pos2: Pos? = null,
+    /** Pro contract clause/option: "" none, "PO" player option, "TO" team option, "NTC" no-trade clause, "RFA" restricted, "QO" qualifying offer. */
+    var clause: String = "",
+    /** Pro contract structure: "FLAT", "FRONT" (front-loaded), or "BACK" (back-loaded). */
+    var structure: String = "",
 ) {
     val name get() = "$first $last".trim()
     /** "PG/SG" for a two-position player, else just his position. */
@@ -980,11 +987,64 @@ class ProState(
     var liveDay: Int = 0,
     /** Trade offers other teams have made the user (NBA coach mode). */
     val tradeOffers: MutableList<TradeOffer> = mutableListOf(),
+    /** Per-team Trade Block (player ids), Untouchables (player ids), and custom positional Needs / Surplus. */
+    val onTheBlock: MutableMap<Int, MutableList<Int>> = mutableMapOf(),
+    val untouchables: MutableMap<Int, MutableList<Int>> = mutableMapOf(),
+    val customNeeds: MutableMap<Int, MutableList<Pos>> = mutableMapOf(),
+    val customSurplus: MutableMap<Int, MutableList<Pos>> = mutableMapOf(),
+    /** Retained trade salaries and stretched contract buyouts per team (max 3 active per team). */
+    val retained: MutableMap<Int, MutableList<RetainedSalary>> = mutableMapOf(),
+    /** Interactive Trade Deadline Day hour (0 = not started, 1..5 = hours remaining, 6 = deadline passed). */
+    var deadlineHour: Int = 0,
+    /** Interactive multi-round Free Agency frenzy state (0 = not open, 1..6 = current round, 7 = finished). */
+    var faRound: Int = 0,
+    val faCases: MutableList<FaCase> = mutableListOf(),
+    val faUsedMle: MutableList<Int> = mutableListOf(),
+    val faWatchlist: MutableList<Int> = mutableListOf(),
+    val pendingRfaMatches: MutableList<FaCase> = mutableListOf(),
 )
 
-/** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
+/** Dead cap from retaining up to 50% of a contract in a trade or stretching a buyout. */
 @Serializable
-class PickAsset(val season: Int, val original: Int, var owner: Int)
+class RetainedSalary(
+    val pid: Int,
+    val name: String,
+    val amount: Int,
+    var yearsLeft: Int,
+    val kind: String = "Retained",
+)
+
+/** A live contract bid in Free Agency (from the user or an AI team). */
+@Serializable
+class ContractBid(
+    val teamId: Int,
+    var salary: Int,
+    var years: Int,
+    var clause: String = "",
+    var structure: String = "FLAT",
+    val bird: Boolean = false,
+    val mle: Boolean = false,
+    val rfaSheet: Boolean = false,
+    val roundPlaced: Int = 1,
+)
+
+/** A free agent on the open market during the multi-round Free Agency frenzy. */
+@Serializable
+class FaCase(
+    val pid: Int,
+    val fromTeamId: Int,
+    val askSalary: Int,
+    val askYears: Int = 2,
+    val askClause: String = "",
+    val restricted: Boolean = false,
+    val bids: MutableList<ContractBid> = mutableListOf(),
+    var signedTeamId: Int = -1,
+    var statusNote: String = "",
+)
+
+/** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s, with optional top-[protection] protection. */
+@Serializable
+class PickAsset(val season: Int, val original: Int, var owner: Int, var protection: Int = 0)
 
 /**
  * One honor: [award] like "Player of the Week" or "MVP", for a player ([pid]) or a coach or front

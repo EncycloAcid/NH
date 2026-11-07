@@ -1359,18 +1359,20 @@ object ProCareer {
                 draft(lg)
                 Picks.ensure(lg)
                 Trades.summer(lg)
+                Market.prepareOffseasonContracts(lg)
                 // His own free agents: the good ones are on the list to bring back.
                 ps.userKeep.clear()
-                ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 }.map { it.id }
+                ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 || it.clause == "QO" }.map { it.id }
                 ps.userOffers.clear()
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
-                Market.run(lg)
+                Market.open(lg)
                 ps.step = ProStep.FREE_AGENCY
                 TradeFinder.makeOffers(lg)
             }
             ProStep.FREE_AGENCY -> {
+                Market.finish(lg)
                 if (ps.history.isNotEmpty()) summer(lg)
                 ps.step = ProStep.SUMMER
             }
@@ -1433,8 +1435,8 @@ object ProCareer {
         val names = lg.players.map { it.name }.toSet()
         val real = if (Eras.of(lg) != Era.TODAY || lg.season <= ProLeague.DATA_SEASON) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
         for (i in 0 until picks) {
-            // A traded first-round pick goes to the team that owns it.
-            val t = lg.team(if (i < order.size) Picks.owner(lg, lg.season, order[i]) else order[i % order.size])
+            // A traded first-round pick goes to the team that owns it (unless protected and lands inside protection).
+            val t = lg.team(if (i < order.size) Picks.resolveDraftOwner(lg, lg.season, order[i], i + 1) else order[i % order.size])
             val p = if (i == rivalSlot && rival != null) {
                 ProLeague.joinPro(lg, rival, t, rival.year + 1)
                 r?.rivalPick = i + 1

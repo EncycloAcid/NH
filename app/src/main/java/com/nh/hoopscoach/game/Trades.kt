@@ -30,11 +30,48 @@ object Trades {
         return exp((p.ovr - 82) / 3.5 + upside + prod) * age
     }
 
+    /** Effective salary of [p] after [retainPct] (0..50%) is retained by the sending team. */
+    fun effectiveSalary(lg: League, p: Player, retainPct: Int = 0): Int {
+        val sal = Payroll.salaryOf(lg, p)
+        val pct = retainPct.coerceIn(0, 50)
+        return ((sal * (100 - pct)) / 100.0).roundToInt()
+    }
+
+    /**
+     * How much [p]'s contract helps or hurts his trade value (in trade-value units).
+     * A bargain/rookie deal or retained salary adds value; an overpaid multi-year contract subtracts
+     * value and can push a declining veteran's net trade value negative (red bar in BLM 27).
+     */
+    fun contractDelta(lg: League, p: Player, retainPct: Int = 0): Double {
+        val eff = effectiveSalary(lg, p, retainPct)
+        val fair = ProCareer.marketValue(lg, p).coerceAtLeast(ProCareer.minSalary(lg, p.proYears))
+        val cap = Payroll.cap(lg).toDouble().coerceAtLeast(10_000.0)
+        val diffRatio = (fair - eff) / cap // positive if bargain, negative if overpaid
+        val yrsFactor = (0.7 + p.contractYears.coerceIn(1, 4) * 0.22)
+        return when {
+            diffRatio >= 0.02 -> (diffRatio * 14.0 * yrsFactor).coerceAtMost(5.5)
+            diffRatio <= -0.02 -> (diffRatio * 18.0 * yrsFactor).coerceAtLeast(-7.5)
+            else -> 0.0
+        }
+    }
+
+    /** Net trade value of [p] including his contract and any [retainPct] salary retention. Can be negative for bad contracts. */
+    fun netValue(lg: League, p: Player, retainPct: Int = 0): Double =
+        value(p) + contractDelta(lg, p, retainPct)
+
+    /** BLM 27-style explicit numeric trade value (can be negative for albatross contracts). */
+    fun points(lg: League, p: Player, retainPct: Int = 0): Int =
+        (netValue(lg, p, retainPct) * 42.0).roundToInt()
+
+    /** BLM 27-style numeric trade value from [t]'s perspective (incorporating direction, positional need, and contract). */
+    fun pointsFor(lg: League, t: Team, p: Player, retainPct: Int = 0): Int =
+        ((valueFor(lg, t, p) * Needs.needFactor(lg, t, p) + contractDelta(lg, p, retainPct)) * 42.0).roundToInt()
+
     /** A rebuilding seller wants a first-round pick back: the buyer's furthest one, if it has one. */
     fun sweetener(lg: League, seller: Team, buyer: Team): List<PickAsset> =
         if (seller.w + seller.l >= 10 && seller.winPct < 0.45) listOfNotNull(Picks.owned(lg, buyer).lastOrNull()) else emptyList()
 
-    /** His trade value in a word: Franchise, All-Star, Starter, Rotation or Bench. */
+    /** His trade value in a word: Franchise, All-Star, Starter, Rotation, Bench, or Negative (bad contract). */
     fun tier(p: Player): String {
         val v = value(p)
         return when { v >= 40 -> "Franchise"; v >= 12 -> "All-Star"; v >= 4 -> "Starter"; v >= 1.5 -> "Rotation"; else -> "Bench" }
@@ -66,7 +103,8 @@ object Trades {
     fun bundleFor(lg: League, t: Team, target: Double, lo: Double, hi: Double) = bundle(lg, t, target, lo, hi, emptySet())
 
     private fun bundle(lg: League, t: Team, target: Double, lo: Double, hi: Double, keep: Set<Int>): List<Player>? {
-        val pool = lg.rosterOf(t).filter { it.id != lg.heroId && it.id !in keep && it.id !in (lg.proState?.moved ?: emptyList<Int>()) }
+        val untouch = Needs.untouchableIds(lg, t)
+        val pool = lg.rosterOf(t).filter { it.id != lg.heroId && it.id !in keep && it.id !in untouch && it.clause != "NTC" && it.id !in (lg.proState?.moved ?: emptyList<Int>()) }
             .sortedByDescending { value(it) }
         val out = mutableListOf<Player>()
         var sum = 0.0
@@ -88,11 +126,17 @@ object Trades {
         p.teamId = to.id
         if (to.roster.any { lg.player(it).number == p.number }) p.number = Recruiting.freeNumber(lg, to)
         to.roster += p.id
+        lg.proState?.onTheBlock?.get(from.id)?.remove(p.id)
+        lg.proState?.untouchables?.get(from.id)?.remove(p.id)
     }
 
-    /** Swaps [fromA] (to [b]) for [fromB] (to [a]) and fixes up both rosters. */
-    fun execute(lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, offseason: Boolean = lg.phase == Phase.OFFSEASON,
-                picksA: List<PickAsset> = emptyList(), picksB: List<PickAsset> = emptyList()): Trade {
+    /** Swaps [fromA] (to [b]) for [fromB] (to [a]), applies any salary retention & pick protections, and fixes up both rosters. */
+    fun execute(
+        lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, offseason: Boolean = lg.phase == Phase.OFFSEASON,
+        picksA: List<PickAsset> = emptyList(), picksB: List<PickAsset> = emptyList(),
+        retainA: Map<Int, Int> = emptyMap(), retainB: Map<Int, Int> = emptyMap(),
+        protA: Map<Int, Int> = emptyMap(), protB: Map<Int, Int> = emptyMap(),
+    ): Trade {
         val ps = lg.proState!!
         val hero = fromA.any { it.id == lg.heroId } || fromB.any { it.id == lg.heroId }
         if (hero) {
@@ -101,8 +145,28 @@ object Trades {
         }
         val beforeA = ProLeague.teamValue(lg, a)
         val beforeB = ProLeague.teamValue(lg, b)
-        for (p in fromA) move(lg, p, a, b)
-        for (p in fromB) move(lg, p, b, a)
+        for (p in fromA) {
+            val pct = retainA[p.id]?.coerceIn(0, 50) ?: 0
+            if (pct > 0 && Payroll.canRetainMore(lg, a)) {
+                val kept = ((p.salary * pct) / 100.0).roundToInt() / 10 * 10
+                if (kept > 0) {
+                    Payroll.addRetained(lg, a, p, kept, p.contractYears.coerceAtLeast(1), "Retained")
+                    p.salary = (p.salary - kept).coerceAtLeast(ProCareer.minSalary(lg, p.proYears))
+                }
+            }
+            move(lg, p, a, b)
+        }
+        for (p in fromB) {
+            val pct = retainB[p.id]?.coerceIn(0, 50) ?: 0
+            if (pct > 0 && Payroll.canRetainMore(lg, b)) {
+                val kept = ((p.salary * pct) / 100.0).roundToInt() / 10 * 10
+                if (kept > 0) {
+                    Payroll.addRetained(lg, b, p, kept, p.contractYears.coerceAtLeast(1), "Retained")
+                    p.salary = (p.salary - kept).coerceAtLeast(ProCareer.minSalary(lg, p.proYears))
+                }
+            }
+            move(lg, p, b, a)
+        }
         for (t in listOf(a, b)) {
             ProLeague.trim(lg, t)
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
@@ -112,12 +176,14 @@ object Trades {
         // The trade changes how good each team is (on top of how it has played).
         a.elo += (ProLeague.teamValue(lg, a) - beforeA) * ProLeague.ELO_PER_POINT
         b.elo += (ProLeague.teamValue(lg, b) - beforeB) * ProLeague.ELO_PER_POINT
-        // Picks change hands too.
+        // Picks change hands too, with any agreed protections.
+        Picks.move(lg, picksA, b, protA)
+        Picks.move(lg, picksB, a, protB)
         val pickNamesA = picksA.map { Picks.label(lg, it) }
         val pickNamesB = picksB.map { Picks.label(lg, it) }
-        Picks.move(lg, picksA, b)
-        Picks.move(lg, picksB, a)
-        val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, fromA.map { it.name } + pickNamesA, fromB.map { it.name } + pickNamesB, hero)
+        val namesA = fromA.map { p -> val r = retainA[p.id] ?: 0; if (r > 0) "${p.name} ($r% ret.)" else p.name } + pickNamesA
+        val namesB = fromB.map { p -> val r = retainB[p.id] ?: 0; if (r > 0) "${p.name} ($r% ret.)" else p.name } + pickNamesB
+        val trade = Trade(lg.season, lg.day, offseason, a.id, b.id, namesA, namesB, hero)
         ps.trades += trade
         NewsDesk.trade(lg, trade, a, b, fromA, fromB, pickNamesA, pickNamesB)
         Rumors.breaking(lg, trade)

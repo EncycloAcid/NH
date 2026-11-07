@@ -377,4 +377,116 @@ class SimTest {
         val atLargeByConf = ncaa.seeds.keys.filter { it !in autos }.groupingBy { lg.conf(lg.team(it).confId).abbr }.eachCount()
         println("  at-large bids: $atLargeByConf")
     }
+
+    @Test
+    fun nbaCoachTradingAndFreeAgency() {
+        Rng.seed(77L)
+        val lg = com.nh.hoopscoach.game.ProLeague.coachLeague(2027, "BOS", "Brad", "Stevens")
+        val u = lg.user
+        assertTrue(com.nh.hoopscoach.game.NbaCoach.active(lg))
+        assertTrue(com.nh.hoopscoach.game.NbaCoach.canTrade(lg))
+
+        // 1. Trade Block, Untouchables, Needs & Surplus
+        com.nh.hoopscoach.game.Needs.autoDetectBlock(lg, u)
+        val star = lg.rosterOf(u).maxBy { it.ovr }
+        val role = lg.rosterOf(u).sortedByDescending { it.ovr }[6]
+        if (!com.nh.hoopscoach.game.Needs.isOnBlock(lg, u, role)) {
+            com.nh.hoopscoach.game.Needs.toggleBlock(lg, u, role.id)
+        }
+        assertTrue(com.nh.hoopscoach.game.Needs.isOnBlock(lg, u, role))
+        if (!com.nh.hoopscoach.game.Needs.isUntouchable(lg, u, star)) {
+            com.nh.hoopscoach.game.Needs.toggleUntouchable(lg, u, star.id)
+        }
+        assertTrue(com.nh.hoopscoach.game.Needs.isUntouchable(lg, u, star))
+
+        // 2. Trade Value Points, Salary Retention, Pick Protections & Auto-Balance
+        val basePts = com.nh.hoopscoach.game.Trades.points(lg, role, 0)
+        val retainedPts = com.nh.hoopscoach.game.Trades.points(lg, role, 50)
+        assertTrue("50% retained salary boosts trade value points", retainedPts >= basePts)
+
+        val myPick = com.nh.hoopscoach.game.Picks.owned(lg, u).first()
+        val unprotPts = com.nh.hoopscoach.game.Picks.points(lg, myPick, 0)
+        val lottoProtPts = com.nh.hoopscoach.game.Picks.points(lg, myPick, 14)
+        assertTrue("Unprotected pick is worth at least as much as lottery-protected pick", unprotPts >= lottoProtPts)
+
+        val partner = lg.teams.first { it.id != u.id }
+        val giveIds = mutableSetOf(role.id)
+        val getIds = mutableSetOf<Int>()
+        val givePickKeys = mutableSetOf<Int>()
+        val getPickKeys = mutableSetOf<Int>()
+        val retainMine = mutableMapOf<Int, Int>()
+        val retainTheirs = mutableMapOf<Int, Int>()
+        val protMine = mutableMapOf<Int, Int>()
+        val protTheirs = mutableMapOf<Int, Int>()
+        val autoMsg = com.nh.hoopscoach.game.NbaCoach.autoBalance(
+            lg, partner, giveIds, getIds, givePickKeys, getPickKeys, retainMine, retainTheirs, protMine, protTheirs
+        )
+        assertTrue(autoMsg.isNotEmpty())
+
+        // Execute a trade with 25% salary retention and Top-10 pick protection
+        val shopDeal = com.nh.hoopscoach.game.TradeFinder.shop(lg, role).firstOrNull()
+        assertNotNull("Shop finds at least one deal", shopDeal)
+        if (shopDeal != null) {
+            val retMap = mapOf(role.id to 25)
+            val verdict = com.nh.hoopscoach.game.NbaCoach.trade(
+                lg, shopDeal.other, shopDeal.give, shopDeal.get, shopDeal.givePicks, shopDeal.getPicks, retainMine = retMap
+            )
+            assertTrue("Trade with 25% salary retention succeeds: ${verdict.text}", verdict.ok)
+            assertTrue("Retained dead cap recorded", com.nh.hoopscoach.game.Payroll.deadCap(lg, u) > 0)
+        }
+
+        // 3. Buyout & Stretch
+        val bench = lg.rosterOf(u).minBy { it.ovr }
+        val (perYr, yrs, saved) = com.nh.hoopscoach.game.Payroll.buyoutPreview(lg, bench)
+        assertTrue(perYr > 0 && yrs >= 2 && saved > 0)
+        assertTrue("Buyout succeeds", com.nh.hoopscoach.game.Payroll.buyout(lg, u, bench))
+        assertEquals("Bought-out player enters free agent pool", -1, bench.teamId)
+
+        // 4. Advance through season to Offseason DRAFT -> Contract Options, QOs, Extensions
+        com.nh.hoopscoach.game.ProCareer.next(lg) // SUMMER -> REGULAR
+        assertEquals(Phase.REGULAR, lg.phase)
+        var guard = 0
+        while (lg.phase != Phase.OFFSEASON && guard++ < 220) {
+            com.nh.hoopscoach.game.ProSeason.playDay(lg)
+        }
+        assertEquals(Phase.OFFSEASON, lg.phase)
+        assertEquals(com.nh.hoopscoach.game.ProStep.REVIEW, lg.proState!!.step)
+
+        com.nh.hoopscoach.game.ProCareer.next(lg) // REVIEW -> DRAFT
+        assertEquals(com.nh.hoopscoach.game.ProStep.DRAFT, lg.proState!!.step)
+
+        val exp = com.nh.hoopscoach.game.NbaCoach.expiring(lg)
+        if (exp.isNotEmpty()) {
+            val p = exp.first()
+            val ask = com.nh.hoopscoach.game.NbaCoach.ask(lg, p)
+            val eval = com.nh.hoopscoach.game.Market.evaluateOffer(lg, u, p, (ask * 1.05).toInt() / 10 * 10, 3, "PO", "FLAT", u.id, isExtension = true)
+            assertTrue("Generous offer with Player Option has high interest (${eval.pct}%)", eval.pct >= 52)
+            val (ok, _) = com.nh.hoopscoach.game.Market.negotiateExtension(lg, p, (ask * 1.05).toInt() / 10 * 10, 3, "PO", "FLAT")
+            assertTrue("Extension accepted", ok)
+            assertEquals("PO", p.clause)
+        }
+
+        // 5. Open Interactive Multi-Round Free Agency (DRAFT -> FREE_AGENCY)
+        com.nh.hoopscoach.game.ProCareer.next(lg)
+        assertEquals(com.nh.hoopscoach.game.ProStep.FREE_AGENCY, lg.proState!!.step)
+        assertEquals("Starts at Round 1 of Free Agency", 1, lg.proState!!.faRound)
+        assertTrue("Free agent cases populated", lg.proState!!.faCases.isNotEmpty())
+
+        val topFa = lg.proState!!.faCases.first()
+        val faPlayer = lg.player(topFa.pid)
+        val bidSal = com.nh.hoopscoach.game.ProCareer.minSalary(lg, faPlayer.proYears)
+        com.nh.hoopscoach.game.Market.evaluateOffer(lg, u, faPlayer, bidSal, 2, "PO", "FRONT", topFa.fromTeamId)
+
+        // Advance 2 rounds interactively, verify SaveIO round-trip mid-frenzy, then finish FA
+        com.nh.hoopscoach.game.Market.runRound(lg)
+        assertEquals(2, lg.proState!!.faRound)
+        val decoded = SaveIO.decode(SaveIO.encode(lg))
+        assertEquals(2, decoded.proState!!.faRound)
+        assertEquals(lg.proState!!.faCases.size, decoded.proState!!.faCases.size)
+
+        com.nh.hoopscoach.game.ProCareer.next(lg) // FREE_AGENCY -> SUMMER (calls Market.finish)
+        assertEquals(com.nh.hoopscoach.game.ProStep.SUMMER, lg.proState!!.step)
+        assertTrue("All rosters filled after Free Agency", lg.teams.all { it.roster.size >= com.nh.hoopscoach.game.ProLeague.ROSTER })
+        assertTrue("No unsigned free agents left in lg.players", lg.players.all { it.teamId >= 0 })
+    }
 }

@@ -34,9 +34,12 @@ object NbaCoach {
     /** Cap room after the players he's bringing back (their asks replace their old deals). */
     fun room(lg: League): Int {
         val ps = lg.proState ?: return 0
+        if (ps.step == ProStep.FREE_AGENCY && ps.faCases.isNotEmpty()) {
+            return Market.availableRoom(lg, lg.user)
+        }
         val u = lg.user
         val staying = lg.rosterOf(u).filter { !(it.proYears > 0 && it.contractYears <= 1) || it.id in ps.userKeep }
-        val payroll = staying.sumOf { if (it.contractYears <= 1 && it.proYears > 0) ask(lg, it) else Payroll.salaryOf(lg, it) }
+        val payroll = staying.sumOf { if (it.contractYears <= 1 && it.proYears > 0) ask(lg, it) else Payroll.salaryOf(lg, it) } + Payroll.deadCap(lg, u)
         return Payroll.cap(lg) - payroll - ps.userOffers.values.sum()
     }
 
@@ -46,38 +49,110 @@ object NbaCoach {
     fun canTrade(lg: League): Boolean = active(lg) && !(lg.proState?.fired ?: false) &&
         (lg.phase == Phase.OFFSEASON && lg.proState?.step != ProStep.REVIEW || lg.phase == Phase.REGULAR && lg.day <= Trades.deadlineDay(lg))
 
-    class Verdict(val ok: Boolean, val text: String, val give: Double, val get: Double)
+    class Verdict(
+        val ok: Boolean,
+        val text: String,
+        val give: Double,
+        val get: Double,
+        val givePts: Int = (give * 100).roundToInt(),
+        val getPts: Int = (get * 100).roundToInt(),
+    )
 
-    /** How [other] sees a deal: what it gets from the user ([give], [givePicks]) against what it sends ([get], [getPicks]). */
-    fun judge(lg: League, other: Team, give: List<Player>, get: List<Player>, givePicks: List<PickAsset>, getPicks: List<PickAsset>): Verdict {
+    /**
+     * How [other] sees a deal: what it gets from the user ([give], [givePicks]) against what it sends ([get], [getPicks]),
+     * accounting for contract surplus/burden, retained salary ([retainMine], [retainTheirs]), pick protections ([protMine], [protTheirs]),
+     * Untouchable status, and No-Trade Clauses (`NTC`).
+     */
+    fun judge(
+        lg: League,
+        other: Team,
+        give: List<Player>,
+        get: List<Player>,
+        givePicks: List<PickAsset>,
+        getPicks: List<PickAsset>,
+        retainMine: Map<Int, Int> = emptyMap(),
+        retainTheirs: Map<Int, Int> = emptyMap(),
+        protMine: Map<Int, Int> = emptyMap(),
+        protTheirs: Map<Int, Int> = emptyMap(),
+    ): Verdict {
         val u = lg.user
-        if (give.isEmpty() && givePicks.isEmpty() || get.isEmpty() && getPicks.isEmpty()) return Verdict(false, "Pick something from each side.", 0.0, 0.0)
-        val theyGet = give.sumOf { Trades.valueFor(lg, other, it) } + givePicks.sumOf { Picks.value(lg, it) }
-        val theySend = get.sumOf { Trades.valueFor(lg, other, it) } + getPicks.sumOf { Picks.value(lg, it) }
-        val inMine = get.sumOf { Payroll.salaryOf(lg, it) }
-        val outMine = give.sumOf { Payroll.salaryOf(lg, it) }
-        if (!Payroll.tradeWorks(lg, u, inMine, outMine)) return Verdict(false, "Your salaries don't match: over the cap you can take back at most 125% of what you send, plus $100K.", theyGet, theySend)
-        if (!Payroll.tradeWorks(lg, other, outMine, inMine)) return Verdict(false, "Their salaries don't match: the ${other.name} are over the cap and can't take on that much.", theyGet, theySend)
-        if (lg.rosterOf(u).size - give.size + get.size < 10 || lg.rosterOf(other).size - get.size + give.size < 10) return Verdict(false, "That leaves a roster too thin to play.", theyGet, theySend)
+        if (give.isEmpty() && givePicks.isEmpty() || get.isEmpty() && getPicks.isEmpty()) {
+            return Verdict(false, "Pick something from each side.", 0.0, 0.0, 0, 0)
+        }
+        val theyGet = give.sumOf { p ->
+            val r = retainMine[p.id] ?: 0
+            (Trades.valueFor(lg, other, p) + Trades.contractDelta(lg, p, r) * 0.45).coerceAtLeast(-2.0)
+        } + givePicks.sumOf { pk -> Picks.value(lg, pk, protMine[Picks.key(pk)]) }
+        val theySend = get.sumOf { p ->
+            val r = retainTheirs[p.id] ?: 0
+            (Trades.valueFor(lg, other, p) + Trades.contractDelta(lg, p, r) * 0.45).coerceAtLeast(-2.0)
+        } + getPicks.sumOf { pk -> Picks.value(lg, pk, protTheirs[Picks.key(pk)]) }
+
+        val theirRetainCount = retainTheirs.count { (pid, pct) -> pct > 0 && get.any { it.id == pid } }
+        val reqRatio = if (theirRetainCount > 0) 1.12 else 1.05
+        val givePts = (theyGet * 100).roundToInt().coerceAtLeast(0)
+        val getPts = (theySend * reqRatio * 100).roundToInt().coerceAtLeast(0)
+
+        val ntcMine = give.firstOrNull { it.clause == "NTC" }
+        if (ntcMine != null) return Verdict(false, "${ntcMine.name} has a No-Trade Clause (NTC) and blocks the trade.", theyGet, theySend, givePts, getPts)
+        val ntcTheirs = get.firstOrNull { it.clause == "NTC" }
+        if (ntcTheirs != null) return Verdict(false, "${ntcTheirs.name} has a No-Trade Clause (NTC) and won't waive it.", theyGet, theySend, givePts, getPts)
+
+        val untouch = get.firstOrNull { Needs.isUntouchable(lg, other, it) }
+        if (untouch != null) return Verdict(false, "The ${other.name} have marked ${untouch.name} as Untouchable.", theyGet, theySend, givePts, getPts)
+
+        val myRetainCount = retainMine.count { (pid, pct) -> pct > 0 && give.any { it.id == pid } }
+        if (Payroll.retainedSlotsUsed(lg, u) + myRetainCount > Payroll.MAX_RETAINED) {
+            return Verdict(false, "You can retain salary on at most ${Payroll.MAX_RETAINED} contracts at once.", theyGet, theySend, givePts, getPts)
+        }
+        if (Payroll.retainedSlotsUsed(lg, other) + theirRetainCount > Payroll.MAX_RETAINED) {
+            return Verdict(false, "The ${other.name} have no retained salary slots left.", theyGet, theySend, givePts, getPts)
+        }
+
+        val inMine = get.sumOf { Trades.effectiveSalary(lg, it, retainTheirs[it.id] ?: 0) }
+        val outMine = give.sumOf { Trades.effectiveSalary(lg, it, retainMine[it.id] ?: 0) }
+        if (!Payroll.tradeWorks(lg, u, inMine, outMine)) {
+            return Verdict(false, "Your salaries don't match: over the cap you can take back at most 125% of what you send, plus $100K.", theyGet, theySend, givePts, getPts)
+        }
+        if (!Payroll.tradeWorks(lg, other, outMine, inMine)) {
+            return Verdict(false, "Their salaries don't match: the ${other.name} are over the cap and can't take on that much.", theyGet, theySend, givePts, getPts)
+        }
+        val myAfter = lg.rosterOf(u).size - give.size + get.size
+        val theirAfter = lg.rosterOf(other).size - get.size + give.size
+        if (myAfter < 10 || theirAfter < 10) return Verdict(false, "That leaves a roster too thin to play (minimum 10).", theyGet, theySend, givePts, getPts)
+        if (myAfter > ProLeague.MAX_ROSTER || theirAfter > ProLeague.MAX_ROSTER) return Verdict(false, "That puts a roster over the ${ProLeague.MAX_ROSTER}-player limit.", theyGet, theySend, givePts, getPts)
+
         // A team wants a little more than it gives, and won't move its franchise player for a pile of role players.
         val star = get.maxByOrNull { Trades.value(it) }
-        if (star != null && Trades.tier(star) == "Franchise" && give.none { Trades.value(it) >= Trades.value(star) * 0.7 })
-            return Verdict(false, "The ${other.name} won't move ${star.name} without a star coming back.", theyGet, theySend)
-        val ok = theyGet >= theySend * 1.05
+        if (star != null && Trades.tier(star) == "Franchise" && give.none { Trades.value(it) >= Trades.value(star) * 0.7 }) {
+            return Verdict(false, "The ${other.name} won't move ${star.name} without a star coming back.", theyGet, theySend, givePts, getPts)
+        }
+        val ok = theyGet >= theySend * reqRatio
         val text = when {
             ok && theyGet >= theySend * 1.4 -> "They'd jump at it. You might be giving up too much."
-            ok -> "The ${other.name} accept."
-            theyGet >= theySend * 0.85 -> "Close. The ${other.name} want a little more."
-            else -> "Not close. The ${other.name} hang up."
+            ok -> "The ${other.name} accept (${givePts} vs ${getPts} pts)."
+            theyGet >= theySend * 0.85 -> "Close (${givePts} vs ${getPts} pts). The ${other.name} want a little more."
+            else -> "Not close (${givePts} vs ${getPts} pts). The ${other.name} hang up."
         }
-        return Verdict(ok, text, theyGet, theySend)
+        return Verdict(ok, text, theyGet, theySend, givePts, getPts)
     }
 
     /** Makes the deal if [other] accepts. */
-    fun trade(lg: League, other: Team, give: List<Player>, get: List<Player>, givePicks: List<PickAsset>, getPicks: List<PickAsset>): Verdict {
-        val v = judge(lg, other, give, get, givePicks, getPicks)
+    fun trade(
+        lg: League,
+        other: Team,
+        give: List<Player>,
+        get: List<Player>,
+        givePicks: List<PickAsset>,
+        getPicks: List<PickAsset>,
+        retainMine: Map<Int, Int> = emptyMap(),
+        retainTheirs: Map<Int, Int> = emptyMap(),
+        protMine: Map<Int, Int> = emptyMap(),
+        protTheirs: Map<Int, Int> = emptyMap(),
+    ): Verdict {
+        val v = judge(lg, other, give, get, givePicks, getPicks, retainMine, retainTheirs, protMine, protTheirs)
         if (!v.ok || !canTrade(lg)) return v
-        Trades.execute(lg, lg.user, other, give, get, picksA = givePicks, picksB = getPicks)
+        Trades.execute(lg, lg.user, other, give, get, picksA = givePicks, picksB = getPicks, retainA = retainMine, retainB = retainTheirs, protA = protMine, protB = protTheirs)
         // A new roster, a new target: the owner re-sets his expectation to the new projection.
         val ps = lg.proState
         if (ps != null && lg.phase == Phase.REGULAR) {
@@ -88,6 +163,169 @@ object NbaCoach {
             if (ps.expect != before) lg.news += News(lg.season, lg.day, "After the trade, the ${lg.user.name}' owner now expects about ${ps.expect} wins (was $before)", true)
         }
         return v
+    }
+
+    /**
+     * BLM 27's "Auto-Balance Deal" magic button in the Trade Builder: adjusts salary retention, pick protections,
+     * draft picks, or matching players so that salaries match and [other] accepts the trade.
+     */
+    fun autoBalance(
+        lg: League,
+        other: Team,
+        giveIds: MutableSet<Int>,
+        getIds: MutableSet<Int>,
+        givePickKeys: MutableSet<Int>,
+        getPickKeys: MutableSet<Int>,
+        retainMine: MutableMap<Int, Int>,
+        retainTheirs: MutableMap<Int, Int>,
+        protMine: MutableMap<Int, Int>,
+        protTheirs: MutableMap<Int, Int>,
+    ): String {
+        val u = lg.user
+        val myRoster = lg.rosterOf(u)
+        val theirRoster = lg.rosterOf(other)
+        val myPicks = Picks.owned(lg, u)
+        val theirPicks = Picks.owned(lg, other)
+        val myUntouch = Needs.untouchableIds(lg, u)
+        val theirUntouch = Needs.untouchableIds(lg, other)
+
+        fun curGive() = myRoster.filter { it.id in giveIds }
+        fun curGet() = theirRoster.filter { it.id in getIds }
+        fun curGivePicks() = myPicks.filter { Picks.key(it) in givePickKeys }
+        fun curGetPicks() = theirPicks.filter { Picks.key(it) in getPickKeys }
+        fun curVerdict() = judge(lg, other, curGive(), curGet(), curGivePicks(), curGetPicks(), retainMine, retainTheirs, protMine, protTheirs)
+
+        if (giveIds.isEmpty() && givePickKeys.isEmpty() && getIds.isEmpty() && getPickKeys.isEmpty()) {
+            return "Select at least one player or pick first, then tap Auto-Balance."
+        }
+
+        // Case 1: User only selected what they want from [other]; find the best accepted package.
+        if (giveIds.isEmpty() && givePickKeys.isEmpty() && curGet().size == 1 && getPickKeys.isEmpty()) {
+            val targetPlayer = curGet().first()
+            val found = TradeFinder.target(lg, targetPlayer, 1).firstOrNull()
+            if (found != null) {
+                giveIds.addAll(found.give.map { it.id })
+                givePickKeys.addAll(found.givePicks.map { Picks.key(it) })
+                return "Found package for ${targetPlayer.name}."
+            }
+        }
+        // Case 2: User only selected what they're sending; find the best return from [other].
+        if (getIds.isEmpty() && getPickKeys.isEmpty()) {
+            val candidates = theirRoster.filter { it.id !in theirUntouch && it.clause != "NTC" }
+                .sortedByDescending { Trades.valueFor(lg, u, it) + Trades.contractDelta(lg, it) * 0.35 }
+            for (q in candidates) {
+                getIds += q.id
+                if (curVerdict().ok) return "Added ${q.name} from the ${other.name}."
+                for (pk in theirPicks) {
+                    getPickKeys += Picks.key(pk)
+                    if (curVerdict().ok) return "Added ${q.name} + 1st-round pick from the ${other.name}."
+                    getPickKeys -= Picks.key(pk)
+                }
+                getIds -= q.id
+            }
+        }
+
+        if (curVerdict().ok) return "Deal already works — the ${other.name} accept!"
+
+        // Step A: Try fixing salary matching first (via retention or adding a salary-matching player).
+        val inSal = curGet().sumOf { Trades.effectiveSalary(lg, it, retainTheirs[it.id] ?: 0) }
+        val outSal = curGive().sumOf { Trades.effectiveSalary(lg, it, retainMine[it.id] ?: 0) }
+        if (!Payroll.tradeWorks(lg, other, outSal, inSal) && Payroll.canRetainMore(lg, u)) {
+            for (p in curGive().sortedByDescending { Payroll.salaryOf(lg, it) }) {
+                for (pct in listOf(25, 50)) {
+                    retainMine[p.id] = pct
+                    val newOut = curGive().sumOf { Trades.effectiveSalary(lg, it, retainMine[it.id] ?: 0) }
+                    if (Payroll.tradeWorks(lg, other, newOut, inSal)) break
+                }
+            }
+        }
+        if (!Payroll.tradeWorks(lg, u, inSal, curGive().sumOf { Trades.effectiveSalary(lg, it, retainMine[it.id] ?: 0) })) {
+            val myPool = myRoster.filter { it.id !in giveIds && it.id !in myUntouch && it.clause != "NTC" }
+                .sortedWith(compareByDescending<Player> { Needs.isOnBlock(lg, u, it) }.thenBy { Trades.netValue(lg, it) })
+            for (filler in myPool) {
+                giveIds += filler.id
+                val newOut = curGive().sumOf { Trades.effectiveSalary(lg, it, retainMine[it.id] ?: 0) }
+                if (Payroll.tradeWorks(lg, u, inSal, newOut)) break
+                if (giveIds.size >= 4) break
+            }
+        }
+
+        if (curVerdict().ok) return "Balanced salaries — the ${other.name} accept!"
+
+        // Step B: Remove pick protections on user picks if value is slightly short.
+        for (k in givePickKeys) {
+            if ((protMine[k] ?: 0) > 0) {
+                protMine[k] = 0
+                if (curVerdict().ok) return "Removed pick protection to close the deal."
+            }
+        }
+
+        // Step C: Try retaining salary on an outgoing player to boost trade value.
+        if (Payroll.canRetainMore(lg, u)) {
+            for (p in curGive().sortedByDescending { Payroll.salaryOf(lg, it) }) {
+                for (pct in listOf(25, 50)) {
+                    retainMine[p.id] = pct
+                    if (curVerdict().ok) return "Added $pct% salary retention on ${p.last} to seal the deal."
+                }
+                retainMine.remove(p.id)
+            }
+        }
+
+        // Step D: Try adding 1 or 2 user draft picks (trying Top-10 protected first, then unprotected).
+        val availPicks = myPicks.filter { Picks.key(it) !in givePickKeys }
+        for (pk in availPicks) {
+            val k = Picks.key(pk)
+            givePickKeys += k
+            for (prot in listOf(10, 5, 0)) {
+                protMine[k] = prot
+                if (curVerdict().ok) {
+                    val pLabel = Picks.protectionLabel(prot).let { if (it.isNotEmpty()) " ($it)" else "" }
+                    return "Added ${pk.season} 1st$pLabel to balance the trade."
+                }
+            }
+            protMine.remove(k)
+        }
+        if (curVerdict().ok) return "Added draft picks to balance the trade."
+        // Reset added picks that didn't solve it alone before trying player combinations.
+        availPicks.forEach { givePickKeys -= Picks.key(it) }
+
+        // Step E: Try adding a non-untouchable user player (+ optional pick).
+        val pool = myRoster.filter { it.id !in giveIds && it.id !in myUntouch && it.clause != "NTC" }
+            .sortedWith(compareByDescending<Player> { Needs.isOnBlock(lg, u, it) }.thenBy { Trades.value(it) })
+        for (p in pool) {
+            giveIds += p.id
+            if (curVerdict().ok) return "Added ${p.name} to complete the trade."
+            for (pk in availPicks.take(2)) {
+                val k = Picks.key(pk)
+                givePickKeys += k
+                if (curVerdict().ok) return "Added ${p.name} + ${pk.season} 1st to complete the trade."
+                givePickKeys -= k
+            }
+            giveIds -= p.id
+        }
+
+        return curVerdict().text
+    }
+
+    /** True when the regular season is within 5 days of the Trade Deadline. */
+    fun isDeadlineWindow(lg: League): Boolean =
+        active(lg) && lg.phase == Phase.REGULAR && lg.day in (Trades.deadlineDay(lg) - 5)..Trades.deadlineDay(lg)
+
+    /**
+     * BLM 27 Trade Deadline Day Frenzy: advances the deadline countdown by 1 hour (`1..6`), triggering
+     * league-wide deadline deals and fresh incoming trade offers for the user's Trade Block.
+     */
+    fun deadlineStep(lg: League): List<String> {
+        val ps = lg.proState ?: return emptyList()
+        if (!canTrade(lg)) return emptyList()
+        val beforeSize = ps.moved.size
+        if (Rng.chance(0.75)) Trades.minor(lg)
+        if (ps.deadlineHour >= 4 && Rng.chance(0.5)) Trades.deadline(lg)
+        TradeFinder.makeOffers(lg)
+        ps.deadlineHour = (ps.deadlineHour + 1).coerceIn(1, 6)
+        val newDeals = ps.moved.drop(beforeSize)
+        val offerMsg = if (ps.tradeOffers.isNotEmpty()) "${ps.tradeOffers.size} active trade offers on your desk" else "Phones are quiet this hour"
+        return listOf("Deadline Hour ${ps.deadlineHour}/6 · $offerMsg") + newDeals
     }
 
     // ---------- from college ----------
