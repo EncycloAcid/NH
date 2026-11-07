@@ -1138,6 +1138,8 @@ class League(
     val eraIds: MutableMap<String, Int> = mutableMapOf(),
     /** Big moments waiting to pop up for the user, oldest first. */
     val alerts: MutableList<Alert> = mutableListOf(),
+    /** A coach who played first (Road to the League): his playing career, carried from save to save. */
+    var playedAs: PlayedAs? = null,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

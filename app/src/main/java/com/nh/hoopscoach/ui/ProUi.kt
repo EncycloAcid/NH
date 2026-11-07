@@ -1557,7 +1557,7 @@ fun ProEnding(vm: GameViewModel, lg: League) {
         if (r.retired) item {
             val jobs = remember(lg) { com.nh.hoopscoach.game.Afterward.coachingJobs(lg) }
             Section("What's next: coaching")
-            Text("Programs want you on the sideline. Taking a job starts a new save in the coach game, with your name and reputation.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+            Text("Programs want you on the sideline. Taking a job starts your coaching career the next season, with your name, your reputation and your playing career on your résumé. Win in college and NBA teams call: your NBA name gets those calls sooner, and your old team often calls first.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
             GroupList(jobs, inset = 16.dp) { j ->
                 ListRow(onClick = { vm.retireToCoach(j.school) }) {
                     Column(Modifier.weight(1f)) {

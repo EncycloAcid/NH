@@ -112,11 +112,15 @@ object NbaCoach {
             c.titles >= 2 || (c.finalFours >= 3 && c.security >= 70) -> 0.2
             c.w >= 250 && c.tourneys >= 6 && round >= 2 -> 0.1
             else -> 0.0
-        }
-        if (!Rng.chance(chance)) return
+        } + Lifetime.nbaBoost(lg, round) // a former NBA name gets calls sooner
+        if (!Rng.chance(chance.coerceAtMost(0.9))) return
         val n = if (round >= 6) Rng.range(2, 3) else Rng.range(1, 2)
         os.nbaOffers.clear()
-        os.nbaOffers += teamsFor(lg.season).shuffled(Rng.r).take(n).map { it.slot }
+        val teams = teamsFor(lg.season)
+        // His old NBA team (the last one he played for that's in the league that year) often calls first.
+        val old = lg.playedAs?.proSlots.orEmpty().reversed().firstOrNull { s -> teams.any { it.slot == s } }
+        if (old != null && Rng.chance(0.6)) os.nbaOffers += old
+        os.nbaOffers += teams.filter { it.slot !in os.nbaOffers }.shuffled(Rng.r).take(n - os.nbaOffers.size).map { it.slot }
         lg.news += News(lg.season, lg.day, "NBA teams call ${c.name}", true)
         Alerts.add(lg, "NBA teams are calling", "${os.nbaOffers.size} NBA ${if (os.nbaOffers.size == 1) "team wants" else "teams want"} you as head coach. You'll find the offers on the Career decision step of the offseason.", "")
     }
@@ -140,6 +144,7 @@ object NbaCoach {
         pc.history.clear()
         pc.history += c.history.map { CoachSeason(it.season, -1, it.team, it.w, it.l, it.result, it.prestige) }
         pc.security = 70
+        pro.playedAs = college.playedAs
         pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
         pro.news += News(pro.season, 0, "${pc.name} leaves ${college.user.school} for the ${pro.user.name}", true)
         return pro
@@ -164,6 +169,7 @@ object NbaCoach {
      * seasons, he's fired, and three teams with openings call.
      */
     fun seasonEnd(lg: League) {
+        Lifetime.hallOfFame(lg)
         val ps = lg.proState ?: return
         val u = lg.user
         val c = lg.userCoach

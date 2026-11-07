@@ -633,7 +633,12 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                     Column(Modifier.weight(1f)) {
                         Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("Head coach · the ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} season", style = T.small, color = P.sub, maxLines = 1)
-                        Text("Wants a winner from the college game", style = T.small, color = P.accent, maxLines = 1)
+                        val old = lg.playedAs?.proSlots?.contains(t.slot) == true
+                        Text(when {
+                            old -> "Your old team wants you back on its bench"
+                            com.nh.hoopscoach.game.Lifetime.name(lg.playedAs) > 0 -> "Wants your name and your college wins"
+                            else -> "Wants a winner from the college game"
+                        }, style = T.small, color = if (old) P.gold else P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     SmallButton("Talk", primary = true) { ask = true }
                 }

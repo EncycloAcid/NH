@@ -326,7 +326,16 @@ object Afterward {
     fun coachingJobs(lg: League): List<Job> {
         val r = lg.road ?: return emptyList()
         val schools = Schools.conferences.flatMap { Schools.parse(it) }
-        val alma = r.collegeSchools.substringBefore(" →").trim()
+        val alma = (if (lg.pro) r.collegeSchools else r.schools.lastOrNull()?.let { lg.team(it).school } ?: "").substringBefore(" →").trim()
+        // A career that ended after college: smaller programs, and his school only if he was a star there.
+        if (!lg.pro) {
+            val h = lg.hero
+            val star = h != null && h.awards.any { it.contains("AA ") || it.contains("Nat MVP") || it.contains("Conf POY") }
+            val out = mutableListOf<Job>()
+            if (star) schools.firstOrNull { it.name == alma }?.let { out += Job(it.name, "Your old school wants its star back") }
+            for (s in schools.filter { it.prestige in 25..55 && it.name != alma }.shuffled(Rng.r).take(4 - out.size)) out += Job(s.name, "Prestige ${s.prestige}")
+            return out
+        }
         val legacy = AllTime.heroScore(lg)
         val band = when { legacy >= 60 -> 80..99; legacy >= 30 -> 65..85; else -> 45..70 }
         val out = mutableListOf<Job>()
@@ -335,22 +344,42 @@ object Afterward {
         return out
     }
 
+    /** Years between the end of his playing days and his first season as a coach (a career overseas first). */
+    fun yearsAway(lg: League): Int {
+        if (lg.pro) return 1
+        val age = lg.hero?.age ?: 22
+        return (31 - age).coerceIn(4, 10)
+    }
+
     /** The coach he becomes: a recruiter who sells his name, and a teacher of the game he played. */
     fun becomeCoach(pro: League, college: League, school: String): League {
         val r = pro.road!!
         val h = pro.hero!!
         val t = college.teams.first { it.school == school }
-        college.season = pro.season + 1
+        val away = yearsAway(pro)
+        val past = Lifetime.fromPlayer(pro)
+        college.season = pro.season + away
         Offseason.claimTeam(college, t.id, h.first, h.last)
         val c = college.userCoach
         val legacy = AllTime.heroScore(pro)
         val peak = h.ovrHistory.maxOrNull() ?: h.ovr
-        c.age = h.age + 1
-        c.rec = (60 + legacy / 3).roundToInt().coerceIn(60, 95)
-        c.off = (55 + (peak - 85) * 2.5).roundToInt().coerceIn(55, 92)
-        c.def = (52 + (peak - 85) * 2.0).roundToInt().coerceIn(50, 88)
-        c.dev = 64
-        college.news += News(college.season, 0, "${h.name} takes over at ${t.school}: ${r.rings} ${if (r.rings == 1) "ring" else "rings"}, ${r.allStars} All-Star games and a pro career to sell", true)
+        c.age = h.age + away
+        if (pro.pro) {
+            c.rec = (60 + legacy / 3).roundToInt().coerceIn(60, 95)
+            c.off = (55 + (peak - 85) * 2.5).roundToInt().coerceIn(55, 92)
+            c.def = (52 + (peak - 85) * 2.0).roundToInt().coerceIn(50, 88)
+            c.dev = 64
+        } else {
+            // Years overseas taught him the game; his college name still sells a little.
+            c.rec = (55 + (peak - 75) * 0.8).roundToInt().coerceIn(52, 72)
+            c.off = (58 + (peak - 75) * 0.8).roundToInt().coerceIn(55, 75)
+            c.def = (55 + (peak - 75) * 0.6).roundToInt().coerceIn(52, 72)
+            c.dev = 66
+        }
+        college.playedAs = past
+        college.news += News(college.season, 0,
+            if (pro.pro) "${h.name} takes over at ${t.school}: ${r.rings} ${if (r.rings == 1) "ring" else "rings"}, ${r.allStars} All-Star games and a pro career to sell"
+            else "${h.name} comes home from $away years overseas to coach ${t.school}", true)
         return college
     }
 }

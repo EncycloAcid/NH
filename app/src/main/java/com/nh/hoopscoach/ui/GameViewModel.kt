@@ -278,12 +278,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     /** A retired pro takes a college job: a new save in the coach game with his name and reputation. */
     fun retireToCoach(school: String) {
         val pro = league ?: return
-        if (busy != null || pro.road?.retired != true) return
+        if (busy != null || pro.road?.ended != true) return
         busy = "Taking the job at $school"
         viewModelScope.launch {
             delay(60)
             val college = mutex.withLock {
-                withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Afterward.becomeCoach(pro, com.nh.hoopscoach.game.LeagueGen.newLeague(pro.season + 1), school) }
+                withContext(Dispatchers.Default) {
+                    val start = pro.season + com.nh.hoopscoach.game.Afterward.yearsAway(pro)
+                    com.nh.hoopscoach.game.Afterward.becomeCoach(pro, com.nh.hoopscoach.game.LeagueGen.newLeague(start), school)
+                }
             }
             stack.clear()
             sheet = null

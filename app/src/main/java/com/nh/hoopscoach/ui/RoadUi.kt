@@ -1132,9 +1132,25 @@ fun RoadEnding(vm: GameViewModel, lg: League) {
                 Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
                 Text("Schools: ${r.schools.joinToString(" → ") { lg.team(it).school }}", style = T.small, color = P.sub)
             }
+        }
+        item {
+            val jobs = remember(lg) { com.nh.hoopscoach.game.Afterward.coachingJobs(lg) }
+            val years = com.nh.hoopscoach.game.Afterward.yearsAway(lg)
+            Section("What's next: coaching")
+            Text("After $years years overseas you come home to coach. Taking a job starts your coaching career in ${lg.season + years}, with your playing career on your résumé. Win in college and NBA teams call.",
+                style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+            GroupList(jobs, inset = 16.dp) { j ->
+                ListRow(onClick = { vm.retireToCoach(j.school) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text(j.school, style = T.bodyB, color = P.ink)
+                        Text(j.why, style = T.small, color = P.sub)
+                    }
+                    SmallButton("Coach here", primary = true) { vm.retireToCoach(j.school) }
+                }
+            }
             Spacer(Modifier.height(16.dp))
             Box(Modifier.padding(horizontal = Gutter)) {
-                PrimaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
+                SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
             }
             Spacer(Modifier.height(24.dp))
         }

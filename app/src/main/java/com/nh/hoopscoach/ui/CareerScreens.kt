@@ -90,6 +90,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
                     style = T.numSm,
                 )
             }
+            PlayingPast(lg)
             Section("Job security")
             Panel {
                 val label = when { c.security >= 75 -> "Untouchable"; c.security >= 50 -> "Safe"; c.security >= 30 -> "Warm seat"; else -> "Hot seat" }

@@ -470,6 +470,7 @@ object Coaching {
         val u = lg.user
         val c = lg.userCoach
         val round = Awards.tourneyRound(lg, u.id)
+        Lifetime.hallOfFame(lg)
         if (c.security < 15) {
             os.fired = true
             val pool = lg.teams.filter { it.id != u.id && it.prestige in (u.prestige - 40)..(u.prestige - 8) }.shuffled(Rng.r)
