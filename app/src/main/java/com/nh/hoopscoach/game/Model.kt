@@ -940,6 +940,8 @@ class ProState(
     val jobOffers: MutableList<Int> = mutableListOf(),
     /** This summer's results for the user's team: who signed, re-signed or left. */
     val userMoves: MutableList<String> = mutableListOf(),
+    /** A coach who came up from college: his college record in a line. */
+    var collegeResume: String = "",
 )
 
 /** A first-round pick in [season]'s draft, originally [original]'s, now [owner]'s. */
@@ -1046,6 +1048,8 @@ class OffseasonState(
     val released: MutableList<String> = mutableListOf(),
     val offers: MutableList<JobOffer> = mutableListOf(),
     var fired: Boolean = false,
+    /** NBA teams that want the user (their places in today's league: "BOS", "LAL"...). */
+    val nbaOffers: MutableList<String> = mutableListOf(),
     val growth: MutableList<Growth> = mutableListOf(),
     var round: Int = 1,
     val signed: MutableList<Int> = mutableListOf(),

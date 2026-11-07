@@ -470,6 +470,7 @@ object Coaching {
             picks.forEach { os.offers += JobOffer(it.id, "Offers you a fresh start") }
             lg.news += News(lg.season, lg.day, "${u.school} has fired ${c.name}", true)
         } else {
+            NbaCoach.collegeOffers(lg, os, round)
             val strong = c.security >= 75 || round >= 4 || u.w - u.expWins >= 5
             val n = if (strong) Rng.range(2, 5) else if (c.security >= 55) Rng.range(0, 2) else 0
             lg.teams.filter { it.id != u.id && it.prestige in (u.prestige - 12)..(u.prestige + 35) }

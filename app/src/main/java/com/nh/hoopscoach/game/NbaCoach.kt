@@ -82,6 +82,60 @@ object NbaCoach {
         return v
     }
 
+    // ---------- from college ----------
+
+    /** The NBA season a college coach would start in, after college season [season]. */
+    fun firstSeasonAfter(season: Int) = season + 1
+
+    /** The teams of that NBA season, for the offer list. */
+    fun teamsFor(season: Int): List<Team> = ProLeague.seasonTeams(firstSeasonAfter(season).coerceAtMost(ProLeague.DATA_SEASON + 1))
+
+    /**
+     * A college coach who wins big gets NBA calls in the offseason: a national title or a Final Four run
+     * makes it likely, a great program and a long résumé possible. One to three teams call.
+     */
+    fun collegeOffers(lg: League, os: OffseasonState, round: Int) {
+        if (lg.playerMode || lg.pro) return
+        val c = lg.userCoach
+        val chance = when {
+            round == 7 -> 0.75
+            round >= 5 -> 0.45
+            round >= 4 && c.finalFours >= 1 -> 0.25
+            c.titles >= 2 || (c.finalFours >= 3 && c.security >= 70) -> 0.2
+            c.w >= 250 && c.tourneys >= 6 && round >= 2 -> 0.1
+            else -> 0.0
+        }
+        if (!Rng.chance(chance)) return
+        val n = if (round >= 6) Rng.range(2, 3) else Rng.range(1, 2)
+        os.nbaOffers.clear()
+        os.nbaOffers += teamsFor(lg.season).shuffled(Rng.r).take(n).map { it.slot }
+        lg.news += News(lg.season, lg.day, "NBA teams call ${c.name}", true)
+    }
+
+    /**
+     * A college coach takes an NBA job: the NBA league of the next season (real rosters through 2026-27,
+     * then today's league aged forward to the year he arrives), with him on the bench of the team in [slot].
+     * His college record stays with him.
+     */
+    fun fromCollege(college: League, slot: String): League {
+        val c = college.userCoach
+        val first = firstSeasonAfter(college.season)
+        val pro = ProLeague.coachLeague(first.coerceAtMost(ProLeague.DATA_SEASON + 1), slot, c.first, c.last)
+        // Past today's data, the league ages forward to the year he arrives.
+        val gap = first - (pro.season + 1)
+        if (gap > 0) ProLeague.ageForward(pro, gap)
+        val pc = pro.userCoach
+        pc.age = c.age
+        pc.off = c.off; pc.def = c.def; pc.rec = c.rec; pc.dev = c.dev
+        // His college seasons stay on his record (not tied to an NBA team).
+        pc.history.clear()
+        pc.history += c.history.map { CoachSeason(it.season, -1, it.team, it.w, it.l, it.result, it.prestige) }
+        pc.security = 70
+        pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
+        pro.news += News(pro.season, 0, "${pc.name} leaves ${college.user.school} for the ${pro.user.name}", true)
+        return pro
+    }
+
     // ---------- the owner ----------
 
     /** Playoff series the team won this season (the title counts as one more). */

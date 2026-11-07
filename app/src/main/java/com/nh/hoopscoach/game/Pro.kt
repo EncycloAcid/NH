@@ -563,6 +563,48 @@ object ProLeague {
         lg.reindex()
     }
 
+    /** [years] seasons pass for a league before the user arrives: aging, growth, retirements and new draftees. */
+    fun ageForward(lg: League, years: Int) {
+        repeat(years.coerceIn(0, 80)) {
+            for (p in lg.players) p.age++
+            for (t in lg.teams) {
+                val dev = Coaching.devOf(lg.coachOf(t))
+                for (pid in t.roster.toList()) {
+                    val p = lg.player(pid)
+                    p.proYears++
+                    val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
+                    if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
+                    ProCareer.develop(p, dev)
+                }
+            }
+            // A full two-round draft, weakest rosters first, with real ceilings: tomorrow's stars.
+            val order = lg.teams.sortedBy { t -> lg.rosterOf(t).map { it.ovr }.sortedDescending().take(8).average() }
+            val firstRound = mutableSetOf<Int>()
+            for (pick in 1..minOf(60, 2 * lg.teams.size)) {
+                val t = order[(pick - 1) % order.size]
+                val age = Rng.range(19, 22)
+                val p = makePro(lg, scarcest(lg, t), draftOverall(pick), age, t)
+                p.proYears = 0
+                p.pot = (p.ovr + (23 - age) * 2 + Rng.range(0, 3)).coerceIn(p.ovr, 99)
+                if (pick <= lg.teams.size) firstRound += p.id
+            }
+            for (t in lg.teams) {
+                trim(lg, t, firstRound)
+                while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 82), Rng.range(22, 27), t)
+            }
+            lg.reindex()
+        }
+        lg.season += years.coerceIn(0, 80)
+        for (t in lg.teams) {
+            trim(lg, t)
+            while (t.roster.size < ROSTER) makePro(lg, scarcest(lg, t), Rng.range(80, 85), Rng.range(23, 31), t)
+            Gameplan.autoAllocate(lg, t)
+        }
+        lg.reindex()
+        rateTeams(lg)
+        Payroll.sign(lg)
+    }
+
     /** The position a roster is thinnest at. */
     private fun scarcest(lg: League, t: Team): Pos = Pos.entries.minBy { pos -> lg.rosterOf(t).count { it.pos == pos } * 10 + Rng.int(0, 9) }
 

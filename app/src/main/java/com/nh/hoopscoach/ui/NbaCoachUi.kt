@@ -512,6 +512,10 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                     Stat("Job", "${c.security}", Modifier.weight(1f), style = T.numSm)
                 }
             }
+            lg.proState?.collegeResume?.takeIf { it.isNotEmpty() }?.let {
+                Section("Before the NBA")
+                Panel { Text(it, style = T.bodyB, color = P.ink) }
+            }
             Section("Season by season")
             if (c.history.isEmpty()) Panel { Text("Your first season is under way.", style = T.body, color = P.sub) }
             GroupList(c.history.reversed()) { h ->

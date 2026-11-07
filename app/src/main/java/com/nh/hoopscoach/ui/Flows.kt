@@ -585,6 +585,33 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                 }
             }
         }
+        if (os.nbaOffers.isNotEmpty()) {
+            val nba = com.nh.hoopscoach.game.NbaCoach.teamsFor(lg.season)
+            Section("NBA teams calling")
+            GroupList(os.nbaOffers.mapNotNull { s -> nba.firstOrNull { it.slot == s } }) { t ->
+                var ask by remember { mutableStateOf(false) }
+                ListRow {
+                    TeamBadge(t, 40.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Head coach · the ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} season", style = T.small, color = P.sub, maxLines = 1)
+                        Text("Wants a winner from the college game", style = T.small, color = P.accent, maxLines = 1)
+                    }
+                    SmallButton("Talk", primary = true) { ask = true }
+                }
+                if (ask) AlertDialog(
+                    onDismissRequest = { ask = false }, containerColor = P.surface,
+                    title = { Text("Coach the ${t.name}?", style = T.head, color = P.ink) },
+                    text = {
+                        Text("You'll leave ${u.school} for the NBA: the ${t.name}' roster, payroll and an owner with expectations. " +
+                            "Your college record stays on your résumé. This starts your NBA career in place of this college save.", style = T.body, color = P.sub)
+                    },
+                    confirmButton = { TextButton({ ask = false; vm.goNbaCoach(t.slot) }) { Text("Take the job", color = P.accent) } },
+                    dismissButton = { TextButton({ ask = false }) { Text("Stay in college", color = P.sub) } },
+                )
+            }
+        }
         Section(if (os.offers.isEmpty()) "No programs called" else "Programs that want you")
         if (os.offers.isEmpty()) Panel { Text("Win more to get noticed. You're staying at ${u.school}.", style = T.body, color = P.sub) }
         GroupList(os.offers) { o ->

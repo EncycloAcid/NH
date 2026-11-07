@@ -323,6 +323,26 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** A college coach takes an NBA job: the new league replaces the college save. */
+    fun goNbaCoach(slot: String) {
+        val college = league ?: return
+        if (busy != null) return
+        busy = "Heading to the NBA"
+        viewModelScope.launch {
+            delay(60)
+            val pro = mutex.withLock {
+                withContext(Dispatchers.Default) { com.nh.hoopscoach.game.NbaCoach.fromCollege(college, slot).also { com.nh.hoopscoach.game.ProCareer.next(it) } }
+            }
+            stack.clear()
+            sheet = null
+            live = null
+            tab = Tab.TODAY
+            league = pro
+            busy = null
+            bump()
+        }
+    }
+
     /** An NBA coaching career: [year]'s real league (the season it ends), coaching the team in [slot]. */
     fun startNbaCoach(year: Int, slot: String, first: String, last: String) {
         if (busy != null) return
