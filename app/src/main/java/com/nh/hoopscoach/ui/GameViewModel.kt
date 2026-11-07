@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.nh.hoopscoach.game.GameEngine
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.LeagueGen
+import com.nh.hoopscoach.game.Reactions
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.SaveIO
@@ -182,7 +183,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun act(block: (League) -> Unit) {
         val lg = league ?: return
         viewModelScope.launch {
-            mutex.withLock { block(lg) }
+            mutex.withLock { block(lg); Reactions.pass(lg) }
             bump()
         }
     }
@@ -196,7 +197,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         progressNote = ""
         viewModelScope.launch {
             delay(60) // let the UI leave any screen that reads the league
-            mutex.withLock { withContext(Dispatchers.Default) { block(lg) } }
+            mutex.withLock { withContext(Dispatchers.Default) { block(lg); Reactions.pass(lg) } }
             busy = null
             progress = null
             progressNote = ""

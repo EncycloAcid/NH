@@ -309,7 +309,11 @@ object Offseason {
         EraCollege.populate(lg)
         setupSeason(lg, carryElo = true)
         lg.news += News(lg.season, 0, "Welcome to the ${lg.season} season", true)
-        if (lg.news.size > 250) lg.news.subList(0, lg.news.size - 250).clear()
+        if (lg.news.size > 250) {
+            val cut = lg.news.size - 250
+            lg.news.subList(0, cut).clear()
+            lg.newsSeen = (lg.newsSeen - cut).coerceAtLeast(0)
+        }
     }
 
     private fun ordinalWord(n: Int) = "$n" + when { n % 100 in 11..13 -> "th"; n % 10 == 1 -> "st"; n % 10 == 2 -> "nd"; n % 10 == 3 -> "rd"; else -> "th" }

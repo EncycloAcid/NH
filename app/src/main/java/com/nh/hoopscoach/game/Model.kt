@@ -233,6 +233,8 @@ class Player(
     var favorite: Boolean = false,
     /** On a walk-on spot: no scholarship. */
     var walkOn: Boolean = false,
+    /** Hidden: how well his body holds up (1-99; 0 means not set, see Longevity). Never shown. */
+    var longevity: Int = 0,
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -513,6 +515,8 @@ class News(
     val body: String = "", val source: String = "",
     /** The team and player the story is about, for its picture and links. */
     val teamId: Int = -1, val pid: Int = -1,
+    /** What people said about it: players, coaches, analysts, insiders and fans. */
+    var reactions: List<Reaction> = emptyList(),
 ) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
@@ -1064,6 +1068,10 @@ class PressAnswer(
 class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "")
 
 /** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
+/** One reaction to a story: who said it (and in what role), what they said, and how many liked it. */
+@Serializable
+class Reaction(val who: String, val role: String, val text: String, val likes: Int, val avatar: String = "", val verified: Boolean = false, val tone: Int = 0)
+
 @Serializable
 class Post(
     val season: Int, val day: Int, val name: String, val handle: String, val kind: String, val text: String,
@@ -1163,6 +1171,8 @@ class League(
     val eraIds: MutableMap<String, Int> = mutableMapOf(),
     /** Big moments waiting to pop up for the user, oldest first. */
     val alerts: MutableList<Alert> = mutableListOf(),
+    /** How many news stories have been through the reactions pass. */
+    var newsSeen: Int = 0,
     /** A coach who played first (Road to the League): his playing career, carried from save to save. */
     var playedAs: PlayedAs? = null,
 ) {

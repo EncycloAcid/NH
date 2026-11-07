@@ -211,6 +211,7 @@ object ProLeague {
         RecordBook.seed(lg)
         Payroll.sign(lg)
         Picks.ensure(lg)
+        Longevity.assignReal(lg)
         return lg
     }
 
@@ -374,6 +375,7 @@ object ProLeague {
         // Every pro gets a deal, so payrolls are real from day one, and every team owns its picks.
         Payroll.sign(lg)
         Picks.ensure(lg)
+        Longevity.assignReal(lg)
         return lg
     }
 
@@ -529,7 +531,7 @@ object ProLeague {
             for (pid in t.roster.toList()) {
                 val p = lg.player(pid)
                 p.proYears++
-                val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
+                val go = Longevity.retires(p)
                 if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
                 ProCareer.develop(p, dev)
             }
@@ -573,7 +575,7 @@ object ProLeague {
                 for (pid in t.roster.toList()) {
                     val p = lg.player(pid)
                     p.proYears++
-                    val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
+                    val go = Longevity.retires(p)
                     if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
                     ProCareer.develop(p, dev)
                 }
@@ -1381,7 +1383,7 @@ object ProCareer {
             val p = lg.player(pid)
             if (p.id == lg.heroId) continue
             // Good players last: most stars play into their late 30s. Fading role players go sooner.
-            val go = p.age >= 42 || (p.age >= 36 && Rng.chance((p.age - 35) * 0.14)) || (p.age >= 33 && p.ovr < 80) || (p.age >= 30 && p.ovr < 76)
+            val go = Longevity.retires(p)
             if (!go) continue
             AllTime.freeze(lg, p)
             t.roster.remove(pid)
@@ -1649,6 +1651,7 @@ object ProCareer {
                 val trainer = p.id == lg.heroId && lg.road?.hired?.contains(Staff.TRAINER) == true
                 // The user's player earns his growth until 30; after that he ages like everyone.
                 if (p.id == lg.heroId && p.age <= 30) Earned.hero(lg, p, dev) else develop(p, dev, trainer)
+                if (p.id == lg.heroId && p.age >= 29) lg.news += News(lg.season, 0, Longevity.hint(p), true, -1, "", "", "", t.id, p.id)
             }
         }
         lg.reindex()
@@ -1659,12 +1662,15 @@ object ProCareer {
         // Pros grow slower than college players, mostly while young: a fifth to a third of the gap to
         // their ceiling a summer at 22 and under, less each year after, so the league doesn't fill up with 90s.
         val share = when { p.age <= 22 -> 0.22 + Rng.d() * 0.12; p.age <= 25 -> 0.14 + Rng.d() * 0.1; else -> 0.06 + Rng.d() * 0.08 }
+        // His body's age (hidden longevity): a durable player declines later, a fragile one from 28.
+        val body = Longevity.bodyAge(p)
+        val declining = p.age >= 28 && body > 30
         when {
-            p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev, share)
-            p.age <= 30 -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
+            !declining && p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev, share)
+            !declining -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
             else -> {
-                // A slow slide from 31, faster in the late 30s.
-                var drop = (p.age - 30) * 0.55 + Rng.d() * 0.8
+                // A slow slide once his body is past 30, faster in its late 30s.
+                var drop = (body - 30) * 0.55 + Rng.d() * 0.8
                 if (trainer) drop *= 0.6
                 val steps = (drop * 7.3).roundToInt()
                 val w = doubleArrayOf(1.3, 0.6, 0.5, 1.0, 0.4, 1.1, 1.4, 1.0, 1.3, 1.2)
@@ -1732,5 +1738,8 @@ object ProCareer {
 
 /** Picks the right season loop for the league. */
 object Sim {
-    fun playDay(lg: League) = if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
+    fun playDay(lg: League) {
+        if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
+        Reactions.pass(lg)
+    }
 }

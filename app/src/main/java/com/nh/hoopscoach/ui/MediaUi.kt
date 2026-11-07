@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Post
+import com.nh.hoopscoach.game.Reaction
 import com.nh.hoopscoach.game.Road
 
 // ---------- social media ----------
@@ -121,7 +122,7 @@ fun SocialScreen(vm: GameViewModel, lg: League) {
 fun newsClick(vm: GameViewModel, lg: League, n: News): (() -> Unit)? {
     val i = lg.news.indexOf(n)
     return when {
-        n.body.isNotEmpty() && i >= 0 -> ({ vm.push(Route.Article(i)) })
+        (n.body.isNotEmpty() || n.reactions.isNotEmpty()) && i >= 0 -> ({ vm.push(Route.Article(i)) })
         n.gameId >= 0 && lg.games.any { it.id == n.gameId } -> ({ vm.push(Route.Box(n.gameId)) })
         else -> null
     }
@@ -147,7 +148,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         color = ink, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
-                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
+                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade", "move" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; "upset", "buzzer", "moment" -> "MOMENTS"; "" -> "NEWS"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
                         style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
                     Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
                         color = ink, modifier = Modifier.padding(top = 6.dp))
@@ -168,10 +169,17 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
+                    if (n.body.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
+                        }
                     }
+                }
+                // What people said: the players, coaches, analysts and fans, most liked first.
+                if (n.reactions.isNotEmpty()) {
+                    Section("Reactions · ${n.reactions.size}")
+                    GroupList(n.reactions.sortedByDescending { it.likes }, inset = 60.dp) { r -> ReactionRow(r) }
                 }
                 Column(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(Modifier.height(8.dp))
@@ -198,12 +206,43 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Column(Modifier.weight(1f)) {
             NewsTag(n)
             Text(headline(n.text), style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
-            if (n.body.isNotEmpty()) Text("${n.source.ifEmpty { "Story" }} · Read", style = T.small, color = P.accent)
+            val said = if (n.reactions.isEmpty()) "" else "${n.reactions.size} ${if (n.reactions.size == 1) "reaction" else "reactions"}"
+            if (n.body.isNotEmpty()) Text("${n.source.ifEmpty { "Story" }} · Read" + (if (said.isEmpty()) "" else " · $said"), style = T.small, color = P.accent)
+            else if (said.isNotEmpty()) Text(said, style = T.small, color = P.accent)
         }
     }
 }
 
 @Suppress("unused") private val keepColor = Color.Unspecified
+
+/** One reaction to a story: who said it (a real account's avatar, or initials tinted by the mood), their role, what they said, the likes. */
+@Composable
+fun ReactionRow(r: Reaction) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        val initials = r.who.split(" ").filter { it.isNotEmpty() && it.first().isLetter() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val img = androidx.compose.runtime.remember(r.avatar) { if (r.avatar.isEmpty()) null else Logos.asset(ctx, "social/${r.avatar}.webp") }
+        val mood = when (r.tone) { 1 -> P.good; -1 -> P.bad; else -> P.accent }
+        Box(Modifier.size(36.dp).clip(CircleShape).background(mood.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            if (img != null) androidx.compose.foundation.Image(img, r.who, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            else Text(initials, style = T.label, color = mood)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(r.who, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (r.verified) { Spacer(Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, "Verified", tint = P.accent, modifier = Modifier.size(14.dp)) }
+            }
+            Text(r.role, style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 2.dp))
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.7f), modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(Road.count(r.likes), style = T.small, color = P.sub)
+            }
+        }
+    }
+}
 
 // ---------- the news page ----------
 
@@ -211,7 +250,7 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
 private fun newsFilter(lg: League, n: News, f: Int): Boolean = when (f) {
     1 -> n.mine || n.teamId == lg.userTeamId
     2 -> n.kind in setOf("game", "recap", "article", "series", "upset", "buzzer", "moment", "rivalry") || n.rivalry
-    3 -> n.kind == "trade" || n.text.startsWith("Free agency") || n.text.startsWith("Front office") || n.text.startsWith("Coaching change") || n.text.contains(" signs ")
+    3 -> n.kind == "trade" || n.kind == "move" || n.text.startsWith("Free agency") || n.text.startsWith("Front office") || n.text.startsWith("Coaching change") || n.text.contains(" signs ")
     4 -> n.kind == "column" || n.kind == "quote"
     else -> true
 }

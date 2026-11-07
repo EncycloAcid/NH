@@ -138,6 +138,8 @@ object EraData {
         if (pick.college.isNotEmpty()) p.highSchool = pick.college
         // Players who became stars get the ceiling they reached; the rest keep a raw rookie's.
         if (pick.peak > 0) p.pot = maxOf(p.ovr, pick.peak + Rng.int(-1, 1)).coerceAtMost(99)
+        // His real career says how long his body lasts (hidden).
+        Longevity.real(pick.name)?.let { p.longevity = it }
         for (c in college(pick.id)) {
             val s = StatLine(gp = c.g, sec = (c.mpg * 60 * c.g).roundToInt(), pts = (c.ppg * c.g).roundToInt(),
                 drb = (c.rpg * c.g).roundToInt(), ast = (c.apg * c.g).roundToInt())
