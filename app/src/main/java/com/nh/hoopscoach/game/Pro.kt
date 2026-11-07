@@ -801,6 +801,8 @@ object ProSeason {
                 if (lg.day % 7 == 0) lg.proState?.let { ps -> ps.live = NbaPreviews.project(lg); ps.liveDay = lg.day }
                 // When he coaches: teams call with offers every week until the deadline.
                 if (NbaCoach.active(lg) && lg.day % 7 == 3) TradeFinder.makeOffers(lg)
+                // Minor deals trickle through the season: a team thin at a spot swaps bench pieces with one that's deep.
+                if (lg.day < Trades.deadlineDay(lg) - 4 && lg.day % 9 == 5 && Rng.chance(0.4)) Trades.minor(lg)
                 NbaCup.endOfDay(lg)
                 NbaAwards.endOfDay(lg)
                 Rumors.daily(lg)
@@ -1305,6 +1307,7 @@ object ProCareer {
                 Staffing.offseason(lg)
                 newYear(lg)
                 ps.moved.clear()
+                Trades.draftDay(lg)
                 draft(lg)
                 Picks.ensure(lg)
                 Trades.summer(lg)
@@ -1352,6 +1355,7 @@ object ProCareer {
                 Staffing.offseason(lg)
                 newYear(lg)
                 ps.moved.clear()
+                Trades.draftDay(lg)
                 draft(lg)
                 Picks.ensure(lg)
                 Trades.summer(lg)

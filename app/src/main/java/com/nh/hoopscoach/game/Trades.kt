@@ -240,40 +240,231 @@ object Trades {
 
     // ---------- the AI's trades ----------
 
-    /** Sellers move a good veteran to a contender for younger pieces. */
+    /** A player's worth to a specific team: base value, then up or down for whether he fills its hole at his spot. */
+    fun neededValue(lg: League, t: Team, p: Player): Double = valueFor(lg, t, p) * Needs.needFactor(lg, t, p)
+
+    /**
+     * Would both sides take the deal, each valuing the players its own way? A motivated seller takes a
+     * little less (dumping a contract or cashing out a veteran); everyone else wants to win the swap
+     * or break about even, the way Basketball Legacy Manager scores it: a small loss is fine, a big
+     * one is not.
+     */
+    private fun fair(lg: League, a: Team, b: Team, fromA: List<Player>, fromB: List<Player>, picksA: List<PickAsset>, picksB: List<PickAsset>, aMotivated: Boolean, bMotivated: Boolean): Boolean {
+        if (fromA.isEmpty() && picksA.isEmpty() || fromB.isEmpty() && picksB.isEmpty()) return false
+        val aGets = fromB.sumOf { neededValue(lg, a, it) } + picksB.sumOf { Picks.value(lg, it) }
+        val aGives = fromA.sumOf { neededValue(lg, a, it) } + picksA.sumOf { Picks.value(lg, it) }
+        val bGets = fromA.sumOf { neededValue(lg, b, it) } + picksA.sumOf { Picks.value(lg, it) }
+        val bGives = fromB.sumOf { neededValue(lg, b, it) } + picksB.sumOf { Picks.value(lg, it) }
+        val aNeed = if (aMotivated) 0.82 else 0.93
+        val bNeed = if (bMotivated) 0.82 else 0.93
+        return aGets >= aGives * aNeed && bGets >= bGives * bNeed
+    }
+
+    /**
+     * Balance a deal the way a GM would: the light side adds its cheapest spare pick, then a
+     * low-value spare part, until it's close enough or nothing sensible is left. True when it lands.
+     */
+    private fun equalize(lg: League, a: Team, b: Team, fromA: MutableList<Player>, fromB: MutableList<Player>, picksA: MutableList<PickAsset>, picksB: MutableList<PickAsset>, aMotivated: Boolean, bMotivated: Boolean): Boolean {
+        val moved = lg.proState?.moved.orEmpty().toSet()
+        var tries = 0
+        while (tries++ < 4 && !fair(lg, a, b, fromA, fromB, picksA, picksB, aMotivated, bMotivated)) {
+            val aGets = fromB.sumOf { neededValue(lg, a, it) } + picksB.sumOf { Picks.value(lg, it) }
+            val aGives = fromA.sumOf { neededValue(lg, a, it) } + picksA.sumOf { Picks.value(lg, it) }
+            val bGets = fromA.sumOf { neededValue(lg, b, it) } + picksA.sumOf { Picks.value(lg, it) }
+            val bGives = fromB.sumOf { neededValue(lg, b, it) } + picksB.sumOf { Picks.value(lg, it) }
+            val aShort = aGets < aGives * (if (aMotivated) 0.82 else 0.93)
+            val bShort = bGets < bGives * (if (bMotivated) 0.82 else 0.93)
+            if (aShort == bShort) return fair(lg, a, b, fromA, fromB, picksA, picksB, aMotivated, bMotivated)
+            // The side getting the worse end owes value; it pays from its bench or its picks.
+            val payer = if (aShort) a else b
+            val sends = if (aShort) fromA else fromB
+            val sendPicks = if (aShort) picksA else picksB
+            val pick = Picks.owned(lg, payer).filter { it !in sendPicks }.minByOrNull { Picks.value(lg, it) }
+            val spare = lg.rosterOf(payer).filter { it.id != lg.heroId && it.id !in moved && it !in sends && Needs.isSurplus(lg, payer, it) }
+                .sortedBy { value(it) }.firstOrNull { value(it) <= 6.0 }
+            val deficit = if (aShort) aGives - aGets else bGives - bGets
+            when {
+                spare != null && value(spare) <= deficit * 1.4 -> sends += spare
+                pick != null && (spare == null || Picks.value(lg, pick) <= deficit * 1.5) -> sendPicks += pick
+                spare != null -> sends += spare
+                else -> return false
+            }
+        }
+        return fair(lg, a, b, fromA, fromB, picksA, picksB, aMotivated, bMotivated)
+    }
+
+    /** Everyone the engine may move: nobody on the user's bench when he coaches, never his player, nobody already dealt. */
+    private fun tradeable(lg: League, t: Team, ps: com.nh.hoopscoach.game.ProState): List<Player> {
+        val userCoached = NbaCoach.active(lg) && t.id == lg.userTeamId
+        return lg.rosterOf(t).filter { it.id != lg.heroId && it.id != (lg.road?.rivalId ?: -2) && it.id !in ps.moved && !userCoached }
+    }
+
+    /**
+     * Contenders shop for the piece they're missing: the best player another team will give up at
+     * their weakest spot, bought with surplus players and picks. The league's live trades, made one
+     * phone call at a time until [count] land or the lines go quiet.
+     */
     fun aiTrades(lg: League, count: Int) {
-        // Coaching a team: the AI never trades the user's players without him.
-        val ranked = lg.teams.filter { !(NbaCoach.active(lg) && it.id == lg.userTeamId) }.sortedBy { it.winPct + it.elo / 10_000.0 }
+        val ps = lg.proState ?: return
+        var made = 0
+        var tries = 0
+        val maxTries = count * 25 + 30
+        while (made < count && tries++ < maxTries) {
+            val trade = when (val roll = Rng.d()) {
+                in 0.0..0.45 -> upgradeTrade(lg, ps)
+                in 0.45..0.75 -> sellOffTrade(lg, ps)
+                in 0.75..0.9 -> salaryDumpTrade(lg, ps)
+                else -> minorSwap(lg, ps)
+            }
+            if (trade != null) made++
+        }
+    }
+
+    /** A contender (or the hero's stacked team) buys a starter-level player at its weakest spot. */
+    private fun upgradeTrade(lg: League, ps: com.nh.hoopscoach.game.ProState): Trade? {
         // A team with a star (the user's player at 90 or better) builds around him: it buys, it never sells.
         val starTeam = lg.playerOrNull(lg.heroId)?.takeIf { it.teamId >= 0 && it.ovr >= 90 }?.let { lg.team(it.teamId) }
-        val sellers = ranked.take(12).filter { it.id != starTeam?.id }
-        val buyers = (ranked.takeLast(12) + listOfNotNull(starTeam)).distinctBy { it.id }
-        var made = 0
-        if (starTeam != null) for (seller in sellers.shuffled(Rng.r)) {
-            // First call: the star's team goes after the best veteran it can afford.
-            val vet = lg.rosterOf(seller).filter { it.id != lg.heroId && it.age >= 27 && it.ovr >= 87 && it.id !in lg.proState!!.moved }.maxByOrNull { it.ovr } ?: continue
-            val keep = (listOf(lg.heroId) + lg.rosterOf(starTeam).filter { it.id != lg.heroId }.sortedByDescending { value(it) }.take(1).map { it.id }).toSet()
-            val pack = bundle(lg, starTeam, value(vet), 0.7, 1.35, keep) ?: continue
-            if (!Payroll.tradeWorks(lg, starTeam, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            execute(lg, seller, starTeam, listOf(vet), pack, picksB = sweetener(lg, seller, starTeam))
-            made++
-            break
+        val buyers = lg.teams.filter {
+            !(NbaCoach.active(lg) && it.id == lg.userTeamId) &&
+                (Needs.direction(lg, it) == Needs.Direction.CONTENDING || it.id == starTeam?.id)
+        }.shuffled(Rng.r)
+        for (buyer in buyers) {
+            val spot = Needs.weakestSpot(lg, buyer) ?: continue
+            val keep = (listOfNotNull(lg.heroId.takeIf { it >= 0 }, lg.road?.rivalId) + lg.rosterOf(buyer).filter { it.id != lg.heroId }
+                .sortedByDescending { value(it) }.take(2).map { it.id }).toSet()
+            // Sellers: anyone with a surplus player at that spot, rebuilders first.
+            val sellers = lg.teams.filter { it.id != buyer.id && !(NbaCoach.active(lg) && it.id == lg.userTeamId) }
+                .sortedBy { if (Needs.direction(lg, it) == Needs.Direction.REBUILDING) 0 else 1 }
+            for (seller in sellers) {
+                val target = tradeable(lg, seller, ps).filter { it.pos == spot && Needs.isSurplus(lg, seller, it) }
+                    .maxByOrNull { neededValue(lg, buyer, it) } ?: continue
+                if (Trades.value(target) < 3.0) continue
+                val pack = bundle(lg, buyer, valueFor(lg, buyer, target), 0.7, 1.3, keep) ?: continue
+                val fromB = pack.toMutableList()
+                val picksB = mutableListOf<PickAsset>()
+                val fromA = mutableListOf(target)
+                val picksA = mutableListOf<PickAsset>()
+                val sellerMotivated = Needs.direction(lg, seller) == Needs.Direction.REBUILDING || target.age >= 30
+                if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, target), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
+                if (!equalize(lg, seller, buyer, fromA, fromB, picksA, picksB, sellerMotivated, bMotivated = false)) continue
+                return execute(lg, seller, buyer, fromA, fromB, picksA = picksA, picksB = picksB)
+            }
         }
+        return null
+    }
+
+    /** A rebuilder cashes in a productive veteran for youth and a draft pick. */
+    private fun sellOffTrade(lg: League, ps: com.nh.hoopscoach.game.ProState): Trade? {
+        val sellers = lg.teams.filter {
+            Needs.direction(lg, it) == Needs.Direction.REBUILDING && !(NbaCoach.active(lg) && it.id == lg.userTeamId)
+        }.shuffled(Rng.r)
+        for (seller in sellers) {
+            val vet = tradeable(lg, seller, ps).filter { it.age >= 27 && Trades.value(it) >= 5.0 }
+                .maxByOrNull { value(it) } ?: continue
+            // Who wants him? A team short at his spot; contenders pay best.
+            val buyers = lg.teams.filter { it.id != seller.id && !(NbaCoach.active(lg) && it.id == lg.userTeamId) }
+                .sortedByDescending { neededValue(lg, it, vet) * (if (Needs.direction(lg, it) == Needs.Direction.CONTENDING) 1.2 else 1.0) }
+            for (buyer in buyers.take(6)) {
+                if (Needs.needFactor(lg, buyer, vet) < 1.0) continue
+                val target = neededValue(lg, buyer, vet)
+                // The seller wants a pick plus young pieces; the buyer keeps its top two.
+                val keep = (listOfNotNull(lg.heroId.takeIf { it >= 0 }) + lg.rosterOf(buyer).filter { it.id != lg.heroId }
+                    .sortedByDescending { value(it) }.take(2).map { it.id }).toSet()
+                val young = lg.rosterOf(buyer).filter { it.id !in keep && it.id != (lg.road?.rivalId ?: -2) && it.age <= 25 && it.id !in ps.moved }
+                    .sortedByDescending { value(it) }
+                val pack = mutableListOf<Player>()
+                var sum = 0.0
+                for (y in young) { if (sum + value(y) > target * 1.15) continue; pack += y; sum += value(y); if (sum >= target * 0.6 || pack.size == 2) break }
+                val picksB = mutableListOf<PickAsset>()
+                val fromA = mutableListOf(vet)
+                val picksA = mutableListOf<PickAsset>()
+                if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
+                if (!equalize(lg, seller, buyer, fromA, pack, picksA, picksB, aMotivated = true, bMotivated = false)) continue
+                return execute(lg, seller, buyer, fromA, pack, picksA = picksA, picksB = picksB)
+            }
+        }
+        return null
+    }
+
+    /** A team over the tax sheds a bad contract: money relief for whoever has the room or the need. */
+    private fun salaryDumpTrade(lg: League, ps: com.nh.hoopscoach.game.ProState): Trade? {
+        val dumper = lg.teams.filter {
+            !(NbaCoach.active(lg) && it.id == lg.userTeamId) && Payroll.total(lg, it) > Payroll.tax(lg)
+        }.shuffled(Rng.r).firstOrNull() ?: return null
+        val dump = tradeable(lg, dumper, ps).filter { Needs.isSurplus(lg, dumper, it) && Payroll.salaryOf(lg, it) > ProCareer.marketValue(lg, it) * 1.35 }
+            .maxByOrNull { Payroll.salaryOf(lg, it) - ProCareer.marketValue(lg, it) } ?: return null
+        // A bad contract costs an asset to move: the dumper attaches a pick, and takes back the cheapest matching salary.
+        for (taker in lg.teams.filter { it.id != dumper.id && !(NbaCoach.active(lg) && it.id == lg.userTeamId) }.shuffled(Rng.r)) {
+            val room = Payroll.total(lg, taker) - Payroll.salaryOf(lg, dump)
+            if (room > Payroll.cap(lg) * 0.9 && Needs.needFactor(lg, taker, dump) < 1.1) continue
+            val back = tradeable(lg, taker, ps).filter { Payroll.salaryOf(lg, it) <= Payroll.salaryOf(lg, dump) }
+                .minByOrNull { value(it) } ?: continue
+            if (!Payroll.tradeWorks(lg, taker, Payroll.salaryOf(lg, dump), Payroll.salaryOf(lg, back))) continue
+            val picksA = mutableListOf<PickAsset>()
+            val overpay = Payroll.salaryOf(lg, dump) - ProCareer.marketValue(lg, dump)
+            val cost = (overpay / (Payroll.cap(lg) * 0.05)).toInt().coerceAtMost(2)
+            repeat(cost) {
+                Picks.owned(lg, dumper).filter { it !in picksA }.maxByOrNull { it.season }?.let { picksA += it }
+            }
+            val fromA = mutableListOf(dump)
+            val fromB = mutableListOf(back)
+            val picksB = mutableListOf<PickAsset>()
+            if (!equalize(lg, dumper, taker, fromA, fromB, picksA, picksB, aMotivated = true, bMotivated = false)) continue
+            return execute(lg, dumper, taker, fromA, fromB, picksA = picksA, picksB = picksB)
+        }
+        return null
+    }
+
+    /** One small in-season deal (returns it, or null when nobody matches up). */
+    fun minor(lg: League): Trade? = lg.proState?.let { minorSwap(lg, it) }
+
+    /** A small deal: a team thin at a spot swaps bench pieces with one that's deep there. */
+    private fun minorSwap(lg: League, ps: com.nh.hoopscoach.game.ProState): Trade? {
+        val a = lg.teams.filter { !(NbaCoach.active(lg) && it.id == lg.userTeamId) }.shuffled(Rng.r).firstOrNull() ?: return null
+        val spot = Needs.weakestSpot(lg, a) ?: return null
+        val b = lg.teams.filter { it.id != a.id && !(NbaCoach.active(lg) && it.id == lg.userTeamId) }
+            .shuffled(Rng.r).firstOrNull { Needs.depthAt(lg, it, spot).size >= 3 } ?: return null
+        val get = tradeable(lg, b, ps).filter { it.pos == spot && Trades.value(it) in 0.5..6.0 }.maxByOrNull { neededValue(lg, a, it) } ?: return null
+        val give = tradeable(lg, a, ps).filter { it.pos != spot && Needs.isSurplus(lg, a, it) && Trades.value(it) <= Trades.value(get) * 1.3 }
+            .maxByOrNull { neededValue(lg, b, it) } ?: return null
+        if (!Payroll.tradeWorks(lg, a, Payroll.salaryOf(lg, get), Payroll.salaryOf(lg, give))) return null
+        val fromA = mutableListOf(give)
+        val fromB = mutableListOf(get)
+        val picksA = mutableListOf<PickAsset>()
+        val picksB = mutableListOf<PickAsset>()
+        if (!equalize(lg, a, b, fromA, fromB, picksA, picksB, aMotivated = false, bMotivated = false)) return null
+        return execute(lg, a, b, fromA, fromB, picksA = picksA, picksB = picksB)
+    }
+
+    /**
+     * Draft night: teams move up and down the board. A team hunting its man pays its later first plus
+     * a future one for an earlier slot; the team moving down only deals when it isn't a rebuilder
+     * sitting on a top-five pick.
+     */
+    fun draftDay(lg: League) {
+        val ps = lg.proState ?: return
+        val year = lg.season
+        // Firsts on the clock, earliest (worst original record) first.
+        val board = ps.picks.filter { it.season == year }.sortedBy { lg.team(it.original).winPct }
+        var swaps = 0
         var tries = 0
-        while (made < count && tries++ < count * 6) {
-            val seller = Rng.pick(sellers)
-            val buyer = Rng.pick(buyers)
-            if (seller.id == buyer.id) continue
-            val vet = lg.rosterOf(seller).filter {
-                it.id != lg.heroId && it.age >= 28 && it.ovr >= 87 && it.id !in lg.proState!!.moved
-            }.maxByOrNull { it.ovr } ?: continue
-            // A contender pays up for a veteran who helps now.
-            val target = valueFor(lg, buyer, vet)
-            val keep = lg.rosterOf(buyer).sortedByDescending { value(it) }.take(2).map { it.id }.toSet()
-            val pack = bundle(lg, buyer, target, 0.75, 1.3, keep) ?: continue
-            if (!Payroll.tradeWorks(lg, buyer, Payroll.salaryOf(lg, vet), pack.sumOf { Payroll.salaryOf(lg, it) })) continue
-            execute(lg, seller, buyer, listOf(vet), pack, picksB = sweetener(lg, seller, buyer))
-            made++
+        while (swaps < 2 && tries++ < 15) {
+            val up = board.drop(5).shuffled(Rng.r).firstOrNull { candidate ->
+                !(NbaCoach.active(lg) && candidate.owner == lg.userTeamId)
+            } ?: return
+            val upTeam = lg.team(up.owner)
+            val down = board.take(board.indexOf(up)).shuffled(Rng.r).firstOrNull { earlier ->
+                val t = lg.team(earlier.owner)
+                t.id != upTeam.id && !(NbaCoach.active(lg) && t.id == lg.userTeamId) &&
+                    !(board.indexOf(earlier) < 5 && Needs.direction(lg, t) == Needs.Direction.REBUILDING)
+            } ?: return
+            val downTeam = lg.team(down.owner)
+            // The mover-up pays his later first plus his cheapest future first.
+            val extra = Picks.owned(lg, upTeam).filter { it.season != year }.minByOrNull { Picks.value(lg, it) } ?: return
+            Picks.move(lg, listOf(down), upTeam)
+            Picks.move(lg, listOf(up, extra), downTeam)
+            swaps++
+            lg.news += News(lg.season, 0, "Draft-night trade: the ${upTeam.name} move up, sending ${Picks.label(lg, up)} and a future first to the ${downTeam.name} for ${Picks.label(lg, down)}", true)
         }
     }
 
