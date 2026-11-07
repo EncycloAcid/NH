@@ -68,7 +68,8 @@ object RealSeasons {
     /** basketball-reference's abbreviation, then and now, to the franchise's place in today's league. */
     fun slotOf(abbr: String): String = when (abbr) {
         "NJN", "BRK" -> "BKN"
-        "CHH" -> "NOP"
+        // The first Hornets (1988-2002) play in Charlotte's place in the era team lists, and move to New Orleans's in 2003.
+        "CHH" -> "CHA"
         "CHO" -> "CHA"
         "NOH", "NOK" -> "NOP"
         "SEA" -> "OKC"

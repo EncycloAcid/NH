@@ -73,18 +73,20 @@ private fun heightRange(pos: Pos) = when (pos) { Pos.PG -> 70..78; Pos.SG -> 72.
 fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     val hero = vm.roadHero
     if (hero != null) { RoadOffers(vm, lg, hero, header); return }
-    var first by remember { mutableStateOf("") }
-    var last by remember { mutableStateOf("") }
-    var pos by remember { mutableStateOf(Pos.SG) }
-    var pos2 by remember { mutableStateOf<Pos?>(null) }
-    var era by remember { mutableStateOf(com.nh.hoopscoach.game.Era.TODAY) }
-    var height by remember { mutableIntStateOf(76) }
-    var weight by remember { mutableIntStateOf(200) }
-    var town by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("GA") }
-    var style by remember { mutableStateOf(Arch.SHOT_CREATOR) }
-    var stars by remember { mutableIntStateOf(4) }
-    var number by remember { mutableIntStateOf(3) }
+    // Start from the last player made here, so going back from the offers keeps every choice (the era above all).
+    val saved = vm.roadSpec
+    var first by remember { mutableStateOf(saved?.first ?: "") }
+    var last by remember { mutableStateOf(saved?.last ?: "") }
+    var pos by remember { mutableStateOf(saved?.pos ?: Pos.SG) }
+    var pos2 by remember { mutableStateOf(saved?.pos2) }
+    var era by remember { mutableStateOf(saved?.era ?: com.nh.hoopscoach.game.Era.TODAY) }
+    var height by remember { mutableIntStateOf(saved?.height ?: 76) }
+    var weight by remember { mutableIntStateOf(saved?.weight ?: 200) }
+    var town by remember { mutableStateOf(saved?.town ?: "") }
+    var state by remember { mutableStateOf(saved?.state ?: "GA") }
+    var style by remember { mutableStateOf(saved?.style ?: Arch.SHOT_CREATOR) }
+    var stars by remember { mutableIntStateOf(saved?.stars ?: 4) }
+    var number by remember { mutableIntStateOf(saved?.number ?: 3) }
     val range = heightRange(pos)
     if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
     val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
@@ -194,6 +196,14 @@ private fun RoadOffers(vm: GameViewModel, lg: League, hero: Player, header: @Com
                         Spacer(Modifier.width(6.dp))
                         Ring(hero.pot, 48.dp, label = "POT", textSize = 17.sp)
                     }
+                    // Which era this career is in, so a wrong pick is caught before signing.
+                    val era = com.nh.hoopscoach.game.Era.entries.firstOrNull { it.name == lg.era }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (era == null || era == com.nh.hoopscoach.game.Era.TODAY) "ERA: TODAY · today's college game, then today's NBA"
+                        else "ERA: ${era.year} · college starts in ${lg.season - 1}-${(lg.season % 100).toString().padStart(2, '0')}, then the real NBA of the year you turn pro",
+                        style = T.label.copy(fontSize = 10.sp), color = P.accent,
+                    )
                 }
                 Section("Scholarship offers · ${vm.roadOffers.size}")
                 Text("Pick where you'll play. A school with fewer good players at your position means minutes sooner; richer programs pay more NIL.",

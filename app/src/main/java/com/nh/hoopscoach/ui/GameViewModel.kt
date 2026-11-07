@@ -225,8 +225,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     var reveal by mutableIntStateOf(0)
     var revealSeason by mutableIntStateOf(-1)
 
+    /** The last player made on the creator: it comes back filled in after the offers, so nothing (the era above all) resets. */
+    var roadSpec: com.nh.hoopscoach.game.Road.Spec? = null
+
     fun roadFindOffers(spec: com.nh.hoopscoach.game.Road.Spec) {
         val d0 = draft ?: return
+        roadSpec = spec
         busy = "Coaches are calling"
         viewModelScope.launch {
             // A different era needs a college league that starts in that era's season, with its real players.
@@ -255,6 +259,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             draft = null
             roadHero = null
             roadOffers = emptyList()
+            roadSpec = null
             league = d
             tab = Tab.TODAY
             stack.clear()

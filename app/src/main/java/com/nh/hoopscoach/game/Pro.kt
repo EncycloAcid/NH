@@ -248,8 +248,9 @@ object ProLeague {
         )
         // An era career in college joins the league the year he's drafted, after the years he spent in school.
         val inEra = era != Era.TODAY && college.era == era.name && college.season >= era.year
-        // A past era has only the teams that existed (23 in 1985-86), under their names then.
-        val startList = if (era != Era.TODAY) EraData.teams(era.year) else null
+        // A past era has only the teams that existed in the season he arrives (23 in 1985-86, 25 in 1988-89),
+        // under their names then (the Bobcats in 2006-07, the Hornets and Pelicans by 2016-17).
+        val startList = if (era != Era.TODAY) EraData.teams(firstSeason(college, era, inEra)) ?: EraData.teams(era.year) else null
         val teams = mutableListOf<Team>()
         for (f in TEAMS) {
             val fr = startList?.firstOrNull { it.slot == f.abbr }

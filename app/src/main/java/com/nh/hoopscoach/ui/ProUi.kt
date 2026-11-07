@@ -1637,10 +1637,15 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
             if (careerEra != null) item {
                 val teams = com.nh.hoopscoach.game.EraData.teams(lg.season + 1)
                 Section("Your league")
+                // The league of the season he arrives, named by its real stars (not the era it started from).
+                val stars = remember(lg.season) {
+                    com.nh.hoopscoach.game.RealSeasons.season(lg.season + 1).filter { it.g >= 20 }
+                        .sortedByDescending { com.nh.hoopscoach.game.RealSeasons.rating2k(it) * 100 + it.ppg }.map { it.name }.distinct().take(4)
+                }
                 Panel {
                     Text("THE ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} NBA", style = T.label, color = P.accent)
-                    Text(careerEra.title, style = T.head, color = P.ink)
-                    Text("${teams?.size ?: 30} teams. The stars of ${careerEra.year - 1}-${(careerEra.year % 100).toString().padStart(2, '0')} are ${lg.season + 1 - careerEra.year} years older, and the real draft classes since have arrived.", style = T.small, color = P.sub)
+                    Text(if (stars.isNotEmpty()) stars.joinToString(", ") else careerEra.title, style = T.head, color = P.ink)
+                    Text("${teams?.size ?: 30} teams, each with the real roster it opened that season: real ratings, real photos, the real draft classes every summer after.", style = T.small, color = P.sub)
                     Text(eraRules(careerEra), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 4.dp))
                 }
             } else item { EraPicker(era) { era = it } }
