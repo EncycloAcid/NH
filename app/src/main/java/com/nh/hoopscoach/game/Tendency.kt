@@ -17,7 +17,7 @@ object Tendency {
     fun pass(p: Player) = (if (has(p, Attr.PAS)) 1.8 else 1.0) * (if (has(p, Attr.HND)) 1.15 else 1.0)
     /** Rebounders crash the glass; defenders (interior and perimeter: two-way and lockdown players) box out and finish the stop. */
     fun reb(p: Player) = (if (has(p, Attr.REB)) 1.7 else 1.0) * (if (has(p, Attr.IDF)) 1.15 else 1.0) * (if (has(p, Attr.PER)) 1.2 else 1.0) *
-        (if (p.style == Arch.TWO_WAY_GUARD || p.style == Arch.TWO_WAY_WING) 1.25 else 1.0)
+        (if (p.style == Arch.TWO_WAY_GUARD || p.style == Arch.TWO_WAY_WING || p.style == Arch.TWO_WAY_POINT) 1.25 else 1.0)
     fun stl(p: Player) = (if (has(p, Attr.STL)) 1.8 else 1.0) * (if (has(p, Attr.PER)) 1.6 else 1.0)
     fun blk(p: Player) = (if (has(p, Attr.BLK)) 1.9 else 1.0) * (if (has(p, Attr.IDF)) 1.2 else 1.0)
 

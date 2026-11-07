@@ -79,7 +79,32 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     GLASS_CLEANER("Glass Cleaner", "GLS", listOf(Attr.REB, Attr.PAS, Attr.IDF), "Owns the defensive glass and starts the break with an outlet"),
     ELBOW_HUB("Elbow Hub", "ELB", listOf(Attr.MID, Attr.PAS, Attr.IDF), "Runs the offense from the elbow with a soft jumper and sharp passes"),
     MOBILE_BIG("Mobile Big", "MOB", listOf(Attr.PER, Attr.REB, Attr.BLK), "Switches onto guards, contests at the rim and runs the floor"),
-    PAINT_BEAST("Paint Beast", "BST", listOf(Attr.INS, Attr.IDF, Attr.BLK), "Overpowers everyone inside on both ends of the floor");
+    PAINT_BEAST("Paint Beast", "BST", listOf(Attr.INS, Attr.IDF, Attr.BLK), "Overpowers everyone inside on both ends of the floor"),
+    // More point guards
+    JUMBO_PLAYMAKER("Jumbo Playmaker", "JPM", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big point guard who posts up smaller guards, grabs the rebound and leads the break"),
+    PULL_UP_ARTIST("Pull-Up Artist", "PUA", listOf(Attr.MID, Attr.OUT, Attr.HND), "Rises off the dribble from anywhere: the step-back three, the pull-up jumper"),
+    TWO_WAY_POINT("Two-Way Point", "2WP", listOf(Attr.OUT, Attr.PAS, Attr.PER), "Runs the offense, spaces the floor and takes the other team's point guard"),
+    CRAFTY_FINISHER("Crafty Finisher", "CRF", listOf(Attr.INS, Attr.MID, Attr.PAS), "Floaters, scoop layups and dump-offs: wins in the paint without jumping over anyone"),
+    // More shooting guards
+    SECONDARY_CREATOR("Secondary Creator", "SEC", listOf(Attr.INS, Attr.HND, Attr.PAS), "Second ball handler who attacks a tilted defense and finds the open man"),
+    PERIMETER_STOPPER("Perimeter Stopper", "STP", listOf(Attr.OUT, Attr.PER, Attr.STL), "Hounds the best guard all night and makes the open three"),
+    CRASH_GUARD("Crash Guard", "CRG", listOf(Attr.INS, Attr.REB, Attr.STL), "Crashes the glass from the wing, jumps passing lanes and scores on the scraps"),
+    OFF_BALL_CUTTER("Off-Ball Cutter", "CUT", listOf(Attr.INS, Attr.OUT, Attr.PER), "Never stands still: backdoor cuts, corner threes and honest defense"),
+    // More small forwards
+    SHOT_MAKER("Tough Shot Maker", "SHM", listOf(Attr.MID, Attr.OUT, Attr.HND), "Fadeaways, step-backs and contested jumpers: the shot clock is never a problem"),
+    CONNECTOR("Connector", "CON", listOf(Attr.OUT, Attr.PAS, Attr.REB), "Spaces the floor, keeps the ball moving and finishes the possession on the glass"),
+    RANGY_DEFENDER("Rangy Defender", "RNG", listOf(Attr.PER, Attr.BLK, Attr.REB), "Long arms everywhere: contests on the wing, weak-side blocks and box-outs"),
+    TRANSITION_WING("Transition Wing", "TRN", listOf(Attr.INS, Attr.OUT, Attr.STL), "Gets out and runs: steals, layups on the break and trailing threes"),
+    // More power forwards
+    STRETCH_REBOUNDER("Stretch Rebounder", "SRB", listOf(Attr.OUT, Attr.REB, Attr.BLK), "Spaces the floor, cleans the glass and swats shots from the weak side"),
+    TWO_WAY_FOUR("Two-Way Four", "2WF", listOf(Attr.OUT, Attr.PER, Attr.IDF), "Guards every frontcourt spot and hits the corner three"),
+    SHORT_ROLL("Short-Roll Playmaker", "SRL", listOf(Attr.INS, Attr.PAS, Attr.IDF), "Catches in the short roll and makes the right read; holds the paint on defense"),
+    BRUISER("Bruiser", "BRU", listOf(Attr.INS, Attr.MID, Attr.IDF), "All muscle: bully post-ups, elbow jumpers and a wall in the paint"),
+    // More centers
+    LOB_THREAT("Lob Threat", "LOB", listOf(Attr.INS, Attr.PER, Attr.BLK), "Rolls hard, catches everything above the rim and switches onto guards"),
+    SPACING_FIVE("Pick-and-Pop Five", "SP5", listOf(Attr.MID, Attr.OUT, Attr.REB), "Center who pops to the arc on offense and still owns the defensive glass"),
+    POST_PLAYMAKER("Post Playmaker", "PPM", listOf(Attr.INS, Attr.MID, Attr.PAS), "Draws double teams on the block and picks them apart with his passing"),
+    SHOT_BLOCKER("Shot Blocker", "SWT", listOf(Attr.IDF, Attr.STL, Attr.BLK), "Times every shot at the rim: blocks, deflections and steals in the paint");
 }
 
 enum class Trait(val label: String, val good: Boolean) {

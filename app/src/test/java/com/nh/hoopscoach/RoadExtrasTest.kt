@@ -27,10 +27,10 @@ class RoadExtrasTest {
     @Test
     fun archetypes() {
         val styles = Arch.entries.filter { it != Arch.MANUAL }
-        assertEquals("fifty-four archetypes", 54, styles.size)
+        assertEquals("seventy-four archetypes", 74, styles.size)
         assertEquals("short codes are unique", styles.size, styles.map { it.short }.toSet().size)
         assertTrue("each boosts three ratings", styles.all { it.boosts.size == 3 && it.boosts.toSet().size == 3 })
-        for (pos in Pos.entries) assertTrue("$pos has 10 or 11 styles", Ratings.styles(pos).size in 10..11)
+        for (pos in Pos.entries) assertTrue("$pos has 14 or 15 styles", Ratings.styles(pos).size in 14..15)
         assertTrue("no two styles at a position boost the same three ratings",
             Pos.entries.all { pos -> Ratings.styles(pos).map { it.boosts.toSet() }.let { it.size == it.toSet().size } })
         assertTrue("every archetype belongs to exactly one position", styles.all { a -> Pos.entries.count { a in Ratings.styles(it) } == 1 })
