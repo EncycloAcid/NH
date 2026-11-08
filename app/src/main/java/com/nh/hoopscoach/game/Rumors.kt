@@ -57,7 +57,8 @@ object Rumors {
         val b = lg.team(t.teamB)
         val text = "The ${a.name} are trading ${t.toB.joinToString(" and ")} to the ${b.name} for ${t.toA.joinToString(" and ")}"
         Media.post(lg, INSIDER, HANDLE, "insider", "BREAKING: $text.", Media.likes(lg, if (t.hero) 0.12 else 0.03), verified = true, league = !(t.hero || Feed.mine(lg, a.id, b.id)))
-        if (t.teamA == lg.userTeamId || t.teamB == lg.userTeamId) {
+        // His own trade has its own fan reactions (see [TradeCall]).
+        if (!t.hero && (t.teamA == lg.userTeamId || t.teamB == lg.userTeamId)) {
             val got = if (t.teamA == lg.userTeamId) t.toA else t.toB
             Media.post(lg, "${lg.user.mascot} Nation", "${lg.user.abbr.lowercase()}nation", "fan",
                 Rng.pick(listOf("Welcome to town, ${got.first()}!", "Not sure how I feel about this one.", "Front office cooking. ${got.first()} fits right in.", "We gave up too much. Fight me.")),

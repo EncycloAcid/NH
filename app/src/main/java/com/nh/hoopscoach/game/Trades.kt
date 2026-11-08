@@ -138,11 +138,8 @@ object Trades {
         protA: Map<Int, Int> = emptyMap(), protB: Map<Int, Int> = emptyMap(),
     ): Trade {
         val ps = lg.proState!!
+        // His own trade gets its moment from [TradeCall] once the deal is done.
         val hero = fromA.any { it.id == lg.heroId } || fromB.any { it.id == lg.heroId }
-        if (hero) {
-            val to = if (fromA.any { it.id == lg.heroId }) b else a
-            Alerts.add(lg, "You've been traded", "You're headed to the ${to.name}. New team, new role: check the Me tab.", "trade")
-        }
         val beforeA = ProLeague.teamValue(lg, a)
         val beforeB = ProLeague.teamValue(lg, b)
         for (p in fromA) {
@@ -286,8 +283,10 @@ object Trades {
         r.tradedDay = lg.day
         r.tradeNote = (if (asked) "You got your wish: " else "You've been traded: ") +
             "the ${from.name} send you to the ${to.name} for ${back.joinToString(" and ") { it.name }}."
+        r.tradeReaction = -1
         Road.sync(lg)
-        // The trade's write-up comes from execute().
+        // The trade's write-up comes from execute(); the reactions, the big-name story and (if he didn't ask) the call, from here.
+        runCatching { TradeCall.after(lg, from, to, back, asked) }
         return true
     }
 
@@ -554,7 +553,14 @@ object Trades {
     }
 
     /** The summer: more AI deals, and a request still open when the season starts gets settled. */
-    fun summer(lg: League) = aiTrades(lg, Rng.range(6, 10))
+    fun summer(lg: League) {
+        aiTrades(lg, Rng.range(6, 10))
+        // Teams reshape in the summer too, and sometimes that means him: no request, just a call.
+        val r = lg.road ?: return
+        if (r.ended || r.suitors.isNotEmpty() || lg.hero?.teamId?.let { it < 0 } != false) return
+        if (Rng.chance(dealChance(lg) * 0.7)) suitors(lg, 3, 0.7, 1.3).maxByOrNull { s -> s.sends.sumOf { lg.playerOrNull(it)?.let { p -> value(p) } ?: 0.0 } }
+            ?.let { dealHero(lg, it, asked = false) }
+    }
 
     fun settleOpenRequest(lg: League) {
         val r = lg.road ?: return
@@ -583,6 +589,7 @@ object Trades {
         if (h.age >= 30 && t.gp >= 8 && t.winPct < 0.55) { s -= 12; why += "At ${h.age}, you want a ring" }
         if ((lg.road?.persona ?: 0) >= 5) { s -= 5; why += "Lightning rods get restless" }
         Hometown.moodLift(lg)?.let { (lift, reason) -> s += lift; why += reason }
+        TradeCall.moodHit(lg)?.let { (hit, reason) -> s += hit; why += reason }
         val v = s.roundToInt().coerceIn(0, 100)
         val label = when { v >= 70 -> "Happy"; v >= 50 -> "Content"; v >= 30 -> "Frustrated"; else -> "Wants out" }
         return Mood(v, label, why)

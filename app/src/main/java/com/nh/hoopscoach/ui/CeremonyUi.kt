@@ -81,7 +81,7 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
                         Text(c.title, style = T.hero.copy(fontSize = 50.sp, lineHeight = 50.sp), color = fg)
                         Spacer(Modifier.height(8.dp))
                         Text(c.sub, style = T.bodyB, color = fg.copy(alpha = 0.85f))
-                        if (c.badge.isNotEmpty()) Text("🏆 ${c.badge}", style = T.small, color = accent, modifier = Modifier.padding(top = 4.dp))
+                        if (c.badge.isNotEmpty()) Text((if (c.kind == "traded") "⇄ " else "🏆 ") + c.badge, style = T.small, color = accent, modifier = Modifier.padding(top = 4.dp))
                         Spacer(Modifier.height(16.dp))
                         team?.let { TeamBadge(it, 64.dp) }
                         Spacer(Modifier.height(18.dp))

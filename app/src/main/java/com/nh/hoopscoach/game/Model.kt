@@ -880,6 +880,11 @@ class RoadState(
     var tradedSeason: Int = 0,
     var tradedDay: Int = -1,
     var tradeNote: String = "",
+    /** The last trade: whether he asked for it, his first words after (0 humble, 1 even, 2 brash; -1 none), and the old team he hasn't been back to play yet (see [TradeCall]). */
+    var tradeAsked: Boolean = false,
+    var tradeReaction: Int = -1,
+    var returnTeam: Int = -1,
+    var returnSeason: Int = 0,
     /** Free agency: a player option on his last year that he has to decide on this summer. */
     var optionPending: Boolean = false,
     /** Restricted free agency after a first-round rookie deal: his team can match any offer sheet. */

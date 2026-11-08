@@ -1864,6 +1864,8 @@ object Sim {
         if (lg.pro) runCatching { FarewellTour.afterDay(lg, day) }
         // The hometown kid: coming home, leaving, and home games in his city.
         if (lg.pro) runCatching { Hometown.check(lg, day) }
+        // His first game back against the team that traded him.
+        if (lg.pro) runCatching { TradeCall.afterDay(lg, day) }
         // The defending champion's season, in the news.
         runCatching { TitleDefense.check(lg) }
         // Tomorrow's big games.
