@@ -107,6 +107,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
                     if (p.gear.isNotEmpty()) Text("Gear: " + com.nh.hoopscoach.game.Gear.decode(p.gear).describe(), style = T.small, color = P.sub)
+                    if (p.id == lg.heroId) lg.road?.shoe?.let { Text("Shoes: the ${com.nh.hoopscoach.game.Shoes.shoeName(lg, it)}", style = T.small, color = P.sub) }
+                    com.nh.hoopscoach.game.Jerseys.rank(lg, p).takeIf { it > 0 }?.let { Text("No. $it in jersey sales", style = T.small, color = P.gold) }
                     if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = P.bad)
                     // A pro's contract.
                     if (lg.pro && team != null) {

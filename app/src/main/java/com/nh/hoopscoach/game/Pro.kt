@@ -812,6 +812,8 @@ object ProSeason {
                 if (lg.day == ProLeague.allStarDay(lg) - 1 && NbaCoach.active(lg)) runCatching { FrontOffice.meeting(lg) }
                 // Extensions at the break: other teams lock up their own, and auto re-sign does the user's.
                 if (lg.day == ProLeague.allStarDay(lg) - 1) runCatching { Extensions.allStarBreak(lg) }
+                // The jersey-sales list at the break.
+                if (lg.day == ProLeague.allStarDay(lg) - 1) runCatching { Jerseys.update(lg, "at the break") }
                 if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
             }
@@ -1276,6 +1278,7 @@ object ProCareer {
     fun age(lg: League) = lg.hero?.age ?: 0
 
     fun seasonEnd(lg: League) {
+        runCatching { Jerseys.update(lg, "for the season") }
         if (NbaCoach.active(lg)) {
             for (p in lg.players) if (p.teamId >= 0 || p.stats.gp > 0 || p.tourney.gp > 0) p.proYears++
             NbaCoach.seasonEnd(lg)
@@ -1287,6 +1290,8 @@ object ProCareer {
         Leadership.seasonEnd(lg)
         val endorse = endorsements(lg)
         r.earned += endorse
+        // His signature shoe: this year's sales, next year's model, or offers once he's a star.
+        runCatching { Shoes.seasonEnd(lg) }
         r.contract?.let { it.years-- }
         val s = h.stats
         val honors = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
@@ -1811,6 +1816,8 @@ object Sim {
         runCatching { TitleDefense.check(lg) }
         // Tomorrow's big games.
         runCatching { Marquee.preview(lg) }
+        // The weekly TV debate.
+        runCatching { TvShow.daily(lg) }
         Reactions.pass(lg)
     }
 }

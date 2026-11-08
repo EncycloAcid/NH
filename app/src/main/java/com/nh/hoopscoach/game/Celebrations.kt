@@ -401,6 +401,7 @@ object Celebrations {
 
     fun speak(lg: League, cer: Ceremony, choice: Int) {
         cer.chosen = choice
+        if (cer.kind == "shoes") { Shoes.sign(lg, choice); return }
         val r = lg.road
         val hero = lg.hero?.takeIf { playerMode(lg) }
         val t = lg.user

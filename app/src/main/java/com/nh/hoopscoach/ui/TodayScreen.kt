@@ -83,6 +83,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
         item { TitleDefenseCard(lg) }
+        item { TvCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
         if (!lg.playerMode) item { GoalsCard(lg) }

@@ -208,6 +208,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             GroupList(shown) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
         item { TitleDefenseCard(lg) }
+        item { TvCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { GoalsCard(lg) }
         item { InjuryReport(vm, lg, u) }

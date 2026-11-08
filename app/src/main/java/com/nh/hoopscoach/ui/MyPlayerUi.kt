@@ -138,7 +138,9 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
                 Gear.PARTS.forEachIndexed { i, label ->
                     if (i == 2 && gear.sleeve == 0) return@forEachIndexed
                     Section(label)
-                    Chips(Gear.OPTIONS[i], gear.parts()[i], { v -> gear = gear.with(i, v) })
+                    // The signature shoe is there once he has a deal.
+                    val opts = if (i == 4 && r.shoe == null) Gear.OPTIONS[i].dropLast(1) else Gear.OPTIONS[i]
+                    Chips(opts, gear.parts()[i].coerceAtMost(opts.size - 1), { v -> gear = gear.with(i, v) })
                 }
                 Spacer(Modifier.height(10.dp))
                 Panel { Text(gear.describe() + ".", style = T.small, color = P.ink) }

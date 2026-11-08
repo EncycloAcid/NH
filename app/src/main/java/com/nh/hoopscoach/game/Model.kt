@@ -832,6 +832,10 @@ class RoadState(
     var celebration: Int = 0,
     /** Big moments use a timing meter for his own shots. */
     var shotMeter: Boolean = true,
+    /** His signature shoe deal (see [Shoes]), the season brands last made offers, and the offers on the table. */
+    var shoe: ShoeDeal? = null,
+    var shoeOffered: Int = 0,
+    val shoeOffers: MutableList<ShoeDeal> = mutableListOf(),
     /** The class rival: a top recruit from the same class who follows him all career. */
     var rivalId: Int = -1,
     var rivalName: String = "",
@@ -1354,6 +1358,12 @@ class League(
     var retroAll: Boolean = false,
     /** Picks every social account's profile picture: random for each save, the same all through it. */
     var pfpSeed: Long = 0,
+    /** This week's sports-TV debate about the user (see [TvShow]). */
+    var tv: TvSegment? = null,
+    /** Jersey sales: the top 15 (player ids), the list before, and the season they're for. */
+    val jerseyTop: MutableList<Int> = mutableListOf(),
+    val jerseyLast: MutableList<Int> = mutableListOf(),
+    var jerseySeason: Int = 0,
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

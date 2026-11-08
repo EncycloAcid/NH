@@ -145,6 +145,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         item { HeroTodayCard(vm, lg) }
         item { TitleDefenseCard(lg) }
+        item { TvCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
         if (lg.phase == Phase.REGULAR) item { NbaPreviewCard(vm, lg) }
@@ -476,7 +477,7 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
             }
             1 -> playoffs(vm, lg)
             2 -> cup(lg)
-            3 -> leaders(vm, lg)
+            3 -> { item { JerseySales(vm, lg) }; leaders(vm, lg) }
             4 -> proAwards(vm, lg)
             else -> history(vm, lg)
         }
@@ -890,6 +891,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         if (vm.meTab == 2) item { PracticePanel(vm, lg) }
         if (vm.meTab == 2) item { StaffPanel(vm, lg) }
         if (vm.meTab == 3) item { MediaPanel(lg) }
+        if (vm.meTab == 3) item { ShoePanel(lg) }
         if (vm.meTab == 3 && r.feed.isNotEmpty()) item { SocialStrip(vm, lg) }
         if (vm.meTab == 2) item {
             Section("Development")

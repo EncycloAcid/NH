@@ -19,7 +19,7 @@ class Gear(
         if (sleeve > 0) "${COLORS[sleeveColor].lowercase()} ${if (sleeve == 3) "sleeves on both arms" else "sleeve on the ${if (sleeve == 1) "left" else "right"} arm"}" else null,
         if (wristbands > 0) "${OPTIONS[3][wristbands].lowercase()} wristbands" else null,
         if (legs > 0) OPTIONS[6][legs].lowercase() else null,
-        "${COLORS[shoeColor].lowercase()} ${OPTIONS[4][shoes].lowercase()}",
+        if (shoes == 5) "his signature shoes in ${COLORS[shoeColor].lowercase()}" else "${COLORS[shoeColor].lowercase()} ${OPTIONS[4][shoes].lowercase()}",
     ).joinToString(", ").replaceFirstChar { it.uppercase() }
 
     companion object {
@@ -30,7 +30,7 @@ class Gear(
             listOf("None", "Left arm", "Right arm", "Both arms"),
             COLORS,
             listOf("None", "White", "Black", "Team"),
-            listOf("Low-tops", "Mid-tops", "High-tops", "Retro high-tops", "Speed lows"),
+            listOf("Low-tops", "Mid-tops", "High-tops", "Retro high-tops", "Speed lows", "Signature"),
             COLORS,
             listOf("Nothing", "Black tights", "White tights", "Knee sleeve", "Leg sleeve"),
         )
