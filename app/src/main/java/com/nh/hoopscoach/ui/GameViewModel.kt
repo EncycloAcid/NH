@@ -60,6 +60,7 @@ sealed interface Route {
     data class Article(val newsIndex: Int) : Route
     data object Trophies : Route
     data object Staff : Route
+    data class Portrait(val playerId: Int) : Route
 }
 
 /** A game being watched possession by possession. */

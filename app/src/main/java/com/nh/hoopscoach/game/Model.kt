@@ -244,6 +244,8 @@ class Player(
     var injTotal: Int = 0,
     /** His summer development plan, set by the user's coach: "shooting", "playmaking", "inside", "defense", "conditioning" or "". */
     var devPlan: String = "",
+    /** His custom portrait (see Face), or "" to draw one from [look]. */
+    var face: String = "",
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -1328,6 +1330,8 @@ class League(
     var nextAssistantId: Int = 1,
     /** The user's head-to-head with every coach he's faced, and how heated each one is. */
     var coachRivals: MutableList<CoachRival> = mutableListOf(),
+    /** Draw every player as a retro portrait, real headshots included. */
+    var retroAll: Boolean = false,
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

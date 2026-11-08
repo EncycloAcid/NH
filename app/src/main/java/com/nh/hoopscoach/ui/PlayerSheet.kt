@@ -163,6 +163,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
                 if (coaching || yourself) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
+                if (coaching || yourself || (mine && com.nh.hoopscoach.game.NbaCoach.active(lg))) SmallButton("Portrait") { vm.sheet = null; vm.push(Route.Portrait(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
             }
             if (mine && p.walkOn && team != null) {

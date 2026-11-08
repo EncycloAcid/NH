@@ -176,7 +176,7 @@ fun ProfileCard(vm: GameViewModel, lg: League) {
         title = { Text("Profile picture", style = T.head, color = P.ink) },
         text = {
             androidx.compose.foundation.layout.Column {
-                for ((style, label) in listOf("photo" to "Choose a photo from your phone", "" to "Your jersey", "logo" to "Your team's logo", "cartoon" to "A cartoon")) {
+                for ((style, label) in listOf("photo" to "Choose a photo from your phone", "" to "Your retro portrait", "logo" to "Your team's logo", "cartoon" to "A cartoon")) {
                     Text(
                         (if (r.avatarStyle == style || (style == "photo" && r.avatarStyle == "photo")) "● " else "○ ") + label,
                         style = T.bodyB, color = P.ink,

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -65,7 +67,11 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         item {
             BackBar("Edit player", p.name, onBack = { vm.back() })
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Jersey(number, androidx.compose.ui.graphics.Color(t.primary), androidx.compose.ui.graphics.Color(t.secondary), 84.dp)
+                // His retro portrait: tap it to open the portrait maker.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.clickable { vm.push(Route.Portrait(p.id)) }) { PixelPortrait(p, t, 84.dp) }
+                    Text("Edit portrait", style = T.small, color = P.accent, modifier = Modifier.clickable { vm.push(Route.Portrait(p.id)) }.padding(top = 4.dp))
+                }
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(first.ifBlank { "First" }.uppercase(), style = T.label, color = P.sub)

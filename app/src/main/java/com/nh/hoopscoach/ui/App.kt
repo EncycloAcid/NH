@@ -81,7 +81,7 @@ fun App(vm: GameViewModel) {
                 busy != null -> BusyScreen(busy, vm.progress, vm.progressNote)
                 lg == null -> NewGameScreen(vm)
                 // A pro league shows ratings on a 2K-style scale.
-                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v })) { Shell(vm, lg) }
+                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides lg.retroAll) { Shell(vm, lg) }
             }
             Toast(vm)
         }
@@ -170,6 +170,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Article -> ArticleScreen(vm, lg, r.newsIndex)
         is Route.Trophies -> TrophyRoomScreen(vm, lg)
         is Route.Staff -> StaffScreen(vm, lg)
+        is Route.Portrait -> PortraitMakerScreen(vm, lg, r.playerId)
     }
 }
 

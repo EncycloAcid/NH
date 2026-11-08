@@ -240,6 +240,16 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     SecondaryButton("Restore", Modifier.weight(1f)) { runCatching { importer.launch(arrayOf("*/*")) }.onFailure { vm.toast("No file app available") } }
                 }
             }
+            Section("Portraits")
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Retro portraits for everyone", style = T.bodyB, color = P.ink)
+                        Text("Draw real players as retro portraits too, instead of their headshots.", style = T.small, color = P.sub)
+                    }
+                    androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
+                }
+            }
             Section("Schools")
             Panel {
                 Text("Fix a name, nickname or colors for any school.", style = T.small, color = P.sub)
