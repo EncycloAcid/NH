@@ -25,6 +25,7 @@ import kotlin.math.sqrt
 object CelRender {
     const val N = 128
     private const val R = 256
+    private const val ZOOM = 1.17
     const val INK = 0xFF1A1218.toInt()
 
     private class Off(val dx: Int, val dy: Int, val d: Double)
@@ -38,7 +39,8 @@ object CelRender {
         val part = IntArray(R * R)
         val k = 96.0 / R
         for (y in 0 until R) for (x in 0 until R) {
-            sc.sample((x + 0.5) * k, (y + 0.5) * k)
+            // A closer crop than the scene's full frame, so the face reads at small sizes.
+            sc.sample(48 + ((x + 0.5) * k - 48) / ZOOM, 47.5 + ((y + 0.5) * k - 47.5) / ZOOM)
             col[y * R + x] = sc.c
             part[y * R + x] = sc.part
         }
@@ -477,7 +479,13 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
         val nx = (dx / (w + 1.5)).coerceIn(-0.97, 0.97)
         val ny = if (y < cy) -((cy - y) / (cy - crTop + 3)).coerceIn(0.0, 0.9) else ((y - cy) / (chinY - cy + 4) * 0.9).coerceIn(0.0, 0.9)
         val nz = sqrt((1 - nx * nx - ny * ny).coerceAtLeast(0.12))
-        var col = cel(skin, skinSh, nx, ny * 0.2, nz, 0.24)
+        val band = 2.6 + (if (y > cy) (y - cy) * 0.16 else (cy - y) * 0.05) + sin(y * 0.7) * 0.25
+        var col = if (dx > 0 && w - dx < band) skinSh else skin
+        // Under the cheekbone the shadow reaches in a little further.
+        if (dx > 0 && y in eyeY + 5..jawY && w - dx < band + 2.2 * (1 - abs(y - (eyeY + 9)) / 5).coerceAtLeast(0.0)) col = skinSh
+        // A rim of light from the aura along the left edge.
+        if (dx < 0 && w + dx < 0.85 && y in crTop + 6..jawY + 3) col = mix(skin, auraCol, 0.55)
+        if (nz < 0) col = skinSh
         // The hair's shadow across the forehead.
         if (casts && y > hairline(x) && y < hairline(x) + 2.4 + sin(x * 0.9) * 0.6) col = skinSh
         if (style == 1) col = buzzTint(col, x, y, 0.62)
@@ -516,44 +524,50 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
     }
 
     private fun eye(x: Double, y: Double, side: Int) {
-        val ex = 48 + side * 8.0
-        val u = (x - ex) * side / 4.7   // -1 inner .. 1 outer
+        val ex = 48 + side * 8.2
+        val u = (x - ex) * side / 5.1   // -1 inner .. 1 outer
         if (u < -1.05 || u > 1.35) return
         val open = when (f.eyes.coerceIn(0, 2)) { 1 -> 0.72; 2 -> 1.25; else -> 1.0 }
         val baseY = eyeY + 0.35 - (u + 1) / 2 * 1.2
         val uu = u.coerceIn(-1.0, 1.0)
-        val top = baseY - 2.3 * open * (1 - uu * uu).pow(0.55) * (1 - 0.18 * uu)
-        val bot = baseY + 1.25 * open * (1 - uu * uu).pow(0.85)
+        val top = baseY - 2.75 * open * (1 - uu * uu).pow(0.55) * (1 - 0.18 * uu)
+        val bot = baseY + 1.5 * open * (1 - uu * uu).pow(0.85)
         // Upper lash line: thick, thicker at the outer corner, with a sharp flick past it.
         val lash = 0.5 + 0.4 * ((u + 1) / 2).coerceIn(0.0, 1.0)
         if (u <= 1.0 && y in top - lash..top + 0.15) { c = INK; return }
         if (u in 1.0..1.35 && abs(y - (baseY - 0.3 - (u - 1) * 1.6)) < 0.42 * (1.35 - u) / 0.35 + 0.05) { c = INK; return }
+        // The lid's crease above.
+        if (u in -0.4..0.95 && abs(y - (top - 1.25 - (u + 0.4) * 0.15)) < 0.17) { c = mul(skinDeep, 0.85, 0.85, 0.85); return }
         // Lower lid: a thin line on the outer half.
         if (u in 0.1..1.0 && abs(y - bot) < 0.22) { c = INK; return }
         if (u < -1.0 || u > 1.0 || y < top || y > bot) return
         // The white, shaded under the lid.
         var col = if (y < top + 0.9 * open) 0xFFC5C9D6.toInt() else 0xFFF4F2EF.toInt()
-        val ix = ex - side * 0.35; val iy = eyeY + 0.15
-        val irx = 1.45; val iry = 2.05 * min(open, 1.1)
+        val ix = ex - side * 0.35; val iy = eyeY + 0.1
+        val irx = 1.8; val iry = 2.45 * min(open, 1.1)
         val id = ((x - ix) / irx).pow(2) + ((y - iy) / iry).pow(2)
         if (id < 1) {
-            col = if (y < iy - 0.3) mul(eyeColor, 0.55, 0.55, 0.6) else eyeColor
-            if (((x - ix) / 0.62).pow(2) + ((y - iy) / 1.05).pow(2) < 1) col = 0xFF0E0A0C.toInt()
-            if (id > 0.82) col = mul(eyeColor, 0.45, 0.45, 0.5)
-            if (hypot(x - (ix - 0.55), y - (iy - 0.75)) < 0.45) col = WHITE
-            if (hypot(x - (ix + 0.5), y - (iy + 0.7)) < 0.22) col = WHITE
+            col = when {
+                y < iy - 0.4 -> mul(eyeColor, 0.55, 0.55, 0.6)
+                y > iy + 0.9 -> mix(eyeColor, WHITE, 0.32)
+                else -> eyeColor
+            }
+            if (((x - ix) / 0.78).pow(2) + ((y - iy) / 1.25).pow(2) < 1) col = 0xFF0E0A0C.toInt()
+            if (id > 0.8) col = mul(eyeColor, 0.42, 0.42, 0.48)
+            if (hypot(x - (ix - 0.7), y - (iy - 0.9)) < 0.58) col = WHITE
+            if (hypot(x - (ix + 0.6), y - (iy + 0.85)) < 0.28) col = WHITE
         }
         c = col
     }
 
     private fun brow(x: Double, y: Double, side: Int) {
-        val ex = 48 + side * 8.0
-        val u = (x - ex) * side / 5.4  // -1 inner .. 1 outer
+        val ex = 48 + side * 8.2
+        val u = (x - ex) * side / 5.6  // -1 inner .. 1 outer
         if (u < -1.0 || u > 1.05) return
         val t = (u + 1) / 2
         val fierce = f.brows == 2
-        val inner = eyeY - (if (fierce) 3.4 else 4.6)
-        val outer = eyeY - (if (fierce) 6.0 else 5.4)
+        val inner = eyeY - (if (fierce) 4.0 else 5.2)
+        val outer = eyeY - (if (fierce) 6.6 else 6.0)
         val arch = if (fierce) 0.0 else sin(t * PI) * 0.7
         val by = inner + (outer - inner) * t - arch
         val thick = (if (f.brows == 1) 1.6 else 1.15) * (1 - t * 0.55) + 0.15
@@ -664,10 +678,10 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
     private val digits = number.coerceIn(0, 99).toString()
 
     private fun numberDist(x: Double, y: Double): Double {
-        val u = 1.8
+        val u = 1.3
         val gap = 2.4
         val w = digits.length * 4 + (digits.length - 1) * gap
-        val gx = (x - 48) / u + w / 2; val gy = (y - 79.5) / u
+        val gx = (x - 48) / u + w / 2; val gy = (y - 79.3) / u
         var best = 99.0
         for ((i, chr) in digits.withIndex()) {
             val ox = i * (4 + gap)
@@ -754,11 +768,12 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
         val rays = 18
         val ray = floor((ang + PI) / (2 * PI) * rays + noise(ang * 3, 0.0, seed) * 0.4).toInt() % 2 == 0
         val dist = hypot(x - 48, (y - 46) * 0.9)
-        var col = if (ray) mul(team, 0.5, 0.5, 0.58) else mul(team, 0.72, 0.72, 0.8)
+        var col = if (ray) mul(team, 0.56, 0.56, 0.64) else mul(team, 0.68, 0.68, 0.76)
+        if (dist < 30) col = mix(col, mix(team, WHITE, 0.25), 0.35)
         // The aura: flame tongues around the figure, licking upward.
         val flick = noise(x * 0.32, y * 0.11 + 7, seed + 21) * 5.0
         val up = ((60 - y) / 60).coerceIn(0.0, 1.0) * 3.0
-        val g = 2.6 + flick * 0.85 + up
+        val g = 1.6 + flick * 0.55 + up * 0.7
         val inAura = inHead(x, y + up * 0.8, g + 3.5) || (y > 66 && abs(x - 48) < 31 + g * 0.6 && y > trapY(abs(x - 48)) - g) ||
             (style in setOf(5, 6, 4) && hypot(x - 48, y - (crTop + 4)) < 24 + g)
         if (inAura) {
@@ -766,7 +781,7 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
             col = if (core) auraCore else auraCol
         }
         // Speed lines.
-        if (!inAura && (hash((ang * 40).toInt(), 2, seed) > 0.93) && dist > 30) col = mix(col, WHITE, 0.35)
+        if (!inAura && (hash((ang * 40).toInt(), 2, seed) > 0.96) && dist > 34) col = mix(col, WHITE, 0.25)
         c = col
     }
 
