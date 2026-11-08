@@ -339,6 +339,7 @@ object Market {
                     if (t.id == lg.userTeamId) ps.userMoves += "${p.name} declines his Player Option and enters free agency"
                 }
             }
+            Extensions.applyNext(p)
             if (p.contractYears > 0) p.contractYears--
             if (p.contractYears <= 0) {
                 val isRfa = p.clause == "QO" || (t.id != lg.userTeamId && p.clause == "RFA" && p.ovr >= 82)
@@ -712,6 +713,7 @@ object Market {
         val pool = mutableListOf<Pair<Player, Int>>()
         for (t in lg.teams) for (p in lg.rosterOf(t).toList()) {
             if (p.id in keep || p.proYears == 0) continue
+            Extensions.applyNext(p)
             if (p.contractYears > 0) p.contractYears--
             if (p.contractYears <= 0) { t.roster.remove(p.id); p.teamId = -1; pool += p to t.id }
         }

@@ -1158,7 +1158,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 // Development: playing time and production earn XP.
                 // Pros grow slower in season, and not past their ceiling, so the league's ratings hold steady.
                 // First-year pros stop at the rookie cap of 83 until their first summer.
-                val proRate = if (!lg.pro) 1.0 else if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) 0.0 else 0.35
+                val proRate = if (!lg.pro) (if (p.ovr >= p.pot && p.id != lg.heroId) 0.0 else 1.0) else if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) 0.0 else 0.35
                 val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side]) + Assistants.dev(lg, t)) *
                     (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0) * proRate
                 Ratings.addXp(p, xp.roundToInt())

@@ -272,6 +272,8 @@ class Player(
     var clause: String = "",
     /** Pro contract structure: "FLAT", "FRONT" (front-loaded), or "BACK" (back-loaded). */
     var structure: String = "",
+    /** An extension signed during the season: his salary from next season (0 when none). */
+    var nextSalary: Int = 0,
 ) {
     /** Out injured. */
     val out get() = injGames > 0
@@ -1040,6 +1042,8 @@ class ProState(
     var preview: NbaPreview? = null,
     /** NBA coach mode: the user's own expiring players he wants back, his free-agent offers (player id to salary), */
     val userKeep: MutableList<Int> = mutableListOf(),
+    /** NBA coach mode: the front office re-signs and extends the players worth keeping. */
+    var autoResign: Boolean = false,
     val userOffers: MutableMap<Int, Int> = mutableMapOf(),
     /** the owner's target for this season (projected wins), and whether he's just been fired (with the teams that called). */
     var expect: Int = -1,

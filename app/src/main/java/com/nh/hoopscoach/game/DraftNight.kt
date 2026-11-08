@@ -53,7 +53,7 @@ object DraftNight {
             p.height = (Ratings.heightFor(pos) + 1).coerceAtMost(88)
             p.weight = Ratings.weightFor(p.height)
             // Rookies come in raw, with real upside.
-            p.pot = (p.ovr + (24 - age) * 2 + Rng.range(0, 4)).coerceIn(p.ovr, 99)
+            p.pot = Balance.rookieCeiling(p.ovr, age)
             p.recruitRank = 0
             p.stars = 0
             p.ovrHistory.clear()

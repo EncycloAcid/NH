@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -112,21 +113,43 @@ private fun Shell(vm: GameViewModel, lg: League) {
     }
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         val route = vm.stack.lastOrNull()
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        // Screens slide in when opened and back out when closed; tabs cross-fade.
+        val screen = Screen(route, vm.tab, vm.stack.size)
+        androidx.compose.animation.AnimatedContent(
+            targetState = screen,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentKey = { s -> s.route?.let { "${s.depth}:$it" } ?: "tab:${s.tab}" },
+            transitionSpec = {
+                val push = targetState.depth > initialState.depth
+                val pop = targetState.depth < initialState.depth
+                when {
+                    push -> (androidx.compose.animation.slideInHorizontally(tween(240)) { it / 5 } + androidx.compose.animation.fadeIn(tween(200))) togetherWith
+                        androidx.compose.animation.fadeOut(tween(140))
+                    pop -> (androidx.compose.animation.slideInHorizontally(tween(240)) { -it / 6 } + androidx.compose.animation.fadeIn(tween(200))) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally(tween(200)) { it / 5 } + androidx.compose.animation.fadeOut(tween(160)))
+                    else -> androidx.compose.animation.fadeIn(tween(180)) togetherWith androidx.compose.animation.fadeOut(tween(120))
+                }
+            },
+            label = "screens",
+        ) { s ->
+            // Read the revision here too, so the screen redraws after every change to the league.
+            @Suppress("UNUSED_VARIABLE") val rev2 = vm.rev
+            val route = s.route
+            Box(Modifier.fillMaxSize()) {
             if (route == null) {
-                if (com.nh.hoopscoach.game.NbaCoach.active(lg)) when (vm.tab) {
+                if (com.nh.hoopscoach.game.NbaCoach.active(lg)) when (s.tab) {
                     Tab.TODAY -> NbaCoachToday(vm, lg)
                     Tab.TEAM -> NbaCoachTeam(vm, lg)
                     Tab.RECRUIT -> NbaTradeScreen(vm, lg)
                     Tab.LEAGUE -> ProLeagueScreen(vm, lg)
                     Tab.CAREER -> NbaCoachCareer(vm, lg)
-                } else if (lg.pro) when (vm.tab) {
+                } else if (lg.pro) when (s.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> ProTeamScreen(vm, lg)
                     Tab.RECRUIT -> ProHeroScreen(vm, lg)
                     Tab.LEAGUE -> ProLeagueScreen(vm, lg)
                     Tab.CAREER -> ProCareerScreen(vm, lg)
-                } else when (vm.tab) {
+                } else when (s.tab) {
                     Tab.TODAY -> TodayScreen(vm, lg)
                     Tab.TEAM -> TeamScreen(vm, lg)
                     Tab.RECRUIT -> if (lg.playerMode) HeroScreen(vm, lg) else RecruitScreen(vm, lg)
@@ -134,6 +157,7 @@ private fun Shell(vm: GameViewModel, lg: League) {
                     Tab.CAREER -> if (lg.playerMode) HeroCareerScreen(vm, lg) else CareerScreen(vm, lg)
                 }
             } else RouteScreen(vm, lg, route)
+            }
         }
         if (route == null) {
             val flowOnScreen = vm.tab == Tab.TODAY && (lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON)
@@ -144,6 +168,9 @@ private fun Shell(vm: GameViewModel, lg: League) {
     vm.sheet?.let { pid -> lg.anyPlayer(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
     vm.guide?.let { GuideSheet(vm, it) }
 }
+
+/** What's on screen: an open route (or none, for a tab), the tab, and how deep the stack is. */
+private data class Screen(val route: Route?, val tab: Tab, val depth: Int)
 
 @Composable
 private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {

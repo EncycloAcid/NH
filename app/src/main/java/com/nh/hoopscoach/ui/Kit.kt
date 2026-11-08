@@ -44,6 +44,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,6 +111,8 @@ fun BackBar(title: String, sub: String? = null, onBack: () -> Unit, actions: @Co
 @Composable
 fun Section(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
     Row(modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(width = 3.dp, height = 12.dp).clip(RoundedCornerShape(2.dp)).background(P.accent))
+        Spacer(Modifier.width(7.dp))
         Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.weight(1f))
         if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clickable { onAction?.invoke() }.padding(4.dp))
     }
@@ -207,11 +211,21 @@ fun Chips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifie
     }
 }
 
+/** Buttons give a little as you press them. */
+@Composable
+private fun Modifier.pressable(enabled: Boolean, onClick: () -> Unit): Modifier {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.96f else 1f, androidx.compose.animation.core.tween(90), label = "press")
+    return this.graphicsLayer { scaleX = scale; scaleY = scale }
+        .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
+}
+
 @Composable
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(if (enabled) P.accent else P.surface2)
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp),
+            .pressable(enabled, onClick).padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.onAccent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
@@ -220,7 +234,7 @@ fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean 
 fun SecondaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(P.accentSoft)
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp),
+            .pressable(enabled, onClick).padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.accent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
@@ -230,7 +244,7 @@ fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = 
     val bg = when { !enabled -> P.surface2; danger -> P.bad.copy(alpha = 0.12f); primary -> P.accent; else -> P.accentSoft }
     val fg = when { !enabled -> P.faint; danger -> P.bad; primary -> P.onAccent; else -> P.accent }
     Box(
-        modifier.heightIn(min = 38.dp).clip(RoundedCornerShape(11.dp)).background(bg).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 8.dp),
+        modifier.heightIn(min = 38.dp).clip(RoundedCornerShape(11.dp)).background(bg).pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1) }
 }
@@ -467,13 +481,15 @@ fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: St
     val value = shown(rating)
     val c = tier(value)
     val track = P.surface2
+    val fill = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(value) { fill.animateTo(value.coerceIn(0, 99) / 99f, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(size)) {
             val sw = this.size.width * 0.09f
             val inset = sw / 2
             val arcSize = Size(this.size.width - sw, this.size.height - sw)
             drawArc(track, 135f, 270f, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
-            drawArc(c, 135f, 270f * (value.coerceIn(0, 99) / 99f), false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
+            drawArc(c, 135f, 270f * fill.value, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("$value", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)

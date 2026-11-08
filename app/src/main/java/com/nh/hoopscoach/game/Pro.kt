@@ -504,7 +504,7 @@ object ProLeague {
                 // Young players grow toward what they became, when the draft data knows it.
                 val peak = EraData.pickOf(l.id)?.peak ?: 0
                 p.pot = when {
-                    today != null -> maxOf(p.ovr, Ratings.proInternal(today.pot))
+                    today != null -> maxOf(p.ovr, Balance.realCeiling(today.ovr, today.pot, l.age))
                     peak > p.ovr && l.age <= 27 -> peak.coerceAtMost(99)
                     else -> (p.ovr + (25 - l.age).coerceAtLeast(0) * 1.2).roundToInt().coerceIn(p.ovr, 99)
                 }
@@ -551,7 +551,7 @@ object ProLeague {
                         it.proYears = 0
                         Payroll.rookie(lg, it, pk.pick)
                         it.awards += "$year Draft #${pk.pick}"
-                        it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
+                        it.pot = Balance.rookieCeiling(it.ovr, it.age)
                         EraData.apply(it, pk)
                         if (pk.pick <= lg.teams.size) firstRound += it.id
                     }
@@ -588,13 +588,14 @@ object ProLeague {
                 val age = Rng.range(19, 22)
                 val p = makePro(lg, scarcest(lg, t), draftOverall(pick), age, t)
                 p.proYears = 0
-                p.pot = (p.ovr + (23 - age) * 2 + Rng.range(0, 3)).coerceIn(p.ovr, 99)
+                p.pot = Balance.rookieCeiling(p.ovr, age)
                 if (pick <= lg.teams.size) firstRound += p.id
             }
             for (t in lg.teams) {
                 trim(lg, t, firstRound)
                 while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 82), Rng.range(22, 27), t)
             }
+            Balance.pro(lg)
             lg.reindex()
         }
         lg.season += years.coerceIn(0, 80)
@@ -809,6 +810,8 @@ object ProSeason {
                 if (lg.day == ProLeague.allStarDay(lg) - 1) allStar(lg)
                 // The owner calls the coach in at the break.
                 if (lg.day == ProLeague.allStarDay(lg) - 1 && NbaCoach.active(lg)) runCatching { FrontOffice.meeting(lg) }
+                // Extensions at the break: other teams lock up their own, and auto re-sign does the user's.
+                if (lg.day == ProLeague.allStarDay(lg) - 1) runCatching { Extensions.allStarBreak(lg) }
                 if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
             }
@@ -1409,11 +1412,15 @@ object ProCareer {
         lg.reindex()
         Picks.ensure(lg)
         Trades.summer(lg)
+        // Extensions signed during the season start now.
+        Extensions.applyAll(lg)
         Market.prepareOffseasonContracts(lg)
         // His own free agents: the good ones are on the list to bring back.
         ps.userKeep.clear()
         ps.userKeep += NbaCoach.expiring(lg).filter { Trades.value(it) >= 1.5 || it.clause == "QO" }.map { it.id }
         ps.userOffers.clear()
+        // Auto re-sign: options, qualifying offers and extensions, done for him.
+        runCatching { Extensions.beforeFreeAgency(lg) }
     }
 
     /** A year older for everyone; some veterans retire. */
@@ -1497,7 +1504,7 @@ object ProCareer {
                     Payroll.rookie(lg, it, i + 1)
                     it.awards += "${lg.season} Draft #${i + 1}"
                     // Rookies come in raw, with real upside.
-                    it.pot = (it.ovr + (24 - it.age) * 2 + Rng.range(0, 4)).coerceIn(it.ovr, 99)
+                    it.pot = Balance.rookieCeiling(it.ovr, it.age)
                     if (pick != null) EraData.apply(it, pick)
                 }
             }
@@ -1707,6 +1714,8 @@ object ProCareer {
                 if (p.id == lg.heroId && p.age >= 29) lg.news += News(lg.season, 0, Longevity.hint(p), true, -1, "", "", "", t.id, p.id)
             }
         }
+        // Stars stay rare: the league's spread stays the real NBA's.
+        Balance.pro(lg)
         lg.reindex()
     }
 
@@ -1720,7 +1729,11 @@ object ProCareer {
         val declining = p.age >= 28 && body > 30
         when {
             !declining && p.age <= 27 -> Ratings.offseasonGrowth(p, coachDev, share)
-            !declining -> if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
+            !declining -> {
+                if (p.pot > p.ovr) Ratings.offseasonGrowth(p, coachDev, share) else Ratings.offseasonGrowth(p.also { it.pot = it.ovr }, coachDev, share)
+                // Past his late 20s his ceiling is where he is: an off year isn't won back in season, so veterans don't creep up.
+                if (p.age >= 29) p.pot = p.ovr
+            }
             else -> {
                 // A slow slide once his body is past 30, faster in its late 30s.
                 var drop = (body - 30) * 0.55 + Rng.d() * 0.8

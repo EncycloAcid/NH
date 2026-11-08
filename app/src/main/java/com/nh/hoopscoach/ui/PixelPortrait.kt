@@ -27,10 +27,10 @@ import kotlinx.coroutines.withContext
 /** Draw every player as a retro portrait, real headshots included (a setting). */
 val LocalRetroAll = compositionLocalOf { false }
 
-/** Retro portraits in the style of 2000s console sports games (see [Ps2Render]), cached once drawn. */
+/** Cel-shaded anime portraits (see [CelRender]), cached once drawn. */
 object Pixels {
-    const val N = Ps2Render.N
-    private val cache = android.util.LruCache<String, ImageBitmap>(240)
+    const val N = CelRender.N
+    private val cache = android.util.LruCache<String, ImageBitmap>(200)
 
     fun key(f: Face, primary: Long, secondary: Long, number: Int) = "${f.encode()}|$primary|$secondary|$number"
 
@@ -39,7 +39,7 @@ object Pixels {
     fun bitmap(f: Face, primary: Long, secondary: Long, number: Int): ImageBitmap {
         val key = key(f, primary, secondary, number)
         cache.get(key)?.let { return it }
-        val px = Ps2Render.render(f, primary.toInt(), secondary.toInt(), number)
+        val px = CelRender.render(f, primary.toInt(), secondary.toInt(), number)
         val bmp = android.graphics.Bitmap.createBitmap(px, N, N, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
         cache.put(key, bmp)
         return bmp

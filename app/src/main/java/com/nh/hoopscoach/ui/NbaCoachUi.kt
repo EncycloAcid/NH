@@ -50,6 +50,7 @@ import com.nh.hoopscoach.game.FaCase
 import com.nh.hoopscoach.game.DraftNight
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Market
+import com.nh.hoopscoach.game.Extensions
 import com.nh.hoopscoach.game.NbaCoach
 import com.nh.hoopscoach.game.NbaData
 import com.nh.hoopscoach.game.Needs
@@ -262,6 +263,7 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
     val retained = Payroll.retainedList(lg, t)
     var buyoutTarget by remember { mutableStateOf<Player?>(null) }
     var buyoutNotice by remember { mutableStateOf<String?>(null) }
+    var extendTarget by remember { mutableStateOf<Player?>(null) }
 
     Section("Payroll & Cap Sheet")
     Panel {
@@ -276,6 +278,8 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
         Text("${Payroll.status(lg, t)}. Tax line ${Road.dollars(tax)}; apron ${Road.dollars(Payroll.apron(lg))}; MLE ${Road.dollars(Payroll.mle(lg))}.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
         buyoutNotice?.let { Text(it, style = T.small, color = P.accent, modifier = Modifier.padding(top = 6.dp)) }
     }
+
+    if (t.id == lg.userTeamId) AutoResignCard(vm, lg)
 
     if (retained.isNotEmpty()) {
         Section("Retained & Buyout Dead Cap (${retained.size}/${Payroll.MAX_RETAINED})")
@@ -298,6 +302,7 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
         val clShort = Payroll.clauseShort(p.clause)
         val stLabel = if (p.structure == "FRONT" || p.structure == "BACK") " · ${Payroll.structureLabel(p.structure)}" else ""
         val yrsText = if (p.contractYears <= 1) "1 yr (expiring)" else "${p.contractYears} yrs"
+        val nextText = if (p.nextSalary > 0) " · then ${Road.dollars(p.nextSalary)}" else ""
         ListRow(onClick = { vm.openPlayer(p.id) }) {
             PlayerJersey(p, t, 38.dp)
             Spacer(Modifier.width(10.dp))
@@ -308,9 +313,13 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
                     if (delta >= 1.2) Tag("BARGAIN", P.good)
                     else if (delta <= -1.2) Tag("OVERPAID", P.bad)
                 }
-                Text("${p.posLabel} · age ${p.age} · ${Road.dollars(sal)}/yr · $yrsText$stLabel", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                Text("${p.posLabel} · age ${p.age} · ${Road.dollars(sal)}/yr · $yrsText$nextText$stLabel", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
             }
             Ring(p.ovr, 34.dp, textSize = 12.sp)
+            if (Extensions.canExtend(lg, p)) {
+                Spacer(Modifier.width(6.dp))
+                SmallButton("Extend", primary = true) { extendTarget = p }
+            }
             if (canBuyout && p.id != lg.heroId) {
                 Spacer(Modifier.width(6.dp))
                 SmallButton("Buyout", danger = true) { buyoutTarget = p }
@@ -324,6 +333,19 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
         Panel {
             Text(picks.joinToString(" · ") { Picks.label(lg, it).removePrefix("a ") + " (${Picks.points(lg, it)} pts)" }, style = T.small, color = P.ink)
         }
+    }
+
+    extendTarget?.let { p ->
+        ContractNegotiationDialog(
+            lg = lg, p = p, isExtension = true, fromTeamId = p.teamId,
+            initialSalary = NbaCoach.ask(lg, p), initialYears = Market.desiredYears(p),
+            initialClause = Market.desiredClause(p).takeIf { it != "TO" } ?: "", initialStructure = "FLAT",
+            onDismiss = { extendTarget = null },
+            onSubmit = { sal, yrs, cl, st ->
+                vm.act { l -> l.playerOrNull(p.id)?.let { pl -> buyoutNotice = Extensions.extend(l, pl, sal, yrs, cl, st).second } }
+                extendTarget = null
+            },
+        )
     }
 
     buyoutTarget?.let { p ->
@@ -1367,6 +1389,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                             PlayerLine(vm, lg, u, p, "${p.awards.firstOrNull { it.contains("Draft #") } ?: "Rookie"} · ${p.posLabel} · POT ${Ratings.shownPro(p.pot)} · ${Road.dollars(Payroll.salaryOf(lg, p))}")
                         }
                     }
+                    item { AutoResignCard(vm, lg) }
                     item {
                         Section("Expiring Contracts, Options & Extensions")
                         Text(
@@ -2117,3 +2140,35 @@ fun ProjectionLines(lg: League) {
 
 /** A trade tier as the rows show it: "Starter value", so a bench player rated as one doesn't read as a starter. */
 fun tierWords(tier: String) = if (tier == "Franchise") "Franchise piece" else "$tier value"
+
+/** The auto re-sign switch, with who it would keep. */
+@Composable
+private fun AutoResignCard(vm: GameViewModel, lg: League) {
+    val ps = lg.proState ?: return
+    val u = lg.user
+    Section("Auto re-sign")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Let the front office handle contracts", style = T.bodyB, color = P.ink)
+                Text(
+                    "At the All-Star break it extends your expiring players worth keeping (your top nine, and young players who can play) at their asking price. " +
+                        "After the season it picks up good team options, makes qualifying offers and re-signs the rest, staying under the apron except for your three best.",
+                    style = T.small, color = P.sub,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            androidx.compose.material3.Switch(ps.autoResign, { on -> vm.act { it.proState?.autoResign = on } })
+        }
+        val exp = lg.rosterOf(u).filter { it.proYears > 0 && it.contractYears <= 1 && it.id != lg.heroId }
+        if (exp.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            val keep = exp.filter { Extensions.keeper(lg, u, it) }
+            Text(
+                (if (keep.isEmpty()) "No expiring player makes the cut." else "Would keep: " + keep.joinToString(", ") { it.name }) +
+                    exp.filter { it !in keep }.let { if (it.isEmpty()) "" else ". Would let go: " + it.joinToString(", ") { p -> p.name } } + ".",
+                style = T.small, color = P.ink,
+            )
+        }
+    }
+}

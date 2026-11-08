@@ -98,7 +98,7 @@ object LeagueGen {
         val first = if (country != null) Rng.pick(Names.intlFirst.getValue(country)) else Rng.pick(Names.first)
         val last = if (country != null) Rng.pick(Names.intlLast.getValue(country)) else Rng.pick(Names.last)
         val height = Ratings.heightFor(pos)
-        val growthLeft = when (year) { 1 -> Rng.range(6, 18); 2 -> Rng.range(4, 12); 3 -> Rng.range(2, 8); else -> Rng.range(0, 4) }
+        val growthLeft = when (year) { 1 -> Rng.range(4, 12); 2 -> Rng.range(3, 9); 3 -> Rng.range(1, 6); else -> Rng.range(0, 3) }
         val p = Player(
             id = lg.nextPlayerId++,
             first = first, last = last, pos = pos, year = year,
@@ -154,7 +154,8 @@ object LeagueGen {
             val pos = Rng.weighted(Pos.entries) { when (it) { Pos.PG -> .2; Pos.SG -> .22; Pos.SF -> .22; Pos.PF -> .2; Pos.C -> .16 } }
             val p = makePlayer(lg, pos, 0, ovr, -1)
             p.ovrHistory.clear()
-            val growth = (Rng.range(6, 16) + x * 8 + Rng.gauss() * 3).roundToInt().coerceAtLeast(3)
+            // Most of a recruit's growth is already in the rating; the top of a class isn't a pile of future 95s.
+            val growth = (Rng.range(2, 8) + x * 3 + Rng.gauss() * 2.5).roundToInt().coerceAtLeast(1)
             p.pot = (ovr + growth).coerceAtMost(99)
             p.recruitRank = rank
             p.stars = Ratings.starsFor(rank)

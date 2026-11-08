@@ -111,6 +111,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                         val sal = com.nh.hoopscoach.game.Payroll.salaryOf(lg, p)
                         val yrs = if (p.id == lg.heroId) lg.road?.contract?.years ?: 0 else p.contractYears
                         if (sal > 0) Text("${money(sal)} a season · " + (if (yrs <= 0) "expiring" else "$yrs ${if (yrs == 1) "year" else "years"} left"), style = T.small, color = P.sub)
+                        if (p.nextSalary > 0) Text("Extended: ${money(p.nextSalary)} a season from next year", style = T.small, color = P.good)
+                        else if (com.nh.hoopscoach.game.Extensions.canExtend(lg, p)) Text("Last year of his deal: extend him on Team → Payroll", style = T.small, color = P.warn)
                     }
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }

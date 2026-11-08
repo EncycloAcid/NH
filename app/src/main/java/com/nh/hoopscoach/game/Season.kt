@@ -103,6 +103,8 @@ object Season {
             val dev = Coaching.devOf(lg.coachOf(t))
             for (pid in t.roster) {
                 val p = lg.player(pid)
+                // Practice takes him to his ceiling, not past it (your own player excepted).
+                if (p.ovr >= p.pot && p.id != lg.heroId) continue
                 Ratings.addXp(p, (7 * Ratings.devRate(p, dev)).roundToInt())
                 Tryouts.checkStar(lg, t, p)
             }
