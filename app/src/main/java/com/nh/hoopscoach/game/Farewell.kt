@@ -212,6 +212,8 @@ object Farewell {
      * press conference, where he picks his opening statement.
      */
     fun hire(lg: League, headline: String) {
+        // A new job, a new contract.
+        runCatching { CoachContracts.sign(lg) }
         val t = lg.user
         val c = lg.userCoach
         val pa = lg.playedAs

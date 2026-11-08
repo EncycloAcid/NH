@@ -159,7 +159,7 @@ object Offseason {
                 if (lg.playerMode) Road.afterDraft(lg)
             }
             OffStep.DRAFT -> os.step = OffStep.CAREER
-            OffStep.CAREER -> { if (os.fired) return; runDevelopment(lg, os); os.step = OffStep.DEVELOPMENT }
+            OffStep.CAREER -> { if (os.fired) return; CoachContracts.settle(lg); runDevelopment(lg, os); os.step = OffStep.DEVELOPMENT }
             OffStep.DEVELOPMENT -> os.step = OffStep.BUDGET
             OffStep.BUDGET -> { os.step = OffStep.RECRUITING; Recruiting.startCycle(lg) }
             OffStep.RECRUITING -> { Recruiting.lockRound(lg); if (os.round > ROUNDS) finish(lg) }
@@ -489,12 +489,12 @@ object Coaching {
         val round = Awards.tourneyRound(lg, u.id)
         Lifetime.hallOfFame(lg)
         runCatching { Celebrations.coachHallOfFame(lg) }
-        if (c.security < 15) {
-            os.fired = true
-            val pool = lg.teams.filter { it.id != u.id && it.prestige in (u.prestige - 40)..(u.prestige - 8) }.shuffled(Rng.r)
-            val picks = (if (pool.size >= 2) pool else lg.teams.filter { it.id != u.id }.sortedBy { it.prestige }.take(20).shuffled(Rng.r)).take(3)
-            picks.forEach { os.offers += JobOffer(it.id, "Offers you a fresh start") }
-            lg.news += News(lg.season, lg.day, "${u.school} has fired ${c.name}", true)
+        val firing = c.security < 15
+        // His contract: paid, a year off, and settled if it's done (a buyout if he's fired, an offer or the door if it's up).
+        val gone = CoachContracts.seasonEnd(lg, firing)
+        if (gone) {
+            if (firing) lg.news += News(lg.season, lg.day, "${u.school} has fired ${c.name}", true)
+            openMarket(lg, os, better = !firing)
         } else {
             NbaCoach.collegeOffers(lg, os, round)
             val strong = c.security >= 75 || round >= 4 || u.w - u.expWins >= 5
@@ -504,6 +504,17 @@ object Coaching {
                 .sortedByDescending { it.prestige }
                 .forEach { os.offers += JobOffer(it.id, if (it.prestige > u.prestige) "Wants you to lead a bigger program" else "Interested in your rebuild skills") }
         }
+    }
+
+    /** Out of a job (fired, not brought back, or walked away): programs with openings call; a coach who left on his own terms hears from better ones. */
+    fun openMarket(lg: League, os: OffseasonState, better: Boolean) {
+        val u = lg.user
+        os.fired = true
+        os.offers.clear()
+        val range = if (better) (u.prestige - 15)..(u.prestige + 15) else (u.prestige - 40)..(u.prestige - 8)
+        val pool = lg.teams.filter { it.id != u.id && it.prestige in range }.shuffled(Rng.r)
+        val picks = (if (pool.size >= 2) pool else lg.teams.filter { it.id != u.id }.sortedBy { it.prestige }.take(20).shuffled(Rng.r)).take(3)
+        picks.forEach { os.offers += JobOffer(it.id, if (better) "Wants you to run its program" else "Offers you a fresh start") }
     }
 
     /** User accepts a job: swaps benches with that school's coach. */
@@ -521,6 +532,7 @@ object Coaching {
         newTeam.coachId = me.id
         lg.userTeamId = newTeam.id
         me.security = 70
+        CoachContracts.sign(lg, newTeam)
         newTeam.plan.auto = true
         os.offers.clear()
         os.fired = false

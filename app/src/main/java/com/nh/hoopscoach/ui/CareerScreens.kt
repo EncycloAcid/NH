@@ -103,6 +103,8 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
                 Bar(c.security / 100f, Modifier.fillMaxWidth(), color = col, height = 8.dp)
                 Spacer(Modifier.height(8.dp))
                 Text("Beat your expected wins and go deep in March to keep the boosters happy.", style = T.small, color = P.sub)
+                com.nh.hoopscoach.game.CoachContracts.ensure(lg)
+                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)} · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
             }
             Section("Coaching skills", action = "Develop", onAction = { vm.push(Route.CoachDev) })
             Panel(onClick = { vm.push(Route.CoachDev) }) {

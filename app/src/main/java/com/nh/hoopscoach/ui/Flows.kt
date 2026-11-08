@@ -585,6 +585,8 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                 }
             }
         }
+        // His contract, and an extension if the AD offers one.
+        if (!os.fired) CoachContractPanel(vm, lg) { l -> l.offseason?.let { com.nh.hoopscoach.game.Coaching.openMarket(l, it, better = true) } }
         if (os.confInvites.isNotEmpty() && !os.fired) {
             Section("Conference invitations")
             GroupList(os.confInvites.toList()) { inv ->
@@ -666,6 +668,7 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                     Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${lg.conf(t.confId).abbr} · prestige ${t.prestige} · ${money(Finance.budget(lg, t))} budget", style = T.small, color = P.sub, maxLines = 1)
                     Text(o.note, style = T.small, color = P.accent, maxLines = 1)
+                    Text(com.nh.hoopscoach.game.CoachContracts.pitch(lg, t), style = T.small, color = P.good, maxLines = 1)
                 }
                 SmallButton("Talk") { ask = true }
             }

@@ -420,6 +420,16 @@ class Coach(
     var skills: MutableList<CoachSkill> = mutableListOf(),
     /** The season he went into the Hall of Fame as a coach (0: not yet). */
     var hofSeason: Int = 0,
+    /** The user's contract (see [CoachContracts]): years left, salary a year (thousands), the season he signed, and his career earnings. */
+    var contractYears: Int = 0,
+    var contractSalary: Int = 0,
+    var contractSigned: Int = 0,
+    var earnings: Int = 0,
+    /** An extension on the table: years, salary, whether it's an early one (his deal still runs), and whether he's countered. */
+    var offerYears: Int = 0,
+    var offerSalary: Int = 0,
+    var offerEarly: Boolean = false,
+    var countered: Boolean = false,
 ) {
     fun has(s: CoachSkill) = s in skills
     val name get() = "$first $last"

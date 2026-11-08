@@ -474,17 +474,29 @@ object NbaCoach {
         lg.news += News(lg.season, lg.day, "The ${u.name} finish ${u.w}-${u.l} (projected $expect wins). " +
             "Job security: ${securityLabel(c.security).lowercase()} (${if (c.security >= before) "+" else "−"}${kotlin.math.abs(c.security - before)})", true)
         val recentTitle = c.history.takeLast(2).any { it.result == "Champion" }
-        if (c.security < 15 && seasonsHere(lg) >= 2 && !recentTitle) fire(lg)
+        val firing = c.security < 15 && seasonsHere(lg) >= 2 && !recentTitle
+        // His contract: paid, a year off, and settled if it's done (a buyout if he's fired, an offer or the door if it's up).
+        if (CoachContracts.seasonEnd(lg, firing)) {
+            if (firing) fire(lg) else openMarket(lg, better = true,
+                why = "Your contract is up and the ${u.name} are moving on. ${"%d"} teams with openings have called.")
+        }
     }
 
     private fun fire(lg: League) {
+        val u = lg.user
+        lg.news += News(lg.season, lg.day, "The ${u.name} fire head coach ${lg.userCoach.name}", true)
+        openMarket(lg, better = false, why = "The ${u.name} have let you go after a ${u.w}-${u.l} season. ${"%d"} teams with openings have called.", title = "You've been fired")
+    }
+
+    /** Out of a job: teams with openings call (weaker ones after a firing, better ones if he left on his own terms or his deal simply ran out). */
+    fun openMarket(lg: League, better: Boolean, why: String = "", title: String = "On the market") {
         val ps = lg.proState ?: return
         val u = lg.user
         ps.fired = true
         ps.jobOffers.clear()
-        ps.jobOffers += lg.teams.filter { it.id != u.id }.sortedBy { it.winPct }.take(6).shuffled(Rng.r).take(3).map { it.id }
-        lg.news += News(lg.season, lg.day, "The ${u.name} fire head coach ${lg.userCoach.name}", true)
-        Alerts.add(lg, "You've been fired", "The ${u.name} have let you go after a ${u.w}-${u.l} season. ${ps.jobOffers.size} teams with openings have called.", "")
+        val pool = if (better) lg.teams.filter { it.id != u.id }.sortedByDescending { it.winPct }.drop(4).take(16) else lg.teams.filter { it.id != u.id }.sortedBy { it.winPct }.take(6)
+        ps.jobOffers += pool.shuffled(Rng.r).take(3).map { it.id }
+        if (why.isNotEmpty()) Alerts.add(lg, title, why.replace("%d", "${ps.jobOffers.size}"), "")
     }
 
     // ---------- from the court ----------

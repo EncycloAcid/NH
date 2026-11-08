@@ -195,6 +195,8 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(8.dp))
                 GrowBar(c.security / 100f, Modifier.fillMaxWidth(), securityColor(c.security), 8.dp)
                 ProjectionLines(lg)
+                com.nh.hoopscoach.game.CoachContracts.ensure(lg)
+                Text("Your contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)}", style = T.small, color = if (c.contractYears <= 1) P.warn else P.sub, modifier = Modifier.padding(top = 8.dp))
                 if (lg.phase == Phase.REGULAR) {
                     val dl = Trades.deadlineDay(lg)
                     Text(if (lg.day <= dl) "Trade deadline: day $dl. Make deals on the Trades tab." else "The trade deadline has passed.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))
@@ -1347,11 +1349,13 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
     if (ps.fired) {
         LazyColumn(Modifier.fillMaxSize()) {
             item {
-                ScreenHeader("${lg.season} · Offseason", "You've been fired", "${c.name} · ${c.w}-${c.l} career")
+                // Fired, not brought back, or walked away: the market either way.
+                val fired = c.security < 15
+                ScreenHeader("${lg.season} · Offseason", if (fired) "You've been fired" else "On the market", "${c.name} · ${c.w}-${c.l} career")
                 Panel(color = P.hero) {
-                    Text("THE OWNER HAS DECIDED", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                    Text("The ${u.name} are moving on.", style = T.head, color = P.onHero)
-                    Text("Teams with openings have called. Pick your next job.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                    Text(if (fired) "THE OWNER HAS DECIDED" else "A FREE AGENT COACH", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+                    Text(if (fired) "The ${u.name} are moving on." else "You're done with the ${u.name}.", style = T.head, color = P.onHero)
+                    Text("Teams with openings have called. Pick your next job. Career earnings: ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)}.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
                 Section("Job offers")
                 GroupList(ps.jobOffers.map { lg.team(it) }) { t ->
@@ -1361,6 +1365,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                         Column(Modifier.weight(1f)) {
                             Text(t.name, style = T.bodyB, color = P.ink)
                             Text("${t.w}-${t.l} last season · ${Payroll.status(lg, t)}", style = T.small, color = P.sub)
+                            Text(com.nh.hoopscoach.game.CoachContracts.pitch(lg, t), style = T.small, color = P.good)
                         }
                         SmallButton("Take it", primary = true) { vm.act { NbaCoach.takeJob(it, t.id) } }
                     }
@@ -1412,6 +1417,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                             if (h.roy.isNotEmpty()) Text("Rookie of the Year: ${h.roy}", style = T.small, color = P.sub)
                         }
                     }
+                    CoachContractPanel(vm, lg) { l -> com.nh.hoopscoach.game.NbaCoach.openMarket(l, better = true, why = "You've walked away from the ${l.user.name}. %d teams with openings have called.", title = "On the market") }
                     Section("Your career")
                     Panel { Text("${c.w}-${c.l} · ${c.tourneys} playoff trip${if (c.tourneys == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}", style = T.bodyB, color = P.ink) }
                     Text("Next: the draft lottery, rookie selections, team options, qualifying offers, and contract extensions.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 10.dp))
@@ -2100,6 +2106,8 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 Bar(c.security / 100f, Modifier.fillMaxWidth(), color = col, height = 8.dp)
                 Spacer(Modifier.height(8.dp))
                 Text("The owner expects the preseason projection. Wins above it, playoff series and titles raise it; falling short lowers it.", style = T.small, color = P.sub)
+                com.nh.hoopscoach.game.CoachContracts.ensure(lg)
+                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)} · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
             }
             Section("Coaching skills")
             Panel {

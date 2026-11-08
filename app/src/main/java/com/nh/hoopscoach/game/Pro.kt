@@ -1420,6 +1420,7 @@ object ProCareer {
         if (ps.fired) return
         when (ps.step) {
             ProStep.REVIEW -> {
+                CoachContracts.settle(lg)
                 Staffing.offseason(lg)
                 newYear(lg)
                 ps.moved.clear()
