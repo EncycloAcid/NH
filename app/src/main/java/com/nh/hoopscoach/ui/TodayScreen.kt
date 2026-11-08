@@ -138,21 +138,30 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         Spacer(Modifier.height(16.dp))
         val mine = P.accent
         val theirs = teamInk(opp).let { if (contrast(it, mine) < 1.4f) P.faint else it }
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("${(p * 100).toInt()}%", style = T.num, color = P.ink)
-            Text("  win chance", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 3.dp).weight(1f))
-            Text("${100 - (p * 100).toInt()}%", style = T.num, color = P.sub)
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
-            Box(Modifier.weight(p.toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(mine))
-            Spacer(Modifier.width(3.dp))
-            Box(Modifier.weight((1 - p).toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(theirs))
-        }
+        WinChance(p, opp)
         Spacer(Modifier.height(12.dp))
         Compare("Overall", Gameplan.teamRating(lg, u), Gameplan.teamRating(lg, opp), mine, theirs)
         Compare("Offense", Gameplan.teamRating(lg, u) { Ratings.offense(it) }, Gameplan.teamRating(lg, opp) { Ratings.offense(it) }, mine, theirs)
         Compare("Defense", Gameplan.teamRating(lg, u) { Ratings.defense(it) }, Gameplan.teamRating(lg, opp) { Ratings.defense(it) }, mine, theirs)
+    }
+}
+
+/** Our chance against [opp]: both numbers and a split bar in the two teams' colors. */
+@Composable
+fun WinChance(p: Double, opp: Team) {
+    val mine = P.accent
+    val theirs = teamInk(opp).let { if (contrast(it, mine) < 1.4f) P.faint else it }
+    val pct = (p * 100).toInt().coerceIn(1, 99)
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text("$pct%", style = T.num, color = P.ink)
+        Text("  win chance", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 3.dp).weight(1f))
+        Text("${100 - pct}%", style = T.num, color = P.sub)
+    }
+    Spacer(Modifier.height(6.dp))
+    Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
+        Box(Modifier.weight(p.toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(mine))
+        Spacer(Modifier.width(3.dp))
+        Box(Modifier.weight((1 - p).toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(theirs))
     }
 }
 

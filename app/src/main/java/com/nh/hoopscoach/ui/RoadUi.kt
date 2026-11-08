@@ -405,6 +405,7 @@ fun DealPicker(vm: GameViewModel, lg: League) {
 }
 
 /** "Your player" card at the top of Today. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HeroTodayCard(vm: GameViewModel, lg: League) {
     val h = lg.playerOrNull(lg.heroId) ?: return
@@ -422,15 +423,35 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
             }
             Ring(h.ovr, 44.dp)
         }
+        // His last game: the result on the left, his line in big numbers on the right.
         h.log.lastOrNull()?.let { g ->
-            Spacer(Modifier.height(8.dp))
-            Text("Last game: ${if (g.won) "W" else "L"} ${g.score} ${g.site} ${lg.team(g.oppId).abbr} · ${g.pts} pts, ${g.reb} reb, ${g.ast} ast in ${g.min} min",
-                style = T.small, color = P.ink)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(P.surface2).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("LAST GAME", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (g.won) "W" else "L", style = T.numSm.copy(fontSize = 17.sp), color = if (g.won) P.good else P.bad)
+                        Spacer(Modifier.width(6.dp))
+                        Text("${g.score} ${g.site} ${lg.team(g.oppId).abbr}", style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, maxLines = 1)
+                    }
+                }
+                for ((v, l) in listOf(g.pts to "PTS", g.reb to "REB", g.ast to "AST", g.min to "MIN")) {
+                    Column(Modifier.width(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("$v", style = T.numSm.copy(fontSize = 18.sp), color = if (l == "MIN") P.sub else P.ink)
+                        Text(l, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.sub)
+                    }
+                }
+            }
         }
+        // Where he stands, as small chips: the award race (once he's in it), his legs, his practice, his following.
         lg.road?.let { r ->
-            Spacer(Modifier.height(6.dp))
-            val race = if (r.raceRank in 1..100) "${if (lg.pro) "MVP" else "POY"} race No. ${r.raceRank} · " else ""
-            Text("$race${Road.fatigueLabel(r.fatigue)} · ${r.practice.label} · ${Road.count(r.followers)} followers", style = T.small, color = P.sub)
+            Spacer(Modifier.height(10.dp))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (r.raceRank in 1..25) Tag("${if (lg.pro) "MVP" else "POY"} NO. ${r.raceRank}", P.gold)
+                Tag(Road.fatigueLabel(r.fatigue).uppercase(), when { r.fatigue >= 75 -> P.bad; r.fatigue >= 55 -> P.warn; else -> P.good })
+                Tag(r.practice.label.uppercase(), P.accent)
+                Tag("${Road.count(r.followers)} FOLLOWERS", P.sub)
+            }
         }
         val today = com.nh.hoopscoach.game.Season.userGameToday(lg)
         val rv = Rival.active(lg)
@@ -780,8 +801,33 @@ internal fun CareerStory(lg: League) {
     val r = lg.road ?: return
     if (r.story.isEmpty()) return
     Section("Your story")
-    GroupList(r.story) { line ->
+    GroupList(r.story) { line -> StoryLine(line) }
+}
+
+/**
+ * One season of his story, "2026 · Oregon · FR · 10.7 ppg, 4.7 rpg · Round of 32 · NIL $1.27M · …",
+ * laid out as the year and team, the stat line, then everything else.
+ */
+@Composable
+private fun StoryLine(line: String) {
+    val parts = line.split(" · ")
+    val year = parts.firstOrNull()?.takeIf { it.length == 4 && it.all(Char::isDigit) }
+    if (year == null || parts.size < 2) {
         Text(line, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+        return
+    }
+    val rest = parts.drop(1)
+    val statIdx = rest.indexOfFirst { "ppg" in it }
+    val head = (if (statIdx > 0) rest.take(statIdx) else rest.take(1)).joinToString(" · ")
+    val stats = rest.getOrNull(statIdx)?.takeIf { statIdx >= 0 }
+    val extra = rest.drop(if (statIdx >= 0) statIdx + 1 else 1)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.Top) {
+        Text(year, style = T.numSm, color = P.accent, modifier = Modifier.width(52.dp))
+        Column(Modifier.weight(1f)) {
+            Text(head, style = T.bodyB, color = P.ink)
+            if (stats != null) Text(stats, style = T.small, color = P.ink)
+            if (extra.isNotEmpty()) Text(extra.joinToString(" · "), style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        }
     }
 }
 

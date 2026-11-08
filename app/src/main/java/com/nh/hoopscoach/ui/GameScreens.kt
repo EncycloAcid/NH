@@ -390,7 +390,7 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
 private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
     val e = lv.engine
     Panel(color = P.hero) {
-        Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; "halftime" -> "HALFTIME"; else -> "YOUR CALL" }, style = T.label, color = P.gold)
+        Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; "halftime" -> "HALFTIME"; else -> "YOUR CALL" }, style = T.label, color = heroKicker)
         Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
         Spacer(Modifier.height(10.dp))

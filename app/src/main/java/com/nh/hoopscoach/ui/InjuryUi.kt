@@ -27,7 +27,7 @@ fun InjuryReport(vm: GameViewModel, lg: League, t: Team) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(Injuries.tag(p), style = T.small, color = P.bad, maxLines = 2)
+                Text(Injuries.tag(p), style = T.small, color = injuryColor(p), maxLines = 2)
             }
             Tag("INJ", P.bad)
         }
@@ -46,11 +46,15 @@ fun LeagueInjuries(vm: GameViewModel, lg: League) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("${p.name} · ${t.abbr}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(Injuries.tag(p), style = T.small, color = P.bad, maxLines = 2, modifier = Modifier.padding(top = 1.dp))
+                Text(Injuries.tag(p), style = T.small, color = injuryColor(p), maxLines = 2, modifier = Modifier.padding(top = 1.dp))
             }
         }
     }
 }
+
+/** How bad it is, at a glance: amber for day-to-day, red for anything longer. */
+@Composable
+fun injuryColor(p: com.nh.hoopscoach.game.Player): androidx.compose.ui.graphics.Color = if (p.injGames <= 3 && p.injTotal <= 3) P.warn else P.bad
 
 /** The user's team is defending a title: what it's chasing and how it's going. */
 @Composable
@@ -60,7 +64,7 @@ fun TitleDefenseCard(lg: League) {
     val u = lg.user
     Spacer(Modifier.height(6.dp))
     Panel(color = P.hero) {
-        Text(if (d.streak >= 2) "${com.nh.hoopscoach.game.TitleDefense.runWords(d.streak).uppercase()} · DEFENDING CHAMPIONS" else "DEFENDING CHAMPIONS", style = T.label, color = P.gold)
+        Text(if (d.streak >= 2) "${com.nh.hoopscoach.game.TitleDefense.runWords(d.streak).uppercase()} · DEFENDING CHAMPIONS" else "DEFENDING CHAMPIONS", style = T.label, color = heroKicker)
         Text("Chasing ${com.nh.hoopscoach.game.TitleDefense.chasing(d.streak)}", style = T.head, color = P.onHero)
         Text("${u.record} so far. Everyone circles your game on their schedule.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
     }

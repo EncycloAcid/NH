@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Jerseys
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Road
@@ -31,10 +32,13 @@ fun TvCard(vm: GameViewModel, lg: League) {
     if (seg.season != lg.season || lg.day - seg.day > 6) return
     Section("On TV · ${seg.show}")
     Panel(color = P.hero) {
-        Text("THIS WEEK'S DEBATE", style = T.label, color = P.gold)
+        Text("THIS WEEK'S DEBATE", style = T.label, color = heroKicker)
         Text(seg.topic, style = T.title.copy(fontSize = androidx.compose.ui.unit.TextUnit(22f, androidx.compose.ui.unit.TextUnitType.Sp)), color = P.onHero)
-        // Last week's take, checked.
-        if (seg.recap.isNotEmpty()) Text(seg.recap, style = T.small, color = P.gold, modifier = Modifier.padding(top = 6.dp))
+        // Last week's take, checked, in a box of its own.
+        if (seg.recap.isNotEmpty()) Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(P.onHero.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Text("LAST WEEK'S CALL", style = T.label.copy(fontSize = 10.sp), color = heroKicker)
+            Text(seg.recap.removePrefix("Last week: "), style = T.small, color = P.onHero.copy(alpha = 0.92f))
+        }
         Spacer(Modifier.height(10.dp))
         for (take in seg.takes) {
             Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {

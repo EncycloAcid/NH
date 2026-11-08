@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Earned
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Leadership
@@ -67,8 +68,31 @@ fun ImpactPanel(vm: GameViewModel, lg: League) {
     }
     Section("How you're growing")
     Panel {
-        Text(Earned.outlook(lg, h), style = T.bodyB, color = P.ink)
-        Text("Summer growth is earned: minutes, playing above your rating, and practice. Last summer: ${r.growthNote.ifEmpty { "not yet." }}",
-            style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+        val rep = Earned.report(lg, h)
+        val gap = (h.pot - h.ovr).coerceAtLeast(0)
+        val est = (gap * Earned.share(rep)).roundToInt()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("THIS SUMMER, SO FAR", style = T.label, color = P.accent)
+                Text(if (gap == 0) "At your ceiling" else "On track for about +$est", style = T.head, color = P.ink)
+            }
+            if (gap > 0) Text("+$est", style = T.num, color = if (est >= 4) P.good else P.ink)
+        }
+        Spacer(Modifier.height(10.dp))
+        // What it's built from: minutes (45%), production (35%), practice (20%).
+        for ((label, v) in listOf("Minutes" to rep.minutes, "Production" to rep.production, "Practice" to rep.work)) {
+            val word = when { v >= 0.75 -> "Strong"; v >= 0.45 -> "Fair"; else -> "Weak" }
+            val c = when { v >= 0.75 -> P.good; v >= 0.45 -> P.warn; else -> P.bad }
+            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(label, style = T.small, color = P.ink, modifier = Modifier.width(84.dp))
+                GrowBar(v.toFloat(), Modifier.weight(1f), c, 6.dp)
+                Text(word, style = T.small, color = c, modifier = Modifier.width(56.dp).padding(start = 8.dp))
+            }
+        }
+        Text("Summer growth is earned: minutes, playing above your rating, and practice.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))
+        if (r.growthNote.isNotEmpty()) {
+            Text("LAST SUMMER", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 10.dp))
+            Text(r.growthNote.replace("his rating", "your rating"), style = T.small, color = P.ink)
+        }
     }
 }

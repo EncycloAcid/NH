@@ -106,10 +106,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
-                    if (p.gear.isNotEmpty()) Text("Gear: " + com.nh.hoopscoach.game.Gear.decode(p.gear).describe(), style = T.small, color = P.sub)
-                    if (p.id == lg.heroId) lg.road?.shoe?.let { Text("Shoes: the ${com.nh.hoopscoach.game.Shoes.shoeName(lg, it)}", style = T.small, color = P.sub) }
-                    com.nh.hoopscoach.game.Jerseys.rank(lg, p).takeIf { it > 0 }?.let { Text("No. $it in jersey sales", style = T.small, color = P.gold) }
-                    if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = P.bad)
+                    if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = injuryColor(p))
                     // A pro's contract.
                     if (lg.pro && team != null) {
                         val sal = com.nh.hoopscoach.game.Payroll.salaryOf(lg, p)
@@ -159,8 +156,11 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (p.walkOn) Tag("WALK-ON", P.sub)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
+                com.nh.hoopscoach.game.Jerseys.rank(lg, p).takeIf { it > 0 }?.let { Tag("NO. $it IN JERSEY SALES", P.gold) }
+                if (p.id == lg.heroId) lg.road?.shoe?.let { Tag("THE ${com.nh.hoopscoach.game.Shoes.shoeName(lg, it).uppercase()}", P.accent) }
             }
             Text(playsLike(p), style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+            if (p.gear.isNotEmpty()) Text("Gear: " + com.nh.hoopscoach.game.Gear.decode(p.gear).describe(), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp).padding(bottom = 4.dp))
             Spacer(Modifier.height(6.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // In player mode you only manage yourself, and your NIL comes from your deal.

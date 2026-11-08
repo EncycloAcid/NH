@@ -176,6 +176,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
                         Text(if (g.home == u.id) "VS" else "AT", style = T.h2, color = P.faint)
                         MatchSide(lg, opp, Modifier.weight(1f))
                     }
+                    Spacer(Modifier.height(14.dp))
+                    WinChance(com.nh.hoopscoach.game.Rankings.winProbFor(lg, g, u.id), opp)
                     Rival.active(lg)?.takeIf { Rival.isDuel(lg, g) }?.let { rv ->
                         Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1766,7 +1768,7 @@ private fun FarewellPanel(vm: GameViewModel, lg: League) {
     if (r.farewellSeason == lg.season) {
         Section("Farewell tour")
         Panel(color = P.hero) {
-            Text("THE LAST RIDE", style = T.label, color = P.gold)
+            Text("THE LAST RIDE", style = T.label, color = heroKicker)
             Text("${r.tourStops.size} ${if (r.tourStops.size == 1) "arena has" else "arenas have"} honored you", style = T.head, color = P.onHero)
             Text(if (r.tourStops.isEmpty()) "Every road arena honors you on your first visit." else r.tourStops.takeLast(6).joinToString(", ") { lg.team(it).name } + (if (r.tourStops.size > 6) " and more" else "") + ".",
                 style = T.small, color = P.onHero.copy(alpha = 0.85f))

@@ -341,22 +341,31 @@ fun teamLabel(t: com.nh.hoopscoach.game.Team) = if (t.ap in 1..25) "#${t.ap} ${t
 /** A big moment: an award, an All-Star nod, a trade, a record, a title. */
 @Composable
 private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = { vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } },
-        containerColor = P.surface,
-        title = {
-            androidx.compose.foundation.layout.Column {
-                Text(when (a.kind) { "award" -> "HONOR"; "star" -> "ALL-STAR"; "trade" -> "TRADE"; "record" -> "RECORDS BOOK"; "title" -> "CHAMPIONSHIP"; else -> "NEWS" }, style = T.label, color = P.accent)
-                Text(a.title, style = T.head, color = P.ink)
+    val dismiss = { vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } }
+    val left = vm.league?.alerts?.size ?: 1
+    val (kicker, icon) = when (a.kind) {
+        "award" -> "HONOR" to MenuIcons.Star; "star" -> "ALL-STAR" to MenuIcons.Star; "trade" -> "TRADE" to MenuIcons.Swap
+        "record" -> "RECORDS BOOK" to MenuIcons.Flag; "title" -> "CHAMPIONSHIP" to MenuIcons.Trophy; "trophy" -> "TROPHY ROOM" to MenuIcons.Trophy
+        "farewell" -> "FAREWELL TOUR" to MenuIcons.Flag; "signing" -> "SIGNED" to MenuIcons.Swap; else -> "NEWS" to MenuIcons.Calendar
+    }
+    // Gold for the big honors, the team's color for everything else.
+    val tone = if (a.kind in setOf("award", "star", "record", "title", "trophy", "farewell")) P.gold else P.accent
+    androidx.compose.ui.window.Dialog(onDismissRequest = { dismiss() }) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(P.surface).padding(22.dp)) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = tone, modifier = Modifier.size(26.dp))
             }
-        },
-        text = { Text(a.body, style = T.body, color = P.ink) },
-        confirmButton = {
-            androidx.compose.material3.TextButton({ vm.act { if (it.alerts.isNotEmpty()) it.alerts.removeAt(0) } }) {
-                Text(if (vm.league?.alerts?.size ?: 0 > 1) "Next" else "Nice", color = P.accent, style = T.bodyB)
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(kicker, style = T.label, color = tone, modifier = Modifier.weight(1f))
+                if (left > 1) Text("1 of $left", style = T.label, color = P.faint)
             }
-        },
-    )
+            Text(a.title, style = T.h2, color = P.ink, modifier = Modifier.padding(top = 2.dp))
+            Text(a.body, style = T.body, color = P.sub, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(20.dp))
+            PrimaryButton(if (left > 1) "Next" else "Nice", Modifier.fillMaxWidth()) { dismiss() }
+        }
+    }
 }
 
 /** The save's profile-picture seed, picked at random the first time and kept with the save from then on. */

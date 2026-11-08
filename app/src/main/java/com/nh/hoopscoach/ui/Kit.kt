@@ -241,10 +241,13 @@ fun SecondaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolea
 
 @Composable
 fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val bg = when { !enabled -> P.surface2; danger -> P.bad.copy(alpha = 0.12f); primary -> P.accent; else -> P.accentSoft }
+    // A risky action is outlined, never filled, so it can't be mistaken for the main one even when the team's color is red.
+    val bg = when { !enabled -> P.surface2; danger -> Color.Transparent; primary -> P.accent; else -> P.accentSoft }
     val fg = when { !enabled -> P.faint; danger -> P.bad; primary -> P.onAccent; else -> P.accent }
+    val shape = RoundedCornerShape(11.dp)
     Box(
-        modifier.heightIn(min = 38.dp).clip(RoundedCornerShape(11.dp)).background(bg).pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
+        modifier.heightIn(min = 38.dp).clip(shape).background(bg).then(if (danger && enabled) Modifier.border(1.dp, P.bad.copy(alpha = 0.45f), shape) else Modifier)
+            .pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1) }
 }
@@ -562,6 +565,9 @@ fun teamInk(t: Team): Color {
         else -> P.sub
     }
 }
+
+/** The small gold label on a feature card: gold when it reads on the card's color, soft white when it doesn't (a red or orange team). */
+val heroKicker: Color @Composable get() = if (contrast(P.gold, P.hero) >= 3f) P.gold else P.onHero.copy(alpha = 0.78f)
 
 fun f1(v: Double) = "%.1f".format(v)
 fun pct(v: Double) = "%.1f%%".format(v * 100)

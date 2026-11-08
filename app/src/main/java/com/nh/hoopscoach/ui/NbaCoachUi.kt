@@ -171,8 +171,9 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
                         Text(if (g.home == u.id) "VS" else "AT", style = T.h2, color = P.faint)
                         MatchSide(lg, opp, Modifier.weight(1f))
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Our chance to win: ${(win * 100).toInt()}%. Set the rotation and game plan on the Team tab.", style = T.small, color = P.sub)
+                    Spacer(Modifier.height(14.dp))
+                    WinChance(win, opp)
+                    Text("Set the rotation and game plan on the Team tab.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))
                 }
             }
         }
@@ -336,9 +337,15 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
     val picks = Picks.owned(lg, t)
     if (picks.isNotEmpty()) {
         Section("First-round picks (${picks.size})")
-        Panel {
-            Text(picks.joinToString(" · ") { Picks.label(lg, it).removePrefix("a ") + " (${Picks.points(lg, it)} pts)" }, style = T.small, color = P.ink)
+        // One row per pick, with what it's worth in a trade.
+        GroupList(picks) { pk ->
+            ListRow {
+                Text(Picks.label(lg, pk).removePrefix("a ").replaceFirstChar { it.uppercase() }, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${Picks.points(lg, pk)}", style = T.numSm, color = P.ink)
+                Text(" PTS", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+            }
         }
+        Text("Trade value: what a pick is worth to other teams in a deal.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
     }
 
     extendTarget?.let { p ->

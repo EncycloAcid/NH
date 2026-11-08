@@ -146,7 +146,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 "${p.posLabel} · ${if (p.year == com.nh.hoopscoach.game.PRO_YEAR) "age ${p.age}" else p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
                 style = T.small, color = P.sub, maxLines = 1,
             )
-            if (p.out) Text(com.nh.hoopscoach.game.Injuries.tag(p), style = T.small, color = P.bad, maxLines = 1)
+            if (p.out) Text(com.nh.hoopscoach.game.Injuries.tag(p), style = T.small, color = injuryColor(p), maxLines = 1)
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
             if (p.traits.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
@@ -201,13 +201,20 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             SlotPick("Backup", rs, Modifier.weight(1f)) { choose = false }
         }
         Spacer(Modifier.height(10.dp))
+        // The split of the position's minutes: the starter's on the left, the backup's on the right.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$minutes", style = T.numSm, color = P.ink, modifier = Modifier.width(30.dp))
+            Column(Modifier.width(44.dp)) {
+                Text("$minutes", style = T.numSm, color = P.ink)
+                Text("START", style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.5.sp), color = P.sub)
+            }
             HoopsSlider(
                 minutes.toFloat(), { minutes = kotlin.math.round(it).toInt() }, 0f..40f, Modifier.weight(1f), enabled = rs != null,
                 onFinished = { val m = minutes; vm.act { slot.starterMin = m; it.user.plan.auto = false } },
             )
-            Text("${40 - minutes}", style = T.numSm, color = P.sub, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
+            Column(Modifier.width(44.dp), horizontalAlignment = Alignment.End) {
+                Text("${40 - minutes}", style = T.numSm, color = P.sub)
+                Text("BENCH", style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.5.sp), color = P.sub)
+            }
         }
         Expandable("Usage") {
             UsageRow("Starter shot share", slot.starterUsg) { v -> vm.act { slot.starterUsg = v; it.user.plan.auto = false } }
