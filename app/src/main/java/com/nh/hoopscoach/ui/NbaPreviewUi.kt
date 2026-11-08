@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,14 +54,20 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** The issue's pages: the fixed ones, with this year's three features after the storylines. */
-private fun nbaPageIds(pv: NbaPreview) = listOf("cover", "inside", "stories") + pv.features.indices.map { "f$it" } +
+/** Player mode: the user's player has a page of his own. */
+private fun heroPage(lg: League) = lg.playerMode && lg.hero?.teamId?.let { it >= 0 } == true
+
+private fun nbaPageIds(lg: League, pv: NbaPreview) = listOf("cover", "inside") + (if (heroPage(lg)) listOf("you") else emptyList()) + listOf("stories") +
+    (if (pv.debates.isNotEmpty()) listOf("debate") else emptyList()) + pv.features.indices.map { "f$it" } +
     listOf("power", "title", "conf0", "conf1", "awards", "best", "offseason", "rookies", "report", "picks")
 
 private fun nbaPages(lg: League, pv: NbaPreview) = listOf(
     "Cover" to "Season Preview",
     "Inside" to "In this issue",
+) + (if (heroPage(lg)) listOf("Your player" to (lg.hero?.name ?: "")) else emptyList()) + listOf(
     "Storylines" to "What to watch",
-) + pv.features.map { "Feature" to it.title } + listOf(
+) + (if (pv.debates.isNotEmpty()) listOf("The debate" to "${com.nh.hoopscoach.game.TvShow.showName(lg)} picks a side") else emptyList()) +
+    pv.features.map { "Feature" to it.title } + listOf(
     "Power rankings" to "All 30, one to thirty",
     "The title race" to "Who can win it all",
     "Conference call" to lg.conf(0).name,
@@ -86,7 +93,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { NbaPreviews.current(lg) }
     if (pv == null) { vm.back(); return }
     val list = nbaPages(lg, pv)
-    val ids = nbaPageIds(pv)
+    val ids = nbaPageIds(lg, pv)
     val pager = rememberPagerState { list.size }
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
@@ -94,10 +101,10 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
         BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() })
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             list.indices.forEach { i ->
-                Box(
-                    Modifier.weight(1f).height(if (i == pager.currentPage) 6.dp else 4.dp).clip(RoundedCornerShape(2.dp))
-                        .background(if (i <= pager.currentPage) P.accent else P.line).clickable { go(i) },
-                )
+                // The progress bar fills page by page, the current page's segment taller.
+                val h by androidx.compose.animation.core.animateDpAsState(if (i == pager.currentPage) 6.dp else 4.dp, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "seg")
+                val c by androidx.compose.animation.animateColorAsState(if (i <= pager.currentPage) P.accent else P.line, androidx.compose.animation.core.tween(260), label = "segc")
+                Box(Modifier.weight(1f).height(h).clip(RoundedCornerShape(2.dp)).background(c).clickable { go(i) })
             }
         }
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), beyondViewportPageCount = 1) { page ->
@@ -111,13 +118,16 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
                     alpha = 1f - abs(o) * 0.35f
                 },
             ) {
-                LazyColumn(Modifier.fillMaxSize().background(P.bg)) {
+                // The cover lands with a little spring and a sweep of light; the rest turn like pages.
+                LazyColumn(Modifier.fillMaxSize().background(P.bg).then(if (page == 0) Modifier.popIn(pv.season).sheen() else Modifier)) {
                     val (kicker, title) = list[page]
                     if (page > 0) item { PageHead(kicker, title, page + 1) }
                     when (val id = ids[page]) {
                         "cover" -> nbaCover(lg, pv, list.size) { go(1) }
                         "inside" -> nbaContents(lg, pv, list, go)
                         "stories" -> nbaStories(vm, lg, pv)
+                        "you" -> heroSpotlight(vm, lg, pv)
+                        "debate" -> debates(lg, pv)
                         "power" -> powerRankings(vm, lg, pv)
                         "title" -> nbaTitleRace(vm, lg, pv)
                         "conf0" -> conference(vm, lg, pv, 0)
@@ -145,6 +155,101 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
             Text("${pager.currentPage + 1} / ${list.size}", style = T.numSm, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             if (pager.currentPage < list.lastIndex) SmallButton("Next ›", primary = true) { go(pager.currentPage + 1) }
             else SmallButton("Close", primary = true) { vm.back() }
+        }
+    }
+}
+
+// ---------- the user's player and the TV page ----------
+
+/** His own page: the portrait, what's new around him (home, a last ride, a comeback, his shoe), our odds and his stories. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+private fun LazyListScope.heroSpotlight(vm: GameViewModel, lg: League, pv: NbaPreview) {
+    val h = lg.hero ?: return
+    val t = lg.teams.getOrNull(h.teamId) ?: return
+    val r = lg.road
+    item {
+        Spacer(Modifier.height(6.dp))
+        Panel(color = P.hero, onClick = { vm.openPlayer(h.id) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PlayerJersey(h, t, 96.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text((if (h.proYears == 0) "ROOKIE SEASON" else "YEAR ${h.proYears + 1}") + " · ${t.name.uppercase()}", style = T.label, color = heroKicker)
+                    Text(h.last.uppercase(), style = T.hero.copy(fontSize = 38.sp, lineHeight = 38.sp), color = P.onHero, maxLines = 1)
+                    Text("${h.posLabel} · age ${h.age}", style = T.small, color = P.onHero.copy(alpha = 0.85f))
+                }
+            }
+            // What's new around him this season.
+            val tags = listOfNotNull(
+                if (com.nh.hoopscoach.game.Hometown.active(lg)) "HOMETOWN KID · ${com.nh.hoopscoach.game.Hometown.city(lg).uppercase()}" else null,
+                if (r?.farewellSeason == lg.season) "FINAL SEASON" else null,
+                if (r != null && r.comebackSeason in (lg.season - 1)..lg.season) "THE COMEBACK" else null,
+                r?.shoe?.let { com.nh.hoopscoach.game.Shoes.shoeName(lg, it).uppercase() },
+                com.nh.hoopscoach.game.Jerseys.rank(lg, h).takeIf { it > 0 && lg.jerseySeason == lg.season - 1 }?.let { "NO. $it JERSEY" },
+            )
+            if (tags.isNotEmpty()) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                tags.forEachIndexed { i, tag -> Tag(tag, if (i == 0 && tag.startsWith("HOMETOWN")) P.gold else P.onHero, filled = i == 0 && tag.startsWith("HOMETOWN")) }
+            }
+            val l = NbaPreviews.lastLine(lg, h)
+            Spacer(Modifier.height(14.dp))
+            if (l != null) Row(Modifier.fillMaxWidth()) {
+                for ((label, v) in listOf("PTS" to l.s.ppg, "REB" to l.s.rpg, "AST" to l.s.apg)) Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("%.1f".format(v), style = T.num, color = P.onHero)
+                    Text("$label LAST SEASON", style = T.label.copy(fontSize = 9.sp), color = P.onHero.copy(alpha = 0.75f))
+                }
+            } else Text("Our projection: ${com.nh.hoopscoach.game.Analysis.project(lg, h)}.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+        }
+    }
+    item {
+        // Our odds: his awards, his team.
+        val rows = listOfNotNull(
+            pv.mvp.indexOfFirst { it.pid == h.id }.takeIf { it >= 0 }?.let { Triple("MVP", it + 1, pv.mvp[it].p) },
+            pv.roy.indexOfFirst { it.pid == h.id }.takeIf { it >= 0 }?.let { Triple("Rookie of the Year", it + 1, pv.roy[it].p) },
+            pv.dpoy.indexOfFirst { it.pid == h.id }.takeIf { it >= 0 }?.let { Triple("Defensive Player", it + 1, pv.dpoy[it].p) },
+            pv.sixth.indexOfFirst { it.pid == h.id }.takeIf { it >= 0 }?.let { Triple("Sixth Man", it + 1, pv.sixth[it].p) },
+            pv.mip.indexOfFirst { it.pid == h.id }.takeIf { it >= 0 }?.let { Triple("Most Improved", it + 1, pv.mip[it].p) },
+        )
+        val to = proj(pv, t)
+        Section("Our odds")
+        Panel {
+            for ((label, rank, p) in rows) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                    Text("No. $rank · ${odd(p)}", style = T.small, color = P.sub)
+                }
+                GrowBar((p / 0.5).toFloat(), Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp), P.gold, 5.dp)
+            }
+            if (rows.isEmpty()) Text("Not on any of our award boards yet. That can change by Christmas.", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 10.dp))
+            Text("THE ${t.name.uppercase()}", style = T.label, color = P.accent)
+            Text("${to.w}-${to.l} (${to.lo} to ${to.hi} wins) · Playoffs ${odd(to.playoffs)} · Title ${odd(to.title)}", style = T.small, color = P.ink)
+            GrowBar(to.playoffs.toFloat(), Modifier.fillMaxWidth().padding(top = 6.dp), P.accent, 5.dp)
+        }
+    }
+    // His stories in this issue.
+    val mine = pv.stories.filter { it.pid == h.id }
+    if (mine.isNotEmpty()) item {
+        Section("His stories")
+        GroupList(mine) { st ->
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Text(st.kicker.uppercase(), style = T.label, color = P.accent)
+                Text(st.head, style = T.head, color = P.ink)
+                Text(st.body, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+    }
+}
+
+/** The preseason TV page: the season's biggest questions, argued. */
+private fun LazyListScope.debates(lg: League, pv: NbaPreview) {
+    item { Deck("Before a game is played, ${com.nh.hoopscoach.game.TvShow.showName(lg)} picks a side. One voice argues our projections; the other argues the other side.") }
+    pv.debates.forEachIndexed { i, seg ->
+        item {
+            Spacer(Modifier.height(10.dp))
+            Panel(color = P.hero) {
+                Text("QUESTION ${i + 1} OF ${pv.debates.size}", style = T.label, color = heroKicker)
+                Text(seg.topic, style = T.title.copy(fontSize = 22.sp, lineHeight = 25.sp), color = P.onHero)
+                DebateTakes(seg)
+            }
         }
     }
 }

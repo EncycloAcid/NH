@@ -43,6 +43,8 @@ class NbaPreview(
     val calls: List<Call> = emptyList(),
     var graded: List<Int> = emptyList(),
     var outcomes: List<String> = emptyList(),
+    /** The preseason TV page: the season's biggest questions, argued (see [PreviewDebates]). Filled in once if an older issue has none. */
+    var debates: List<TvSegment> = emptyList(),
 )
 
 object NbaPreviews {
@@ -51,7 +53,11 @@ object NbaPreviews {
     /** This season's issue, built now if there isn't one yet. */
     fun current(lg: League): NbaPreview? {
         val ps = lg.proState ?: return null
-        ps.preview?.takeIf { it.season == lg.season }?.let { return it }
+        ps.preview?.takeIf { it.season == lg.season }?.let { pv ->
+            // An issue from before the TV page: its debates are filled in once.
+            if (pv.debates.isEmpty()) pv.debates = runCatching { PreviewDebates.build(lg, pv) }.getOrDefault(emptyList())
+            return pv
+        }
         if (lg.phase == Phase.OFFSEASON) return ps.preview
         return build(lg).also { it.opened = true; ps.preview = it }
     }
@@ -112,6 +118,7 @@ object NbaPreviews {
             lg.season, proj, mvp, roy, dpoy, sixth, mip,
             stories = stories, bold = calls.first, calls = calls.second, headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
             features = Features.nba(lg, base), cover = cover, coverStyle = style,
+            debates = runCatching { PreviewDebates.build(lg, base) }.getOrDefault(emptyList()),
         )
     }
 
@@ -350,7 +357,34 @@ object NbaPreviews {
                         else -> "."
                     })
                     append(" Our projection: ${Analysis.project(lg, hero)}.")
+                    // What else is new around him: his shoe, his jersey.
+                    lg.road?.shoe?.let { d -> append(" His ${Shoes.shoeName(lg, d)} ${if (d.sales.isEmpty()) "drops this season" else "is on shelves"}.") }
+                    if (lg.jerseySeason == lg.season - 1) Jerseys.rank(lg, hero).takeIf { it > 0 }?.let { append(" His jersey was No. $it in sales last season.") }
                 },
+                ht.id, hero.id,
+            )
+            val r = lg.road
+            val town = Hometown.city(lg)
+            if (Hometown.active(lg)) out += Story(
+                "Hometown kid",
+                pick(lg, 23, "The kid from $town", "$town's own", "Home, for real"),
+                "${hero.name} grew up in $town, and now he plays for its team. " +
+                    "We give the ${ht.name} ${pct(pr(ht).playoffs)} to make the playoffs and ${chance(pr(ht).title)} to win it all. " +
+                    "Expect the loudest building in the league when he gets going: the home crowd is worth a few points to a hometown kid, and every night is a homecoming.",
+                ht.id, hero.id,
+            )
+            if (r != null && r.farewellSeason == lg.season) out += Story(
+                "One last ride",
+                pick(lg, 24, "${hero.name}'s farewell season", "One more time around the league", "The last ride"),
+                "${hero.name} says this is it: " + (if (hero.proYears > 0) "${hero.proYears} seasons in, this one's the last. " else "this season is his last. ") + "Every road arena on the schedule gets one more look, and most will have something for him. " +
+                    "Does he go out with a ring? We give the ${ht.name} ${chance(pr(ht).title)}.",
+                ht.id, hero.id,
+            )
+            if (r != null && r.comebackSeason in (lg.season - 1)..lg.season) out += Story(
+                "The comeback",
+                pick(lg, 25, "${hero.name} is back", "Unretired", "Not done yet"),
+                "He walked away, and then he didn't. ${hero.name}, ${hero.age}, is back with the ${ht.name}. " +
+                    (l?.let { "Last time out he averaged ${f1(it.s.ppg)} points. " } ?: "") + "Our projection: ${Analysis.project(lg, hero)}.",
                 ht.id, hero.id,
             )
         }
@@ -506,6 +540,13 @@ object NbaPreviews {
         fun scored(st: Story, score: Double) { extra += st; scores[st] = score }
         fun nick(team: Team) = team.name.substringAfterLast(' ')
         val turnovers = lg.teams.associateWith { Analysis.turnover(lg, it) }
+        // Last season's best-selling jerseys.
+        if (lg.jerseySeason == lg.season - 1) Jerseys.top(lg).take(3).takeIf { it.size == 3 }?.let { j ->
+            scored(Story("Best-sellers", pick(lg, 310, "Whose jersey are you buying?", "The jerseys everyone wanted", "Last year's best-sellers"),
+                "Last season's top-selling jerseys: ${j.mapIndexed { i, p -> "${i + 1}. ${p.name}" + (lg.teams.getOrNull(p.teamId)?.let { " (${it.name})" } ?: "") }.joinToString(", ")}. " +
+                    "Scoring sells, winning sells, and so does a big market." + (if (j.any { it.id == lg.heroId }) " One of them is ${lg.hero?.name}." else ""),
+                j[0].teamId, j[0].id), 4.5)
+        }
         // New look: the contender, or near-contender, that changed the most.
         turnovers.entries.filter { it.value != null && pr(it.key).playoffs >= 0.25 }.minByOrNull { it.value!!.returning }?.let { (t, tv) ->
             if (tv != null && tv.returning <= 0.55) scored(Story("New look", pick(lg, 300, "A whole new ${nick(t)} team", "The ${t.name} start over on the fly", "Meet the new ${t.name}"),
