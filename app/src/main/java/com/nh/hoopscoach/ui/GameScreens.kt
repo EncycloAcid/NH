@@ -79,9 +79,10 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             // In player mode the game stops for big moments until the user picks a play.
             // Spotlight jumps from one of his plays to the next, so a game takes about a minute.
             val spot = lg.road?.spotlight == true && lg.playerMode
-            if (lv.speed > 0 && lv.moment == null) {
+            if (lv.speed > 0 && lv.moment == null && lv.call == null) {
                 val m = e.pendingMoment()
-                if (m != null) lv.moment = m else if (spot) e.stepToHero() else e.step()
+                val c = if (m == null) e.pendingCall() else null
+                if (m != null) lv.moment = m else if (c != null) lv.call = c else if (spot) e.stepToHero() else e.step()
                 lv.tick++
             }
             delay(
@@ -145,7 +146,8 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         }
         Spacer(Modifier.height(10.dp))
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
-        lv.momentResult?.takeIf { lv.moment == null }?.let {
+        lv.call?.let { c -> CallCard(lv, c); Spacer(Modifier.height(8.dp)) }
+        lv.momentResult?.takeIf { lv.moment == null && lv.call == null }?.let {
             Panel(color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
             Spacer(Modifier.height(8.dp))
         }
@@ -153,6 +155,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             if (lv.moment == null) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Segmented(listOf(if (lv.speed == 0) "▶" else "❚❚", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it }, Modifier.weight(1f).padding(horizontal = 0.dp))
+                    if (e.coachSide >= 0) SmallButton("Timeout · ${e.timeoutsLeft}", enabled = e.timeoutsLeft > 0) { if (e.callTimeout()) { lv.momentResult = e.lastCall; lv.tick++ } }
                     SmallButton("Finish", primary = true) { vm.completeLive() }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -363,6 +366,32 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
             val last = i == values.lastIndex
             Text(v, style = if (header) T.label else if (last) T.numSm.copy(fontSize = 17.sp) else T.body, color = if (header) P.sub else color,
                 modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontWeight = if (last && !header) FontWeight.Bold else null)
+        }
+    }
+}
+
+/** Coach mode: a call to make (a timeout, the closing five, the last play on either end). */
+@Composable
+private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
+    val e = lv.engine
+    Panel(color = P.hero) {
+        Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; else -> "YOUR CALL" }, style = T.label, color = P.gold)
+        Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
+        Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
+        Spacer(Modifier.height(10.dp))
+        for ((id, label, detail) in c.options) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(P.onHero.copy(alpha = 0.14f))
+                    .clickable {
+                        e.playCall(id)
+                        lv.momentResult = e.lastCall
+                        lv.call = null
+                        lv.tick++
+                    }.padding(horizontal = 14.dp, vertical = 11.dp),
+            ) {
+                Text(label, style = T.bodyB, color = P.onHero)
+                if (detail.isNotEmpty()) Text(detail, style = T.small, color = P.onHero.copy(alpha = 0.8f))
+            }
         }
     }
 }

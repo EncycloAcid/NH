@@ -69,6 +69,8 @@ class LiveGame(val engine: GameEngine) {
     /** Player mode: the big moment waiting for a choice, and how the last one went. */
     var moment by mutableStateOf<GameEngine.BigMoment?>(null)
     var momentResult by mutableStateOf<String?>(null)
+    /** Coach mode: the call waiting for a decision (a timeout, the closing five, the last play). */
+    var call by mutableStateOf<GameEngine.CoachCall?>(null)
 }
 
 class GameViewModel(app: Application) : AndroidViewModel(app) {
@@ -550,7 +552,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun startLive() {
         val lg = league ?: return
         val g = Season.userGameToday(lg) ?: return
-        live = LiveGame(GameEngine(lg, g, true).also { it.interactive = lg.playerMode })
+        live = LiveGame(GameEngine(lg, g, true).also {
+            it.interactive = lg.playerMode
+            // Coaching it: timeouts, the closing five and the last plays are his calls.
+            if (!lg.playerMode) it.startCoaching(if (g.home == lg.userTeamId) 0 else 1)
+        })
         stack.add(Route.Live)
     }
 

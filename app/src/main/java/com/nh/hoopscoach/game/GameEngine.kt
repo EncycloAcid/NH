@@ -65,6 +65,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** Points for [o]: the score and everyone's plus-minus. */
     private fun scored(o: Int, pts: Int) {
         score[o] += pts
+        if (runFor == o) runPts += pts else { runFor = o; runPts = pts; runAsked = false }
         for (p in onFloor[o]) line(o, p).pm += pts
         for (p in onFloor[1 - o]) line(1 - o, p).pm -= pts
     }
@@ -155,6 +156,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
+        // A timeout settles his team for a few trips (and takes a little out of the other side's run).
+        if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
         return p.coerceIn(0.12, 0.82)
     }
@@ -375,6 +378,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     } else (period == 1 && pf >= 2 && clock > 300) || (period == 2 && pf >= 4 && clock > 240)
 
     private fun lineup(side: Int): List<Player> {
+        // The coach's closing five, once he's picked it.
+        val close = closers
+        if (side == coachSide && close != null && finalPeriod && clock <= 300) {
+            val five = close.mapNotNull { byId[side][it] }.filter { !fouledOut(side, it.id) }.toMutableList()
+            if (five.size < 5) rosters[side].filter { p -> five.none { it.id == p.id } && !fouledOut(side, p.id) }.sortedByDescending { it.ovr }.forEach { if (five.size < 5) five += it }
+            if (five.size == 5) return five
+        }
         val t = teams[side]
         val roster = rosters[side]
         val lookup = byId[side]
@@ -525,6 +535,190 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         return n
     }
 
+    // ---------- coaching the late game (coach mode, live) ----------
+
+    /** The user's side when he coaches a live game (-1 otherwise), and his timeouts. */
+    var coachSide = -1
+    var timeoutsLeft = 0
+    private var runFor = -1
+    private var runPts = 0
+    private var runAsked = false
+    private var settle = 0
+    private var callsAsked = 0
+    private var closersAsked = false
+    private var closers: List<Int>? = null
+    private var forcedCall: String? = null
+    /** What came of the last call, for the live screen. */
+    var lastCall: String? = null
+
+    /** A decision for the coach: [kind] is "timeout", "closers", "offense" or "defense"; options are (id, label, detail). */
+    class CoachCall(val kind: String, val title: String, val sub: String, val options: List<Triple<String, String, String>>)
+
+    fun startCoaching(side: Int) {
+        coachSide = side
+        timeoutsLeft = if (lg.pro) 7 else 4
+    }
+
+    private fun scorerScore(p: Player) = p[Attr.INS] + p[Attr.MID] + p[Attr.OUT] + p.ovr * 0.5
+
+    fun pendingCall(): CoachCall? {
+        if (coachSide < 0 || finished) return null
+        val me = coachSide
+        val them = 1 - me
+        val margin = score[me] - score[them]
+        // They're on a run: stop it?
+        if (timeoutsLeft > 0 && runFor == them && runPts >= 8 && !runAsked && !(finalPeriod && clock < 24)) return CoachCall(
+            "timeout", "${teams[them].abbr} on a ${runPts}-0 run", "Call a timeout to settle your team down?",
+            listOf(Triple("t_yes", "Call timeout", "Steadier for the next few trips ($timeoutsLeft left)"), Triple("t_no", "Let them play", "Save it for later")),
+        )
+        // Crunch time: who closes?
+        if (!closersAsked && finalPeriod && !overtime && clock <= 300 && abs(margin) <= 8) {
+            val pool = rosters[me].filter { !fouledOut(me, it.id) }
+            fun five(key: (Player) -> Double) = pool.sortedByDescending(key).take(5)
+            fun names(l: List<Player>) = l.joinToString(", ") { it.last.ifEmpty { it.short } }
+            return CoachCall("closers", "Crunch time", "Five minutes left, ${if (margin >= 0) "up" else "down"} ${abs(margin)}. Who finishes it?", listOf(
+                Triple("c_best", "Your best five", names(five { it.ovr.toDouble() })),
+                Triple("c_shoot", "Shooters", names(five { it[Attr.OUT] * 1.0 + it.ovr * 0.3 })),
+                Triple("c_def", "Defense", names(five { (it[Attr.PER] + it[Attr.IDF]) * 1.0 + it.ovr * 0.3 })),
+                Triple("c_size", "Size", names(five { (it[Attr.REB] + it[Attr.INS]) * 1.0 + it.ovr * 0.3 })),
+            ))
+        }
+        if (callsAsked >= 4 || !finalPeriod || clock > 24 || clock < 0.5) return null
+        val offense = lineup(poss)
+        val defense = lineup(1 - poss)
+        val ds = defStats(defense)
+        fun pct(x: Double) = "${(x.coerceIn(0.05, 0.9) * 100).roundToInt()}% to score"
+        if (poss == me && margin in -3..0) {
+            val need3 = margin == -3
+            val star = offense.maxBy { scorerScore(it) }
+            val handler = offense.maxBy { it[Attr.HND] }
+            val big = offense.filter { it.id != handler.id }.maxBy { it[Attr.INS] }
+            val shooter = offense.filter { it.id != star.id }.maxByOrNull { it[Attr.OUT] } ?: star
+            val starType = if (need3 || star[Attr.OUT] >= star[Attr.MID] + 3) 2 else 1
+            val roll = makeChance(me, them, big, 0, ds, margin) + 0.02
+            val pull = makeChance(me, them, handler, 1, ds, margin)
+            val title = when { margin == 0 -> "Tied, ${clock.roundToInt()} seconds left"; else -> "Down ${-margin}, ${clock.roundToInt()} seconds left" }
+            return CoachCall("offense", title, if (need3) "You need a three. Draw it up." else "Your ball. Draw it up.", listOfNotNull(
+                Triple("o_iso", "Iso for ${star.short}", "${if (starType == 2) "Three" else "Pull-up"} · ${pct(makeChance(me, them, star, starType, ds, margin) - 0.02)}"),
+                Triple("o_pnr", "Pick-and-roll: ${handler.short} and ${big.short}", if (need3) "Two points only · ${pct(maxOf(roll, pull))}" else pct(maxOf(roll, pull))),
+                Triple("o_kick", "Drive and kick to ${shooter.short}", "Three · ${pct(makeChance(me, them, shooter, 2, ds, margin) + 0.03)}"),
+                Triple("o_post", "Post up ${big.short}", if (need3) "Two points (and maybe a foul) · ${pct(makeChance(me, them, big, 0, ds, margin))}" else "Draws fouls · ${pct(makeChance(me, them, big, 0, ds, margin))}"),
+            ))
+        }
+        if (poss == them && margin in 0..3) {
+            val theirStar = offense.maxBy { scorerScore(it) }
+            return CoachCall("defense", if (margin == 0) "Tied, their ball" else "Up $margin, their ball", "${clock.roundToInt()} seconds left. One stop.", listOfNotNull(
+                Triple("d_switch", "Switch everything", "Takes away the open three"),
+                Triple("d_deny", "Deny ${theirStar.short}", "Make someone else beat you"),
+                Triple("d_paint", "Pack the paint", "No layups; live with jumpers"),
+                if (margin == 3 && clock <= 12) Triple("d_foul", "Foul before the shot", "Two free throws, no tying three") else null,
+            ))
+        }
+        return null
+    }
+
+    /** The coach's answer; plays the next possession when it's a play call. */
+    fun playCall(id: String) {
+        val me = coachSide
+        lastCall = null
+        when {
+            id == "t_yes" -> { runAsked = true; callTimeout() }
+            id == "t_no" -> runAsked = true
+            id.startsWith("c_") -> {
+                closersAsked = true
+                if (id != "c_best") {
+                    val pool = rosters[me].filter { !fouledOut(me, it.id) }
+                    closers = when (id) {
+                        "c_shoot" -> pool.sortedByDescending { it[Attr.OUT] * 1.0 + it.ovr * 0.3 }
+                        "c_def" -> pool.sortedByDescending { (it[Attr.PER] + it[Attr.IDF]) * 1.0 + it.ovr * 0.3 }
+                        else -> pool.sortedByDescending { (it[Attr.REB] + it[Attr.INS]) * 1.0 + it.ovr * 0.3 }
+                    }.take(5).map { it.id }
+                } else closers = rosters[me].filter { !fouledOut(me, it.id) }.sortedByDescending { it.ovr }.take(5).map { it.id }
+                lastCall = "Your closers are in."
+            }
+            else -> {
+                callsAsked++
+                forcedCall = id
+                val before = score[me] - score[1 - me]
+                step()
+                val after = score[me] - score[1 - me]
+                if (lastCall == null) lastCall = when {
+                    id.startsWith("o_") -> if (after > before) "It works: ${lastMoment ?: "bucket"}" else "No good. ${lastMoment ?: ""}".trim()
+                    else -> if (after < before) "They score. ${lastMoment ?: ""}".trim() else "Stop! ${lastMoment ?: "They come up empty."}"
+                }
+            }
+        }
+    }
+
+    /** A timeout: the run is over, and his team settles down for a few possessions. */
+    fun callTimeout(): Boolean {
+        if (coachSide < 0 || timeoutsLeft <= 0 || finished) return false
+        timeoutsLeft--
+        settle = 4
+        if (runFor != coachSide) runPts = 0
+        log(coachSide, "Timeout, ${teams[coachSide].abbr}", 0)
+        lastCall = "Timeout. Your team regroups."
+        return true
+    }
+
+    private fun calledOffense(o: Int, offense: List<Player>, defense: List<Player>, trail: Int, id: String) {
+        val d = 1 - o
+        val ds = defStats(defense)
+        val need3 = trail == -3
+        val star = offense.maxBy { scorerScore(it) }
+        val handler = offense.maxBy { it[Attr.HND] }
+        val big = offense.filter { it.id != handler.id }.maxBy { it[Attr.INS] }
+        val shooter = offense.filter { it.id != star.id }.maxByOrNull { it[Attr.OUT] } ?: star
+        fun turnover(loser: Player): Boolean {
+            if (!Rng.chance((0.05 + (ds.stealD - loser[Attr.HND]) * 0.0015).coerceIn(0.02, 0.12))) return false
+            line(o, loser).tov++
+            val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * spec(it) }
+            line(d, stealer).stl++
+            log(d, "${stealer.short} steals it from ${loser.short}!", 0)
+            lastCall = "Turned over: ${stealer.short} steals it."
+            poss = d
+            return true
+        }
+        when (id) {
+            "o_iso" -> { if (turnover(star)) return; heroShot(o, d, star, if (need3 || star[Attr.OUT] >= star[Attr.MID] + 3) 2 else 1, offense, defense, ds, trail, -0.02, 0.06, null) }
+            "o_pnr" -> {
+                if (turnover(handler)) return
+                val roll = makeChance(o, d, big, 0, ds, trail) + 0.02
+                val pull = makeChance(o, d, handler, 1, ds, trail)
+                if (roll >= pull) heroShot(o, d, big, 0, offense, defense, ds, trail, 0.02, 0.2, handler) else heroShot(o, d, handler, 1, offense, defense, ds, trail, 0.0, 0.05, null)
+            }
+            "o_kick" -> { if (turnover(handler)) return; heroShot(o, d, shooter, 2, offense, defense, ds, trail, 0.03, 0.02, handler) }
+            else -> heroShot(o, d, big, 0, offense, defense, ds, trail, 0.0, 0.25, null)
+        }
+    }
+
+    private fun calledDefense(o: Int, offense: List<Player>, defense: List<Player>, trail: Int, id: String) {
+        val d = 1 - o
+        val ds = defStats(defense)
+        val need3 = trail == -3
+        val star = offense.maxBy { scorerScore(it) }
+        if (id == "d_foul") {
+            val fouler = pickFouler(d, defense)
+            line(d, fouler).pf++
+            teamFoul(d)
+            val shooter = offense.minBy { it[Attr.OUT] }
+            log(d, "${fouler.short} fouls ${shooter.short} before the shot", 0)
+            bonusFreeThrows(o, shooter, offense, defense, 2)
+            lastCall = "You foul. Two free throws, no chance at a tying three."
+            return
+        }
+        val pool = if (id == "d_deny") offense.filter { it.id != star.id } else offense
+        val shooter = Rng.weighted(pool) { usage(o, it) * (if (it.id == star.id) 1.6 else 1.0) }
+        val three = need3 || when (id) { "d_paint" -> Rng.chance(0.65); "d_switch" -> Rng.chance(0.25); else -> Rng.chance(0.4) }
+        val type = if (three) 2 else if (id == "d_paint") 1 else if (Rng.chance(0.5)) 0 else 1
+        val bonus = when (id) {
+            "d_switch" -> if (type == 2) -0.05 else 0.01
+            "d_paint" -> if (type == 0) -0.07 else 0.02
+            else -> -0.01
+        }
+        heroShot(o, d, shooter, type, offense, defense, ds, trail, bonus, 0.05, null)
+    }
+
     // ---------- the possession ----------
 
     fun step(): Boolean {
@@ -563,6 +757,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (clock <= len) len = clock
         elapse(len, offense, defense)
         runPossession(o, offense, defense, trail)
+        if (settle > 0) settle--
         endCheck()
         return !finished
     }
@@ -577,6 +772,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     private fun runPossession(o: Int, offense: List<Player>, defense: List<Player>, trail: Int) {
+        val fc = forcedCall
+        if (fc != null && coachSide >= 0) {
+            forcedCall = null
+            if (o == coachSide && fc.startsWith("o_")) { calledOffense(o, offense, defense, trail, fc); return }
+            if (o != coachSide && fc.startsWith("d_")) { calledDefense(o, offense, defense, trail, fc); return }
+        }
         val f = forced
         if (f != null) {
             forced = null
