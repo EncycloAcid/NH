@@ -25,7 +25,8 @@ object Gameplan {
         fun rate(p: Player): Double = p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
             (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
             (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
-        val pool = lg.rosterOf(t).sortedByDescending { rate(it) }.toMutableList()
+        // The injured don't get minutes (unless the team is too thin to manage without them).
+        val pool = lg.rosterOf(t).filter { !it.out }.takeIf { it.size >= 8 }.let { it ?: lg.rosterOf(t) }.sortedByDescending { rate(it) }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
@@ -90,7 +91,8 @@ object Gameplan {
         val slots = t.plan.slots
         val broken = slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
             slots.flatMap { listOf(it.starter, it.reserve) }.filter { it != -1 }.let { it.size != it.toSet().size } ||
-            slots.any { it.starter == -1 && t.roster.size >= 5 }
+            slots.any { it.starter == -1 && t.roster.size >= 5 } ||
+            (t.plan.auto && slots.any { sl -> sl.starter >= 0 && lg.playerOrNull(sl.starter)?.out == true })
         if (broken || t.plan.auto && !lg.humanCoach(t)) autoAllocate(lg, t)
     }
 

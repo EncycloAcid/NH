@@ -25,6 +25,8 @@ object Morale {
     }
 
     fun expectedMinutes(lg: League, t: Team, p: Player): Int {
+        // Hurt players don't expect minutes they can't play.
+        if (p.out) return Gameplan.plannedMinutes(t, p.id)
         val rank = lg.rosterOf(t).sortedByDescending { it.ovr }.indexOf(p)
         return when {
             rank < 5 -> 28

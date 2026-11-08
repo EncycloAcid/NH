@@ -1148,6 +1148,7 @@ object ProSeason {
         lg.phase = Phase.REGULAR
         lg.games.clear()
         lg.seasonAwards.clear()
+        Injuries.clearAll(lg)
         ps.series.clear(); ps.seeds.clear(); ps.champion = -1
         ps.allStars.clear(); ps.allStarNote = ""; ps.weekend.clear(); ps.mvpVotes.clear()
         ps.draftedByUser.clear(); ps.retiredThisSummer.clear(); ps.before.clear()

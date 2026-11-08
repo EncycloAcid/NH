@@ -333,6 +333,7 @@ object Offseason {
         }
         lg.phase = Phase.REGULAR
         lg.day = 1
+        Injuries.clearAll(lg)
         lg.wrapUp = null
         lg.offseason = null
         lg.seasonAwards = mutableListOf()

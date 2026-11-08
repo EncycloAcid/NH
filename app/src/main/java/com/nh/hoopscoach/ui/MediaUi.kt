@@ -357,6 +357,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
             }
+            if (filter == 0) item { LeagueInjuries(vm, lg) }
             if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("No stories here yet.", style = T.body, color = P.sub) } }
             val byDay = shown.filter { it !== top }.take(120).groupBy { it.season * 1000 + it.day }
             byDay.forEach { (key, list) ->

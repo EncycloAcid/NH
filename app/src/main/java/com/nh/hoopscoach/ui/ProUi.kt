@@ -144,6 +144,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { HeroTodayCard(vm, lg) }
+        item { InjuryReport(vm, lg, u) }
         if (lg.phase == Phase.REGULAR) item { NbaPreviewCard(vm, lg) }
         if (lg.phase == Phase.REGULAR && u.w + u.l >= 7) item {
             Section("Season outlook")

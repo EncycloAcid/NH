@@ -134,6 +134,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (you) { Spacer(Modifier.width(6.dp)); Tag("YOU", P.accent, filled = true) }
                 if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
+                if (p.out) { Spacer(Modifier.width(6.dp)); Tag("INJ", P.bad, filled = true) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }
                     Mood.UNHAPPY -> { Spacer(Modifier.width(6.dp)); Tag("UNHAPPY", P.warn) }
@@ -145,6 +146,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 "${p.posLabel} · ${if (p.year == com.nh.hoopscoach.game.PRO_YEAR) "age ${p.age}" else p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
                 style = T.small, color = P.sub, maxLines = 1,
             )
+            if (p.out) Text(com.nh.hoopscoach.game.Injuries.tag(p), style = T.small, color = P.bad, maxLines = 1)
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
             if (p.traits.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))

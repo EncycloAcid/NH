@@ -204,6 +204,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             Section(lg.conf(u.confId).name, action = "All", onAction = { vm.leagueTab = 0; vm.select(Tab.LEAGUE) })
             GroupList(shown) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
+        item { InjuryReport(vm, lg, u) }
         item {
             val leaders = lg.rosterOf(u).filter { it.stats.gp > 0 }.sortedByDescending { it.stats.ppg }.take(4)
             if (leaders.isNotEmpty()) {

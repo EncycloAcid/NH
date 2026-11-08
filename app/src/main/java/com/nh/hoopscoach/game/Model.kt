@@ -238,6 +238,10 @@ class Player(
     var walkOn: Boolean = false,
     /** Hidden: how well his body holds up (1-99; 0 means not set, see Longevity). Never shown. */
     var longevity: Int = 0,
+    /** Hurt: what it is, how many of his team's games he'll still miss (0 = healthy) and how many in all. */
+    var injury: String = "",
+    var injGames: Int = 0,
+    var injTotal: Int = 0,
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -265,6 +269,8 @@ class Player(
     /** Pro contract structure: "FLAT", "FRONT" (front-loaded), or "BACK" (back-loaded). */
     var structure: String = "",
 ) {
+    /** Out injured. */
+    val out get() = injGames > 0
     val name get() = "$first $last".trim()
     /** "PG/SG" for a two-position player, else just his position. */
     val posLabel get() = pos2?.let { "$pos/$it" } ?: "$pos"
