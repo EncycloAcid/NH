@@ -34,6 +34,7 @@ enum class HistoryKind(val title: String, val sub: String) {
     DRAFT("Draft History", "Every pick, every year"),
     HOF("Hall of Fame", "Inducted players and coaches"),
     RECORDS("Record Book", "Single-game records"),
+    GREATEST("Greatest Teams", "Every champion, rated on one scale"),
 }
 
 sealed interface Route {
@@ -57,6 +58,7 @@ sealed interface Route {
     data object RecruitPreview : Route
     data object Social : Route
     data class Article(val newsIndex: Int) : Route
+    data object Trophies : Route
 }
 
 /** A game being watched possession by possession. */

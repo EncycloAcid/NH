@@ -386,6 +386,7 @@ object NbaCoach {
         pc.history += c.history.map { CoachSeason(it.season, -1, it.team, it.w, it.l, it.result, it.prestige) }
         pc.security = 70
         pro.playedAs = college.playedAs
+        Trophies.carry(college, pro)
         pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
         val head = "${pc.name} leaves ${college.user.school} for the ${pro.user.name}"
         runCatching { Farewell.hire(pro, head) }.onFailure { pro.news += News(pro.season, 0, head, true) }
@@ -445,6 +446,7 @@ object NbaCoach {
      */
     fun seasonEnd(lg: League) {
         Lifetime.hallOfFame(lg)
+        runCatching { Celebrations.coachHallOfFame(lg) }
         val ps = lg.proState ?: return
         val u = lg.user
         val c = lg.userCoach

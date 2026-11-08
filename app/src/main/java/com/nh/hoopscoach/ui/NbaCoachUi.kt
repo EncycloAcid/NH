@@ -1997,6 +1997,7 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
             ScreenHeader("Head coach · age ${c.age}", c.name, "${u.name} · ${ordinal(NbaCoach.seasonsHere(lg) + 1)} season") {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
+            TrophyRoomLink(vm, lg)
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CoachBadge(c.first, c.last, 60.dp)

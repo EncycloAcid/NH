@@ -304,6 +304,8 @@ class GamePlan(
 class TeamSeason(
     val season: Int, val w: Int, val l: Int, val cw: Int, val cl: Int,
     val result: String, val prestige: Int, val net: Int, val ap: Int, val coach: String,
+    /** Average scoring margin, and the playoff record (NBA), for rating the great teams. */
+    val margin: Double = 0.0, val pw: Int = 0, val pl: Int = 0,
 )
 
 @Serializable
@@ -398,6 +400,8 @@ class Coach(
     var history: MutableList<CoachSeason> = mutableListOf(),
     var points: Int = 0,
     var skills: MutableList<CoachSkill> = mutableListOf(),
+    /** The season he went into the Hall of Fame as a coach (0: not yet). */
+    var hofSeason: Int = 0,
 ) {
     fun has(s: CoachSkill) = s in skills
     val name get() = "$first $last"
@@ -1288,6 +1292,9 @@ class League(
     var ceremony: Ceremony? = null,
     /** Moments waiting their turn behind [ceremony]. */
     var ceremonyQueue: MutableList<Ceremony> = mutableListOf(),
+    /** The trophy room: every achievement unlocked across the career (carried from save to save). */
+    var achievements: MutableList<Achievement> = mutableListOf(),
+    var trophiesSeeded: Boolean = false,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

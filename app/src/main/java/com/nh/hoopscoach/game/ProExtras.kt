@@ -377,6 +377,7 @@ object Afterward {
             c.dev = 66
         }
         college.playedAs = past
+        Trophies.carry(pro, college)
         val head = if (pro.pro) "${h.name} takes over at ${t.school}: ${r.rings} ${if (r.rings == 1) "ring" else "rings"}, ${r.allStars} All-Star games and a pro career to sell"
             else "${h.name} comes home from $away years overseas to coach ${t.school}"
         // His introduction: a press conference of its own.

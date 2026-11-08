@@ -797,6 +797,7 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
         }
+        item { TrophyRoomLink(vm, lg) }
         if (h != null) item { CareerTotals(h) }
         item { CareerStory(lg) }
         if (h != null && h.awards.isNotEmpty()) item {

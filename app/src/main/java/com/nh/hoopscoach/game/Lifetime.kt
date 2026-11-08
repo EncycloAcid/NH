@@ -120,9 +120,11 @@ object Lifetime {
         val p = lg.playedAs ?: return
         if (p.hofClass <= 0 || p.inducted || lg.season < p.hofClass) return
         p.inducted = true
-        lg.news += News(lg.season, lg.day, "${p.name} enters the Hall of Fame, class of ${p.hofClass}", true)
-        Alerts.add(lg, "The Hall of Fame", "Class of ${p.hofClass}: ${p.name}. ${p.honors.joinToString(", ").ifEmpty { p.proLine }}. " +
-            "You take the stage in Springfield between seasons on the sideline.", "award")
+        // Enshrinement night, on a screen of its own.
+        runCatching { Celebrations.hallOfFame(lg, p) }.onFailure {
+            lg.news += News(lg.season, lg.day, "${p.name} enters the Hall of Fame, class of ${p.hofClass}", true)
+            Alerts.add(lg, "The Hall of Fame", "Class of ${p.hofClass}: ${p.name}.", "award")
+        }
     }
 
     /** The whole path so far, oldest first: playing, then every coaching stop. */

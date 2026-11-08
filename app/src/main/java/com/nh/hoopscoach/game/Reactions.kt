@@ -70,6 +70,8 @@ object Reactions {
     fun pass(lg: League) {
         // His own feed: posts for anything new in his career (player mode).
         runCatching { Feed.watch(lg) }
+        // The trophy room: anything newly earned.
+        runCatching { Trophies.check(lg) }
         // An older save: start with the latest stories rather than the whole archive.
         if (lg.newsSeen == 0 && lg.news.size > 40) lg.newsSeen = lg.news.size - 12
         var i = lg.newsSeen.coerceIn(0, lg.news.size)

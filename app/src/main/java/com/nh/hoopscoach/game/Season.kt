@@ -365,7 +365,7 @@ object Season {
             Brand.updateLegacy(t, round)
             val c = lg.coachOf(t)
             val result = Awards.resultFor(lg, t.id)
-            t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name)
+            t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, result, t.prestige, t.net, t.ap, c.name, GreatTeams.margin(t))
             c.history += CoachSeason(lg.season, t.id, t.school, t.w, t.l, result, t.prestige)
         }
         val results = HashMap<Int, String>()

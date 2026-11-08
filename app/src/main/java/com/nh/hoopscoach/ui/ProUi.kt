@@ -476,7 +476,7 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
             2 -> cup(lg)
             3 -> leaders(vm, lg)
             4 -> proAwards(vm, lg)
-            else -> history(lg)
+            else -> history(vm, lg)
         }
         item { Spacer(Modifier.height(16.dp)) }
     }
@@ -765,7 +765,7 @@ private fun LeaderRow(vm: GameViewModel, lg: League, rank: Int, p: Player, t: Te
 
 private fun Modifier.widthIn(v: String) = if (v.length > 6) this.width(118.dp) else this
 
-private fun LazyListScope.history(lg: League) {
+private fun LazyListScope.history(vm: GameViewModel, lg: League) {
     val ps = lg.proState ?: return
     val era = Eras.of(lg)
     if (era != com.nh.hoopscoach.game.Era.TODAY) item {
@@ -773,6 +773,18 @@ private fun LazyListScope.history(lg: League) {
             Text("ERA · ${era.year}", style = T.label, color = P.accent)
             Text(era.title, style = T.head, color = P.ink)
             Text(eraRules(era), style = T.small, color = P.sub)
+        }
+    }
+    item {
+        Section("Archive")
+        GroupList(listOf(HistoryKind.GREATEST)) { k ->
+            ListRow(onClick = { vm.push(Route.History(k)) }) {
+                Column(Modifier.weight(1f)) {
+                    Text(k.title, style = T.bodyB, color = P.ink)
+                    Text(k.sub, style = T.small, color = P.sub)
+                }
+                Chevron()
+            }
         }
     }
     val recent = ps.trades.filter { it.season >= lg.season - 1 }.takeLast(15).reversed()
@@ -1163,6 +1175,7 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
             ScreenHeader("Road to the League · Pro", h.name, "${r.collegeSchools} → ${r.proTeams.joinToString(" → ") { lg.team(it).name }}") {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
+            TrophyRoomLink(vm, lg)
             Panel(color = P.hero) {
                 Text(
                     if (h.teamId >= 0 && !r.retired) (if (h.proYears == 0) "ROOKIE SEASON" else "${ordinal(h.proYears + 1).uppercase()} PRO SEASON")

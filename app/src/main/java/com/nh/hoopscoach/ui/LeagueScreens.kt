@@ -470,6 +470,7 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                 Segmented(listOf("All", lg.user.school), mine, { mine = it })
                 HighlightReel(vm, lg, mine == 1)
             }
+            HistoryKind.GREATEST -> greatestTeams(vm, lg)
             HistoryKind.RECORDS -> item {
                 Spacer(Modifier.height(8.dp))
                 GroupList(lg.records) { r ->

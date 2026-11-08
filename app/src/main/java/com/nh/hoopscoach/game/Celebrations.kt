@@ -80,6 +80,7 @@ object Celebrations {
             titles == 2 -> "Their second. The first one was a surprise. This one was a statement."
             else -> "The first one is the one you never forget."
         }
+        runCatching { GreatTeams.rankOf(lg, t) }.getOrNull()?.takeIf { it in 1..25 }?.let { story += "Where this team ranks: No. $it on our list of the greatest champions ever." }
         story += "At the stage, the microphone came to ${me(lg)}."
 
         // The speech.
@@ -287,6 +288,108 @@ object Celebrations {
         ))
     }
 
+    // ---------- the Hall of Fame ----------
+
+    /** Classmates for an induction: this year's inductees in the league, else retired greats, else made-up names. */
+    private fun classmates(lg: League, me: String): List<String> {
+        val here = lg.hallOfFame.filter { it.season == lg.season && it.name != me }.map { it.name }
+        val frozen = lg.proState?.frozen?.keys?.filter { it != me }?.shuffled(kotlin.random.Random(lg.season.toLong()))?.take(3).orEmpty()
+        return (here + frozen).distinct().take(3).ifEmpty { List(3) { "${Rng.pick(Names.first)} ${Rng.pick(Names.last)}" } }
+    }
+
+    private val HOF_CHOICES = listOf("Thank everyone who got me here.", "Talk about where it all started.", "Settle a few old scores.")
+    private fun hofEffects(lg: League) = if (lg.road == null) listOf("Recruits are watching (recruiting +2).", "Your players love it (player happiness +4).", "Your bosses like the fire (job security +2).")
+    else listOf("", "", "")
+
+    /** His Hall of Fame night as a player: the presenter, the career, his speech. */
+    fun hallOfFame(lg: League, pa: PlayedAs) {
+        val year = pa.hofClass.takeIf { it > 0 } ?: lg.season
+        val teams = pa.proTeams
+        // His presenter: an old teammate still around, or a legend.
+        val mate = lg.players.firstOrNull { p -> p.name != pa.name && p.career.any { l -> l.cls == PRO_YEAR && lg.teams.getOrNull(l.teamId)?.name in teams } }?.name
+        val presenter = mate ?: "${Rng.pick(Names.first)} ${Rng.pick(Names.last)}"
+        val labels = mutableListOf("SEASONS")
+        val values = mutableListOf("${pa.proSeasons}")
+        if (pa.rings > 0) { labels += "RINGS"; values += "${pa.rings}" }
+        if (pa.mvps > 0) { labels += "MVP"; values += "${pa.mvps}" }
+        if (pa.allStars > 0) { labels += "ALL-STAR"; values += "${pa.allStars}" }
+        if (pa.allTime > 0) { labels += "ALL-TIME"; values += "No. ${pa.allTime}" }
+        val story = mutableListOf<String>()
+        story += "Springfield, Massachusetts. The class of $year walks in to a standing ovation: ${pa.name}, with ${classmates(lg, pa.name).joinToString(", ")}."
+        story += "${pa.name}: ${pa.college.ifEmpty { "college" }}, then ${pa.draft.lowercase().replaceFirstChar { it.uppercase() }}. " +
+            (if (teams.isNotEmpty()) "${plural(pa.proSeasons, "season")} with ${teams.joinToString(", ")}. " else "") + pa.proLine.ifEmpty { pa.collegeLine } + "."
+        if (pa.honors.isNotEmpty()) story += "The résumé: ${pa.honors.joinToString(", ")}. ${pa.verdict}."
+        story += "$presenter walks him to the podium" + (if (mate != null) ", the way he walked him onto the floor so many nights." else ".") + " The jacket goes on. The room goes quiet."
+        val quotes = listOf(
+            "Nobody gets here alone. My coaches, my teammates, every trainer who taped an ankle at six in the morning, and my family, who sat through every one of them. This is yours.",
+            "There was a gym and a kid who wouldn't go home. If you're that kid tonight: stay a little longer. It's worth it.",
+            "A lot of people said I'd never be here. I wrote every one of their names down. I don't need the list anymore. But I kept it.",
+        )
+        val an = Media.pundit(lg)
+        val reactions = listOf(
+            listOf(Tribute(an.name, "Analyst", "Grace. That's how you give a Hall of Fame speech.", an.avatar, an.verified), Tribute(Media.fanName(), "Fan", "Crying at a speech again. Thank you.")),
+            listOf(Tribute(an.name, "Analyst", "Every kid in a gym somewhere just got a little taller.", an.avatar, an.verified), Tribute(Media.fanName(), "Fan", "\"Stay a little longer.\" Chills.")),
+            listOf(Tribute(an.name, "Analyst", "Petty. Legendary. Both can be true.", an.avatar, an.verified), Tribute(Media.fanName(), "Fan", "HE KEPT THE LIST 😂😂")),
+        )
+        val trib = mutableListOf(
+            Tribute(presenter, "His presenter", "Proudest night of my life, and it isn't even mine."),
+            Tribute(if (lg.pro) "NBA" else "NCAA", "League", "Congratulations to Hall of Famer ${pa.name}.", verified = true),
+            Tribute(Media.fanName(), "Fan", "Hall of Famer. Say it again."),
+        )
+        val head = "${pa.name} enters the Hall of Fame, class of $year"
+        lg.news += News(lg.season, lg.day, head, true, -1, "award", story.joinToString("\n\n"), "Hoops Wire", -1, -1, reactions(trib, 2_000, 70_000))
+        Farewell.show(lg, Ceremony(
+            "hof", "CLASS OF $year", "HALL OF FAMER", pa.name, -1, 0, labels, values, "Enshrinement night", story, trib, listOf(head),
+            HOF_CHOICES, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. The room is waiting.", effects = hofEffects(lg),
+            badge = "Basketball Hall of Fame",
+        ))
+    }
+
+    /** The coach's own induction, once: two titles, or 500 wins over 15 seasons. Checked at season's end. */
+    fun coachHallOfFame(lg: League) {
+        if (lg.road != null) return
+        val c = runCatching { lg.userCoach }.getOrNull() ?: return
+        if (c.hofSeason > 0) return
+        val titles = c.history.count { it.result == "National Champion" || it.result == "Champion" }
+        val wins = c.history.sumOf { it.w }
+        if (titles < 2 && !(wins >= 500 && c.history.size >= 15)) return
+        c.hofSeason = lg.season
+        val losses = c.history.sumOf { it.l }
+        val stops = c.history.map { it.team }.distinct()
+        val labels = listOf("SEASONS", "RECORD", "TITLES", "FINAL FOURS")
+        val values = listOf("${c.history.size}", "$wins-$losses", "$titles", "${c.history.count { it.result in setOf("Final Four", "Runner-Up", "National Champion") }}")
+        val story = mutableListOf<String>()
+        story += "The call came in the summer: ${c.name} is going into the Hall of Fame as a coach, class of ${lg.season}, with ${classmates(lg, c.name).joinToString(", ")}."
+        story += "${plural(c.history.size, "season")} on the sideline at ${stops.joinToString(", ")}: $wins wins, ${plural(titles, "title")}."
+        c.history.filter { it.result == "National Champion" || it.result == "Champion" }.takeIf { it.isNotEmpty() }?.let { t ->
+            story += "The titles: " + t.joinToString(", ") { "${it.season} with ${it.team} (${it.w}-${it.l})" } + "."
+        }
+        lg.playedAs?.takeIf { it.inducted }?.let { story += "He's already in as a player. Now he's in twice." }
+        story += "His former players line the front rows."
+        val quotes = listOf(
+            "Coaches don't win games. Players do. Every one of you in those front rows: this is your night.",
+            "I was a kid with a whistle and a lot of ideas, and somebody gave me a chance. To every young coach out there: keep showing up.",
+            "Some people told me I'd never last in this business. They're not here tonight. I am.",
+        )
+        val an = Media.pundit(lg)
+        val reactions = listOf(
+            listOf(Tribute(an.name, "Analyst", "That's why players wanted to play for him.", an.avatar, an.verified)),
+            listOf(Tribute(an.name, "Analyst", "A love letter to coaching.", an.avatar, an.verified)),
+            listOf(Tribute(an.name, "Analyst", "Coach still has that edge. Good.", an.avatar, an.verified)),
+        )
+        val trib = listOfNotNull(
+            lg.rosterOf(lg.user).maxByOrNull { it.ovr }?.let { Tribute(it.name, "His player", "Hall of Fame coach. We knew.") },
+            Tribute(Media.fanName(), "Fan", "Put him in twice if you have to."),
+        )
+        val head = "${c.name} elected to the Hall of Fame as a coach"
+        lg.news += News(lg.season, lg.day, head, true, -1, "award", story.joinToString("\n\n"), "Hoops Wire", lg.userTeamId, -1, reactions(trib, 1_000, 40_000))
+        Farewell.show(lg, Ceremony(
+            "hofcoach", "CLASS OF ${lg.season}", "HALL OF FAME COACH", c.name, lg.userTeamId, 0, labels, values, "Enshrinement night", story, trib, listOf(head),
+            HOF_CHOICES, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. Your players are in the front row.", effects = hofEffects(lg),
+            badge = "Basketball Hall of Fame",
+        ))
+    }
+
     // ---------- the speeches ----------
 
     fun speak(lg: League, cer: Ceremony, choice: Int) {
@@ -306,6 +409,13 @@ object Celebrations {
                 0 -> happy(4, hero?.id ?: -1)
                 1 -> follow(0.06)
                 else -> {}
+            }
+            "hof", "hofcoach" -> if (lg.road == null) runCatching { lg.userCoach }.getOrNull()?.let { c ->
+                when (choice) {
+                    0 -> c.rec = (c.rec + 2).coerceAtMost(99)
+                    1 -> happy(4)
+                    else -> c.security = (c.security + 2).coerceIn(0, 100)
+                }
             }
         }
         val who = me(lg)

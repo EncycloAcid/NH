@@ -145,6 +145,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
             }
             GroupList(rows) { it() }
         }
+        item { TrophyRoomLink(vm, lg) }
         item {
             Section("Archive")
             GroupList(HistoryKind.entries) { k ->
