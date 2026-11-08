@@ -646,6 +646,11 @@ object Previews {
                 t.id,
             )
         }
+        // What the numbers say, among the teams that matter (the top 40 and the user's).
+        runCatching { val top = pv.proj.entries.sortedBy { it.value.nat }.take(40).map { it.key }.toSet() + lg.userTeamId; Scout.leagueNotes(lg) { it.id in top } }.getOrNull()?.takeIf { it.size >= 3 }?.let { notes ->
+            out += Story("By the numbers", pick(lg, 170, "What the numbers say", "Things the polls won't tell you", "Under the hood"),
+                notes.joinToString(" ") { (h, b) -> "$h. $b" })
+        }
         pv.marquee.mapNotNull { id -> lg.games.firstOrNull { it.id == id } }.firstOrNull { lg.rivalry(it) != null }?.let { g ->
             val a = lg.team(g.away)
             val h = lg.team(g.home)

@@ -294,8 +294,12 @@ object Takes {
     fun college(lg: League, pv: Preview, t: Team, n: Int = 3, from: Int = 0): String {
         val c = Col(lg, pv, t)
         val lead = c.lead()
-        val rest = listOfNotNull(c.people(from == 0 && c.star != null && lead.contains(c.star.name)), c.identity(), c.outlook())
-        val order = if (n >= 4 || pick(lg, t, 50, true, false)) rest else listOfNotNull(rest.getOrNull(1), rest.getOrNull(0), rest.getOrNull(2))
+        // The scout's best findings first.
+        val scout = Scout.lines(lg, t, 2, skip = if (from == 0) lead else "")
+        val star = c.star
+        val people = c.people(from == 0 && c.star != null && lead.contains(c.star.name))?.takeIf { star == null || scout.none { it.contains(star.name) || it.contains(star.last) } }
+        val rest = listOfNotNull(scout.getOrNull(0), people, scout.getOrNull(1) ?: c.identity(), c.outlook())
+        val order = rest
         val parts = if (from == 0) listOf(lead) + order.take((n - 1).coerceAtLeast(0)) else order.take(n)
         return parts.joinToString(" ").replace("  ", " ").trim()
     }
@@ -376,6 +380,8 @@ object Takes {
             if (bw != null) append(if (bw.second.second <= c.n / 9) "There's no weak spot to fix; it's about winning the close ones. " else "Fix the ${AREAS[bw.second.first]} (${ord(bw.second.second)}) and the ceiling rises. ")
             append(Previews.expectation(c.pr.nat) + ". ")
             append(CollegeHistory.line(lg, t))
+            val r = Scout.report(lg, t)
+            append(" The question: ${r.question} Best case, ${c.o.hi} wins if ${r.best}; worst case, ${c.o.lo} if ${r.worst}.")
         }.trim()
     }
 
@@ -572,8 +578,12 @@ object Takes {
     fun nba(lg: League, pv: NbaPreview, t: Team, n: Int = 3, from: Int = 0): String {
         val c = Nba(lg, pv, t)
         val lead = c.lead()
-        val rest = listOfNotNull(c.people(if (from == 0) lead else ""), c.identity(), c.outlook())
-        val order = if (n >= 4 || pick(lg, t, 150, true, false)) rest else listOfNotNull(rest.getOrNull(1), rest.getOrNull(0), rest.getOrNull(2))
+        // The scout's best findings come first: what actually decides this team's season.
+        val scout = Scout.lines(lg, t, 2, skip = if (from == 0) lead else "")
+        val star = c.star
+        val people = c.people(if (from == 0) lead else "")?.takeIf { star == null || scout.none { it.contains(star.name) || it.contains(star.last) } }
+        val rest = listOfNotNull(scout.getOrNull(0), people, scout.getOrNull(1) ?: c.identity(), c.outlook())
+        val order = rest
         val parts = if (from == 0) listOf(lead) + order.take((n - 1).coerceAtLeast(0)) else order.take(n)
         return parts.joinToString(" ").replace("  ", " ").trim()
     }
@@ -604,6 +614,8 @@ object Takes {
             if (bw != null) append(if (bw.second.second <= c.n / 3) "There's no weak spot to shore up, so it comes down to health and the matchups. "
                 else "Shore up the ${AREAS[bw.second.first]} (${ord(bw.second.second)}) and those flips start breaking their way. ")
             c.star?.let { append(pick(lg, t, 160, "It goes as far as ${it.name} takes it.", "${it.name} sets the ceiling.", "Keep ${it.name} healthy and anything's possible.")) }
+            val r = Scout.report(lg, t)
+            append(" The question: ${r.question} Best case, ${c.pr.hi} wins if ${r.best}; worst case, ${c.pr.lo} if ${r.worst}.")
         }.trim()
     }
 

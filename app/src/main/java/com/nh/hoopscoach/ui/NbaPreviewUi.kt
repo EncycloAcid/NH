@@ -621,6 +621,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
             }
             Text("Right column: our chance to win each game.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
         }
+        ScoutingReport(vm, lg, u, o.lo, o.hi)
         Section("The bottom line")
         Panel {
             Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = T.body, color = P.ink)

@@ -645,6 +645,11 @@ object NbaPreviews {
         }
         val luck = kotlin.random.Random(lg.season * 977L + 5)
         out += extra.sortedByDescending { (scores[it] ?: 5.0) + luck.nextDouble() * 2.5 }.take(4)
+        // What the numbers say: luck, breakouts, the hardest road, a contender's hole.
+        runCatching { Scout.leagueNotes(lg) }.getOrNull()?.takeIf { it.size >= 3 }?.let { notes ->
+            out += Story("By the numbers", pick(lg, 170, "What the numbers say", "Six things the standings won't tell you", "Under the hood"),
+                notes.joinToString(" ") { (h, b) -> "$h. $b" })
+        }
         // The bottom of the league.
         lg.teams.filter { it.id != u.id }.minByOrNull { pr(it).w }?.let { t ->
             out += Story(
