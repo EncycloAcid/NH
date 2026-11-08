@@ -836,6 +836,9 @@ class RoadState(
     var shoe: ShoeDeal? = null,
     /** Calling it a career: the season he said would be his last, the season he came back from retirement, and the teams that already honored him on the farewell tour. */
     var farewellSeason: Int = 0,
+    /** The hometown team he's playing for right now (-1 when he isn't), and the season he came home (see [Hometown]). */
+    var homeTeam: Int = -1,
+    var homeSince: Int = 0,
     var comebackSeason: Int = 0,
     val tourStops: MutableList<Int> = mutableListOf(),
     var shoeOffered: Int = 0,

@@ -19,6 +19,8 @@ object Jerseys {
         if (Ratings.shownPro(p.ovr) >= 90) v += 3.5
         if (p.age <= 24 && p.pot - p.ovr >= 4) v += 3.0
         if (p.id == lg.heroId) v += ((lg.road?.followers ?: 0) / 1_000_000.0 * 3.0).coerceAtMost(9.0)
+        // A hometown kid's jersey is everywhere in his city.
+        if (p.id == lg.heroId && Hometown.active(lg)) v += 4.0
         return v
     }
 

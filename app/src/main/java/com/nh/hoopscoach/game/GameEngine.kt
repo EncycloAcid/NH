@@ -118,6 +118,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** A shooting coach helps the user's player's jump shots, and his big shots most. */
     private val heroJumper = if (heroId >= 0) Road.jumpShotBonus(lg) else 0.0
     private val heroClutch = if (heroId >= 0) Road.clutchBonus(lg) else 0.0
+    /** His hometown crowd: a lift on every shot at home when he plays for his city's team. */
+    private val heroHome = if (heroId >= 0) Hometown.shotBonus(lg, game) else 0.0
     /** A Game 7, an elimination game or a close-out: more big moments, and they start earlier. */
     val bigNight: String = if (heroSide >= 0) BigNights.stakes(lg, game) else ""
 
@@ -160,7 +162,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
-        if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) - heroTired
+        if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) + heroHome - heroTired
         return p.coerceIn(0.12, 0.82)
     }
 
@@ -929,7 +931,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && finalPeriod && clock < 120 && abs(trail) <= 5) pMake += 0.03
-            if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) - heroTired
+            if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) + heroHome - heroTired
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)

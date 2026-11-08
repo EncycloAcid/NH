@@ -582,6 +582,7 @@ object Trades {
         else if (rank <= 2 && mins >= want) why += "You're a focal point"
         if (h.age >= 30 && t.gp >= 8 && t.winPct < 0.55) { s -= 12; why += "At ${h.age}, you want a ring" }
         if ((lg.road?.persona ?: 0) >= 5) { s -= 5; why += "Lightning rods get restless" }
+        Hometown.moodLift(lg)?.let { (lift, reason) -> s += lift; why += reason }
         val v = s.roundToInt().coerceIn(0, 100)
         val label = when { v >= 70 -> "Happy"; v >= 50 -> "Content"; v >= 30 -> "Frustrated"; else -> "Wants out" }
         return Mood(v, label, why)

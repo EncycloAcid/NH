@@ -447,6 +447,7 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
         lg.road?.let { r ->
             Spacer(Modifier.height(10.dp))
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (com.nh.hoopscoach.game.Hometown.active(lg)) Tag("HOMETOWN KID · ${com.nh.hoopscoach.game.Hometown.city(lg).uppercase()}", P.gold, filled = true)
                 if (r.raceRank in 1..25) Tag("${if (lg.pro) "MVP" else "POY"} NO. ${r.raceRank}", P.gold)
                 Tag(Road.fatigueLabel(r.fatigue).uppercase(), when { r.fatigue >= 75 -> P.bad; r.fatigue >= 55 -> P.warn; else -> P.good })
                 Tag(r.practice.label.uppercase(), P.accent)

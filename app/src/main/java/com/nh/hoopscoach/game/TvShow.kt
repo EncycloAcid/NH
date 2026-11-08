@@ -397,6 +397,27 @@ object TvShow {
                 listOf("Top seed, healthy star: anything less is a failure.", "Windows close fast."),
                 listOf("A conference final is a great season.", "Nobody's title or bust in January."),
                 answers("Every season's about winning it all.", "One game at a time.", "We know what we're here for."), h.id, "win", t.winPct, 1)
+            // The hometown kid: can he bring a title home?
+            if (Hometown.active(lg) && s.gp >= 12 && t.w + t.l >= 12) {
+                val town = Hometown.city(lg)
+                val homeIds = c.home.map { it.id }.toSet()
+                val atHome = h.log.filter { it.gameId in homeIds }
+                val roadIds = c.road.map { it.id }.toSet()
+                val awayLog = h.log.filter { it.gameId in roadIds }
+                val homePpg = if (atHome.isEmpty()) 0.0 else atHome.sumOf { it.pts }.toDouble() / atHome.size
+                val roadPpg = if (awayLog.isEmpty()) 0.0 else awayLog.sumOf { it.pts }.toDouble() / awayLog.size
+                out += Topic("hometown", "Can $L bring a title home to $town?", ((t.winPct - 0.6) * 2.2 + c.margin / 25).coerceIn(-0.8, 0.7), 6.0,
+                    listOfNotNull(
+                        Fact(t.winPct >= 0.55, "${c.Cap} ${c.are} ${c.rec}${if (seed > 0) ", ${ord(seed)} in the ${c.confLabel(conf)}" else ""}.", 1.5),
+                        Fact(c.margin >= 3, "${sign(c.margin)} a game.", 1.2),
+                        if (atHome.size >= 4 && awayLog.size >= 4) Fact(homePpg >= roadPpg, "He scores ${f1(homePpg)} at home and ${f1(roadPpg)} on the road.", 1.1) else null,
+                    ),
+                    listOf("The kid from $town, in front of $town. That's how titles happen.", "Nobody plays harder for a city than the one who grew up in it."),
+                    listOf("A great story doesn't win a playoff series.", "Pressure at home is real. Every bad night, the whole city hears about it."),
+                    answers("That's the dream. It's why I'm here.", "One game at a time.", "I'm bringing one home. Write it down."), h.id, "win", t.winPct, 1,
+                    yesBack = listOf("You think $town doesn't push him? Watch the fourth quarters at home."),
+                    noBack = listOf("Talk to me when they win a round. The story's nice; the roster isn't there."))
+            }
         }
 
         // Rookies, sophomores, improvement.

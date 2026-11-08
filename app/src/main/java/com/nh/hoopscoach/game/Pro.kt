@@ -1355,6 +1355,12 @@ object ProCareer {
 
     /** Moves the pro offseason one step: review, draft, free agency, summer, then the new season. */
     fun next(lg: League) {
+        nextStep(lg)
+        // Drafted, signed or traded to his city's team: the hometown kid comes home.
+        runCatching { Hometown.check(lg) }
+    }
+
+    private fun nextStep(lg: League) {
         val ps = lg.proState ?: return
         if (NbaCoach.active(lg)) { coachNext(lg); return }
         val r = lg.road ?: return
@@ -1577,10 +1583,13 @@ object ProCareer {
             val top = minOf(maxFor(lg, t.id), limit).coerceAtLeast(minSalary(lg, h.proYears))
             // Teams that need him at his position pay more; teams set there offer less.
             val need = when (ahead) { 0 -> 1.0; 1 -> 0.9; else -> 0.78 }
-            val pay = ((value * (if (t.id == h.teamId) 1.05 else (0.78 + Rng.d() * 0.22) * need)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
+            // His hometown team wants the local kid and pays a little more for him.
+            val home = Hometown.isHome(t, h.hometown)
+            val pay = ((value * (if (t.id == h.teamId) 1.05 else (0.78 + Rng.d() * 0.22) * need) * (if (home) 1.06 else 1.0)).roundToInt() / 10 * 10).coerceIn(minSalary(lg, h.proYears), top)
             // How far each team will stretch: a little more for his own team, never past the max.
             val max = ((pay * (1.04 + Rng.d() * 0.24 + if (t.id == h.teamId) 0.05 else 0.0)).roundToInt() / 10 * 10).coerceIn(pay, top)
-            ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max, note = if (pay >= top) how else "")
+            ProOffer(t.id, pay, years.coerceAtMost(maxYears(lg, t.id)), roleFor(ahead), ahead, t.winPct, max,
+                note = listOfNotNull(if (home) "Your hometown team: ${h.hometown.substringBefore(",")} wants you home" else null, if (pay >= top) how else null).joinToString(" · "))
         }.sortedByDescending { it.salary }
     }
 
@@ -1853,6 +1862,8 @@ object Sim {
         if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
         // The farewell tour's stops.
         if (lg.pro) runCatching { FarewellTour.afterDay(lg, day) }
+        // The hometown kid: coming home, leaving, and home games in his city.
+        if (lg.pro) runCatching { Hometown.check(lg, day) }
         // The defending champion's season, in the news.
         runCatching { TitleDefense.check(lg) }
         // Tomorrow's big games.
