@@ -343,6 +343,39 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** His social profile picture from a photo on the phone: shrunk to 512 px and kept in the app's files. */
+    fun setProfilePhoto(uri: android.net.Uri) {
+        val lg = league ?: return
+        val r = lg.road ?: return
+        viewModelScope.launch {
+            val name = withContext(Dispatchers.IO) {
+                runCatching {
+                    val app = getApplication<Application>()
+                    val bytes = app.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+                    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    var sample = 1
+                    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 512) sample *= 2
+                    val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                        ?: return@runCatching null
+                    // A square from the middle, so the circle crops it well.
+                    val side = minOf(bmp.width, bmp.height)
+                    val square = android.graphics.Bitmap.createBitmap(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side)
+                    val out = android.graphics.Bitmap.createScaledBitmap(square, minOf(side, 512), minOf(side, 512), true)
+                    val n = "profile_${System.currentTimeMillis()}.jpg"
+                    File(app.filesDir, n).outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                    // The old one goes.
+                    if (r.avatarFile.isNotEmpty() && r.avatarFile != n) File(app.filesDir, r.avatarFile).delete()
+                    n
+                }.getOrNull()
+            }
+            if (name == null) { toast("Couldn't use that picture."); return@launch }
+            mutex.withLock { r.avatarStyle = "photo"; r.avatarFile = name }
+            bump()
+            toast("Profile picture updated.")
+        }
+    }
+
     /** Draft-night work that picks many players at once (simming to the user's pick, or the rest of the draft). */
     fun draftSim(label: String, block: (League) -> Unit) = heavy(label) { block(it) }
 

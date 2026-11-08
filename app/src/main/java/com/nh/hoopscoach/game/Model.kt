@@ -756,6 +756,9 @@ class RoadState(
     val story: MutableList<String> = mutableListOf(),
     /** Social following. Every follower adds a dollar a year to his NIL value. */
     var followers: Int = 0,
+    /** His social profile picture: "" his jersey (or headshot), "logo" his team's, "cartoon", or "photo" (a picture from his phone, [avatarFile]). */
+    var avatarStyle: String = "",
+    var avatarFile: String = "",
     var seasonStartFollowers: Int = 0,
     /** Media persona from press answers: negative humble, positive brash. */
     var persona: Int = 0,

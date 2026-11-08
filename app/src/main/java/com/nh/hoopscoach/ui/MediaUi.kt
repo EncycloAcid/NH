@@ -64,16 +64,10 @@ private fun kindLabel(kind: String) = when (kind) {
 
 /** One post: avatar, name with a check if verified, handle and day, the text, and the likes. [onOpen] opens the story it's about. */
 @Composable
-fun PostRow(p: Post, onOpen: (() -> Unit)? = null) {
+fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
     Row(Modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
-        val initials = p.name.split(" ").filter { it.isNotEmpty() }.take(2).joinToString("") { it.first().uppercase() }
-        // A real account shows its avatar; everyone else their initials.
-        val ctx = androidx.compose.ui.platform.LocalContext.current
-        val img = androidx.compose.runtime.remember(p.avatar) { if (p.avatar.isEmpty()) null else Logos.asset(ctx, "social/${p.avatar}.webp") }
-        Box(Modifier.size(36.dp).clip(CircleShape).background(kindColor(p.kind).copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-            if (img != null) androidx.compose.foundation.Image(img, p.name, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-            else Text(initials, style = T.label, color = kindColor(p.kind))
-        }
+        // Everyone has a profile picture: real accounts their own, the rest drawn (see ProfilePic).
+        ProfilePic(lg, p, 36.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -104,7 +98,7 @@ fun SocialStrip(vm: GameViewModel, lg: League) {
     val posts = r.feed.filter { it.season == lg.season }.takeLast(2).reversed()
     if (posts.isEmpty()) return
     Section("Social · ${Road.count(r.followers)} followers", action = "See all", onAction = { vm.socialTab = 0; vm.push(Route.Social) })
-    GroupList(posts, inset = 60.dp) { p -> PostRow(p) }
+    GroupList(posts, inset = 60.dp) { p -> PostRow(p, lg = lg) }
     // The latest big story around the league, a tap away from that tab.
     r.leagueFeed.lastOrNull { it.kind == "news" && it.season == lg.season }?.let { n ->
         Spacer(Modifier.height(8.dp))
@@ -140,11 +134,12 @@ fun SocialScreen(vm: GameViewModel, lg: League) {
                 Segmented(listOf("You", "Around the league"), vm.socialTab, { vm.socialTab = it })
             }
             if (vm.socialTab == 0) {
+                item { ProfileCard(vm, lg) }
                 val posts = r.feed.reversed()
                 if (posts.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("Nothing yet. Play a game and the internet will have opinions.", style = T.body, color = P.sub) } }
                 else item {
                     Spacer(Modifier.height(8.dp))
-                    GroupList(posts, inset = 60.dp) { p -> PostRow(p) }
+                    GroupList(posts, inset = 60.dp) { p -> PostRow(p, lg = lg) }
                 }
             } else {
                 val all = r.leagueFeed.reversed()
@@ -181,7 +176,7 @@ fun SocialScreen(vm: GameViewModel, lg: League) {
                 if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("Nothing here yet. Sim a few days and the league will start talking.", style = T.body, color = P.sub) } }
                 else item {
                     Spacer(Modifier.height(8.dp))
-                    GroupList(shown, inset = 60.dp) { p -> PostRow(p, storyClick(vm, lg, p)) }
+                    GroupList(shown, inset = 60.dp) { p -> PostRow(p, storyClick(vm, lg, p), lg) }
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -307,8 +302,12 @@ fun ReactionRow(r: Reaction) {
         val img = androidx.compose.runtime.remember(r.avatar) { if (r.avatar.isEmpty()) null else Logos.asset(ctx, "social/${r.avatar}.webp") }
         val mood = when (r.tone) { 1 -> P.good; -1 -> P.bad; else -> P.accent }
         Box(Modifier.size(36.dp).clip(CircleShape).background(mood.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-            if (img != null) androidx.compose.foundation.Image(img, r.who, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-            else Text(initials, style = T.label, color = mood)
+            when {
+                img != null -> androidx.compose.foundation.Image(img, r.who, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                // Leagues and team accounts keep their initials; people get a face.
+                r.role.contains("League") || r.role.contains("team", ignoreCase = true) && !r.role.contains("Teammate") -> Text(initials, style = T.label, color = mood)
+                else -> Cartoon(r.who, 36.dp)
+            }
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
