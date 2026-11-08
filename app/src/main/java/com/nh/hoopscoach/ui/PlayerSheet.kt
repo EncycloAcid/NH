@@ -105,6 +105,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
+                    if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
+                    if (p.gear.isNotEmpty()) Text("Gear: " + com.nh.hoopscoach.game.Gear.decode(p.gear).describe(), style = T.small, color = P.sub)
                     if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = P.bad)
                     // A pro's contract.
                     if (lg.pro && team != null) {
@@ -164,6 +166,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 val yourself = lg.playerMode && p.id == lg.heroId
                 if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
+                if (yourself) SmallButton("Customize", primary = true) { vm.sheet = null; vm.push(Route.MyPlayer) }
                 if (coaching || yourself) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 if (coaching || yourself || (mine && com.nh.hoopscoach.game.NbaCoach.active(lg))) SmallButton("Portrait") { vm.sheet = null; vm.push(Route.Portrait(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }

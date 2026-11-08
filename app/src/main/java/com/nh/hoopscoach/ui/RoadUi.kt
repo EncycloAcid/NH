@@ -359,7 +359,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallButton("Training focus", Modifier.weight(1f), primary = true) { vm.push(Route.Focus(h.id)) }
                     SmallButton("Player card", Modifier.weight(1f)) { vm.openPlayer(h.id) }
-                    SmallButton("Portrait", Modifier.weight(1f)) { vm.push(Route.Portrait(h.id)) }
+                    SmallButton("Customize", Modifier.weight(1f)) { vm.push(Route.MyPlayer) }
                 }
             }
         }

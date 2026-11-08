@@ -112,6 +112,7 @@ object Feed {
             big && pickLine != null && f.pro && h.proYears <= 2 -> "${line.pts} from ${h.last} tonight. $pickLine"
             big && !f.starter -> "${line.pts} off the bench from ${h.last}. That's a starter. Make it official."
             big && f.rookie && r.feed.none { it.season == lg.season && it.kind == "fan" && (it.text.contains("Rookie of the Year talk") || it.text.contains("A freshman with")) } -> if (f.pro) "${line.pts} from the rookie. Rookie of the Year talk starts now." else "A freshman with ${line.pts}. We're in trouble (everybody else is)."
+            big && h.nickname.isNotBlank() && Rng.chance(0.5) -> Rng.pick(listOf("${h.nickname.uppercase()}!!! $stat.", "They don't call him ${h.nickname} for nothing. ${line.pts} tonight.", "${h.nickname} did ${h.nickname} things again. $stat."))
             big -> Rng.pick(listOf("${h.last} is HIM. $stat.", "Every time somebody doubts ${h.last}, he does this. ${line.pts} tonight.", "Put some respect on ${h.first}'s name. $stat."))
             !won && line.pts >= f.norm + 6 -> Rng.pick(listOf("${h.last} gave us ${line.pts} and we still lost. Get the man some help.", "${line.pts} from ${h.last} wasted. Somebody else has to show up."))
             bad -> Rng.pick(listOf("Not ${h.last}'s night: ${line.pts} points. He'll bounce back.", "${h.last} looked off tonight. Happens.", "${line.pts} points for ${h.last}. Shake it off, kid."))

@@ -198,6 +198,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Trophies -> TrophyRoomScreen(vm, lg)
         is Route.Staff -> StaffScreen(vm, lg)
         is Route.Portrait -> PortraitMakerScreen(vm, lg, r.playerId)
+        is Route.MyPlayer -> MyPlayerScreen(vm, lg)
     }
 }
 

@@ -246,6 +246,9 @@ class Player(
     var devPlan: String = "",
     /** His custom portrait (see Face), or "" to draw one from [look]. */
     var face: String = "",
+    /** What people call him ("The Professor"), and his gear ([Gear], encoded). */
+    var nickname: String = "",
+    var gear: String = "",
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -816,6 +819,11 @@ class RoadState(
     var draftWatched: Int = -1,
     /** Live games jump straight to his plays. */
     var spotlight: Boolean = true,
+    /** His signature style ([Signature]): dunk, go-to move, jumper and celebration. */
+    var sigDunk: Int = 0,
+    var sigMove: Int = 0,
+    var sigShot: Int = 0,
+    var celebration: Int = 0,
     /** The class rival: a top recruit from the same class who follows him all career. */
     var rivalId: Int = -1,
     var rivalName: String = "",

@@ -824,7 +824,11 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
     val c = r.contract
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            ScreenHeader("Pro career · year ${h.proYears + 1}", h.last, "${h.posLabel} · age ${h.age} · ${t.name}") { PlayerJersey(h, t, 50.dp) }
+            ScreenHeader("Pro career · year ${h.proYears + 1}", h.last, "${h.posLabel} · age ${h.age} · ${t.name}") {
+                // Tap yourself to open MyPlayer.
+                Box(Modifier.clickable { vm.push(Route.MyPlayer) }) { PlayerJersey(h, t, 50.dp) }
+                SmallButton("Customize") { vm.push(Route.MyPlayer) }
+            }
             Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Ring(h.ovr, 54.dp, label = "OVR", textSize = 19.sp)

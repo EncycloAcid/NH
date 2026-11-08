@@ -1,6 +1,7 @@
 package com.nh.hoopscoach.ui
 
 import com.nh.hoopscoach.game.Face
+import com.nh.hoopscoach.game.Gear
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -31,8 +32,8 @@ object CelRender {
         for (dy in -3..3) for (dx in -3..3) { val d = hypot(dx.toDouble(), dy.toDouble()); if (d in 0.5..2.95) add(Off(dx, dy, d)) }
     }.sortedBy { it.d }
 
-    fun render(f: Face, primary: Int, secondary: Int, number: Int): IntArray {
-        val sc = CelScene(f, primary, secondary, number)
+    fun render(f: Face, primary: Int, secondary: Int, number: Int, gear: Gear = Gear()): IntArray {
+        val sc = CelScene(f, primary, secondary, number, gear)
         val col = IntArray(R * R)
         val part = IntArray(R * R)
         val k = 96.0 / R
@@ -73,13 +74,15 @@ object CelRender {
 private object Parts {
     const val BG = 0
     const val BODY = 1
-    const val JERSEY = 2
-    const val TRIM = 3
-    const val NUMBER = 4
-    const val HAIR_BACK = 5   // 5..14, one per lock
-    const val EAR = 15
-    const val HEAD = 16
-    const val BEARD = 17
+    const val SHIRT = 2
+    const val SLEEVE = 3
+    const val JERSEY = 4
+    const val TRIM = 5
+    const val NUMBER = 6
+    const val HAIR_BACK = 7   // 7..16, one per lock
+    const val EAR = 17
+    const val HEAD = 18
+    const val BEARD = 19
     const val HAIR = 20       // 20..59
     const val ACC = 70
     const val EARRING = 71
@@ -87,14 +90,14 @@ private object Parts {
     fun width(p: Int, q: Int): Double = when {
         q == BG -> 2.9
         p >= HAIR && q >= HAIR -> 1.3
-        p in HAIR_BACK..14 && q in HAIR_BACK..14 -> 1.3
+        p in HAIR_BACK..HAIR_BACK + 9 && q in HAIR_BACK..HAIR_BACK + 9 -> 1.3
         p == BEARD -> 1.5
         p == NUMBER -> 1.9
         else -> 1.8
     }
 }
 
-private class CelScene(val f: Face, primary: Int, secondary: Int, val number: Int) {
+private class CelScene(val f: Face, primary: Int, secondary: Int, val number: Int, val gear: Gear) {
     /** The point's color and shape. */
     var c = 0
     var part = Parts.BG
@@ -122,6 +125,9 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
     private val trim = secondary
     private val trimSh = mul(secondary, 0.7, 0.7, 0.78)
     private val seed = f.encode().hashCode()
+    private fun gearColor(i: Int) = when (i) { 1 -> 0xFFF2F2F0.toInt(); 2 -> 0xFF24242C.toInt(); 3 -> trim; else -> team }
+    private val shirt = when (gear.undershirt) { 1 -> 0xFFF2F2F0.toInt(); 2 -> 0xFF24242C.toInt(); else -> team }
+    private val sleeveCol = gearColor(gear.sleeveColor)
 
     // ---------- light ----------
     private val LX = -0.5; private val LY = -0.6; private val LZ = 0.62
@@ -704,11 +710,25 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
             return true
         }
         part = Parts.BODY
+        // The undershirt: a crew neck, and short sleeves over the shoulders.
+        val crew = 72.6 + (dx / 8.5).pow(2) * 1.8
+        val underShirt = gear.undershirt > 0 && !(inNeck && !inBody && y < crew) && !(inNeck && y < crew) && !(adx > 34.5 && y > 85.5)
+        // Arm sleeves: from just under the shoulder down (the player's left arm is on the right of the picture).
+        val sleeveSide = gear.sleeve == 3 || (gear.sleeve == 1 && dx > 0) || (gear.sleeve == 2 && dx < 0)
+        val onSleeve = sleeveSide && inDelt && adx > 25 && y > 86.5 - (adx - 25) * 0.55
         val nx: Double; val ny: Double
         if (inDelt && (adx > 25 || !inBody)) { nx = (adx - dcx) / dr * side; ny = (y - dcy) / dr }
         else if (inNeck && !inBody) { nx = dx / (half + 2); ny = 0.15 }
         else { nx = side * (0.1 + adx / 31.0 * 0.35); ny = -0.5 * smooth(trapY(adx) + 6, trapY(adx), y) + (y - 88) / 60 }
         val nz = sqrt((1 - nx * nx - ny * ny).coerceAtLeast(0.1))
+        if (onSleeve) { part = Parts.SLEEVE; c = cel(sleeveCol, mul(sleeveCol, 0.68, 0.68, 0.78), nx, ny, nz, 0.25); return true }
+        if (underShirt) {
+            part = Parts.SHIRT
+            c = cel(shirt, mul(shirt, 0.7, 0.7, 0.8), nx, ny, nz, 0.25)
+            // The collar's seam.
+            if (inNeck && abs(y - crew - 0.7) < 0.25) c = mul(shirt, 0.6, 0.6, 0.7)
+            return true
+        }
         var col = cel(skin, skinSh, nx, ny, nz, 0.25)
         // The head's shadow on the neck, hard-edged.
         if (inNeck && y < chinY + 4.5 - adx * 0.15) col = skinSh

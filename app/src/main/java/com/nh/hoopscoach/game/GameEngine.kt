@@ -254,6 +254,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             scored(o, pts)
             if (passer != null) line(o, passer).ast++
             log(o, "★ ${shooter.short} ${if (type == 2) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
+            // The big moment came through: his celebration.
+            Signature.celebrate(lg, shooter, true)?.let { log(o, "${shooter.short} $it", 0) }
             lg.road?.let { it.momentsWon++ }
             lastMoment = if (passer != null) "Assist! ${shooter.short} buries the three." else "Bucket! ${shooter.short} hits the $what."
             if (fouled) {
@@ -906,8 +908,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                         astText = " (${passer.short} assists)"
                     }
                 }
-                val verb = when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
-                log(o, "${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
+                val verb = Signature.made(lg, shooter, type, what) ?: when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
+                log(o, "${Signature.nick(lg, shooter)}${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
+                // Your player's celebration after a big one.
+                val bigOne = clock <= 1.0 || (clutchTime && before <= 0 && before + pts > 0) || (what == "dunk" && Rng.chance(0.25)) || (type == 2 && clutchTime && Rng.chance(0.4))
+                Signature.celebrate(lg, shooter, bigOne)?.let { log(o, "${shooter.short} $it", 0) }
                 if (fouled) {
                     val fouler = pickFouler(d, defense)
                     line(d, fouler).pf++; teamFoul(d)

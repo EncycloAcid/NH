@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import com.nh.hoopscoach.game.Face
+import com.nh.hoopscoach.game.Gear
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Team
 import kotlinx.coroutines.Dispatchers
@@ -32,14 +33,14 @@ object Pixels {
     const val N = CelRender.N
     private val cache = android.util.LruCache<String, ImageBitmap>(200)
 
-    fun key(f: Face, primary: Long, secondary: Long, number: Int) = "${f.encode()}|$primary|$secondary|$number"
+    fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear()) = "${f.encode()}|$primary|$secondary|$number|${gear.encode()}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
 
-    fun bitmap(f: Face, primary: Long, secondary: Long, number: Int): ImageBitmap {
-        val key = key(f, primary, secondary, number)
+    fun bitmap(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear()): ImageBitmap {
+        val key = key(f, primary, secondary, number, gear)
         cache.get(key)?.let { return it }
-        val px = CelRender.render(f, primary.toInt(), secondary.toInt(), number)
+        val px = CelRender.render(f, primary.toInt(), secondary.toInt(), number, gear)
         val bmp = android.graphics.Bitmap.createBitmap(px, N, N, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
         cache.put(key, bmp)
         return bmp
@@ -48,12 +49,12 @@ object Pixels {
 
 /** His portrait, drawn off the main thread the first time; a team-colored card shows until it's ready. */
 @Composable
-fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p)) {
+fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: Gear = Gear.decode(p.gear)) {
     val primary = t?.primary ?: 0xFF5C6B7AL
     val secondary = t?.secondary ?: 0xFFFFFFFFL
-    val key = Pixels.key(face, primary, secondary, p.number)
+    val key = Pixels.key(face, primary, secondary, p.number, gear)
     val bmp by produceState(Pixels.cached(key), key) {
-        if (value == null) value = withContext(Dispatchers.Default) { Pixels.bitmap(face, primary, secondary, p.number) }
+        if (value == null) value = withContext(Dispatchers.Default) { Pixels.bitmap(face, primary, secondary, p.number, gear) }
     }
     val shape = RoundedCornerShape(size * 0.2f)
     Box(Modifier.size(size).clip(shape).background(Color(primary).copy(alpha = 0.55f))) {
