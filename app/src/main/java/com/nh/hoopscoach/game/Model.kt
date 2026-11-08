@@ -242,6 +242,8 @@ class Player(
     var injury: String = "",
     var injGames: Int = 0,
     var injTotal: Int = 0,
+    /** His summer development plan, set by the user's coach: "shooting", "playmaking", "inside", "defense", "conditioning" or "". */
+    var devPlan: String = "",
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -1309,6 +1311,12 @@ class League(
     var usa: UsaTeam? = null,
     /** The defending champion's season: who, how many titles in a row, and which stories have run. */
     var defense: TitleRun? = null,
+    /** The user's assistant coaches, this offseason's candidates, and the coaching tree: assistants who became head coaches. */
+    var staff: MutableList<Assistant> = mutableListOf(),
+    var staffPool: MutableList<Assistant> = mutableListOf(),
+    var staffPoolSeason: Int = 0,
+    var tree: MutableList<TreeBranch> = mutableListOf(),
+    var nextAssistantId: Int = 1,
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

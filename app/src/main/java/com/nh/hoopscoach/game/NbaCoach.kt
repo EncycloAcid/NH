@@ -387,6 +387,7 @@ object NbaCoach {
         pc.security = 70
         pro.playedAs = college.playedAs
         Trophies.carry(college, pro)
+        pro.tree += college.tree
         pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
         val head = "${pc.name} leaves ${college.user.school} for the ${pro.user.name}"
         runCatching { Farewell.hire(pro, head) }.onFailure { pro.news += News(pro.season, 0, head, true) }
@@ -468,6 +469,7 @@ object NbaCoach {
         c.security = (c.security + d.roundToInt()).coerceIn(0, 100)
         // The owner's midseason goals.
         runCatching { FrontOffice.grade(lg) }
+        runCatching { Assistants.seasonEnd(lg) }
         lg.news += News(lg.season, lg.day, "The ${u.name} finish ${u.w}-${u.l} (projected $expect wins). " +
             "Job security: ${securityLabel(c.security).lowercase()} (${if (c.security >= before) "+" else "−"}${kotlin.math.abs(c.security - before)})", true)
         val recentTitle = c.history.takeLast(2).any { it.result == "Champion" }

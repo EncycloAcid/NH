@@ -237,13 +237,15 @@ object Offseason {
 
     private fun runDevelopment(lg: League, os: OffseasonState) {
         for (t in lg.teams) {
-            val dev = Coaching.devOf(lg.coachOf(t))
+            val dev = Coaching.devOf(lg.coachOf(t)) + Assistants.dev(lg, t)
             for (pid in t.roster) {
                 val p = lg.player(pid)
                 val before = p.ovr
                 val attrs = p.attrs.copyOf()
                 val brokeOut = Tryouts.summer(p)
                 if (p.id == lg.heroId && lg.road != null) Earned.hero(lg, p, dev) else Ratings.offseasonGrowth(p, dev)
+                DevPlans.apply(lg, t, p)
+                DevPlans.report(lg, t, p, before)
                 val gains = IntArray(10) { p.attrs[it] - attrs[it] }
                 val lbs = if (p.year <= 2) Rng.range(0, 8) else Rng.range(-2, 4)
                 p.weight += lbs
@@ -414,6 +416,7 @@ object Coaching {
         if (lg.nit?.champion == t.id) delta += 4
         // The building: sellouts please the AD, empty seats don't.
         delta += Business.bossVerdict(t)
+        runCatching { Assistants.seasonEnd(lg) }
         c.security = (c.security + delta).roundToInt().coerceIn(0, 100)
         // The AD's midseason goals.
         runCatching { FrontOffice.grade(lg) }

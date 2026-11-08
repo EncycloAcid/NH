@@ -236,14 +236,15 @@ fun NbaCoachTeam(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             ScreenHeader("${lg.conf(u.confId).name} · Coach ${lg.userCoach.last}", u.name, "${teamLine(lg, u)} · ${Payroll.status(lg, u)}") { TeamBadge(u, 46.dp) }
-            Segmented(listOf("Roster", "Lineup", "Payroll", "Business"), vm.teamTab.coerceIn(0, 3), { vm.teamTab = it })
+            Segmented(listOf("Roster", "Lineup", "Payroll", "Business", "Staff"), vm.teamTab.coerceIn(0, 4), { vm.teamTab = it })
             Spacer(Modifier.height(6.dp))
         }
-        when (vm.teamTab.coerceIn(0, 3)) {
+        when (vm.teamTab.coerceIn(0, 4)) {
             0 -> rosterList(vm, lg, u, mine = true)
             1 -> lineup(vm, lg, u)
             2 -> item { PayrollPanel(vm, lg, u) }
-            else -> item { BusinessPanel(vm, lg, u) }
+            3 -> item { BusinessPanel(vm, lg, u) }
+            else -> { staffItems(vm, lg); item { Section("Summer plans"); StaffLink(vm, lg) } }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }

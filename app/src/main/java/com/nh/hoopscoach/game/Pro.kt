@@ -1692,13 +1692,16 @@ object ProCareer {
         val ps = lg.proState!!
         ps.before.clear()
         for (t in lg.teams) {
-            val dev = Coaching.devOf(lg.coachOf(t))
+            val dev = Coaching.devOf(lg.coachOf(t)) + Assistants.dev(lg, t)
             for (pid in t.roster) {
                 val p = lg.player(pid)
                 ps.before[p.id] = p.ovr
                 val trainer = p.id == lg.heroId && lg.road?.hired?.contains(Staff.TRAINER) == true
                 // The user's player earns his growth until 30; after that he ages like everyone.
-                if (p.id == lg.heroId && p.age <= 30) Earned.hero(lg, p, dev) else develop(p, dev, trainer)
+                if (p.id == lg.heroId && p.age <= 30) Earned.hero(lg, p, dev) else develop(p, dev, trainer || p.devPlan == "conditioning")
+                // His summer plan, then the news if it paid off.
+                DevPlans.apply(lg, t, p)
+                DevPlans.report(lg, t, p, ps.before[p.id] ?: p.ovr)
                 if (p.id == lg.heroId && p.age >= 29) lg.news += News(lg.season, 0, Longevity.hint(p), true, -1, "", "", "", t.id, p.id)
             }
         }

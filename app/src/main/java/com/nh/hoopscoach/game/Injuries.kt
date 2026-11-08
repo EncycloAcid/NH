@@ -68,7 +68,7 @@ object Injuries {
         val age = 1.0 + max(0, p.age - 27) * 0.04
         val body = 1.5 - Longevity.of(p) / 100.0
         val tired = if (p.id == lg.heroId) when { (lg.road?.fatigue ?: 0) >= 70 -> 2.0; (lg.road?.fatigue ?: 0) >= 50 -> 1.3; else -> 1.0 } else 1.0
-        return base * (sec / 1800.0) * age * body * tired
+        return base * (sec / 1800.0) * age * body * tired * DevPlans.injuryFactor(p)
     }
 
     private fun hurt(lg: League, t: Team, p: Player) {

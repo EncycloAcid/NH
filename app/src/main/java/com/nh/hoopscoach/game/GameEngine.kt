@@ -294,8 +294,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
     private val era = if (lg.pro) Eras.of(lg) else Era.TODAY
 
-    private val skillOff = DoubleArray(2) { if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0 }
-    private val skillDef = DoubleArray(2) { if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0 }
+    // Coaching skills, plus the user's assistant coaches (see Assistants).
+    private val skillOff = DoubleArray(2) { (if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0) + Assistants.off(lg, teams[it]) }
+    private val skillDef = DoubleArray(2) { (if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0) + Assistants.def(lg, teams[it]) }
 
     companion object {
         /**
@@ -1158,7 +1159,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 // Pros grow slower in season, and not past their ceiling, so the league's ratings hold steady.
                 // First-year pros stop at the rookie cap of 83 until their first summer.
                 val proRate = if (!lg.pro) 1.0 else if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) 0.0 else 0.35
-                val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side])) *
+                val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side]) + Assistants.dev(lg, t)) *
                     (if (p.id == lg.heroId) Road.xpFactor(lg) else 1.0) * proRate
                 Ratings.addXp(p, xp.roundToInt())
                 if (lg.pro) ProLeague.rookieCap(lg, p)

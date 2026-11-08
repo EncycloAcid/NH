@@ -190,7 +190,7 @@ object Recruiting {
         out += Factor("Program strength", strength, "Recruiting Pull $pull; he's looking for about ${wants(r).roundToInt()}")
         // Coach.
         val c = lg.coachOf(t)
-        val coach = (0.8 + c.rec / 250.0) * if (c.has(CoachSkill.RECRUITER)) 1.08 else 1.0
+        val coach = (0.8 + (c.rec + (if (t.id == lg.userTeamId) Assistants.rec(lg) else 0)) / 250.0) * if (c.has(CoachSkill.RECRUITER)) 1.08 else 1.0
         out += Factor("Coach recruiting", coach, "Coach ${c.last}: ${c.rec} recruiting" + if (c.has(CoachSkill.RECRUITER)) ", Ace Recruiter" else "")
         // Location.
         val close = Geo.closeness(t, r.p)

@@ -169,6 +169,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Social -> SocialScreen(vm, lg)
         is Route.Article -> ArticleScreen(vm, lg, r.newsIndex)
         is Route.Trophies -> TrophyRoomScreen(vm, lg)
+        is Route.Staff -> StaffScreen(vm, lg)
     }
 }
 
