@@ -1761,7 +1761,8 @@ object ProCareer {
             r.ending += " Your rival ${rv.name}: $rings ${if (rings == 1) "ring" else "rings"}, $stars All-Star ${if (stars == 1) "selection" else "selections"}."
         }
         Afterward.retireNumbers(lg)
-        lg.news += News(lg.season, lg.day, "${h.name} announces his retirement", true)
+        // The farewell: his letter, the numbers, the tributes and the coverage, on a screen of its own.
+        runCatching { Farewell.retire(lg) }.onFailure { lg.news += News(lg.season, lg.day, "${h.name} announces his retirement", true) }
         // NBA teams call about their bench; colleges call too (the ending screen lists both).
         lg.proState?.jobOffers?.let { it.clear(); it += NbaCoach.retiredOffers(lg) }
     }

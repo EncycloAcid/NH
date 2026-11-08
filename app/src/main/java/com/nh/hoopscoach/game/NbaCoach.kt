@@ -387,7 +387,8 @@ object NbaCoach {
         pc.security = 70
         pro.playedAs = college.playedAs
         pro.proState!!.collegeResume = "${c.w}-${c.l} in college · ${c.tourneys} NCAA trip${if (c.tourneys == 1) "" else "s"} · ${c.finalFours} Final Four${if (c.finalFours == 1) "" else "s"} · ${c.titles} title${if (c.titles == 1) "" else "s"}"
-        pro.news += News(pro.season, 0, "${pc.name} leaves ${college.user.school} for the ${pro.user.name}", true)
+        val head = "${pc.name} leaves ${college.user.school} for the ${pro.user.name}"
+        runCatching { Farewell.hire(pro, head) }.onFailure { pro.news += News(pro.season, 0, head, true) }
         return pro
     }
 
@@ -532,8 +533,10 @@ object NbaCoach {
         if (ps.step != ProStep.REVIEW) ps.userKeep += expiring(lg).filter { Trades.value(it) >= 1.5 }.map { it.id }
         Gameplan.autoAllocate(lg, t)
         val was = lg.playedAs?.proTeams?.contains(t.name) == true
-        lg.news += News(lg.season, lg.day, "From the court to the bench: the ${t.name} name ${h.name} head coach" +
-            if (was) ", back with a team he played for" else "", true)
+        val head = "From the court to the bench: the ${t.name} name ${h.name} head coach" + if (was) ", back with a team he played for" else ""
+        // The farewell screen is behind him; now the press conference.
+        lg.ceremony = null
+        runCatching { Farewell.hire(lg, head) }.onFailure { lg.news += News(lg.season, lg.day, head, true) }
     }
 
     /** A new job: he takes over [teamId], whose coach is let go. */
@@ -558,6 +561,7 @@ object NbaCoach {
         ps.fired = false
         ps.jobOffers.clear()
         Gameplan.autoAllocate(lg, t)
-        lg.news += News(lg.season, lg.day, "${c.name} is the new head coach of the ${t.name}", true)
+        val head = "${c.name} is the new head coach of the ${t.name}"
+        runCatching { Farewell.hire(lg, head) }.onFailure { lg.news += News(lg.season, lg.day, head, true) }
     }
 }

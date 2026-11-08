@@ -92,6 +92,8 @@ fun App(vm: GameViewModel) {
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     BackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
+    // A career moment (his retirement, his introduction as a coach) takes the whole screen until he moves on.
+    lg.ceremony?.let { CeremonyScreen(vm, lg, it); return }
     // Big moments pop up one at a time.
     lg.alerts.firstOrNull()?.let { a -> AlertPopup(vm, a) }
     // The preseason magazine opens by itself once, before the first game of every season.

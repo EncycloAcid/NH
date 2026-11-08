@@ -1278,6 +1278,8 @@ class League(
     var playedAs: PlayedAs? = null,
     /** The NBA league he played in, packed (SaveIO.pack) while he coaches in college, so a later NBA job returns to the same world. */
     var proWorld: String = "",
+    /** A big moment that takes the whole screen until it's dismissed: his retirement, or his introduction as a coach. */
+    var ceremony: Ceremony? = null,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

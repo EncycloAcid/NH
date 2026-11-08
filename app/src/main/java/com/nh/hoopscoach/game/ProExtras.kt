@@ -377,9 +377,10 @@ object Afterward {
             c.dev = 66
         }
         college.playedAs = past
-        college.news += News(college.season, 0,
-            if (pro.pro) "${h.name} takes over at ${t.school}: ${r.rings} ${if (r.rings == 1) "ring" else "rings"}, ${r.allStars} All-Star games and a pro career to sell"
-            else "${h.name} comes home from $away years overseas to coach ${t.school}", true)
+        val head = if (pro.pro) "${h.name} takes over at ${t.school}: ${r.rings} ${if (r.rings == 1) "ring" else "rings"}, ${r.allStars} All-Star games and a pro career to sell"
+            else "${h.name} comes home from $away years overseas to coach ${t.school}"
+        // His introduction: a press conference of its own.
+        runCatching { Farewell.hire(college, head) }.onFailure { college.news += News(college.season, 0, head, true) }
         return college
     }
 }
