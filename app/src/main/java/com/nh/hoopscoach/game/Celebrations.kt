@@ -75,9 +75,15 @@ object Celebrations {
             append(", ${t.record} on the season.")
             if (mvpName.isNotEmpty()) append(" $mvpName${if (pro) ", the Finals MVP," else ", the Most Outstanding Player,"} rode up front holding the trophy over his head the whole way.")
         }
+        // In a row, or the first in a while.
+        val run = 1 + TitleDefense.streak(lg, t, season - 1)
+        val prevTitle = TitleDefense.titles(lg, t).filter { it < season }.maxOrNull()
         story += when {
-            titles >= 3 -> "It's title No. $titles. The word nobody in the building will say out loud is the one everybody is thinking: dynasty."
-            titles == 2 -> "Their second. The first one was a surprise. This one was a statement."
+            run >= 3 -> "That's ${TitleDefense.runWords(run)}. The word nobody in the building will say out loud is the one everybody is thinking: dynasty."
+            run == 2 -> "Back-to-back. Last year they were the hunted all season, and they won it anyway." +
+                (TitleDefense.lastRepeat(lg, season)?.let { (y, r) -> " The first repeat champions since ${if (pro) "the ${r.name}" else r.school} in $y." } ?: "")
+            titles >= 3 -> "It's title No. $titles for the franchise" + (prevTitle?.let { ", the first since $it." } ?: ".")
+            titles == 2 -> "Their second" + (prevTitle?.let { ", and the first since $it" } ?: "") + ". The first one was a surprise. This one was a statement."
             else -> "The first one is the one you never forget."
         }
         runCatching { GreatTeams.rankOf(lg, t) }.getOrNull()?.takeIf { it in 1..25 }?.let { story += "Where this team ranks: No. $it on our list of the greatest champions ever." }
@@ -146,8 +152,9 @@ object Celebrations {
         val back = lg.rosterOf(t).filter { p -> p.awards.contains("$last Champion") || (!pro && p.career.any { it.season == last && it.teamId == t.id }) }
         val loudest = lg.rosterOf(t).firstOrNull { it.name == mvp } ?: back.maxByOrNull { it.ovr }
         val lines = mutableListOf<String>()
+        val run = TitleDefense.streak(lg, t, last)
         lines += "Before the opener" + (opener?.let { " against ${if (pro) "the ${it.name}" else it.school}" } ?: "") +
-            ", the lights went down and the $last banner rose to the rafters" + (if ((if (pro) lg.proState?.history?.count { it.champion == t.id } else t.titles) ?: 0 > 1) ", next to the others." else ".")
+            ", the lights went down and the $last banner rose to the rafters" + (if (run >= 2) ", the ${run}${if (run == 2) "nd" else if (run == 3) "rd" else "th"} in a row. Now: ${TitleDefense.chasing(run)}." else if ((if (pro) lg.proState?.history?.count { it.champion == t.id } else t.titles) ?: 0 > 1) ", next to the others." else ".")
         lines += "One by one, the rings: ${plural(back.size.coerceAtLeast(1), "player")} still here from the title team" +
             (loudest?.let { ", and the loudest ovation of the night for ${it.name}." } ?: ".")
         lines += pick("Then the hard part: playing a game after that.", "The visitors watched the whole thing from their bench. They'll be getting everybody's best shot all year, too.", "Now everyone's gunning for them.")

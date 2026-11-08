@@ -2,6 +2,7 @@ package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -47,5 +48,19 @@ fun LeagueInjuries(vm: GameViewModel, lg: League) {
                 Text(Injuries.tag(p), style = T.small, color = P.bad, maxLines = 2, modifier = Modifier.padding(top = 1.dp))
             }
         }
+    }
+}
+
+/** The user's team is defending a title: what it's chasing and how it's going. */
+@Composable
+fun TitleDefenseCard(lg: League) {
+    val d = com.nh.hoopscoach.game.TitleDefense.userDefending(lg) ?: return
+    if (lg.phase != com.nh.hoopscoach.game.Phase.REGULAR && lg.phase != com.nh.hoopscoach.game.Phase.PLAYOFFS && lg.phase != com.nh.hoopscoach.game.Phase.CONF_TOURNEY && lg.phase != com.nh.hoopscoach.game.Phase.NCAA) return
+    val u = lg.user
+    Spacer(Modifier.height(6.dp))
+    Panel(color = P.hero) {
+        Text(if (d.streak >= 2) "${com.nh.hoopscoach.game.TitleDefense.runWords(d.streak).uppercase()} · DEFENDING CHAMPIONS" else "DEFENDING CHAMPIONS", style = T.label, color = P.gold)
+        Text("Chasing ${com.nh.hoopscoach.game.TitleDefense.chasing(d.streak)}", style = T.head, color = P.onHero)
+        Text("${u.record} so far. Everyone circles your game on their schedule.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
     }
 }

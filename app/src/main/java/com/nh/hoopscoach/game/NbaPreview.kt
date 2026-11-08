@@ -291,6 +291,7 @@ object NbaPreviews {
         val champ = NbaHistory.finalists(lg, lg.season - 1).first?.id
         val second = ranked(lg, pv).getOrNull(1)
         return when {
+            champ == top.id && TitleDefense.streak(lg, top, lg.season - 1) >= 2 -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question")
             champ == top.id -> pick(lg, 1, "Run it back", "Repeat?", "The champs are still the team to beat", "Defending the throne")
             second != null && o.title - pv.proj.getValue(second.id).title < 0.04 && o.title >= 0.12 -> pick(lg, 4, "Two-horse race", "${top.name.substringAfterLast(' ')} vs. ${second.name.substringAfterLast(' ')}", "Clash of contenders")
             o.title < 0.16 -> pick(lg, 2, "Wide open", "Anyone's title", "No favorite", "Pick a team, any team")

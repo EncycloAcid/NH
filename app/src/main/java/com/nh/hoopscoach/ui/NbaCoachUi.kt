@@ -204,6 +204,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             Section(lg.conf(u.confId).name, action = "All", onAction = { vm.leagueTab = 0; vm.select(Tab.LEAGUE) })
             GroupList(shown) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
+        item { TitleDefenseCard(lg) }
         item { GoalsCard(lg) }
         item { InjuryReport(vm, lg, u) }
         item {

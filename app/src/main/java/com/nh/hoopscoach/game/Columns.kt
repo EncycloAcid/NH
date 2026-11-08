@@ -168,6 +168,7 @@ object Columns {
                     "Our preseason favorite, ${the(lg, fav)}, went ${fav.record}: ${resultWords(fav.history.lastOrNull { it.season == lg.season }?.result ?: "")}."
             }
         }
+        defenseLine(lg)?.let { parts += it }
         ps.preview?.takeIf { it.season == lg.season }?.let { pv -> Receipts.paragraph(pv.bold, pv.graded, pv.outcomes, nextYear = false)?.let { parts += it } }
         val head = pick(lg, 10, "${lg.season} in review: the ${nick(lg, champ)}' year", "The season in review: ${champ.name}, champions", "Looking back at ${lg.season}: how the ${nick(lg, champ)} won it all")
         lg.news += News(lg.season, lg.day, head, champ.id == lg.userTeamId, -1, "column", parts.joinToString("\n\n"), byline(lg, 99), champ.id, mvp?.pid ?: -1)
@@ -199,9 +200,27 @@ object Columns {
                     "Our preseason No. 1, ${no1.school}, ${Previews.lastSeason(no1.history.lastOrNull { it.season == lg.season }?.result ?: "")}."
             }
         }
+        defenseLine(lg)?.let { parts += it }
         lg.preview?.takeIf { it.season == lg.season }?.let { pv -> Receipts.paragraph(pv.bold, pv.graded, pv.outcomes, nextYear = false)?.let { parts += it } }
         val head = pick(lg, 11, "${lg.season} in review: ${champ.school}'s year", "The season in review: ${champ.school}, champions", "Looking back at ${lg.season}: how ${champ.school} won it all")
         lg.news += News(lg.season, lg.day, head, champ.id == lg.userTeamId, -1, "column", parts.joinToString("\n\n"), byline(lg, 98), champ.id, withAward("Nat MVP")?.id ?: -1)
+    }
+
+    /** How last season's champion did this season, for the review. */
+    private fun defenseLine(lg: League): String? {
+        val d = lg.defense?.takeIf { it.season == lg.season } ?: return null
+        val t = lg.teams.getOrNull(d.champ) ?: return null
+        val champNow = if (lg.pro) lg.proState?.champion else lg.ncaa?.champion
+        val who = if (lg.pro) "the ${t.name}" else t.school
+        val result = if (lg.pro) ProSeason.resultFor(lg, t.id) else Awards.resultFor(lg, t.id)
+        return if (champNow == t.id) {
+            val run = TitleDefense.streak(lg, t, lg.season - 1) + 1
+            "${who.replaceFirstChar { it.uppercase() }} did it again: ${TitleDefense.runWords(run)}."
+        } else "Last year's champions, $who, " + when {
+            result == "Missed playoffs" || result == "Missed Tournament" || result.startsWith("NIT") -> "didn't make it back to the ${if (lg.pro) "playoffs" else "tournament"} (${t.record})."
+            lg.pro -> "${resultWords(result)} (${t.record})."
+            else -> "went out in the $result (${t.record})."
+        } + if (d.streak >= 2) " Their run of ${TitleDefense.runWords(d.streak)} is over." else ""
     }
 
     private fun resultWords(result: String) = when {

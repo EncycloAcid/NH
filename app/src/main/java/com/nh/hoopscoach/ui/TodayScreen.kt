@@ -82,6 +82,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
+        item { TitleDefenseCard(lg) }
         item { InjuryReport(vm, lg, u) }
         if (!lg.playerMode) item { GoalsCard(lg) }
         item { Form(vm, lg, u) }

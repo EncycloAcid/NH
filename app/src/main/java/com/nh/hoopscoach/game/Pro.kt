@@ -1789,6 +1789,8 @@ object ProCareer {
 object Sim {
     fun playDay(lg: League) {
         if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
+        // The defending champion's season, in the news.
+        runCatching { TitleDefense.check(lg) }
         Reactions.pass(lg)
     }
 }

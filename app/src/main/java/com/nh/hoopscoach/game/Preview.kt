@@ -356,6 +356,7 @@ object Previews {
         val o = odds(pv, top)
         val champ = CollegeHistory.lastChampion(lg)?.id
         return when {
+            champ == top.id && lg.teams.getOrNull(top.id)?.let { TitleDefense.streak(lg, it, lg.season - 1) >= 2 } == true -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question")
             champ == top.id -> pick(lg, 1, "Repeat?", "Run it back", "Two in a row?")
             o.title < 0.12 -> pick(lg, 2, "Wide open", "Anyone's year", "Up for grabs")
             else -> pick(lg, 3, "The team to beat", "Chasing ${top.school}", "${top.school} on top", "Built for March")

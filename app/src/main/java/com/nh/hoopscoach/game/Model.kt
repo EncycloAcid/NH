@@ -1307,6 +1307,8 @@ class League(
     var goalStake: Int = 0,
     /** Team USA: this summer's call (if any), and the gold medals he's coached. */
     var usa: UsaTeam? = null,
+    /** The defending champion's season: who, how many titles in a row, and which stories have run. */
+    var defense: TitleRun? = null,
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
