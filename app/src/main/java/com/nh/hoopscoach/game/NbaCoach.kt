@@ -463,7 +463,11 @@ object NbaCoach {
         if (!inPlayoffs && expect >= games * 0.55) d -= 6
         if (inPlayoffs && expect < games * 0.45) d += 5
         val before = c.security
+        // The building: sellouts please the owner, empty seats don't.
+        d += Business.bossVerdict(u)
         c.security = (c.security + d.roundToInt()).coerceIn(0, 100)
+        // The owner's midseason goals.
+        runCatching { FrontOffice.grade(lg) }
         lg.news += News(lg.season, lg.day, "The ${u.name} finish ${u.w}-${u.l} (projected $expect wins). " +
             "Job security: ${securityLabel(c.security).lowercase()} (${if (c.security >= before) "+" else "−"}${kotlin.math.abs(c.security - before)})", true)
         val recentTitle = c.history.takeLast(2).any { it.result == "Champion" }

@@ -13,7 +13,8 @@ object Rankings {
     fun homeElo(lg: League, g: Game): Double = when {
         g.neutral -> 0.0
         lg.rivalry(g) != null -> HOME_ELO + Rivalries.HOME_BOOST
-        else -> HOME_ELO
+        // A full building is louder (see Business.crowdElo).
+        else -> HOME_ELO + Business.crowdElo(lg.team(g.home))
     }
 
     /** Pregame win chance for [teamId] in [g], crowd included. */

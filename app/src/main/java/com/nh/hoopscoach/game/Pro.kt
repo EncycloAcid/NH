@@ -807,6 +807,8 @@ object ProSeason {
                 NbaAwards.endOfDay(lg)
                 Rumors.daily(lg)
                 if (lg.day == ProLeague.allStarDay(lg) - 1) allStar(lg)
+                // The owner calls the coach in at the break.
+                if (lg.day == ProLeague.allStarDay(lg) - 1 && NbaCoach.active(lg)) runCatching { FrontOffice.meeting(lg) }
                 if (lg.day == Trades.deadlineDay(lg) - 1) Trades.deadline(lg)
                 if (lg.day >= ProLeague.lastDay(lg)) { startPlayoffs(lg); return }
             }
@@ -1153,6 +1155,8 @@ object ProSeason {
         lg.games.clear()
         lg.seasonAwards.clear()
         Injuries.clearAll(lg)
+        for (t in lg.teams) Business.newSeason(t)
+        lg.goals.removeAll { it.season < lg.season - 1 }
         ps.series.clear(); ps.seeds.clear(); ps.champion = -1
         ps.allStars.clear(); ps.allStarNote = ""; ps.weekend.clear(); ps.mvpVotes.clear()
         ps.draftedByUser.clear(); ps.retiredThisSummer.clear(); ps.before.clear()

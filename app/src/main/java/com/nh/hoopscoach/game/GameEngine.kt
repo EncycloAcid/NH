@@ -974,6 +974,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             teams[1].opp.add(lastTotals(0))
         }
         Rankings.updateElo(lg, game)
+        runCatching { Business.afterGame(lg, game) }
         if (!lg.pro) {
             Rivalries.afterGame(lg, game)
             Fans.afterGame(lg, game)

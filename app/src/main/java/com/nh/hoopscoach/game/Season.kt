@@ -61,6 +61,8 @@ object Season {
             Phase.REGULAR -> {
                 dailyUpkeep(lg)
                 if (lg.day == Schedule.EVENT_DAY + 2) for (ev in lg.events) finishEvent(lg, ev)
+                // Conference play starts: the AD calls the coach in.
+                if (lg.day == Schedule.NC_DAYS && !lg.playerMode) runCatching { FrontOffice.meeting(lg) }
                 if (lg.day >= Schedule.REG_DAYS) {
                     endRegularSeason(lg)
                     lg.day = Schedule.CT_START

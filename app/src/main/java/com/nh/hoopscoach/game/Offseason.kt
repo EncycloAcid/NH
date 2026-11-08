@@ -334,6 +334,8 @@ object Offseason {
         lg.phase = Phase.REGULAR
         lg.day = 1
         Injuries.clearAll(lg)
+        for (t in lg.teams) Business.newSeason(t)
+        lg.goals.removeAll { it.season < lg.season - 1 }
         lg.wrapUp = null
         lg.offseason = null
         lg.seasonAwards = mutableListOf()
@@ -410,7 +412,11 @@ object Coaching {
         val round = Awards.tourneyRound(lg, t.id)
         var delta = (t.w - t.expWins) * 3 + (round - expectedRound(t.prevPrestige)) * 5
         if (lg.nit?.champion == t.id) delta += 4
+        // The building: sellouts please the AD, empty seats don't.
+        delta += Business.bossVerdict(t)
         c.security = (c.security + delta).roundToInt().coerceIn(0, 100)
+        // The AD's midseason goals.
+        runCatching { FrontOffice.grade(lg) }
     }
 
     /** Coaching points earned this season. */

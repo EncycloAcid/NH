@@ -204,6 +204,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             Section(lg.conf(u.confId).name, action = "All", onAction = { vm.leagueTab = 0; vm.select(Tab.LEAGUE) })
             GroupList(shown) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
+        item { GoalsCard(lg) }
         item { InjuryReport(vm, lg, u) }
         item {
             val leaders = lg.rosterOf(u).filter { it.stats.gp > 0 }.sortedByDescending { it.stats.ppg }.take(4)
@@ -234,13 +235,14 @@ fun NbaCoachTeam(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             ScreenHeader("${lg.conf(u.confId).name} · Coach ${lg.userCoach.last}", u.name, "${teamLine(lg, u)} · ${Payroll.status(lg, u)}") { TeamBadge(u, 46.dp) }
-            Segmented(listOf("Roster", "Lineup", "Payroll"), vm.teamTab.coerceIn(0, 2), { vm.teamTab = it })
+            Segmented(listOf("Roster", "Lineup", "Payroll", "Business"), vm.teamTab.coerceIn(0, 3), { vm.teamTab = it })
             Spacer(Modifier.height(6.dp))
         }
-        when (vm.teamTab.coerceIn(0, 2)) {
+        when (vm.teamTab.coerceIn(0, 3)) {
             0 -> rosterList(vm, lg, u, mine = true)
             1 -> lineup(vm, lg, u)
-            else -> item { PayrollPanel(vm, lg, u) }
+            2 -> item { PayrollPanel(vm, lg, u) }
+            else -> item { BusinessPanel(vm, lg, u) }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }

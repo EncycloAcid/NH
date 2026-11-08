@@ -338,6 +338,11 @@ class Team(
     var tourneys: Int = 0,
     var confTitles: Int = 0,
     var bonuses: MutableList<NilBonus> = mutableListOf(),
+    /** The business: ticket price (0 cheap to 4 luxury), the upgrade budget and this season's gate (thousands), upgrades bought. */
+    var price: Int = 2,
+    var cash: Long = -1,
+    var gate: Long = 0,
+    var upgrades: MutableList<String> = mutableListOf(),
     /** Home arena capacity, set once when the league is created (or an old save loads). */
     var arena: Int = 0,
     /** Prestige won or lost in rivalry games this season. */
@@ -1295,6 +1300,9 @@ class League(
     /** The trophy room: every achievement unlocked across the career (carried from save to save). */
     var achievements: MutableList<Achievement> = mutableListOf(),
     var trophiesSeeded: Boolean = false,
+    /** The owner's or AD's goals for this season, and what each one is worth to his job. */
+    var goals: MutableList<Goal> = mutableListOf(),
+    var goalStake: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

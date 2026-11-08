@@ -410,6 +410,7 @@ object Celebrations {
                 1 -> follow(0.06)
                 else -> {}
             }
+            "meeting" -> FrontOffice.answer(lg, choice)
             "hof", "hofcoach" -> if (lg.road == null) runCatching { lg.userCoach }.getOrNull()?.let { c ->
                 when (choice) {
                     0 -> c.rec = (c.rec + 2).coerceAtMost(99)
