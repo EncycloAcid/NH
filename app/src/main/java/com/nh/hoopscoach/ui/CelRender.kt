@@ -279,40 +279,18 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
             3 -> {
                 if (spikyCap(x, y, 1.6, 7, up - 1.0, up + 1.0, { 2.0 + hash(it, 1, seed) * 1.2 }, 0, 0.0, 0.0, crTop + 9.5)) return true
             }
-            4 -> {
-                val top = crTop - 10
-                if (y >= top && abs(x - 48) <= rx - 1.0 && y < hairline(x) + 0.5 && !(inHead(x, y) && y > hairline(x))) {
-                    val corner = y < top + 2 && abs(x - 48) > rx - 3 && hypot(abs(x - 48) - (rx - 3), y - (top + 2)) > 2
-                    if (!corner) {
-                        part = Parts.HAIR
-                        val nx = ((x - 48) / rx).coerceIn(-0.9, 0.9)
-                        c = when {
-                            y < top + 1.6 -> hairHi
-                            abs(y - (top + 5)) < 0.7 && x < 48 -> hairHi
-                            else -> cel(hair, hairSh, nx, 0.0, sqrt(1 - nx * nx), 0.2)
-                        }
-                        return true
-                    }
-                }
-            }
-            6 -> {
-                val top = crTop - 18
-                if (y >= top && y < hairline(x) + 0.5 && !(inHead(x, y) && y > hairline(x))) {
-                    val k = ((y - top) / (crTop + 8 - top)).coerceIn(0.0, 1.0)
-                    val half = rx - 4.2 + k * 3.2
-                    val scallop = if (y < top + 3) sin((x - 48) * 0.9).let { abs(it) } * 1.6 else 0.0
-                    if (abs(x - 48 - (1 - k) * 1.4) <= half && y >= top + scallop) {
-                        part = Parts.HAIR
-                        c = hairColor(x, y, 44.0, top + 6, 22.0)
-                        return true
-                    }
-                }
+            4, 6 -> {
+                if (topBlock(x, y, if (style == 4) 6.5 else 11.5, if (style == 4) 2.2 else 3.6, if (style == 4) 2.5 else 4.0)) return true
             }
             5, 7 -> {
-                // Only the part over the forehead is in front; the rest of the cloud sits behind.
+                // The part over the forehead is in front of the face, but it's the same cloud as the hair behind:
+                // the same shape and color, so no line runs between them.
                 if (inHead(x, y) && y < hairline(x) + 1) {
-                    part = Parts.HAIR
-                    c = hairColor(x, y, 46.0, crTop + 12, 30.0, withShine = false)
+                    part = Parts.HAIR_BACK
+                    val ac = crTop + (if (style == 5) 13 else 14)
+                    val base = if (style == 5) 29.0 else rx + 6.5
+                    c = hairColor(x, y, 46.0, ac - 3, base + 2, withShine = false)
+                    if (abs(noise(x * 0.45, y * 0.45, seed + 8) - 0.5) < 0.025) c = INK
                     return true
                 }
             }
@@ -413,6 +391,35 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
         return false
     }
 
+    /**
+     * A flat-top or high-top: a block of hair [height] above the crown, [inset] narrower at the top than the
+     * head, with rounded corners of radius [round]. The sides are faded down to the scalp; the top plane
+     * catches the light, there's a hard shine band and a tight-curl texture.
+     */
+    private fun topBlock(x: Double, y: Double, height: Double, inset: Double, round: Double): Boolean {
+        val top = crTop - height
+        if (y < top || y > hairline(x) + 0.5) return false
+        if (inHead(x, y) && y > hairline(x)) return false
+        // Narrower at the top, widening smoothly into the head's own outline.
+        val join = crTop + 9
+        val joinHalf = hw(join) + 0.5
+        val half = if (y >= join) hw(y) + 0.5 else max((rx - inset) + (joinHalf - (rx - inset)) * ((y - top) / (join - top)).coerceIn(0.0, 1.0), hw(y) + 0.5)
+        val dx = abs(x - 48)
+        if (dx > half) return false
+        // Rounded top corners.
+        if (y < top + round && dx > half - round && hypot(dx - (half - round), y - (top + round)) > round) return false
+        part = Parts.HAIR
+        val nx = ((x - 48) / (half + 2)).coerceIn(-0.95, 0.95)
+        c = when {
+            y < top + 1.3 -> mix(hair, hairHi, 0.6)
+            abs(y - (top + height * 0.35)) < 0.75 && x < 50 && noise(x * 0.8, 3.0, seed + 6) > 0.3 -> hairHi
+            else -> cel(hair, hairSh, nx, 0.0, sqrt(1 - nx * nx), 0.15)
+        }
+        // Tight curls: little dark flecks.
+        if (y > top + 1.3 && hash((x * 2.2).toInt(), (y * 2.2).toInt(), seed + 3) > 0.86) c = mix(c, hairSh, 0.7)
+        return true
+    }
+
     /** Hair behind the head: the afro and curls, locs and long hair. */
     private fun hairBack(x: Double, y: Double): Boolean {
         when (style) {
@@ -445,16 +452,21 @@ private class CelScene(val f: Face, primary: Int, secondary: Int, val number: In
                 }
             }
             10 -> {
-                val n = 8
+                val n = 7
+                val wave = sin(y * 0.22 + seed % 3) * 0.8 * smooth(cy, cy + 10, y)
+                val xs = x - wave
                 val half = hw(min(y, cy), 3.5) + 0.5 + (y - cy).coerceAtLeast(0.0) * 0.07
-                if (y > crTop + 8 && abs(x - 48) <= half) {
+                if (y > crTop + 8 && abs(xs - 48) <= half) {
                     val x0 = 48 - half; val w = 2 * half / n
-                    val i = floor((x - x0) / w).toInt().coerceIn(0, n - 1)
-                    val t = (x - x0) / w - i
-                    val end = 72 + hash(i, 6, seed) * 5 + 4 * (1 - abs(2 * t - 1))
+                    val i = floor((xs - x0) / w).toInt().coerceIn(0, n - 1)
+                    val t = (xs - x0) / w - i
+                    val end = 73 + hash(i, 6, seed) * 5 + 4.5 * (1 - abs(2 * t - 1)).pow(0.7)
                     if (y < end) {
-                        part = Parts.HAIR_BACK + (i % 2)
+                        part = Parts.HAIR_BACK
                         c = hairColor(x, y, 48.0, cy, 28.0, withShine = false)
+                        // Strands part toward the ends, like locks of hair.
+                        if ((t < 0.07 || t > 0.93) && y > end - 9) c = INK
+                        else if (abs(t - 0.5) < 0.06 && y > end - 6 && y < end - 1.5) c = hairSh
                         return true
                     }
                 }
