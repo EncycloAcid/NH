@@ -320,6 +320,9 @@ object Season {
         for (id in f4) { lg.team(id).finalFours++; lg.coachOf(lg.team(id)).finalFours++ }
         val runnerUp = ncaa.rounds[5].first { it != ncaa.champion }
         lg.news += News(lg.season, lg.day, "${champ.school} are national champions!", champ.id == lg.userTeamId)
+        // The parade for his team's title, then awards night for his (or his players') big honors.
+        if (champ.id == lg.userTeamId) runCatching { Celebrations.parade(lg) }
+        runCatching { Celebrations.awardsNight(lg) }
 
         val confChamps = HashMap<Int, Int>()
         for (b in lg.confBrackets) {

@@ -536,6 +536,7 @@ object NbaCoach {
         val head = "From the court to the bench: the ${t.name} name ${h.name} head coach" + if (was) ", back with a team he played for" else ""
         // The farewell screen is behind him; now the press conference.
         lg.ceremony = null
+        lg.ceremonyQueue.clear()
         runCatching { Farewell.hire(lg, head) }.onFailure { lg.news += News(lg.season, lg.day, head, true) }
     }
 

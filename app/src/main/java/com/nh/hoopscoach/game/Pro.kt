@@ -1092,10 +1092,10 @@ object ProSeason {
         AwardsNight.mostImproved(lg, ladder)?.let { (p, t) -> give(lg, "Most Improved Player", p, t) }
         NbaAwards.awardsNight(lg, ladder, mvp, defense, rookies)
         val mine = lg.seasonAwards.filter { it.pid == lg.heroId }.map { NbaAwards.label(it.award) }
-        if (mine.isNotEmpty()) {
-            lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
-            Alerts.add(lg, if ("MVP" in mine) "You're the MVP" else "Awards night", "Your ${lg.season} honors: ${mine.joinToString(", ")}.", "award")
-        }
+        if (mine.isNotEmpty()) lg.news += News(lg.season, lg.day, "${lg.hero?.name}: ${mine.joinToString(", ")}", true)
+        // Awards night: a big one for him (or, coaching, for one of his players or himself) gets its own screen.
+        val night = runCatching { Celebrations.awardsNight(lg) }.isSuccess && lg.ceremony?.kind == "awards"
+        if (mine.isNotEmpty() && !night) Alerts.add(lg, "Awards night", "Your ${lg.season} honors: ${mine.joinToString(", ")}.", "award")
     }
 
     private fun endSeason(lg: League) {
@@ -1112,11 +1112,12 @@ object ProSeason {
         for (t in lg.teams) if (t.history.none { it.season == lg.season }) t.history += TeamSeason(lg.season, t.w, t.l, t.cw, t.cl, resultFor(lg, t.id), 0, 0, ps.seeds[t.id] ?: 0, lg.coachOf(t).name)
         for (p in lg.rosterOf(champ)) p.awards += "${lg.season} Champion"
         val r = lg.road
-        if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) {
-            r.rings++
-            Alerts.add(lg, "Champions", "The ${champ.name} win the ${lg.season} title" + (if (fmvp?.id == lg.heroId) ", and you're the Finals MVP." else ". That's ring No. ${r.rings}."), "title")
-        }
+        if (r != null && lg.userTeamId == champ.id && lg.playerOrNull(lg.heroId)?.teamId == champ.id) r.rings++
         lg.news += News(lg.season, lg.day, "The ${champ.name} win the title over the ${lg.team(runnerUp).name}" + (fmvp?.let { ". Finals MVP: ${it.name}" } ?: ""), true)
+        // The parade: his team's title gets a day of its own.
+        if (champ.id == lg.userTeamId) runCatching { Celebrations.parade(lg) }.onFailure {
+            Alerts.add(lg, "Champions", "The ${champ.name} win the ${lg.season} title.", "title")
+        }
         for (p in lg.players) {
             val t = if (p.teamId >= 0) lg.team(p.teamId) else null
             if (t != null && (p.stats.gp > 0 || p.tourney.gp > 0)) {
@@ -1176,6 +1177,8 @@ object ProSeason {
         ps.live = emptyMap()
         ps.liveDay = 0
         if (NbaCoach.active(lg)) ps.expect = pv.proj[lg.userTeamId]?.w ?: (ProLeague.seasonGames(lg) / 2)
+        // Ring night: last season's champions raise the banner at the opener.
+        if (ps.history.lastOrNull()?.let { it.season == lg.season - 1 && it.champion == lg.userTeamId } == true) runCatching { Celebrations.ringNight(lg) }
         NbaPreviews.ranked(lg, pv).firstOrNull()?.let { top ->
             lg.news += News(lg.season, 0, "The ${lg.season} season preview is out: the ${top.name} are the title favorites, and we project the ${lg.user.name} at ${pv.proj[lg.user.id]?.w ?: 0}-${pv.proj[lg.user.id]?.l ?: 0}")
         }

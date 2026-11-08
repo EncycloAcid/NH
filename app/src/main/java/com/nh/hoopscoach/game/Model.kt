@@ -1280,6 +1280,8 @@ class League(
     var proWorld: String = "",
     /** A big moment that takes the whole screen until it's dismissed: his retirement, or his introduction as a coach. */
     var ceremony: Ceremony? = null,
+    /** Moments waiting their turn behind [ceremony]. */
+    var ceremonyQueue: MutableList<Ceremony> = mutableListOf(),
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

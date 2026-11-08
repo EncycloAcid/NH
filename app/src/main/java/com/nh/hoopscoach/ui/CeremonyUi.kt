@@ -57,6 +57,7 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
     val fg = onColor(base)
     val accent = if (contrast(second, lerp(base, Color.Black, 0.5f)) >= 2.2f) second else P.gold
     val hire = c.kind == "hire"
+    val choosing = c.choices.isNotEmpty()
     // The title fades in, the way a moment should.
     val fade = remember(c) { Animatable(0f) }
     LaunchedEffect(c) { fade.animateTo(1f, tween(900)) }
@@ -80,6 +81,7 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
                         Text(c.title, style = T.hero.copy(fontSize = 50.sp, lineHeight = 50.sp), color = fg)
                         Spacer(Modifier.height(8.dp))
                         Text(c.sub, style = T.bodyB, color = fg.copy(alpha = 0.85f))
+                        if (c.badge.isNotEmpty()) Text("🏆 ${c.badge}", style = T.small, color = accent, modifier = Modifier.padding(top = 4.dp))
                         Spacer(Modifier.height(16.dp))
                         team?.let { TeamBadge(it, 64.dp) }
                         Spacer(Modifier.height(18.dp))
@@ -104,17 +106,17 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
                 Panel {
                     c.letter.forEachIndexed { i, para ->
                         Text(
-                            para, style = if (hire) T.body else T.body.copy(fontStyle = FontStyle.Italic, lineHeight = 24.sp), color = P.ink,
+                            para, style = if (c.kind != "retire") T.body else T.body.copy(fontStyle = FontStyle.Italic, lineHeight = 24.sp), color = P.ink,
                             modifier = Modifier.padding(bottom = if (i < c.letter.lastIndex) 12.dp else 0.dp),
                         )
                     }
                 }
             }
-            if (hire) item { PressConference(vm, c) }
+            if (choosing) item { PressConference(vm, c) }
             // What people said.
-            val said = if (hire && c.chosen >= 0) c.choiceReactions.getOrNull(c.chosen).orEmpty() + c.tributes else c.tributes
+            val said = if (choosing && c.chosen >= 0) c.choiceReactions.getOrNull(c.chosen).orEmpty() + c.tributes else c.tributes
             if (said.isNotEmpty()) item {
-                Section(if (hire) "The reaction" else "Tributes")
+                Section(when (c.kind) { "retire" -> "Tributes"; "hire" -> "The reaction"; else -> "What they're saying" })
                 GroupList(said, inset = 60.dp) { ReactionRow(it.asReaction()) }
             }
             if (c.coverage.isNotEmpty()) item {
@@ -130,11 +132,12 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
             item { Spacer(Modifier.height(100.dp)) }
         }
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(P.bg.copy(alpha = 0.94f)).padding(horizontal = Gutter, vertical = 10.dp)) {
-            val ready = !hire || c.chosen >= 0
+            val ready = !choosing || c.chosen >= 0
             PrimaryButton(
                 when {
-                    !ready -> "Choose your opening statement"
+                    !ready -> if (hire) "Choose your opening statement" else "Choose what you say"
                     hire -> "Get to work"
+                    lg.ceremonyQueue.isNotEmpty() -> "Next"
                     else -> "Continue"
                 },
                 Modifier.fillMaxWidth(), enabled = ready,
@@ -145,14 +148,14 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
 
 @Composable
 private fun PressConference(vm: GameViewModel, c: Ceremony) {
-    Section("The podium is yours")
+    Section(c.choiceTitle.ifEmpty { "The podium is yours" })
     if (c.chosen < 0) {
-        Text("Your opening statement sets the tone. Pick one.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
+        Text(c.choicePrompt.ifEmpty { "Your opening statement sets the tone. Pick one." }, style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
         c.choices.forEachIndexed { i, line ->
             Panel(Modifier.padding(vertical = 4.dp), onClick = { vm.act { Farewell.speak(it, i) } }) {
                 Text("\"$line\"", style = T.head, color = P.ink)
                 Text(c.choiceQuotes.getOrNull(i) ?: "", style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
-                Text(Farewell.effect(i), style = T.small.copy(fontSize = 12.sp), color = P.accent, modifier = Modifier.padding(top = 6.dp))
+                Text(c.effects.getOrNull(i) ?: Farewell.effect(i), style = T.small.copy(fontSize = 12.sp), color = P.accent, modifier = Modifier.padding(top = 6.dp))
             }
         }
     } else {
@@ -162,7 +165,7 @@ private fun PressConference(vm: GameViewModel, c: Ceremony) {
             Spacer(Modifier.height(6.dp))
             Text(c.choiceQuotes.getOrNull(c.chosen) ?: "", style = T.body.copy(fontStyle = FontStyle.Italic), color = P.onHero.copy(alpha = 0.9f))
             Spacer(Modifier.height(8.dp))
-            Text(Farewell.effect(c.chosen), style = T.small, color = P.gold, textAlign = TextAlign.Start)
+            Text(c.effects.getOrNull(c.chosen) ?: Farewell.effect(c.chosen), style = T.small, color = P.gold, textAlign = TextAlign.Start)
         }
     }
 }

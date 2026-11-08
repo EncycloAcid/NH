@@ -33,6 +33,12 @@ class Ceremony(
     val choiceQuotes: List<String> = emptyList(),
     val choiceReactions: List<List<Tribute>> = emptyList(),
     var chosen: Int = -1,
+    /** The choice section's title and prompt, and what each choice does (empty: the press conference's). */
+    val choiceTitle: String = "",
+    val choicePrompt: String = "",
+    val effects: List<String> = emptyList(),
+    /** A line under the title: a trophy's name, a banner. */
+    val badge: String = "",
 )
 
 object Farewell {
@@ -192,11 +198,11 @@ object Farewell {
         last?.let { t -> Media.post(lg, t.name, t.abbr.lowercase(), "team", "Thank you, ${h.first}. 🧡 No. ${h.number}", Media.likes(lg, 0.5), true, league = true) }
         Media.post(lg, if (lg.pro) "NBA" else "NCAA", "nba", "league", "Congratulations to ${h.name} on a ${plural(seasons, "season")} career.", Media.likes(lg, 0.7), true, league = true)
 
-        lg.ceremony = Ceremony(
+        show(lg, Ceremony(
             "retire", "AFTER ${plural(seasons, "SEASON").uppercase()}", "THANK YOU, ${h.last.uppercase().ifEmpty { h.name.uppercase() }}",
             "${h.name} · ${h.posLabel} · ${teams.joinToString(" · ") { it.abbr }}", last?.id ?: -1, h.number,
             labels, values, letterTitle, letter, trib, coverage,
-        )
+        ))
     }
 
     // ---------- the introduction ----------
@@ -296,16 +302,18 @@ object Farewell {
         val body = (intro + "He takes the podium next.").joinToString("\n\n")
         lg.news += News(lg.season, lg.day, headline, true, -1, "hire", body, "Hoops Wire", t.id, -1,
             trib.map { Reaction(it.who, it.role, it.text, Rng.range(1_000, 40_000), it.avatar, it.verified) })
-        lg.ceremony = Ceremony(
+        show(lg, Ceremony(
             "hire", "INTRODUCING", "COACH ${c.last.uppercase()}", "Head coach · ${if (pro) t.name else "${t.school} ${t.mascot}"}", t.id, 0,
             labels, values, "The introduction", intro, trib, listOf(headline), choices, quotes, reactions,
-        )
+            effects = choices.indices.map { effect(it) },
+        ))
     }
 
     /** He makes his opening statement: the room reacts, the owner or AD takes note, the news runs it. */
     fun speak(lg: League, choice: Int) {
         val cer = lg.ceremony ?: return
-        if (cer.kind != "hire" || cer.chosen >= 0 || choice !in cer.choices.indices) return
+        if (cer.chosen >= 0 || choice !in cer.choices.indices) return
+        if (cer.kind != "hire") { Celebrations.speak(lg, cer, choice); return }
         cer.chosen = choice
         val c = lg.userCoach
         val t = lg.user
@@ -323,7 +331,12 @@ object Farewell {
             cer.choiceReactions[choice].map { Reaction(it.who, it.role, it.text, Rng.range(500, 30_000), it.avatar, it.verified) })
     }
 
-    fun dismiss(lg: League) { lg.ceremony = null }
+    /** Shows [c] now, or after the moment already on screen (a title and an award can land in the same sim). */
+    fun show(lg: League, c: Ceremony) {
+        if (lg.ceremony == null) lg.ceremony = c else lg.ceremonyQueue += c
+    }
+
+    fun dismiss(lg: League) { lg.ceremony = if (lg.ceremonyQueue.isEmpty()) null else lg.ceremonyQueue.removeAt(0) }
 
     /** What each statement does, in a line, for the press conference screen. */
     fun effect(choice: Int) = when (choice) {

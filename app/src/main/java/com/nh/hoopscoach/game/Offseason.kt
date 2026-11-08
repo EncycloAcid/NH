@@ -309,6 +309,8 @@ object Offseason {
         EraCollege.populate(lg)
         setupSeason(lg, carryElo = true)
         lg.news += News(lg.season, 0, "Welcome to the ${lg.season} season", true)
+        // Ring night: last season's national champions raise the banner at the opener.
+        if (lg.history.lastOrNull()?.let { it.season == lg.season - 1 && it.champion == lg.userTeamId } == true) runCatching { Celebrations.ringNight(lg) }
         if (lg.news.size > 250) {
             val cut = lg.news.size - 250
             lg.news.subList(0, cut).clear()
