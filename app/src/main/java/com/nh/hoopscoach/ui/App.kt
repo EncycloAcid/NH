@@ -40,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -77,12 +79,19 @@ fun App(vm: GameViewModel) {
     HoopsTheme(user?.let { Color(it.primary) }, user?.let { Color(it.secondary) }) {
         Box(Modifier.fillMaxSize().background(P.bg)) {
             val busy = vm.busy
-            when {
-                vm.loading -> BusyScreen("Loading")
-                busy != null -> BusyScreen(busy, vm.progress, vm.progressNote)
-                lg == null -> NewGameScreen(vm)
-                // A pro league shows ratings on a 2K-style scale.
-                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides lg.retroAll, LocalPfpSeed provides pfpSeedOf(lg)) { Shell(vm, lg) }
+            // Loading, a long sim and the game itself fade into each other.
+            val mode = when { vm.loading -> 0; busy != null -> 1; lg == null -> 2; else -> 3 }
+            androidx.compose.animation.AnimatedContent(
+                mode, label = "mode",
+                transitionSpec = { (androidx.compose.animation.fadeIn(tween(360, 60)) + androidx.compose.animation.scaleIn(tween(420, 60, easing = Motion.EmphasizedDecel), 0.97f)) togetherWith androidx.compose.animation.fadeOut(tween(160)) },
+            ) { m ->
+                when (m) {
+                    0 -> BusyScreen("Loading")
+                    1 -> BusyScreen(vm.busy ?: "Working", vm.progress, vm.progressNote)
+                    2 -> NewGameScreen(vm)
+                    // A pro league shows ratings on a 2K-style scale.
+                    else -> vm.league?.let { l -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (l.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides l.retroAll, LocalPfpSeed provides pfpSeedOf(l)) { Shell(vm, l) } }
+                }
             }
             Toast(vm)
         }
@@ -124,19 +133,27 @@ private fun Shell(vm: GameViewModel, lg: League) {
             transitionSpec = {
                 val push = targetState.depth > initialState.depth
                 val pop = targetState.depth < initialState.depth
+                val e = Motion.Emphasized
                 when {
-                    push -> (androidx.compose.animation.slideInHorizontally(tween(240)) { it / 5 } + androidx.compose.animation.fadeIn(tween(200))) togetherWith
-                        androidx.compose.animation.fadeOut(tween(140))
-                    pop -> (androidx.compose.animation.slideInHorizontally(tween(240)) { -it / 6 } + androidx.compose.animation.fadeIn(tween(200))) togetherWith
-                        (androidx.compose.animation.slideOutHorizontally(tween(200)) { it / 5 } + androidx.compose.animation.fadeOut(tween(160)))
-                    else -> androidx.compose.animation.fadeIn(tween(180)) togetherWith androidx.compose.animation.fadeOut(tween(120))
-                }
+                    // A new screen slides in over the old one, which eases back and dims: depth, like a card on a stack.
+                    push -> (androidx.compose.animation.slideInHorizontally(tween(420, easing = e)) { it / 3 } + androidx.compose.animation.fadeIn(tween(260, 40))) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally(tween(420, easing = e)) { -it / 8 } + androidx.compose.animation.scaleOut(tween(420, easing = e), 0.94f) + androidx.compose.animation.fadeOut(tween(300)))
+                    // Back: the screen slides away and the one under it comes forward.
+                    pop -> (androidx.compose.animation.slideInHorizontally(tween(380, easing = e)) { -it / 8 } + androidx.compose.animation.scaleIn(tween(380, easing = e), 0.94f) + androidx.compose.animation.fadeIn(tween(240))) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally(tween(340, easing = Motion.EmphasizedAccel)) { it / 3 } + androidx.compose.animation.fadeOut(tween(220, 80)))
+                    // Tabs fade through: the old one fades quickly, the new one settles in from a little smaller.
+                    else -> (androidx.compose.animation.fadeIn(tween(260, 70)) + androidx.compose.animation.scaleIn(tween(320, 70, easing = Motion.EmphasizedDecel), 0.96f)) togetherWith
+                        androidx.compose.animation.fadeOut(tween(90))
+                }.apply { targetContentZIndex = if (pop) -1f else 1f }
             },
             label = "screens",
         ) { s ->
             // Read the revision here too, so the screen redraws after every change to the league.
             @Suppress("UNUSED_VARIABLE") val rev2 = vm.rev
             val route = s.route
+            // When this screen opened, so its cards can wave in (see [reveal]).
+            val opened = remember { now() }
+            androidx.compose.runtime.CompositionLocalProvider(LocalScreenStart provides opened) {
             Box(Modifier.fillMaxSize()) {
             if (route == null) {
                 if (com.nh.hoopscoach.game.NbaCoach.active(lg)) when (s.tab) {
@@ -159,6 +176,7 @@ private fun Shell(vm: GameViewModel, lg: League) {
                     Tab.CAREER -> if (lg.playerMode) HeroCareerScreen(vm, lg) else CareerScreen(vm, lg)
                 }
             } else RouteScreen(vm, lg, route)
+            }
             }
         }
         if (route == null) {
@@ -284,12 +302,24 @@ private fun NavBar(vm: GameViewModel) {
                 val sel = vm.tab == t
                 val label = if (t == Tab.RECRUIT && vm.league?.let { com.nh.hoopscoach.game.NbaCoach.active(it) } == true) "Trades"
                     else if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
+                // The selected tab's pill grows in from the middle and its icon gives a little bounce.
+                val pill by androidx.compose.animation.core.animateFloatAsState(if (sel) 1f else 0f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "navPill")
+                val tint by androidx.compose.animation.animateColorAsState(if (sel) P.accent else P.sub, tween(200), label = "navTint")
+                val soft = P.accentSoft
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { vm.select(t) }.padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Box(Modifier.clip(RoundedCornerShape(50)).background(if (sel) P.accentSoft else Color.Transparent).padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Icon(icon, label, tint = if (sel) P.accent else P.sub, modifier = Modifier.size(22.dp))
+                    Box(
+                        Modifier.drawBehind {
+                            if (pill > 0.01f) {
+                                val w = size.width * (0.45f + 0.55f * pill)
+                                drawRoundRect(soft.copy(alpha = pill.coerceIn(0f, 1f)), topLeft = androidx.compose.ui.geometry.Offset((size.width - w) / 2, 0f),
+                                    size = androidx.compose.ui.geometry.Size(w, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
+                            }
+                        }.padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp).pulseOn(sel.takeIf { it }, 0.18f))
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
@@ -323,16 +353,27 @@ fun BusyScreen(label: String, progress: Float? = null, note: String = "") {
 
 @Composable
 private fun Toast(vm: GameViewModel) {
-    val msg = vm.message ?: return
+    val msg = vm.message
     LaunchedEffect(msg) {
+        if (msg == null) return@LaunchedEffect
         delay(2600)
         if (vm.message == msg) vm.message = null
     }
+    // Keep the last message on screen while it slides away.
+    var shown by remember { mutableStateOf("") }
+    if (msg != null) shown = msg
     Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 150.dp, start = 24.dp, end = 24.dp), contentAlignment = Alignment.BottomCenter) {
-        Box(
-            Modifier.clip(RoundedCornerShape(14.dp)).background(if (P.dark) P.surface2 else P.ink).border(1.dp, P.line, RoundedCornerShape(14.dp))
-                .clickable { vm.message = null }.padding(horizontal = 16.dp, vertical = 12.dp),
-        ) { Text(msg, style = T.bodyB, color = if (P.dark) P.ink else Color.White) }
+        androidx.compose.animation.AnimatedVisibility(
+            msg != null,
+            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 420f)) { it } + androidx.compose.animation.fadeIn(tween(160)) +
+                androidx.compose.animation.scaleIn(tween(260, easing = Motion.EmphasizedDecel), 0.9f),
+            exit = androidx.compose.animation.slideOutVertically(tween(220, easing = Motion.EmphasizedAccel)) { it / 2 } + androidx.compose.animation.fadeOut(tween(180)),
+        ) {
+            Box(
+                Modifier.shadow(12.dp, RoundedCornerShape(14.dp), clip = false).clip(RoundedCornerShape(14.dp)).background(if (P.dark) P.surface2 else P.ink).border(1.dp, P.line, RoundedCornerShape(14.dp))
+                    .clickable { vm.message = null }.padding(horizontal = 16.dp, vertical = 12.dp),
+            ) { Text(shown, style = T.bodyB, color = if (P.dark) P.ink else Color.White) }
+        }
     }
 }
 
@@ -351,8 +392,17 @@ private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
     // Gold for the big honors, the team's color for everything else.
     val tone = if (a.kind in setOf("award", "star", "record", "title", "trophy", "farewell")) P.gold else P.accent
     androidx.compose.ui.window.Dialog(onDismissRequest = { dismiss() }) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(P.surface).padding(22.dp)) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+        // The card springs up into place; each new alert gets its own entrance.
+        val enter = remember(a) { androidx.compose.animation.core.Animatable(0f) }
+        LaunchedEffect(a) { enter.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.68f, stiffness = 340f)) }
+        val glow = breathe()
+        Column(
+            Modifier.graphicsLayer {
+                val v = enter.value
+                alpha = v.coerceIn(0f, 1f); scaleX = 0.86f + 0.14f * v; scaleY = 0.86f + 0.14f * v; translationY = (1f - v) * 60f
+            }.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(P.surface).padding(22.dp),
+        ) {
+            Box(Modifier.size(48.dp).graphicsLayer { scaleX = glow; scaleY = glow }.clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = tone, modifier = Modifier.size(26.dp))
             }
             Spacer(Modifier.height(14.dp))

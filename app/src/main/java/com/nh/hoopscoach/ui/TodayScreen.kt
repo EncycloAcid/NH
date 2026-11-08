@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,10 +160,14 @@ fun WinChance(p: Double, opp: Team) {
         Text("${100 - pct}%", style = T.num, color = P.sub)
     }
     Spacer(Modifier.height(6.dp))
+    // The bar starts at even and swings to the real odds.
+    var shown by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
+    val f by androidx.compose.animation.core.animateFloatAsState(if (shown) p.toFloat() else 0.5f, androidx.compose.animation.core.tween(800, 150, easing = Motion.Emphasized), label = "win")
     Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
-        Box(Modifier.weight(p.toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(mine))
+        Box(Modifier.weight(f.coerceIn(0.02f, 0.98f)).height(8.dp).background(mine))
         Spacer(Modifier.width(3.dp))
-        Box(Modifier.weight((1 - p).toFloat().coerceIn(0.02f, 0.98f)).height(8.dp).background(theirs))
+        Box(Modifier.weight((1 - f).coerceIn(0.02f, 0.98f)).height(8.dp).background(theirs))
     }
 }
 

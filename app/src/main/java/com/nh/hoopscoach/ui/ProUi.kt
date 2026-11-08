@@ -619,9 +619,9 @@ internal fun PlayoffCard(vm: GameViewModel, lg: League) {
                 Text(u.abbr, style = T.label, color = soft, modifier = Modifier.padding(top = 4.dp))
             }
             if (s.bestOf > 1) Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$mine", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (mine >= theirs) fg else soft)
+                RollingText("$mine", T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), if (mine >= theirs) fg else soft, Modifier.pulseOn(mine))
                 Text("–", style = T.h2, color = soft, modifier = Modifier.padding(horizontal = 10.dp))
-                Text("$theirs", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (theirs > mine) fg else soft)
+                RollingText("$theirs", T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), if (theirs > mine) fg else soft, Modifier.pulseOn(theirs))
             } else Text("VS", style = T.h2, color = soft)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 TeamBadge(opp, 52.dp)

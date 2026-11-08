@@ -46,6 +46,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,7 +86,7 @@ private val CardShape = RoundedCornerShape(20.dp)
 
 @Composable
 fun ScreenHeader(eyebrow: String?, title: String, sub: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter, top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
+    Row(Modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter, top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             if (eyebrow != null) Text(eyebrow.uppercase(), style = T.label, color = P.accent)
             Text(title.uppercase(), style = T.title, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -110,7 +112,7 @@ fun BackBar(title: String, sub: String? = null, onBack: () -> Unit, actions: @Co
 
 @Composable
 fun Section(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = 3.dp, height = 12.dp).clip(RoundedCornerShape(2.dp)).background(P.accent))
         Spacer(Modifier.width(7.dp))
         Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.weight(1f))
@@ -121,7 +123,9 @@ fun Section(title: String, modifier: Modifier = Modifier, action: String? = null
 /** A rounded surface on the page background. */
 @Composable
 fun Panel(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(16.dp), color: Color = P.surface, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    val m = modifier.padding(horizontal = Gutter).fillMaxWidth().clip(CardShape).background(color)
+    // Cards rise into place as a screen opens (see [reveal]).
+    val hero = color == P.hero
+    val m = modifier.reveal().padding(horizontal = Gutter).fillMaxWidth().clip(CardShape).background(color).then(if (hero) Modifier.sheen() else Modifier)
     Column((if (onClick != null) m.clickable(onClick = onClick) else m).padding(padding), content = content)
 }
 
@@ -171,29 +175,52 @@ fun Empty(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, scroll: Boolean = false) {
     val track = Modifier.clip(RoundedCornerShape(14.dp)).background(if (P.dark) P.surface else Color(0xFFE6E8EC)).padding(3.dp)
+    val rowH = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Where each tab sits, so the selected pill can slide from one to the next.
+    val starts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+    val widths = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+    val density = LocalDensity.current
+    val pillX by androidx.compose.animation.core.animateIntAsState(starts[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillX")
+    val pillW by androidx.compose.animation.core.animateIntAsState(widths[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillW")
+    val pillColor = if (P.dark) P.surface2 else Color.White
     @Composable
     fun chip(i: Int, label: String, m: Modifier) {
         val sel = i == selected
+        val fg by androidx.compose.animation.animateColorAsState(if (sel) P.ink else P.sub, tween(220), label = "tab")
         Box(
-            m.clip(RoundedCornerShape(11.dp)).background(if (sel) (if (P.dark) P.surface2 else Color.White) else Color.Transparent)
+            // Until the pill has measured itself, the selected tab draws its own background.
+            m.clip(RoundedCornerShape(11.dp)).background(if (sel && pillW == 0) pillColor else Color.Transparent)
                 .clickable { onSelect(i) }.padding(horizontal = if (scroll) 14.dp else 4.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, style = T.bodyB.copy(fontSize = if (!scroll && options.size >= 5) 13.sp else 14.sp), color = if (sel) P.ink else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = T.bodyB.copy(fontSize = if (!scroll && options.size >= 5) 13.sp else 14.sp), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+    @Composable
+    fun pill() {
+        if (pillW > 0) Box(
+            Modifier.offset { androidx.compose.ui.unit.IntOffset(pillX, 0) }.width(with(density) { pillW.toDp() }).height(with(density) { rowH.intValue.toDp() })
+                .graphicsLayer { shadowElevation = 2f; shape = RoundedCornerShape(11.dp); clip = true }.background(pillColor),
+        )
+    }
+    fun Modifier.track(i: Int) = onGloballyPositioned { starts[i] = it.positionInParent().x.toInt(); widths[i] = it.size.width; rowH.intValue = it.size.height }
     if (scroll) {
         // The strip scrolls to keep the selected tab in view.
         val state = rememberScrollState()
-        val starts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
         LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
-        Row(modifier.padding(horizontal = Gutter).horizontalScroll(state).then(track), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            options.forEachIndexed { i, l -> chip(i, l, Modifier.onGloballyPositioned { starts[i] = it.positionInParent().x.toInt() }) }
+        Box(modifier.padding(horizontal = Gutter).horizontalScroll(state).then(track)) {
+            pill()
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
+            }
         }
     } else {
-        Row(modifier.padding(horizontal = Gutter).fillMaxWidth().then(track)) {
-            // Five or more tabs share the width by label length so none gets cut off.
-            options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(if (options.size >= 5) l.length + 4f else 1f)) }
+        Box(modifier.padding(horizontal = Gutter).fillMaxWidth().then(track)) {
+            pill()
+            Row(Modifier.fillMaxWidth()) {
+                // Five or more tabs share the width by label length so none gets cut off.
+                options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(if (options.size >= 5) l.length + 4f else 1f).track(i)) }
+            }
         }
     }
 }
@@ -533,10 +560,14 @@ fun Compare(label: String, a: Int, b: Int, aColor: Color, bColor: Color) {
             Text("$b", style = T.numSm, color = if (b >= a) P.ink else P.sub, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
         }
         Spacer(Modifier.height(4.dp))
+        // The two sides start even and settle to their real split.
+        var shown by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { shown = true }
+        val fa by androidx.compose.animation.core.animateFloatAsState(if (shown) a / total else 0.5f, tween(700, 120, easing = Motion.Emphasized), label = "cmp")
         Row(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))) {
-            Box(Modifier.weight(a / total).height(6.dp).background(aColor))
+            Box(Modifier.weight(fa.coerceIn(0.01f, 0.99f)).height(6.dp).background(aColor))
             Spacer(Modifier.width(3.dp))
-            Box(Modifier.weight(b / total).height(6.dp).background(bColor))
+            Box(Modifier.weight((1f - fa).coerceIn(0.01f, 0.99f)).height(6.dp).background(bColor))
         }
     }
 }

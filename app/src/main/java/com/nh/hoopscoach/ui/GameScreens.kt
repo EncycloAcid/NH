@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -156,7 +158,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
         lv.call?.let { c -> CallCard(lv, c); Spacer(Modifier.height(8.dp)) }
         lv.momentResult?.takeIf { lv.moment == null && lv.call == null }?.let {
-            Panel(color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
+            Panel(Modifier.popIn(it), color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
             Spacer(Modifier.height(8.dp))
         }
         if (!lv.done) {
@@ -194,7 +196,12 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             if (view == 0) {
                 val events = e.events.asReversed()
                 LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
-                    items(events.size) { i -> PlayRow(events[i], home, away) }
+                    // Each play keeps its key, so a new one slides in at the top and the rest move down.
+                    items(events.size, key = { events.size - it }) { i ->
+                        Box(Modifier.animateItem(fadeInSpec = tween(320), placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 420f, visibilityThreshold = androidx.compose.ui.unit.IntOffset.VisibilityThreshold))) {
+                            PlayRow(events[i], home, away)
+                        }
+                    }
                 }
             } else {
                 val box = e.boxScore()
@@ -262,7 +269,9 @@ private fun ScoreHalf(t: Team, score: Int, ahead: Boolean, final: Boolean, modif
         Spacer(Modifier.height(6.dp))
         Text(t.abbr, style = T.label, color = if (t.id == user) P.accent else P.sub)
         // Once it's final, the losing score steps back.
-        Text("$score", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (final && !ahead) P.sub else P.ink)
+        // The score rolls up and gives a little bounce on every basket.
+        val c by androidx.compose.animation.animateColorAsState(if (final && !ahead) P.sub else P.ink, tween(500), label = "score")
+        RollingText("$score", T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), c, Modifier.pulseOn(score, 0.1f))
     }
 }
 
@@ -397,7 +406,7 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
 @Composable
 private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
     val e = lv.engine
-    Panel(color = P.hero) {
+    Panel(Modifier.popIn(c), color = P.hero) {
         Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; "halftime" -> "HALFTIME"; else -> "YOUR CALL" }, style = T.label, color = heroKicker)
         Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
@@ -431,7 +440,7 @@ private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCal
 @Composable
 private fun MomentCard(lg: League, lv: LiveGame, m: com.nh.hoopscoach.game.GameEngine.BigMoment) {
     val e = lv.engine
-    Panel(color = P.hero) {
+    Panel(Modifier.popIn(m), color = P.hero) {
         lv.momentResult?.let {
             Text("LAST TIME: $it", style = T.small, color = P.onHero.copy(alpha = 0.85f), modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp)).background(P.onHero.copy(alpha = 0.1f)).padding(horizontal = 10.dp, vertical = 6.dp))
