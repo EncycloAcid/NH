@@ -103,6 +103,8 @@ object Rivalries {
             return (venue * draw.coerceIn(0.35, 1.0)).roundToInt()
         }
         if (rival) return home.arena
+        // The big nights always sell out.
+        if (Marquee.isMarquee(lg, g)) return home.arena
         // Fan mood fills the building; a packed house is a sellout.
         val fill = Fans.expectedFill(lg, g) + Business.fillBonus(lg, home) + Rng.gauss() * 0.03
         return if (fill >= 0.99) home.arena else (home.arena * fill.coerceIn(0.25, 0.98)).roundToInt()

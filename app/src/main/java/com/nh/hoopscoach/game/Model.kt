@@ -1317,6 +1317,8 @@ class League(
     var staffPoolSeason: Int = 0,
     var tree: MutableList<TreeBranch> = mutableListOf(),
     var nextAssistantId: Int = 1,
+    /** The user's head-to-head with every coach he's faced, and how heated each one is. */
+    var coachRivals: MutableList<CoachRival> = mutableListOf(),
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

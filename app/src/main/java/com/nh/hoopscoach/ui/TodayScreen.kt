@@ -83,6 +83,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
         item { TitleDefenseCard(lg) }
+        item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
         if (!lg.playerMode) item { GoalsCard(lg) }
         item { Form(vm, lg, u) }
@@ -115,7 +116,10 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
             RivalryPreview(lg, g, rivalry)
             Spacer(Modifier.height(12.dp))
         }
+        val big = com.nh.hoopscoach.game.Marquee.label(lg, g)
+        if (big.isNotEmpty()) Text(big.uppercase(), style = T.label, color = P.gold)
         Text("$kind · $where".uppercase(), style = T.label, color = P.sub)
+        com.nh.hoopscoach.game.CoachRivals.pregame(lg, g)?.let { Text(it, style = T.small, color = P.bad) }
         if (rivalry == null && !g.neutral) {
             val home = lg.team(g.home)
             val fill = com.nh.hoopscoach.game.Fans.expectedFill(lg, g)

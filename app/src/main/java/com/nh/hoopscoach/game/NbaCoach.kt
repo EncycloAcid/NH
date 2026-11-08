@@ -470,6 +470,7 @@ object NbaCoach {
         // The owner's midseason goals.
         runCatching { FrontOffice.grade(lg) }
         runCatching { Assistants.seasonEnd(lg) }
+        runCatching { CoachRivals.seasonEnd(lg) }
         lg.news += News(lg.season, lg.day, "The ${u.name} finish ${u.w}-${u.l} (projected $expect wins). " +
             "Job security: ${securityLabel(c.security).lowercase()} (${if (c.security >= before) "+" else "−"}${kotlin.math.abs(c.security - before)})", true)
         val recentTitle = c.history.takeLast(2).any { it.result == "Champion" }

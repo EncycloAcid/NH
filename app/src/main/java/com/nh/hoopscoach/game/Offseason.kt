@@ -417,6 +417,7 @@ object Coaching {
         // The building: sellouts please the AD, empty seats don't.
         delta += Business.bossVerdict(t)
         runCatching { Assistants.seasonEnd(lg) }
+        runCatching { CoachRivals.seasonEnd(lg) }
         c.security = (c.security + delta).roundToInt().coerceIn(0, 100)
         // The AD's midseason goals.
         runCatching { FrontOffice.grade(lg) }

@@ -1171,6 +1171,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         NewsDesk.note(lg, game, teams, lines, score)
         runCatching { Injuries.afterGame(lg, game, teams, lines) }
+        runCatching { Marquee.afterGame(lg, game, teams, lines, score) }
+        runCatching { CoachRivals.afterGame(lg, game, score) }
         if (counts) {
             teams[0].opp.add(lastTotals(1))
             teams[1].opp.add(lastTotals(0))

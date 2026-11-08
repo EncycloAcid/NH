@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -62,5 +63,47 @@ fun TitleDefenseCard(lg: League) {
         Text(if (d.streak >= 2) "${com.nh.hoopscoach.game.TitleDefense.runWords(d.streak).uppercase()} · DEFENDING CHAMPIONS" else "DEFENDING CHAMPIONS", style = T.label, color = P.gold)
         Text("Chasing ${com.nh.hoopscoach.game.TitleDefense.chasing(d.streak)}", style = T.head, color = P.onHero)
         Text("${u.record} so far. Everyone circles your game on their schedule.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+    }
+}
+
+/** The big nights in the next few days, league-wide: Christmas, national TV, top-10 showdowns, rivalry games. */
+@Composable
+fun MarqueeCard(vm: GameViewModel, lg: League) {
+    val games = com.nh.hoopscoach.game.Marquee.upcoming(lg)
+    if (games.isEmpty()) return
+    Section("Big games")
+    GroupList(games) { g ->
+        val h = lg.team(g.home); val a = lg.team(g.away)
+        val mine = g.involves(lg.userTeamId)
+        ListRow(onClick = { vm.push(Route.TeamPage(if (mine) lg.team(g.opp(lg.userTeamId)).id else h.id)) }) {
+            TeamBadge(a, 30.dp)
+            Spacer(Modifier.width(6.dp))
+            TeamBadge(h, 30.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("${if (lg.pro) a.name.substringAfterLast(' ') else a.school} at ${if (lg.pro) h.name.substringAfterLast(' ') else h.school}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (g.day == lg.day) "Today" else "Day ${g.day}", style = T.small, color = P.sub)
+            }
+            Tag(com.nh.hoopscoach.game.Marquee.label(lg, g).uppercase(), if (mine) P.accent else P.gold)
+        }
+    }
+}
+
+/** The user's coaching rivals, for the Career screen. */
+@Composable
+fun CoachRivalsCard(lg: League) {
+    val rivals = com.nh.hoopscoach.game.CoachRivals.rivals(lg)
+    if (rivals.isEmpty()) return
+    Section("Coaching rivals")
+    GroupList(rivals) { r ->
+        val c = lg.coaches.firstOrNull { it.id == r.coachId }
+        ListRow {
+            Column(Modifier.weight(1f)) {
+                Text(c?.name ?: "A former rival", style = T.bodyB, color = P.ink)
+                Text("${lg.teams.getOrNull(c?.teamId ?: -1)?.let { if (lg.pro) it.name else it.school } ?: "Out of coaching"} · you're ${r.w}-${r.l}" + if (r.big > 0) " · ${r.big} postseason meeting${if (r.big == 1) "" else "s"}" else "",
+                    style = T.small, color = P.sub)
+            }
+            Tag(com.nh.hoopscoach.game.CoachRivals.heatLabel(r.heat).uppercase(), if (r.heat >= 6) P.bad else P.warn)
+        }
     }
 }

@@ -161,7 +161,9 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
                 val win = com.nh.hoopscoach.game.Rankings.winProbFor(lg, g, u.id)
                 Section("Next up")
                 Panel {
-                    Text((if (g.label.isNotEmpty()) g.label else if (g.home == u.id) "Home" else "Away").uppercase(), style = T.label, color = P.accent)
+                    val big = com.nh.hoopscoach.game.Marquee.label(lg, g)
+                    Text((if (big.isNotEmpty()) big else if (g.label.isNotEmpty()) g.label else if (g.home == u.id) "Home" else "Away").uppercase(), style = T.label, color = if (big.isNotEmpty()) P.gold else P.accent)
+                    com.nh.hoopscoach.game.CoachRivals.pregame(lg, g)?.let { Text(it, style = T.small, color = P.bad) }
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MatchSide(lg, u, Modifier.weight(1f))
@@ -205,6 +207,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
             GroupList(shown) { t -> StandingRow(vm, lg, st.indexOf(t) + 1, t, st.first()) }
         }
         item { TitleDefenseCard(lg) }
+        item { MarqueeCard(vm, lg) }
         item { GoalsCard(lg) }
         item { InjuryReport(vm, lg, u) }
         item {
@@ -2004,6 +2007,7 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
             TrophyRoomLink(vm, lg)
+            CoachRivalsCard(lg)
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CoachBadge(c.first, c.last, 60.dp)
