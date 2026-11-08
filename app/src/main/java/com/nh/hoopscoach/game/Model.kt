@@ -834,6 +834,10 @@ class RoadState(
     var shotMeter: Boolean = true,
     /** His signature shoe deal (see [Shoes]), the season brands last made offers, and the offers on the table. */
     var shoe: ShoeDeal? = null,
+    /** Calling it a career: the season he said would be his last, the season he came back from retirement, and the teams that already honored him on the farewell tour. */
+    var farewellSeason: Int = 0,
+    var comebackSeason: Int = 0,
+    val tourStops: MutableList<Int> = mutableListOf(),
     var shoeOffered: Int = 0,
     val shoeOffers: MutableList<ShoeDeal> = mutableListOf(),
     /** The class rival: a top recruit from the same class who follows him all career. */
@@ -1360,6 +1364,8 @@ class League(
     var pfpSeed: Long = 0,
     /** This week's sports-TV debate about the user (see [TvShow]). */
     var tv: TvSegment? = null,
+    /** The last few debate topics, so the show doesn't repeat itself. */
+    val tvKinds: MutableList<String> = mutableListOf(),
     /** Jersey sales: the top 15 (player ids), the list before, and the season they're for. */
     val jerseyTop: MutableList<Int> = mutableListOf(),
     val jerseyLast: MutableList<Int> = mutableListOf(),

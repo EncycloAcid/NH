@@ -855,6 +855,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
         if (r.press != null) item { PressCard(vm, lg) }
         if (vm.meTab == 0) item { SituationPanel(vm, lg) }
+        if (vm.meTab == 0) item { FarewellPanel(vm, lg) }
         if (vm.meTab == 0) item { RacePanel(vm, lg) }
         if (vm.meTab == 0) item { AllTimePanel(vm, lg) }
         if (vm.meTab == 0) item { RivalPanel(vm, lg) }
@@ -1299,9 +1300,16 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
         if (ProCareer.canRetire(lg)) {
             Section("Your future")
             Panel {
-                Text("You're ${h.age}. You can keep going or walk away on your terms.", style = T.body, color = P.ink)
+                Text("You're ${h.age}. You can keep going, walk away now, or announce that next season is your last and take a farewell tour.", style = T.body, color = P.ink)
                 Spacer(Modifier.height(10.dp))
-                SecondaryButton("Retire", Modifier.fillMaxWidth()) { vm.act { ProCareer.retire(it) } }
+                if (com.nh.hoopscoach.game.FarewellTour.canAnnounce(lg)) {
+                    PrimaryButton("Make next season my last", Modifier.fillMaxWidth()) { vm.act { com.nh.hoopscoach.game.FarewellTour.announce(it) } }
+                    Spacer(Modifier.height(8.dp))
+                } else if ((lg.road?.farewellSeason ?: 0) > lg.season) {
+                    Text("Next season is your farewell tour.", style = T.bodyB, color = P.accent)
+                    Spacer(Modifier.height(8.dp))
+                }
+                SecondaryButton("Retire now", Modifier.fillMaxWidth()) { vm.act { ProCareer.retire(it) } }
             }
         }
     }
@@ -1600,6 +1608,23 @@ fun ProEnding(vm: GameViewModel, lg: League) {
                 Text("College: ${r.collegeSchools} · Pro: ${r.proTeams.joinToString(" → ") { lg.team(it).name }}", style = T.small, color = P.sub)
             }
         }
+        // Under 40 and just retired: he can still change his mind.
+        if (r.retired && ProCareer.canComeBack(lg)) item {
+            var ask by remember { mutableStateOf(false) }
+            Section("Not done yet?")
+            Panel {
+                Text("You're ${h?.age ?: 0}. You can un-retire now and go back into free agency, where teams will make you offers.", style = T.body, color = P.ink)
+                Spacer(Modifier.height(10.dp))
+                PrimaryButton("Come back", Modifier.fillMaxWidth()) { ask = true }
+            }
+            if (ask) AlertDialog(
+                onDismissRequest = { ask = false }, containerColor = P.surface,
+                title = { Text("Come out of retirement?", style = T.head, color = P.ink) },
+                text = { Text("Your retirement is called off: no jersey nights or Hall of Fame class yet. You'll be a free agent this summer, and your career picks up from there.", style = T.body, color = P.sub) },
+                confirmButton = { TextButton({ ask = false; vm.act { ProCareer.comeBack(it) } }) { Text("I'm coming back", color = P.accent) } },
+                dismissButton = { TextButton({ ask = false }) { Text("Stay retired", color = P.sub) } },
+            )
+        }
         if (r.retired) item {
             val nba = lg.proState?.jobOffers.orEmpty().map { lg.team(it) }
             if (nba.isNotEmpty()) {
@@ -1731,4 +1756,37 @@ private fun EraPicker(selected: Era, onPick: (Era) -> Unit) {
             }
         }
     }
+}
+
+/** Calling it a career: announce this season is your last, or follow the farewell tour. */
+@Composable
+private fun FarewellPanel(vm: GameViewModel, lg: League) {
+    val r = lg.road ?: return
+    val h = lg.hero ?: return
+    if (r.farewellSeason == lg.season) {
+        Section("Farewell tour")
+        Panel(color = P.hero) {
+            Text("THE LAST RIDE", style = T.label, color = P.gold)
+            Text("${r.tourStops.size} ${if (r.tourStops.size == 1) "arena has" else "arenas have"} honored you", style = T.head, color = P.onHero)
+            Text(if (r.tourStops.isEmpty()) "Every road arena honors you on your first visit." else r.tourStops.takeLast(6).joinToString(", ") { lg.team(it).name } + (if (r.tourStops.size > 6) " and more" else "") + ".",
+                style = T.small, color = P.onHero.copy(alpha = 0.85f))
+            Text("You'll retire when the season ends.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 4.dp))
+        }
+        return
+    }
+    if (lg.phase != Phase.REGULAR || !com.nh.hoopscoach.game.FarewellTour.canAnnounce(lg) || lg.day >= com.nh.hoopscoach.game.ProLeague.allStarDay(lg)) return
+    var ask by remember { mutableStateOf(false) }
+    Section("Calling it a career?")
+    Panel {
+        Text("You're ${h.age}. Announce that this season is your last and every arena gives you a send-off on your first visit, with your last home game a night of its own.", style = T.small, color = P.sub)
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("Make this my last season", Modifier.fillMaxWidth()) { ask = true }
+    }
+    if (ask) AlertDialog(
+        onDismissRequest = { ask = false }, containerColor = P.surface,
+        title = { Text("Announce your final season?", style = T.head, color = P.ink) },
+        text = { Text("The farewell tour starts now. You'll retire when the season ends (and if you're under 40, you can still change your mind then).", style = T.body, color = P.sub) },
+        confirmButton = { TextButton({ ask = false; vm.act { com.nh.hoopscoach.game.FarewellTour.announce(it) } }) { Text("Announce it", color = P.accent) } },
+        dismissButton = { TextButton({ ask = false }) { Text("Not yet", color = P.sub) } },
+    )
 }

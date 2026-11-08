@@ -33,6 +33,8 @@ fun TvCard(vm: GameViewModel, lg: League) {
     Panel(color = P.hero) {
         Text("THIS WEEK'S DEBATE", style = T.label, color = P.gold)
         Text(seg.topic, style = T.title.copy(fontSize = androidx.compose.ui.unit.TextUnit(22f, androidx.compose.ui.unit.TextUnitType.Sp)), color = P.onHero)
+        // Last week's take, checked.
+        if (seg.recap.isNotEmpty()) Text(seg.recap, style = T.small, color = P.gold, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(10.dp))
         for (take in seg.takes) {
             Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
@@ -43,19 +45,33 @@ fun TvCard(vm: GameViewModel, lg: League) {
                         Text(take.name, style = T.bodyB, color = P.onHero, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                         Spacer(Modifier.width(6.dp))
                         Tag(take.side.uppercase(), if (take.side == "Yes") P.good else P.bad, filled = true)
+                        if (take.persona.isNotEmpty()) { Spacer(Modifier.width(4.dp)); Tag(take.persona.uppercase(), P.onHero) }
                     }
-                    take.lines.forEach { Text("“$it”", style = T.small, color = P.onHero.copy(alpha = 0.88f), modifier = Modifier.padding(top = 2.dp)) }
+                    take.lines.forEachIndexed { i, line ->
+                        // The last line answers the other side.
+                        val rebuttal = i == take.lines.lastIndex && take.lines.size >= 3
+                        Text((if (rebuttal) "↪ " else "") + "“$line”", style = T.small.copy(fontStyle = if (rebuttal) androidx.compose.ui.text.font.FontStyle.Italic else null),
+                            color = P.onHero.copy(alpha = if (rebuttal) 0.75f else 0.9f), modifier = Modifier.padding(top = 2.dp))
+                    }
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
+        // What the fans think.
+        if (seg.poll in 0..100) {
+            Text("FANS: ${seg.poll}% YES · ${100 - seg.poll}% NO", style = T.label, color = P.onHero.copy(alpha = 0.8f))
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(P.bad.copy(alpha = 0.6f))) {
+                if (seg.poll > 0) androidx.compose.foundation.layout.Box(Modifier.weight(seg.poll.toFloat()).height(8.dp).background(P.good))
+                if (seg.poll < 100) Spacer(Modifier.weight((100 - seg.poll).toFloat()))
+            }
+        }
         if (seg.answered < 0) {
             Text("Your response", style = T.label, color = P.onHero.copy(alpha = 0.75f))
             seg.responses.forEachIndexed { i, label ->
                 Text(label, style = T.bodyB, color = P.onHero, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp))
                     .background(P.onHero.copy(alpha = 0.14f)).clickable { vm.act { TvShow.respond(it, i) } }.padding(horizontal = 14.dp, vertical = 11.dp))
             }
-        } else Text("You chose: ${seg.responses[seg.answered]}.", style = T.small, color = P.onHero.copy(alpha = 0.85f))
+        } else Text("You said: “${seg.quotes.getOrNull(seg.answered) ?: seg.responses[seg.answered]}”", style = T.small, color = P.onHero.copy(alpha = 0.9f))
     }
 }
 

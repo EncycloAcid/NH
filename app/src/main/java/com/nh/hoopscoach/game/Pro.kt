@@ -1312,6 +1312,42 @@ object ProCareer {
     /** Old enough to call it a career. */
     fun canRetire(lg: League) = age(lg) >= 30 && lg.road?.retired == false
 
+    /** He just retired, he's under 40, and the summer hasn't moved on: he can still change his mind. */
+    fun canComeBack(lg: League): Boolean {
+        val r = lg.road ?: return false
+        val h = lg.alumni.firstOrNull { it.id == lg.heroId } ?: lg.playerOrNull(lg.heroId) ?: return false
+        return r.retired && h.age < 40 && !NbaCoach.active(lg) && lg.proState?.step == ProStep.REVIEW && lg.phase == Phase.OFFSEASON
+    }
+
+    /** Un-retires: back in the league as a free agent, and the offseason carries on from there. */
+    fun comeBack(lg: League) {
+        val r = lg.road ?: return
+        if (!canComeBack(lg)) return
+        val h = lg.alumni.firstOrNull { it.id == lg.heroId } ?: lg.playerOrNull(lg.heroId) ?: return
+        lg.alumni.removeAll { it.id == h.id }
+        if (lg.playerOrNull(h.id) == null) { lg.players += h; lg.reindex() }
+        // Back on his last team's books with no contract, like any free agent waiting on offers.
+        val back = lg.teams.getOrNull(h.lastTeam)
+        if (back != null) { h.teamId = back.id; if (h.id !in back.roster) back.roster += h.id } else h.teamId = -1
+        h.left = ""
+        r.retired = false
+        r.ended = false
+        r.ending = ""
+        r.farewellSeason = 0
+        r.comebackSeason = lg.season + 1
+        r.contract = null
+        r.jerseys.clear()
+        r.hofClass = 0
+        lg.ceremony = null
+        lg.ceremonyQueue.clear()
+        lg.proState?.jobOffers?.clear()
+        r.followers = (r.followers * 1.05).roundToInt()
+        lg.news += News(lg.season, lg.day, "${h.name} is coming back", true, -1, "comeback",
+            "Days after announcing his retirement, ${h.name} (${h.age}) has changed his mind: \"I'm not done.\" He's a free agent, and teams will be calling.",
+            "Hoops Wire", h.lastTeam, h.id)
+        Media.post(lg, h.name, h.name.replace(" ", "").replace(".", "").lowercase(), "self", "Not done yet.", Media.likes(lg, 0.1))
+    }
+
     /** He can play into his early 40s if somebody still wants him. */
     const val MAX_AGE = 43
 
@@ -1325,6 +1361,8 @@ object ProCareer {
         if (r.ended) return
         when (ps.step) {
             ProStep.REVIEW -> {
+                // The farewell tour is over: he goes out the way he said he would.
+                if (r.farewellSeason in 1..lg.season) { retire(lg, "After a farewell tour around the league, "); return }
                 if (age(lg) >= MAX_AGE) { retire(lg, "Nobody plays forever. "); return }
                 // Coaches and general managers on the hot seat.
                 Staffing.offseason(lg)
@@ -1811,7 +1849,10 @@ object ProCareer {
 /** Picks the right season loop for the league. */
 object Sim {
     fun playDay(lg: League) {
+        val day = lg.day
         if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
+        // The farewell tour's stops.
+        if (lg.pro) runCatching { FarewellTour.afterDay(lg, day) }
         // The defending champion's season, in the news.
         runCatching { TitleDefense.check(lg) }
         // Tomorrow's big games.
