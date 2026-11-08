@@ -66,17 +66,21 @@ private val NOT_NAMES = setOf("Big", "Courtside", "Coach", "Real", "Hot", "Bench
  * weighted toward men when there isn't one), picked by the handle so the same fan is always the same
  * person. The portraits are randomuser.me's, hand-picked from UI Faces' authorized set.
  */
-fun facePath(seed: String, name: String): String {
-    val h = seed.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+fun facePath(seed: String, name: String, save: Long = 0L): String {
+    // The save's own seed mixes in, so who looks like whom is different in every save and fixed within one.
+    val h = (seed.hashCode().toLong() * 1_000_003L + save).let { (it xor (it ushr 29)) * -0x61c8864680b583ebL }.let { ((it ushr 33) and 0x7FFFFFFF).toInt() }
     val first = name.split(" ", ".").map { it.trim() }.firstOrNull { it.length > 1 && it.first().isUpperCase() && it !in NOT_NAMES }
     val woman = if (first != null) first in WOMEN else h % 10 < 3
     return "faces/${if (woman) "w" else "m"}${"%02d".format(h % 100)}.webp"
 }
 
+/** This save's profile-picture seed (see [League.pfpSeed]). */
+val LocalPfpSeed = androidx.compose.runtime.compositionLocalOf { 0L }
+
 @Composable
 fun RealFace(seed: String, name: String, size: Dp) {
     val ctx = LocalContext.current
-    val path = facePath(seed, name)
+    val path = facePath(seed, name, LocalPfpSeed.current)
     val img = remember(path) { Logos.asset(ctx, path) }
     if (img != null) Image(img, name, Modifier.size(size).clip(CircleShape), contentScale = ContentScale.Crop) else Cartoon(seed, size)
 }

@@ -122,6 +122,8 @@ object Trophies {
         val have = to.achievements.map { it.id }.toHashSet()
         to.achievements += from.achievements.filter { it.id !in have }
         to.trophiesSeeded = true
+        // The same faces on social media all career long.
+        if (from.pfpSeed != 0L) to.pfpSeed = from.pfpSeed
     }
 }
 

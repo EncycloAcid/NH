@@ -1344,6 +1344,8 @@ class League(
     var coachRivals: MutableList<CoachRival> = mutableListOf(),
     /** Draw every player as a retro portrait, real headshots included. */
     var retroAll: Boolean = false,
+    /** Picks every social account's profile picture: random for each save, the same all through it. */
+    var pfpSeed: Long = 0,
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

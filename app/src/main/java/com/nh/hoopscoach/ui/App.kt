@@ -82,7 +82,7 @@ fun App(vm: GameViewModel) {
                 busy != null -> BusyScreen(busy, vm.progress, vm.progressNote)
                 lg == null -> NewGameScreen(vm)
                 // A pro league shows ratings on a 2K-style scale.
-                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides lg.retroAll) { Shell(vm, lg) }
+                else -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (lg.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides lg.retroAll, LocalPfpSeed provides pfpSeedOf(lg)) { Shell(vm, lg) }
             }
             Toast(vm)
         }
@@ -355,4 +355,10 @@ private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
             }
         },
     )
+}
+
+/** The save's profile-picture seed, picked at random the first time and kept with the save from then on. */
+private fun pfpSeedOf(lg: League): Long {
+    if (lg.pfpSeed == 0L) lg.pfpSeed = kotlin.random.Random.nextLong().let { if (it == 0L) 1L else it }
+    return lg.pfpSeed
 }
