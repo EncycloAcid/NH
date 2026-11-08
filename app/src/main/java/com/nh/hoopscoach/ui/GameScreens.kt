@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -353,6 +354,11 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
             Segmented(listOf(away.school, home.school), side, { side = it })
             Spacer(Modifier.height(8.dp))
             BoxTable(vm, lg, if (side == 0) away else home, if (side == 0) b.away else b.home)
+            // Where the shots came from (the user's games keep every one).
+            if (g.shots.isNotEmpty()) {
+                Section("Shot chart · ${if (side == 0) away.abbr else home.abbr}")
+                Panel(padding = PaddingValues(12.dp)) { ShotChartView(lg, g.shots, if (side == 0) 1 else 0) }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -375,7 +381,7 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
 private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
     val e = lv.engine
     Panel(color = P.hero) {
-        Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; else -> "YOUR CALL" }, style = T.label, color = P.gold)
+        Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; "halftime" -> "HALFTIME"; else -> "YOUR CALL" }, style = T.label, color = P.gold)
         Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
         Spacer(Modifier.height(10.dp))
@@ -406,10 +412,16 @@ private fun MomentCard(lg: League, lv: LiveGame, m: com.nh.hoopscoach.game.GameE
         Text("${clock(m.clock.toInt())} left · $sit · your ball", style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text("${lg.hero?.name ?: "You"} has it at the top of the key. What's the play?", style = T.small, color = P.onHero.copy(alpha = 0.85f))
         Spacer(Modifier.height(10.dp))
-        for ((choice, label, pct) in m.options) {
+        // His own shot: the timing meter decides the release.
+        var aiming by remember(m) { androidx.compose.runtime.mutableStateOf<com.nh.hoopscoach.game.GameEngine.MomentChoice?>(null) }
+        val meterOn = lg.road?.shotMeter != false
+        val aim = aiming
+        if (aim != null) ShotMeter(lg, aim) { grade, bonus -> e.playMoment(aim, bonus); lv.momentResult = "$grade ${e.lastMoment ?: ""}".trim(); lv.moment = null; lv.tick++ }
+        else for ((choice, label, pct) in m.options) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(P.onHero.copy(alpha = 0.14f))
                     .clickable {
+                        if (meterOn && choice != com.nh.hoopscoach.game.GameEngine.MomentChoice.KICK) { aiming = choice; return@clickable }
                         e.playMoment(choice)
                         lv.momentResult = e.lastMoment
                         lv.moment = null
@@ -421,7 +433,59 @@ private fun MomentCard(lg: League, lv: LiveGame, m: com.nh.hoopscoach.game.GameE
                 Text("$pct%", style = T.numSm, color = P.onHero)
             }
         }
-        Text("Chance to score, from your ratings against this defense.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 4.dp))
+        if (aim == null) Text("Chance to score, from your ratings against this defense.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 4.dp))
     }
 }
 
+
+/**
+ * The shot meter: a marker sweeps across the bar; stop it in the green. The green is wider for a better
+ * shooter (his three, midrange or inside rating for this shot). Perfect is the middle of the green.
+ */
+@Composable
+private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.MomentChoice, onRelease: (String, Double) -> Unit) {
+    val h = lg.hero
+    val drive = choice == com.nh.hoopscoach.game.GameEngine.MomentChoice.DRIVE
+    val rating = when {
+        h == null -> 70
+        drive -> h[com.nh.hoopscoach.game.Attr.INS]
+        h[com.nh.hoopscoach.game.Attr.OUT] >= h[com.nh.hoopscoach.game.Attr.MID] + 3 -> h[com.nh.hoopscoach.game.Attr.OUT]
+        else -> h[com.nh.hoopscoach.game.Attr.MID]
+    }
+    val window = (0.08f + (rating - 60) / 40f * 0.11f).coerceIn(0.06f, 0.2f)
+    val sweep = androidx.compose.animation.core.rememberInfiniteTransition(label = "meter")
+    val pos by sweep.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
+        androidx.compose.animation.core.tween(if (drive) 820 else 940, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse,
+    ), label = "pos")
+    val green = P.good
+    val track = P.onHero.copy(alpha = 0.18f)
+    val marker = P.onHero
+    Text(if (drive) "Time your finish at the rim" else "Time your release", style = T.bodyB, color = P.onHero)
+    Spacer(Modifier.height(10.dp))
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(34.dp)) {
+        val r = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx())
+        drawRoundRect(track, cornerRadius = r)
+        val gx = size.width * (0.5f - window / 2)
+        drawRoundRect(green.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(gx, 0f), androidx.compose.ui.geometry.Size(size.width * window, size.height), r)
+        val px = size.width * (0.5f - window * 0.35f / 2)
+        drawRect(green, androidx.compose.ui.geometry.Offset(px, 0f), androidx.compose.ui.geometry.Size(size.width * window * 0.35f, size.height))
+        val mx = size.width * pos
+        drawRect(marker, androidx.compose.ui.geometry.Offset(mx - 2.dp.toPx(), -2f), androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height + 4f))
+    }
+    Spacer(Modifier.height(12.dp))
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(P.gold).clickable {
+            val off = kotlin.math.abs(pos - 0.5f)
+            val half = window / 2
+            val (grade, bonus) = when {
+                off <= half * 0.35f -> "Perfect release!" to 0.12
+                off <= half -> "Good release." to 0.05
+                off <= half * 2 -> (if (pos < 0.5f) "A little early." else "A little late.") to -0.04
+                else -> (if (pos < 0.5f) "Way early." else "Way late.") to -0.12
+            }
+            onRelease(grade, bonus)
+        }.padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(if (drive) "FINISH" else "RELEASE", style = T.head, color = P.ink) }
+    Text("Stop the marker in the green. The middle is perfect.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
+}

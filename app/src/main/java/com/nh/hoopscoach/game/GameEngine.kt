@@ -131,6 +131,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     var interactive = false
     private var momentsAsked = 0
     private var forced: MomentChoice? = null
+    /** The shot meter's bonus (or penalty) for the big moment being played. */
+    private var momentTiming = 0.0
     /** What happened on the last big moment, for the live screen. */
     var lastMoment: String? = null
         private set
@@ -196,9 +198,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     /** Play the big moment the user chose, then carry on. */
-    fun playMoment(choice: MomentChoice) {
+    fun playMoment(choice: MomentChoice, timing: Double = 0.0) {
         momentsAsked++
         forced = choice
+        momentTiming = timing
         lastMoment = null
         step()
     }
@@ -217,10 +220,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             poss = d
         }
         when (choice) {
-            MomentChoice.PULL_UP -> heroShot(o, d, hero, pullType(hero, trail), offense, defense, ds, trail, -0.02, 0.04, null)
+            MomentChoice.PULL_UP -> heroShot(o, d, hero, pullType(hero, trail), offense, defense, ds, trail, -0.02 + momentTiming, 0.04, null)
             MomentChoice.DRIVE -> {
                 if (Rng.chance((0.07 + (ds.stealD - hero[Attr.HND]) * 0.002).coerceIn(0.03, 0.18))) { stolen(hero, "strips"); return }
-                heroShot(o, d, hero, 0, offense, defense, ds, trail, 0.0, 0.3, null)
+                heroShot(o, d, hero, 0, offense, defense, ds, trail, momentTiming, 0.3, null)
             }
             MomentChoice.KICK -> {
                 val mate = kickTarget(offense, hero) ?: return heroShot(o, d, hero, 1, offense, defense, ds, trail, 0.0, 0.04, null)
@@ -244,6 +247,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (type == 2) sl.tpa++
         val what = when (type) { 0 -> "layup"; 1 -> "pull-up jumper"; else -> "three" }
         if (made) {
+            chart(o, shooter, type, what, true)
             sl.fgm++; sl.pts += pts
             if (type == 2) sl.tpm++
             if (clutchTime) sl.clutch += pts
@@ -280,6 +284,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             lastMoment = "Fouled on the $what: $made of $pts at the line."
             return
         }
+        chart(o, shooter, type, what, false)
         log(o, "★ ${shooter.short} misses the $what", 0)
         lastMoment = "No good. ${shooter.short} misses the $what."
         val reb = rebound(o, offense, defense, false)
@@ -516,6 +521,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     private fun line(side: Int, p: Player) = lines[side].getOrPut(p.id) { StatLine() }
 
+    /** Every shot this game, packed (kept for the user's games). */
+    private val shotLog = mutableListOf<Long>()
+
+    /** Where a shot came from: his zones, and the game's chart. */
+    private fun chart(side: Int, p: Player, type: Int, what: String, made: Boolean) {
+        val (x, y) = ShotChart.spot(type, what)
+        ShotChart.tally(lg, p, ShotChart.zone(type, x, y), made)
+        shotLog += ShotChart.pack(p.id, side, x, y, made, type)
+    }
+
     private fun log(side: Int, text: String, pts: Int) {
         if (!pbp) return
         events += PlayEvent(period, clock.roundToInt().coerceAtLeast(0), side, text, score[0], score[1], pts, heroShort != null && text.contains(heroShort))
@@ -549,6 +564,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private var settle = 0
     private var callsAsked = 0
     private var closersAsked = false
+    /** Halftime: asked yet, the adjustment ("h_paint", "h_three", "h_star", "h_fast", "h_slow", "h_stay"), their star, and the margin at the half. */
+    private var halftimeAsked = false
+    var halftimePlan = ""
+        private set
+    private var halftimeStar = -1
+    private var halfMargin = 0
+    private val secondHalf get() = period > regPeriods / 2
+    private fun adjusting(side: Int, plan: String) = side == coachSide && secondHalf && halftimePlan == plan
     private var closers: List<Int>? = null
     private var forcedCall: String? = null
     /** What came of the last call, for the live screen. */
@@ -569,6 +592,24 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val me = coachSide
         val them = 1 - me
         val margin = score[me] - score[them]
+        // Halftime: what's working, what isn't, and what changes for the second half.
+        if (!halftimeAsked && secondHalf && !finished) {
+            fun tot(side: Int) = StatLine().also { st -> lines[side].values.forEach { st.add(it) } }
+            val a = tot(me); val b = tot(them)
+            fun fg(st: StatLine) = if (st.fga > 0) "${(st.fgm * 100.0 / st.fga).roundToInt()}%" else "—"
+            val star = lines[them].entries.maxByOrNull { it.value.pts }?.let { e -> rosters[them].firstOrNull { it.id == e.key }?.let { it to e.value.pts } }
+            halftimeStar = star?.first?.id ?: -1
+            val sub = "${teams[me].abbr} ${score[me]}, ${teams[them].abbr} ${score[them]}. You: ${fg(a)} FG, ${a.tpm}/${a.tpa} from three, ${a.tov} turnovers. " +
+                "Them: ${fg(b)} FG, ${b.tpm}/${b.tpa} from three, ${b.tov} turnovers." + (star?.let { " ${it.first.short} has ${it.second}." } ?: "")
+            return CoachCall("halftime", "Halftime adjustments", sub, listOfNotNull(
+                Triple("h_paint", "Attack the paint", "More drives and post-ups"),
+                Triple("h_three", "Let it fly", "More threes"),
+                star?.let { Triple("h_star", "Lock up ${it.first.short}", "Load up on him; the others get more room") },
+                Triple("h_fast", "Push the pace", "Run, more possessions"),
+                Triple("h_slow", "Slow it down", "Work the clock, fewer possessions"),
+                Triple("h_stay", "Stay the course", "No changes"),
+            ))
+        }
         // They're on a run: stop it?
         if (timeoutsLeft > 0 && runFor == them && runPts >= 8 && !runAsked && !(finalPeriod && clock < 24)) return CoachCall(
             "timeout", "${teams[them].abbr} on a ${runPts}-0 run", "Call a timeout to settle your team down?",
@@ -625,6 +666,17 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val me = coachSide
         lastCall = null
         when {
+            id.startsWith("h_") -> {
+                halftimeAsked = true
+                halftimePlan = id
+                halfMargin = score[me] - score[1 - me]
+                val what = when (id) {
+                    "h_paint" -> "attack the paint"; "h_three" -> "let it fly from three"; "h_fast" -> "push the pace"; "h_slow" -> "slow it down"
+                    "h_star" -> "lock up ${rosters[1 - me].firstOrNull { it.id == halftimeStar }?.short ?: "their star"}"; else -> "stay the course"
+                }
+                log(me, "Halftime adjustment, ${teams[me].abbr}: $what", 0)
+                lastCall = "Second half: $what."
+            }
             id == "t_yes" -> { runAsked = true; callTimeout() }
             id == "t_no" -> runAsked = true
             id.startsWith("c_") -> {
@@ -735,6 +787,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val trail = score[o] - score[d]
 
         var len = possLength(o)
+        if (adjusting(o, "h_fast")) len *= 0.84
+        if (adjusting(o, "h_slow")) len *= 1.16
         // Milk the clock with a late lead (but not past the shot clock); hurry when behind; hold for the last shot when tied.
         if (finalPeriod && clock < 60) {
             if (trail > 0) len = min(clock, shotClock - 1.0) else if (trail < 0) len = min(len, 8.0 + Rng.d() * 6)
@@ -870,6 +924,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 Defense.PACKLINE -> if (type == 0) pMake -= 0.04 else if (type == 2) pMake += 0.018
                 else -> {}
             }
+            if (adjusting(o, "h_paint") && type == 0) pMake += 0.012
+            if (adjusting(d, "h_star")) pMake += if (shooter.id == halftimeStar) -0.06 else 0.008
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && finalPeriod && clock < 120 && abs(trail) <= 5) pMake += 0.03
@@ -888,6 +944,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val what = when (type) { 0 -> if (putback != null) "putback" else Rng.pick(listOf("layup", "dunk", "hook shot", "floater")); 1 -> "jumper"; else -> "three" }
 
             if (made) {
+                chart(o, shooter, type, what, true)
                 sl.fgm++; sl.pts += pts
                 if (type == 2) sl.tpm++
                 if (clutchTime) sl.clutch += pts
@@ -934,6 +991,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
 
             // Missed shot
+            chart(o, shooter, type, what, false)
             var blocked = false
             val pBlk = when (type) { 0 -> 0.23 * (blkD / n[8]).pow(2); 1 -> 0.055; else -> 0.017 } * (if (lg.pro) 1.25 else 1.0)
             if (Rng.chance(pBlk)) {
@@ -1000,6 +1058,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Defense.PRESS -> { wi *= 1.1 }
             else -> {}
         }
+        if (adjusting(o, "h_paint")) { wi *= 1.35; w3 *= 0.8 }
+        if (adjusting(o, "h_three")) { w3 *= 1.35; wi *= 0.85 }
         val x = Rng.d() * (wi + wm + w3)
         return when { x < wi -> 0; x < wi + wm -> 1; else -> 2 }
     }
@@ -1129,6 +1189,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val proKeep = lg.pro && (game.type == GameType.PLAYOFF || game.type == GameType.CUP || game.label.startsWith("NBA Cup"))
         if (userInvolved || game.type == GameType.NCAA || userConfTourney || proKeep || lg.rivalry(game) != null) {
             game.box = boxScore()
+        }
+        if (userInvolved) { game.shots.clear(); game.shots.addAll(shotLog) }
+        // Did the halftime adjustment work?
+        if (coachSide >= 0 && halftimePlan.isNotEmpty()) {
+            val second = (score[coachSide] - score[1 - coachSide]) - halfMargin
+            log(coachSide, if (second > 0) "The halftime adjustment worked: won the second half by $second" else if (second < 0) "Lost the second half by ${-second} after the halftime adjustment" else "The second half was a wash", 0)
         }
         val hw = score[0] > score[1]
         // Pro playoff games count in their own stat line, not the standings or the season's averages.

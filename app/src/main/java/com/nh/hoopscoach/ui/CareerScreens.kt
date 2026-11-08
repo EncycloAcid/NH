@@ -250,6 +250,18 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }
             }
+            lg.road?.let { rd ->
+                Section("Big moments")
+                Panel {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Shot meter", style = T.bodyB, color = P.ink)
+                            Text("Time your own release in big moments: perfect timing adds to your chance, a bad one takes away.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(rd.shotMeter, { on -> vm.act { it.road?.shotMeter = on } })
+                    }
+                }
+            }
             Section("Schools")
             Panel {
                 Text("Fix a name, nickname or colors for any school.", style = T.small, color = P.sub)

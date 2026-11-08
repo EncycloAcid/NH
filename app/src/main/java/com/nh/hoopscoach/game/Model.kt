@@ -249,6 +249,10 @@ class Player(
     /** What people call him ("The Professor"), and his gear ([Gear], encoded). */
     var nickname: String = "",
     var gear: String = "",
+    /** This season's shots by zone (see [ShotChart.ZONES]): tries and makes, and the season they're for. */
+    var zoneA: IntArray = IntArray(5),
+    var zoneM: IntArray = IntArray(5),
+    var zoneSeason: Int = 0,
     /** Season he made the team at walk-on tryouts (0 = he didn't). */
     var tryout: Int = 0,
     /** Hidden: this walk-on has a breakout in him. */
@@ -449,6 +453,8 @@ class Game(
     var att: Int = 0,
     /** Prestige the winner took from the loser in a rivalry game. */
     var swing: Int = 0,
+    /** The user's games: every shot, packed (see [ShotChart]). */
+    var shots: MutableList<Long> = mutableListOf(),
 ) {
     val played get() = hs >= 0
     fun winner() = if (hs > aws) home else away
@@ -824,6 +830,8 @@ class RoadState(
     var sigMove: Int = 0,
     var sigShot: Int = 0,
     var celebration: Int = 0,
+    /** Big moments use a timing meter for his own shots. */
+    var shotMeter: Boolean = true,
     /** The class rival: a top recruit from the same class who follows him all career. */
     var rivalId: Int = -1,
     var rivalName: String = "",

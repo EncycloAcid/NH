@@ -286,6 +286,7 @@ private fun CareerTab(vm: GameViewModel, lg: League, p: Player) {
             Spacer(Modifier.height(10.dp))
             StatRow(listOf(Triple("GP", "${s.gp}", null), Triple("MIN", f1(s.mpg), null), Triple("FG%", pct(s.fgPct), null), Triple("3P%", pct(s.tpPct), null), Triple("FT%", pct(s.ftPct), null)), style = T.numSm)
         }
+        HotZones(lg, p)
     }
 
     // Season by season, with the season in progress and a career line.
