@@ -1471,6 +1471,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                 }
 
                 ProStep.FREE_AGENCY -> item {
+                    SummerLeaguePanel(vm, lg)
                     FreeAgencyFrenzyView(
                         vm = vm, lg = lg,
                         onNegotiate = { p -> negotiateIsExtension = false; negotiatePlayer = p },
@@ -1479,6 +1480,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                 }
 
                 ProStep.SUMMER -> item {
+                    TeamUsaPanel(vm, lg)
                     if (ps.userMoves.isNotEmpty()) {
                         Section("Your Offseason Summary")
                         GroupList(ps.userMoves) { line -> ListRow { Text(line, style = T.small, color = P.ink, modifier = Modifier.weight(1f)) } }

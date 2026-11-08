@@ -408,7 +408,7 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
         StepHeader("Offseason · ${lg.season}", steps, os.step.ordinal)
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             when (os.step) {
-                OffStep.ROSTER -> rosterStep(vm, lg)
+                OffStep.ROSTER -> { item { TeamUsaPanel(vm, lg) }; rosterStep(vm, lg) }
                 OffStep.DRAFT -> draftStep(vm, lg)
                 OffStep.CAREER -> careerStep(vm, lg)
                 OffStep.DEVELOPMENT -> developmentStep(vm, lg)

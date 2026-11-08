@@ -96,6 +96,7 @@ object Trophies {
             }
         },
         Def("dynasty", "Dynasty", "Win three titles as a coach", "Coach") { lg -> titles(lg).takeIf { it >= 3 }?.let { "$it titles" } },
+        Def("gold", "Gold medal coach", "Coach Team USA to a gold medal", "Coach") { lg -> lg.usaGolds.takeIf { it > 0 }?.let { "$it×" } },
         Def("hofcoach", "Hall of Fame coach", "Make the Hall of Fame as a coach", "Coach") { lg ->
             if (lg.road != null) null else runCatching { lg.userCoach }.getOrNull()?.hofSeason?.takeIf { it > 0 }?.let { "Class of $it" }
         },

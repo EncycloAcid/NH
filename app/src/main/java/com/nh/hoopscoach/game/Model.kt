@@ -958,6 +958,8 @@ class ProState(
     var step: ProStep = ProStep.FREE_AGENCY,
     /** Draft Night, while the NBA coach's draft is on (null once free agency opens, and in player careers). */
     var draftNight: DraftState? = null,
+    /** The last Summer League: champion, MVP, and the lines worth keeping. */
+    var summerLeague: SummerRecap? = null,
     /** Rookies the user's team drafted this summer, and the order the lottery set. */
     val draftedByUser: MutableList<Int> = mutableListOf(),
     val retiredThisSummer: MutableList<String> = mutableListOf(),
@@ -1303,6 +1305,9 @@ class League(
     /** The owner's or AD's goals for this season, and what each one is worth to his job. */
     var goals: MutableList<Goal> = mutableListOf(),
     var goalStake: Int = 0,
+    /** Team USA: this summer's call (if any), and the gold medals he's coached. */
+    var usa: UsaTeam? = null,
+    var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

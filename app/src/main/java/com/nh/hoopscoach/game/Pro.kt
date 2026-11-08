@@ -1328,6 +1328,7 @@ object ProCareer {
                 ps.step = ProStep.DRAFT
             }
             ProStep.DRAFT -> {
+                runCatching { SummerLeague.run(lg) }
                 // A player option on the last year: he decides before free agency opens.
                 r.contract?.let { c -> if (c.option && c.years == 1) r.optionPending = true }
                 if ((r.contract?.years ?: 0) <= 0) {
@@ -1377,6 +1378,8 @@ object ProCareer {
                 // Skipping ahead never loses the draft: whatever's left is picked first.
                 if (ps.draftNight?.done == false) DraftNight.simRest(lg)
                 ps.draftNight = null
+                // July in Las Vegas: the rookies and second-year players.
+                runCatching { SummerLeague.run(lg) }
                 Market.open(lg)
                 ps.step = ProStep.FREE_AGENCY
                 TradeFinder.makeOffers(lg)
@@ -1385,6 +1388,8 @@ object ProCareer {
                 Market.finish(lg)
                 if (ps.history.isNotEmpty()) summer(lg)
                 ps.step = ProStep.SUMMER
+                // An Olympic or World Cup summer: Team USA may call.
+                runCatching { TeamUSA.offer(lg) }
             }
             ProStep.SUMMER -> ProSeason.startSeason(lg)
         }

@@ -1233,7 +1233,7 @@ fun ProOffseasonFlow(vm: GameViewModel, lg: League) {
             when (ps.step) {
                 ProStep.REVIEW -> reviewStep(vm, lg, h, t)
                 ProStep.DRAFT -> draftStep(vm, lg, t)
-                ProStep.FREE_AGENCY -> contractStep(vm, lg, h, t, rookie)
+                ProStep.FREE_AGENCY -> { item { SummerLeaguePanel(vm, lg) }; contractStep(vm, lg, h, t, rookie) }
                 ProStep.SUMMER -> proSummerStep(vm, lg, h)
             }
             item { Spacer(Modifier.height(20.dp)) }
