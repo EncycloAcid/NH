@@ -33,8 +33,8 @@ import java.io.File
 /**
  * Profile pictures for the social feed. Real accounts show their own; your posts show the picture you
  * picked (a photo from your phone, your jersey, your team's logo or a cartoon); players show their
- * headshot or jersey, teams their logo, and everyone else a cartoon avatar drawn from their handle, so
- * the same fan always looks the same.
+ * headshot or jersey, teams their logo, and everyone else a real face picked by their handle, so the
+ * same fan always looks the same.
  */
 @Composable
 fun ProfilePic(lg: League?, p: Post, size: Dp = 36.dp) {
@@ -50,9 +50,35 @@ fun ProfilePic(lg: League?, p: Post, size: Dp = 36.dp) {
             }
             lg != null && p.kind == "team" && team(lg, p.name) != null -> TeamBadge(team(lg, p.name)!!, size)
             p.kind == "news" || p.kind == "league" -> Initials(p.name, size, P.ink)
-            else -> Cartoon(p.handle.ifEmpty { p.name }, size)
+            else -> RealFace(p.handle.ifEmpty { p.name }, p.name, size)
         }
     }
+}
+
+private val WOMEN = setOf("Dana", "Rae", "Priya", "Jules", "Jen", "Jenny", "Jess", "Jessica", "Sarah", "Ashley", "Emily", "Maria", "Megan", "Lauren", "Rachel",
+    "Nicole", "Amanda", "Kate", "Katie", "Alyssa", "Brianna", "Hannah", "Olivia", "Sophia", "Mia", "Ava", "Chloe", "Grace", "Erin", "Kelly", "Lisa", "Michelle",
+    "Stephanie", "Tiffany", "Vanessa", "Monica", "Tasha", "Keisha", "Aaliyah", "Imani", "Jada", "Nia", "Destiny", "Kayla", "Maya", "Zoe", "Ella", "Natalie",
+    "Rebecca", "Amber", "Brittany", "Danielle", "Jasmine", "Samantha", "Courtney", "Ciara", "Shay", "Tamika", "Elena", "Rosa", "Ana", "Lena", "Carmen")
+private val NOT_NAMES = setOf("Big", "Courtside", "Coach", "Real", "Hot", "Bench", "Overrated", "Die-hard", "The", "NBA", "NCAA", "Hoops")
+
+/**
+ * A real face for an account without a picture: a man's or a woman's by the first name (a coin
+ * weighted toward men when there isn't one), picked by the handle so the same fan is always the same
+ * person. The portraits are randomuser.me's, hand-picked from UI Faces' authorized set.
+ */
+fun facePath(seed: String, name: String): String {
+    val h = seed.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
+    val first = name.split(" ", ".").map { it.trim() }.firstOrNull { it.length > 1 && it.first().isUpperCase() && it !in NOT_NAMES }
+    val woman = if (first != null) first in WOMEN else h % 10 < 3
+    return "faces/${if (woman) "w" else "m"}${"%02d".format(h % 100)}.webp"
+}
+
+@Composable
+fun RealFace(seed: String, name: String, size: Dp) {
+    val ctx = LocalContext.current
+    val path = facePath(seed, name)
+    val img = remember(path) { Logos.asset(ctx, path) }
+    if (img != null) Image(img, name, Modifier.size(size).clip(CircleShape), contentScale = ContentScale.Crop) else Cartoon(seed, size)
 }
 
 private fun player(lg: League, name: String) = lg.players.firstOrNull { it.name == name } ?: lg.alumni.firstOrNull { it.name == name }

@@ -306,7 +306,7 @@ fun ReactionRow(r: Reaction) {
                 img != null -> androidx.compose.foundation.Image(img, r.who, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                 // Leagues and team accounts keep their initials; people get a face.
                 r.role.contains("League") || r.role.contains("team", ignoreCase = true) && !r.role.contains("Teammate") -> Text(initials, style = T.label, color = mood)
-                else -> Cartoon(r.who, 36.dp)
+                else -> RealFace(r.who, r.who, 36.dp)
             }
         }
         Spacer(Modifier.width(10.dp))
