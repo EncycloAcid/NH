@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -102,6 +103,10 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     val edge = (home.elo - away.elo + Rankings.homeElo(lg, e.game)) / 28.0
     Column(Modifier.fillMaxSize()) {
         BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodName} · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
+        // A big moment or a coaching call is the whole screen until it's answered: the chart and the
+        // play-by-play step aside and the rest scrolls, so the card and its buttons always fit.
+        val focus = !e.finished && (lv.moment != null || lv.call != null)
+        Column(if (focus) Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)
@@ -127,7 +132,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
+        if (!focus) Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
             val pts = remember(lv.tick) {
                 val half = e.half.toInt()
                 val len = e.periodLen.toInt()
@@ -181,17 +186,20 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             val won = e.score[if (userHome) 0 else 1] > e.score[if (userHome) 1 else 0]
             PrimaryButton(if (won) "Win · Continue" else "Continue", Modifier.fillMaxWidth().padding(horizontal = Gutter)) { vm.closeLive() }
         }
-        Spacer(Modifier.height(10.dp))
-        Segmented(listOf("Plays", away.abbr, home.abbr), view, { view = it })
-        Spacer(Modifier.height(6.dp))
-        if (view == 0) {
-            val events = e.events.asReversed()
-            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
-                items(events.size) { i -> PlayRow(events[i], home, away) }
+        Spacer(Modifier.height(if (focus) 24.dp else 10.dp))
+        }
+        if (!focus) {
+            Segmented(listOf("Plays", away.abbr, home.abbr), view, { view = it })
+            Spacer(Modifier.height(6.dp))
+            if (view == 0) {
+                val events = e.events.asReversed()
+                LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                    items(events.size) { i -> PlayRow(events[i], home, away) }
+                }
+            } else {
+                val box = e.boxScore()
+                LazyColumn(Modifier.fillMaxWidth().weight(1f)) { item { BoxTable(vm, lg, if (view == 1) away else home, if (view == 1) box.away else box.home) } }
             }
-        } else {
-            val box = e.boxScore()
-            LazyColumn(Modifier.fillMaxWidth().weight(1f)) { item { BoxTable(vm, lg, if (view == 1) away else home, if (view == 1) box.away else box.home) } }
         }
     }
 }
@@ -424,6 +432,10 @@ private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCal
 private fun MomentCard(lg: League, lv: LiveGame, m: com.nh.hoopscoach.game.GameEngine.BigMoment) {
     val e = lv.engine
     Panel(color = P.hero) {
+        lv.momentResult?.let {
+            Text("LAST TIME: $it", style = T.small, color = P.onHero.copy(alpha = 0.85f), modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp)).background(P.onHero.copy(alpha = 0.1f)).padding(horizontal = 10.dp, vertical = 6.dp))
+        }
         Text("BIG MOMENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
         val sit = when { m.margin < 0 -> "down ${-m.margin}"; m.margin > 0 -> "up ${m.margin}"; else -> "tied" }
         Text("${clock(m.clock.toInt())} left · $sit · your ball", style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
@@ -470,10 +482,18 @@ private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.Mome
         else -> h[com.nh.hoopscoach.game.Attr.MID]
     }
     val window = (0.08f + (rating - 60) / 40f * 0.11f).coerceIn(0.06f, 0.2f)
-    val sweep = androidx.compose.animation.core.rememberInfiniteTransition(label = "meter")
-    val pos by sweep.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
-        androidx.compose.animation.core.tween(if (drive) 820 else 940, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse,
-    ), label = "pos")
+    // The marker runs on the screen's frame clock, not the animation system, so it still sweeps on a
+    // phone with animations turned off or reduced (battery saver, accessibility settings).
+    var pos by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var released by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val period = if (drive) 820.0 else 940.0
+    LaunchedEffect(Unit) {
+        val start = androidx.compose.runtime.withFrameNanos { it }
+        while (!released) androidx.compose.runtime.withFrameNanos { t ->
+            val phase = ((t - start) / 1_000_000.0 % (2 * period)) / period
+            pos = (if (phase <= 1.0) phase else 2.0 - phase).toFloat()
+        }
+    }
     val green = P.good
     val track = P.onHero.copy(alpha = 0.18f)
     val marker = P.onHero
@@ -491,7 +511,8 @@ private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.Mome
     }
     Spacer(Modifier.height(12.dp))
     Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(P.gold).clickable {
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(P.gold).clickable(enabled = !released) {
+            released = true
             val off = kotlin.math.abs(pos - 0.5f)
             val half = window / 2
             val (grade, bonus) = when {

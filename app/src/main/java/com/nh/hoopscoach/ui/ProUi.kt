@@ -92,7 +92,16 @@ internal fun proPhase(lg: League): String {
             ps?.rivalryDay -> "Rivalry Night"
             else -> "Game ${(lg.user.gp + 1).coerceAtMost(ProLeague.seasonGames(lg))} of ${ProLeague.seasonGames(lg)}"
         }
-        Phase.PLAYOFFS -> if ((ps?.series?.maxOfOrNull { it.round } ?: 1) == 0) "Play-in" else "Playoffs"
+        Phase.PLAYOFFS -> {
+            // The user's round when he's still alive in it: "Conference Semifinals", "Finals".
+            val s = userSeries(lg)
+            when {
+                (ps?.series?.maxOfOrNull { it.round } ?: 1) == 0 -> "Play-in"
+                ps?.champion == lg.userTeamId -> "Champions"
+                s != null && s.round >= 1 && !s.done -> ProLeague.ROUND_NAMES[s.round - 1]
+                else -> "Playoffs"
+            }
+        }
         else -> "Offseason"
     }
 }
@@ -114,6 +123,7 @@ private fun seriesLine(lg: League, s: Series, from: Int): String {
     return when {
         s.done && s.winner == from -> "Won $mine-$theirs over the ${opp.name}"
         s.done -> "Lost $mine-$theirs to the ${opp.name}"
+        mine == 0 && theirs == 0 -> "Series opens against the ${opp.name}"
         mine == theirs -> "Tied $mine-$theirs with the ${opp.name}"
         mine > theirs -> "Lead the ${opp.name} $mine-$theirs"
         else -> "Trail the ${opp.name} $mine-$theirs"
@@ -135,6 +145,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { TeamBadge(u, 50.dp) }
         }
+        // In the playoffs, where your series stands comes first.
+        if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         if (r.tradedSeason == lg.season && r.tradeNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day - r.tradedDay in 0..7) item {
             Section("Trade")
             Panel(color = P.hero) {
@@ -153,8 +165,6 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             Section("Season outlook")
             Panel { ProjectionLines(lg) }
         }
-        // In the playoffs, where your series stands comes first.
-        if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         Season.userGameToday(lg)?.let { g ->
             item {
                 val opp = lg.team(g.opp(u.id))
@@ -334,7 +344,7 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
                 Text(proPhase(lg).uppercase(), style = T.label, color = P.accent, maxLines = 1)
                 val waiting = lg.phase == Phase.PLAYOFFS && userSeries(lg) == null && ProSeason.seed(lg, u.id) > 0
                 val over = lg.phase == Phase.PLAYOFFS && !waiting && userSeries(lg)?.let { it.done && it.winner != u.id } != false
-                Text(if (waiting) "In the playoffs · waiting on the play-in" else if (over) "Your season is over" else "No game today", style = T.bodyB, color = P.ink, maxLines = 1)
+                Text(if (waiting) "Waiting on the play-in" else if (over) "Your season is over" else playoffOffDay(lg) ?: "No game today", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Box {
@@ -560,54 +570,141 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
     }
 }
 
-/** Today's playoff card: your round, the series, the games so far and where the next one is. */
+/**
+ * Today's playoff card, at the top of the screen all postseason: the round, both teams with the series
+ * score in big numbers, a dot per game, when and where the next one is, and the road to the title.
+ */
 @Composable
 internal fun PlayoffCard(vm: GameViewModel, lg: League) {
     val u = lg.user
     val s = userSeries(lg)
-    Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = { vm.proRound = -1; vm.playoffView = 0; vm.leagueTab = 1; vm.select(Tab.LEAGUE) })
-    Panel {
-        val seed = ProSeason.seed(lg, u.id)
-        if (s == null && seed > 0) {
-            // A top-six seed sits out the play-in: in the playoffs, waiting for Round 1.
-            val opp = ProSeason.firstRoundOpponent(lg, u.id)
-            Text("NO. $seed SEED · ${lg.conf(u.confId).name.uppercase()}", style = T.label, color = P.accent)
-            Text("You're in. Round 1 starts after the play-in", style = T.head, color = P.ink)
-            Text(if (opp != null) "First-round opponent: the No. ${9 - seed} seed ${opp.name}. Sim a day or two while seeds 7 to 10 play in."
-                else "You'll face the play-in winner for the No. ${9 - seed} seed. Sim a day or two while seeds 7 to 10 play in.", style = T.small, color = P.sub)
-            return@Panel
+    val openBracket = { vm.proRound = -1; vm.playoffView = 0; vm.leagueTab = 1; vm.select(Tab.LEAGUE) }
+    Section(if (s?.round == 0) "Play-in" else "Playoffs", action = "Bracket", onAction = openBracket)
+    val seed = ProSeason.seed(lg, u.id)
+    if (s == null && seed > 0) {
+        // A top-six seed sits out the play-in: in the playoffs, waiting for Round 1.
+        val opp = ProSeason.firstRoundOpponent(lg, u.id)
+        Panel(color = P.hero, onClick = openBracket) {
+            Text("NO. $seed SEED · ${lg.conf(u.confId).name.uppercase()}", style = T.label, color = heroKicker)
+            Text("YOU'RE IN", style = T.hero.copy(fontSize = 34.sp), color = P.onHero)
+            Text(if (opp != null) "Round 1 against the No. ${9 - seed} seed ${opp.name}, once the play-in is done."
+                else "Round 1 against the play-in winner for the No. ${9 - seed} seed. Seeds 7 to 10 play in first.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+            PlayoffPath(lg, 0)
         }
-        if (s == null) {
+        return
+    }
+    if (s == null) {
+        Panel {
             Text("The ${u.mascot} missed the playoffs", style = T.head, color = P.ink)
             Text("The postseason goes on without you. Use the ⋮ menu to sim ahead and see who wins it all.", style = T.small, color = P.sub)
-            return@Panel
         }
-        val out = s.done && s.winner != u.id
-        val champs = lg.proState?.champion == u.id
-        Text((if (s.bestOf == 1) "Play-in · ${ProSeason.playInName(s)}" else ProSeason.roundName(s)).uppercase(), style = T.label, color = P.accent)
-        Text(if (champs) "Champions!" else if (s.bestOf == 1) playInLine(lg, s, u.id) else seriesLine(lg, s, u.id), style = T.head, color = P.ink)
-        if (s.bestOf > 1) {
-            // One dot per game: filled for a win.
-            val games = s.gameIds.map { lg.game(it) }.filter { it.played }
-            if (games.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                for ((i, g) in games.withIndex()) {
-                    val won = g.winner() == u.id
-                    Box(Modifier.size(24.dp).clip(CircleShape).background(if (won) P.good else P.bad.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                        Text("${i + 1}", style = T.label.copy(fontSize = 10.sp), color = if (won) P.onAccent else P.bad)
-                    }
+        return
+    }
+    val out = s.done && s.winner != u.id
+    val champs = lg.proState?.champion == u.id
+    val opp = lg.team(if (s.hi == u.id) s.lo else s.hi)
+    val (mine, theirs) = ProSeason.seriesScore(lg, s, u.id)
+    val games = s.gameIds.map { lg.game(it) }.filter { it.played }
+    Panel(color = if (out) P.surface else P.hero, onClick = openBracket) {
+        val fg = if (out) P.ink else P.onHero
+        val soft = if (out) P.sub else P.onHero.copy(alpha = 0.85f)
+        val round = if (s.bestOf == 1) "Play-in · ${ProSeason.playInName(s)}" else ProSeason.roundName(s)
+        val gameNo = if (s.done || s.bestOf == 1) "" else " · GAME ${games.size + 1}"
+        Text((if (champs) "NBA CHAMPIONS" else if (out) "ELIMINATED · ${round.uppercase()}" else round.uppercase() + gameNo), style = T.label, color = if (out) P.bad else heroKicker)
+        Spacer(Modifier.height(10.dp))
+        // The matchup: us, the series score, them.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                TeamBadge(u, 52.dp)
+                Text(u.abbr, style = T.label, color = soft, modifier = Modifier.padding(top = 4.dp))
+            }
+            if (s.bestOf > 1) Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$mine", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (mine >= theirs) fg else soft)
+                Text("–", style = T.h2, color = soft, modifier = Modifier.padding(horizontal = 10.dp))
+                Text("$theirs", style = T.hero.copy(fontSize = 48.sp, lineHeight = 48.sp), color = if (theirs > mine) fg else soft)
+            } else Text("VS", style = T.h2, color = soft)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                TeamBadge(opp, 52.dp)
+                Text(opp.abbr, style = T.label, color = soft, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(if (champs) "Champions!" else if (s.bestOf == 1) playInLine(lg, s, u.id) else seriesLine(lg, s, u.id), style = T.head, color = fg, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        // What's on the line tonight.
+        val need = s.bestOf / 2 + 1
+        val stakes = when {
+            s.done || s.bestOf == 1 -> ""
+            mine == need - 1 && theirs == need - 1 -> "GAME ${s.bestOf}: WINNER MOVES ON"
+            theirs == need - 1 -> "WIN OR GO HOME"
+            mine == need - 1 -> "ONE WIN FROM MOVING ON"
+            else -> ""
+        }
+        if (stakes.isNotEmpty()) Box(Modifier.fillMaxWidth().padding(top = 6.dp), contentAlignment = Alignment.Center) { Tag(stakes, P.gold, filled = true) }
+        // One dot per game: a check for a win.
+        if (s.bestOf > 1 && games.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
+            for ((i, g) in games.withIndex()) {
+                val won = g.winner() == u.id
+                Box(Modifier.size(26.dp).clip(CircleShape).background(if (won) P.good else fg.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", style = T.label.copy(fontSize = 10.sp), color = if (won) androidx.compose.ui.graphics.Color.White else fg.copy(alpha = 0.8f))
                 }
             }
         }
+        // When the next game is.
+        val nextGame = lg.games.filter { !it.played && it.type == GameType.PLAYOFF && it.involves(s.hi) && it.involves(s.lo) && it.day >= lg.day }.minByOrNull { it.day }
         val next = ProSeason.nextGame(lg, s)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            when {
-                champs -> "Sim ahead to the offseason when you're ready."
-                out -> "Use the ⋮ menu to sim ahead and see who wins it all."
-                next.isNotEmpty() -> "Next: $next"
-                else -> "Through to the next round. It starts when the other series finish."
-            }, style = T.small, color = if (out) P.sub else P.ink,
-        )
+        val whenText = nextGame?.let { when (it.day - lg.day) { 0 -> "Tonight"; 1 -> "Tomorrow"; else -> "In ${it.day - lg.day} days" } }
+        val waiting = s.done && !out && !champs
+        val note = when {
+            champs -> "Sim ahead to the offseason when you're ready."
+            out -> "Use the ⋮ menu to sim ahead and see who wins it all."
+            next.isNotEmpty() -> (whenText?.let { "$it · " } ?: "Next · ") + next
+            waiting -> waitingOn(lg, s)
+            else -> ""
+        }
+        if (note.isNotEmpty()) Text(note, style = T.bodyB, color = if (out) P.sub else fg, textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(fg.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 8.dp))
+        if (s.round >= 1 && !out) PlayoffPath(lg, if (champs) 5 else if (waiting) s.round + 1 else s.round)
+    }
+}
+
+/** The bottom bar on a playoff day off: "Game 3 tomorrow · at Denver", "Series won · waiting on the West". */
+internal fun playoffOffDay(lg: League): String? {
+    if (lg.phase != Phase.PLAYOFFS) return null
+    val u = lg.user
+    val s = userSeries(lg) ?: return null
+    if (lg.proState?.champion == u.id) return "Champions!"
+    if (s.done && s.winner == u.id) return "Series won · waiting on the next round"
+    if (s.done) return null
+    val g = lg.games.filter { !it.played && it.type == GameType.PLAYOFF && it.involves(s.hi) && it.involves(s.lo) && it.day >= lg.day }.minByOrNull { it.day } ?: return null
+    val (mine, theirs) = ProSeason.seriesScore(lg, s, u.id)
+    val n = mine + theirs + 1
+    val whenText = when (g.day - lg.day) { 0 -> "today"; 1 -> "tomorrow"; else -> "in ${g.day - lg.day} days" }
+    return (if (s.bestOf == 1) "Play-in game" else "Game $n") + " $whenText · ${if (g.home == u.id) "vs" else "at"} ${lg.team(g.opp(u.id)).name}"
+}
+
+/** Who the user's team waits on after winning a series: the other series feeding the next round. */
+private fun waitingOn(lg: League, s: Series): String {
+    val ps = lg.proState ?: return "Through to the next round."
+    val next = if (s.round == 3) "the Finals" else ProLeague.ROUND_NAMES.getOrElse(s.round) { "the next round" }.let { if (it == "Finals") "the Finals" else "the $it" }
+    val others = ps.series.filter { it.round == s.round && !it.done && (s.round == 3 || it.conf == s.conf) }
+    if (others.isEmpty()) return "Through to $next. It starts soon."
+    return "Through to $next. Waiting on " + others.joinToString(" and ") { "${lg.team(it.hi).name} vs ${lg.team(it.lo).name} (${ProSeason.seriesStatus(lg, it).lowercase().replaceFirstChar { c -> c.uppercase() }})" } + "."
+}
+
+/** The road to the title: the four rounds, done ones checked, the current one lit. */
+@Composable
+private fun PlayoffPath(lg: League, current: Int) {
+    val names = listOf("R1", "SEMIS", "CONF", "FINALS")
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        names.forEachIndexed { i, n ->
+            val r = i + 1
+            val done = r < current
+            val now = r == current
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(when { done -> P.good; now -> P.onHero; else -> P.onHero.copy(alpha = 0.2f) }))
+                Text((if (done) "✓ " else "") + n, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = if (now) P.onHero else P.onHero.copy(alpha = 0.6f), modifier = Modifier.padding(top = 4.dp))
+            }
+        }
     }
 }
 
