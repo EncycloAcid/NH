@@ -304,26 +304,31 @@ private fun PayrollPanel(vm: GameViewModel, lg: League, t: Team) {
         val stLabel = if (p.structure == "FRONT" || p.structure == "BACK") " · ${Payroll.structureLabel(p.structure)}" else ""
         val yrsText = if (p.contractYears <= 1) "1 yr (expiring)" else "${p.contractYears} yrs"
         val nextText = if (p.nextSalary > 0) " · then ${Road.dollars(p.nextSalary)}" else ""
-        ListRow(onClick = { vm.openPlayer(p.id) }) {
-            PlayerJersey(p, t, 38.dp)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val extend = Extensions.canExtend(lg, p)
+        // Buying a player out is rare: offer it for the end of the bench and the bad contracts, not the core.
+        val top9 = lg.rosterOf(t).sortedByDescending { it.ovr }.take(9).map { it.id }
+        val buyout = canBuyout && p.id != lg.heroId && (p.id !in top9 || delta <= -1.2)
+        Column {
+            ListRow(onClick = { vm.openPlayer(p.id) }, padding = PaddingValues(start = 14.dp, end = 14.dp, top = 11.dp, bottom = if (extend || buyout) 4.dp else 11.dp)) {
+                PlayerJersey(p, t, 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (clShort.isNotEmpty()) Tag(clShort, if (p.clause == "NTC") P.bad else P.accent)
-                    if (delta >= 1.2) Tag("BARGAIN", P.good)
-                    else if (delta <= -1.2) Tag("OVERPAID", P.bad)
+                    Text("${p.posLabel} · age ${p.age} · ${Road.dollars(sal)}/yr", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                    Text(yrsText.replace("1 yr (expiring)", "Expiring") + nextText + stLabel, style = T.small.copy(fontSize = 12.sp), color = if (p.contractYears <= 1 && p.nextSalary == 0) P.warn else P.sub, maxLines = 1)
+                    if (clShort.isNotEmpty() || delta >= 1.2 || delta <= -1.2) Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (clShort.isNotEmpty()) Tag(clShort.uppercase(), if (p.clause == "NTC") P.bad else P.accent)
+                        if (delta >= 1.2) Tag("BARGAIN", P.good)
+                        else if (delta <= -1.2) Tag("OVERPAID", P.bad)
+                    }
                 }
-                Text("${p.posLabel} · age ${p.age} · ${Road.dollars(sal)}/yr · $yrsText$nextText$stLabel", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                Ring(p.ovr, 38.dp, textSize = 13.sp)
             }
-            Ring(p.ovr, 34.dp, textSize = 12.sp)
-            if (Extensions.canExtend(lg, p)) {
-                Spacer(Modifier.width(6.dp))
-                SmallButton("Extend", primary = true) { extendTarget = p }
-            }
-            if (canBuyout && p.id != lg.heroId) {
-                Spacer(Modifier.width(6.dp))
-                SmallButton("Buyout", danger = true) { buyoutTarget = p }
+            // Actions get a line of their own, so names never get cut off.
+            if (extend || buyout) Row(Modifier.fillMaxWidth().padding(start = 66.dp, end = 14.dp, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (extend) SmallButton("Extend", primary = true) { extendTarget = p }
+                if (buyout) SmallButton("Buyout", danger = true) { buyoutTarget = p }
             }
         }
     }
@@ -553,6 +558,31 @@ private fun TradeBuilder(
                 t.name to "${t.w}-${t.l} · $dir · Needs $needs · ${Payroll.status(lg, t)}"
             },
         ) { i -> onOtherChange(sortedTeams[i].id) }
+
+        // No partner yet: the teams that fit best (they need what you have extra of), one tap to start.
+        if (other == null) {
+            val mySurplus = Needs.surplusPositions(lg, u).toSet()
+            val myNeeds = Needs.needsOf(lg, u).toSet()
+            val fits = sortedTeams.map { t ->
+                val theyNeed = Needs.needsOf(lg, t).count { it in mySurplus }
+                val theyHave = Needs.surplusPositions(lg, t).count { it in myNeeds }
+                t to (theyNeed * 2 + theyHave)
+            }.filter { it.second > 0 }.sortedByDescending { it.second }.take(6).map { it.first }
+            Spacer(Modifier.height(12.dp))
+            Text(if (fits.isEmpty()) "Pick a team to start building a deal." else "GOOD FITS", style = T.label, color = P.sub)
+            fits.forEach { t ->
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).background(P.surface2).clickable { onOtherChange(t.id) }.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    TeamBadge(t, 30.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${t.name} · ${t.w}-${t.l}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Needs ${Needs.needsOf(lg, t).joinToString("/") { it.label }.ifEmpty { "nothing" }} · ${Needs.direction(lg, t).label}", style = T.small, color = P.sub, maxLines = 1)
+                    }
+                    Chevron()
+                }
+            }
+        }
 
         if (other != null) {
             Spacer(Modifier.height(10.dp))

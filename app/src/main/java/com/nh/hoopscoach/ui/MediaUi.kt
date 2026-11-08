@@ -265,7 +265,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
 /** A headline as shown: "No. 1" never breaks across lines. */
 fun headline(text: String): String = text.replace("No. ", "No.\u00A0")
 
-/** A headline row: tap it to read the story (a small "Read" tag says there is one). */
+/** A headline row: tap it to read the story (a chevron says there is one). */
 @Composable
 fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
     ListRow(onClick = newsClick(vm, lg, n)) {
@@ -284,10 +284,10 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
                     Spacer(Modifier.width(3.dp))
                     Text(said, style = T.small, color = P.sub, maxLines = 1, softWrap = false)
                 }
-                Text("  ·  ", style = T.small, color = P.faint)
-                Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent, maxLines = 1, softWrap = false)
             }
         }
+        // A story to read: a chevron says so, instead of a "Read" link on every row.
+        if (n.body.isNotEmpty() || n.reactions.isNotEmpty()) { Spacer(Modifier.width(6.dp)); Chevron() }
     }
 }
 

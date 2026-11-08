@@ -607,7 +607,8 @@ internal fun RacePanel(vm: GameViewModel, lg: League) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(if (lg.pro) "MVP RACE" else "PLAYER OF THE YEAR", style = T.label, color = P.sub)
-                Text(if (rank <= 100) "No. $rank" else "Outside the top 100", style = T.title.copy(fontSize = if (rank <= 100) 30.sp else 22.sp), color = P.accent)
+                // A real contender's rank is the headline; a long way back reads quieter.
+                Text(if (rank <= 100) "No. $rank" else "Outside the top 100", style = T.title.copy(fontSize = if (rank <= 15) 30.sp else 22.sp), color = if (rank <= 15) P.accent else P.ink)
                 Text(if (lg.pro) proPace(rank) else Road.allAmericaPace(rank), style = T.small, color = P.ink)
             }
             if (r.lastRaceRank in 1..100 && r.raceRank in 1..100 && r.raceRank != r.lastRaceRank) {

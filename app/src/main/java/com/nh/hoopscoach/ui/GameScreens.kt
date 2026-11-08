@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -278,7 +280,10 @@ fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
                 }
                 Text("TEAM", style = T.label, color = P.ink, modifier = Modifier.height(38.dp).padding(top = 12.dp))
             }
-            Column(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(end = 12.dp)) {
+            val hs = rememberScrollState()
+            val surface = P.surface
+            Box(Modifier.weight(1f)) {
+            Column(Modifier.horizontalScroll(hs).padding(end = 12.dp)) {
                 Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically) {
                     cols.forEachIndexed { i, c -> Text(c, style = T.label, color = P.sub, modifier = Modifier.width(widths[i].dp), textAlign = TextAlign.End) }
                 }
@@ -292,6 +297,10 @@ fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
                 Row(Modifier.height(38.dp), verticalAlignment = Alignment.CenterVertically) {
                     values(total).forEachIndexed { i, v -> Text(if (i == 0) "" else v, style = T.bodyB.copy(fontSize = 13.sp), color = P.ink, modifier = Modifier.width(widths[i].dp), textAlign = TextAlign.End) }
                 }
+            }
+            // More stats to the right: a fade at the edge until you've scrolled to the end.
+            if (hs.value < hs.maxValue) Box(Modifier.align(Alignment.CenterEnd).width(28.dp).fillMaxHeight()
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(surface.copy(alpha = 0f), surface))))
             }
         }
     }
@@ -385,15 +394,23 @@ private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCal
         Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
         Spacer(Modifier.height(10.dp))
-        for ((id, label, detail) in c.options) {
+        fun choose(id: String) { e.playCall(id); lv.momentResult = e.lastCall; lv.call = null; lv.tick++ }
+        if (c.options.size > 4) {
+            // Many choices: two to a row, so they all fit on screen.
+            for (pair in c.options.chunked(2)) Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for ((id, label, detail) in pair) Column(
+                    Modifier.weight(1f).heightIn(min = 64.dp).clip(RoundedCornerShape(14.dp)).background(P.onHero.copy(alpha = 0.14f))
+                        .clickable { choose(id) }.padding(horizontal = 12.dp, vertical = 9.dp),
+                ) {
+                    Text(label, style = T.bodyB.copy(fontSize = 14.sp), color = P.onHero, maxLines = 2)
+                    if (detail.isNotEmpty()) Text(detail, style = T.small.copy(fontSize = 12.sp), color = P.onHero.copy(alpha = 0.8f), maxLines = 2)
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        } else for ((id, label, detail) in c.options) {
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(P.onHero.copy(alpha = 0.14f))
-                    .clickable {
-                        e.playCall(id)
-                        lv.momentResult = e.lastCall
-                        lv.call = null
-                        lv.tick++
-                    }.padding(horizontal = 14.dp, vertical = 11.dp),
+                    .clickable { choose(id) }.padding(horizontal = 14.dp, vertical = 11.dp),
             ) {
                 Text(label, style = T.bodyB, color = P.onHero)
                 if (detail.isNotEmpty()) Text(detail, style = T.small, color = P.onHero.copy(alpha = 0.8f))

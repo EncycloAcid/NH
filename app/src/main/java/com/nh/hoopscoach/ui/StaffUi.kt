@@ -123,7 +123,12 @@ fun StaffLink(vm: GameViewModel, lg: League) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Staff & development", style = T.bodyB, color = P.ink)
-                Text("${lg.staff.size} of ${Assistants.SLOTS} assistants · ${lg.rosterOf(lg.user).count { it.devPlan.isNotEmpty() }} players on a summer plan · tree of ${lg.tree.size}", style = T.small, color = P.sub)
+                val plans = lg.rosterOf(lg.user).count { it.devPlan.isNotEmpty() }
+                Text(listOfNotNull(
+                    "${lg.staff.size} of ${Assistants.SLOTS} assistants",
+                    if (plans == 0) "no summer plans set" else "$plans ${if (plans == 1) "player" else "players"} on a summer plan",
+                    if (lg.tree.isEmpty()) null else "${lg.tree.size} in your coaching tree",
+                ).joinToString(" · "), style = T.small, color = P.sub)
             }
             Chevron()
         }

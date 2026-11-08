@@ -98,6 +98,8 @@ private fun Shell(vm: GameViewModel, lg: League) {
     // Big moments pop up one at a time.
     lg.alerts.firstOrNull()?.let { a -> AlertPopup(vm, a) }
     // The preseason magazine opens by itself once, before the first game of every season.
+    // The roster's portraits get drawn in the background right away.
+    LaunchedEffect(lg, lg.season, lg.userTeamId) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { warmPortraits(lg) } }
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview
         if (!lg.pro && lg.phase == Phase.REGULAR && pv != null && pv.season == lg.season && !pv.opened && lg.user.gp == 0) {

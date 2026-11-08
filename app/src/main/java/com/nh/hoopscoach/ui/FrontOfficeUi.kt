@@ -44,7 +44,7 @@ fun BusinessPanel(vm: GameViewModel, lg: League, t: Team) {
         )
     }
     Section("Ticket prices · $${Business.ticket(lg, t)} a seat")
-    Chips(Business.PRICES, t.price, { i -> vm.act { Business.setPrice(it, t, i) } })
+    Segmented(Business.PRICES, t.price, { i -> vm.act { Business.setPrice(it, t, i) } })
     Text(
         when (t.price) { 0 -> "Cheap seats fill the building (+8%) but bring in less."; 1 -> "Fair prices: a few more fans (+4%)."; 2 -> "Standard prices."; 3 -> "Premium prices: more money a seat, fewer seats sold (−7%)."; else -> "Luxury prices: big money from the fans who come, and plenty who don't (−15%)." },
         style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
