@@ -777,6 +777,12 @@ private fun LazyListScope.history(vm: GameViewModel, lg: League) {
             Text(eraRules(era), style = T.small, color = P.sub)
         }
     }
+    com.nh.hoopscoach.game.Expansion.outlook(lg).takeIf { it.isNotEmpty() }?.let { lines ->
+        item {
+            Section("Coming soon")
+            GroupList(lines) { l -> ListRow { Text(l, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f)) } }
+        }
+    }
     item {
         Section("Archive")
         GroupList(listOf(HistoryKind.GREATEST)) { k ->

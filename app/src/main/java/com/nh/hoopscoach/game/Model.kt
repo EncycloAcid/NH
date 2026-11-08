@@ -1005,6 +1005,12 @@ class ProState(
     var era: String = "TODAY",
     /** The league follows the real list of teams each season (expansions and moves); games a team plays this season. */
     var realTeams: Boolean = false,
+    /** A future league's growth: the season new teams join and their cities, and a franchise on the move. */
+    var expandAt: Int = 0,
+    val expandWith: MutableList<String> = mutableListOf(),
+    var moveAt: Int = 0,
+    var moveTeam: Int = -1,
+    var moveTo: String = "",
     var games: Int = 0,
     /** Every honor of this season (weekly and monthly awards, awards night, the playoffs, the Cup and All-Star), and the season awards of past ones. */
     val honors: MutableList<Honor> = mutableListOf(),

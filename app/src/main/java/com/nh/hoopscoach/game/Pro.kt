@@ -1149,6 +1149,8 @@ object ProSeason {
         lg.season++
         // An era career: this season's teams (new names, moves, expansion teams).
         Franchises.apply(lg, lg.season)
+        // Past the real data: expansion teams and franchises on the move.
+        runCatching { Expansion.startSeason(lg) }
         Payroll.newSeason(lg)
         lg.day = 1
         lg.phase = Phase.REGULAR
