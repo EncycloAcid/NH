@@ -1770,10 +1770,18 @@ fun ProEnding(vm: GameViewModel, lg: League) {
         }
         item {
             Spacer(Modifier.height(16.dp))
+            var confirm by remember { mutableStateOf(false) }
             Box(Modifier.padding(horizontal = Gutter)) {
-                SecondaryButton("Start a new player career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
+                SecondaryButton("Start a new player career", Modifier.fillMaxWidth()) { confirm = true }
             }
             Spacer(Modifier.height(24.dp))
+            if (confirm) AlertDialog(
+                onDismissRequest = { confirm = false }, containerColor = P.surface,
+                title = { Text("Start over?", style = T.head, color = P.ink) },
+                text = { Text("This deletes your current career and builds a brand-new league.", style = T.body, color = P.sub) },
+                confirmButton = { TextButton({ confirm = false; vm.abandonCareer() }) { Text("Delete and start over", color = P.bad) } },
+                dismissButton = { TextButton({ confirm = false }) { Text("Cancel", color = P.sub) } },
+            )
         }
     }
 }

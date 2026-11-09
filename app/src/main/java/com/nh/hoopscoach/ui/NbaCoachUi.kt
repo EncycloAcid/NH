@@ -2152,8 +2152,16 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
             GroupList(rows) { it() }
             if (college.isNotEmpty()) Text("NCAA rows are your college seasons.", style = T.small.copy(fontSize = 12.sp), color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
             Spacer(Modifier.height(20.dp))
-            Box(Modifier.padding(horizontal = Gutter)) { SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() } }
+            var confirm by remember { mutableStateOf(false) }
+            Box(Modifier.padding(horizontal = Gutter)) { SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { confirm = true } }
             Spacer(Modifier.height(24.dp))
+            if (confirm) AlertDialog(
+                onDismissRequest = { confirm = false }, containerColor = P.surface,
+                title = { Text("Start over?", style = T.head, color = P.ink) },
+                text = { Text("This deletes your current career and builds a brand-new league.", style = T.body, color = P.sub) },
+                confirmButton = { TextButton({ confirm = false; vm.abandonCareer() }) { Text("Delete and start over", color = P.bad) } },
+                dismissButton = { TextButton({ confirm = false }) { Text("Cancel", color = P.sub) } },
+            )
         }
     }
 }

@@ -20,9 +20,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -1210,10 +1212,18 @@ fun RoadEnding(vm: GameViewModel, lg: League) {
                 }
             }
             Spacer(Modifier.height(16.dp))
+            var confirm by remember { mutableStateOf(false) }
             Box(Modifier.padding(horizontal = Gutter)) {
-                SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { vm.abandonCareer() }
+                SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { confirm = true }
             }
             Spacer(Modifier.height(24.dp))
+            if (confirm) AlertDialog(
+                onDismissRequest = { confirm = false }, containerColor = P.surface,
+                title = { Text("Start over?", style = T.head, color = P.ink) },
+                text = { Text("This deletes your current career and builds a brand-new league.", style = T.body, color = P.sub) },
+                confirmButton = { TextButton({ confirm = false; vm.abandonCareer() }) { Text("Delete and start over", color = P.bad) } },
+                dismissButton = { TextButton({ confirm = false }) { Text("Cancel", color = P.sub) } },
+            )
         }
     }
 }

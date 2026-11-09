@@ -77,8 +77,8 @@ object AllTime {
             pts / 1000.0 * PER_1000
     }
 
-    /** A real player's career before this league, plus everything since. */
-    fun total(lg: League, p: Player): Double = (if (p.photo.isNotEmpty()) ACTIVE[p.name] ?: 0.0 else 0.0) + inGame(lg, p)
+    /** A real player's career before this league, plus everything since (only today's era starts with modern pre-existing legacy). */
+    fun total(lg: League, p: Player): Double = (if (Eras.of(lg) == Era.TODAY && p.photo.isNotEmpty()) ACTIVE[p.name] ?: 0.0 else 0.0) + inGame(lg, p)
 
     /** Everyone on the list, best first (the user's player included once he's earned a spot). */
     fun list(lg: League): List<Entry> {

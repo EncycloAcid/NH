@@ -8,10 +8,15 @@ import kotlin.random.Random
 /** Shared random source. Tests can reseed it for repeatable seasons. */
 object Rng {
     var r: Random = Random(System.nanoTime())
+    /** Isolated PRNG for cosmetic text, commentary and flavor, so adding/changing flavor text never alters game outcomes or simulation seeds. */
+    var cosmetic: Random = Random(42)
     fun int(from: Int, until: Int) = r.nextInt(from, until)
     fun range(lo: Int, hi: Int) = r.nextInt(lo, hi + 1)
     fun d() = r.nextDouble()
     fun chance(p: Double) = r.nextDouble() < p
+    fun <T> flavorPick(list: List<T>): T = list[cosmetic.nextInt(list.size)]
+    fun flavorD() = cosmetic.nextDouble()
+    fun flavorChance(p: Double) = cosmetic.nextDouble() < p
     fun gauss(): Double {
         // Box-Muller
         val u = max(1e-9, r.nextDouble())

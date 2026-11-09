@@ -138,7 +138,18 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     init {
         if (autoLoad) viewModelScope.launch {
             val lg = withContext(Dispatchers.IO) {
-                runCatching { if (file.exists()) SaveIO.decode(file.readBytes()) else null }.getOrNull()
+                val primary = runCatching { if (file.exists()) SaveIO.decode(file.readBytes()) else null }.getOrNull()
+                if (primary != null) return@withContext primary
+                val bak = File(file.path + ".bak")
+                val backup = runCatching { if (bak.exists()) SaveIO.decode(bak.readBytes()) else null }.getOrNull()
+                if (backup != null) {
+                    runCatching { bak.copyTo(file, overwrite = true) }
+                    return@withContext backup
+                }
+                if (file.exists()) {
+                    runCatching { file.copyTo(File(file.path + ".corrupt"), overwrite = true) }
+                }
+                null
             }
             league = lg
             loading = false
@@ -185,6 +196,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 val tmp = File(file.path + ".tmp")
                 tmp.writeBytes(bytes)
+                val bak = File(file.path + ".bak")
+                if (file.exists()) {
+                    runCatching { file.copyTo(bak, overwrite = true) }
+                }
                 if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
             }
         }
@@ -512,7 +527,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             mutex.withLock {
                 saveJob?.cancel()
-                withContext(Dispatchers.IO) { file.delete() }
+                withContext(Dispatchers.IO) {
+                    file.delete()
+                    File(file.path + ".bak").delete()
+                    File(file.path + ".tmp").delete()
+                }
                 league = null
                 stack.clear()
                 sheet = null
@@ -598,25 +617,34 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         stack.add(Route.Live)
     }
 
+    private suspend fun finishLive(lv: LiveGame, lg: League) {
+        if (lv.done) return
+        mutex.withLock {
+            if (!lv.done) {
+                lv.engine.simToEnd()
+                lv.engine.commit()
+                lv.tick++
+                com.nh.hoopscoach.game.Sim.playDay(lg)
+                lv.done = true
+            }
+        }
+        bump()
+    }
+
     /** Called when the final buzzer sounds (or the user skips ahead). */
     fun completeLive() {
         val lv = live ?: return
         val lg = league ?: return
         if (lv.done) return
-        viewModelScope.launch {
-            mutex.withLock {
-                lv.engine.simToEnd()
-                lv.engine.commit()
-                lv.tick++
-                com.nh.hoopscoach.game.Sim.playDay(lg)
-            }
-            lv.done = true
-            bump()
-        }
+        viewModelScope.launch { finishLive(lv, lg) }
     }
 
     fun closeLive() {
-        if (live?.done == false) completeLive()
+        val lv = live
+        val lg = league
+        if (lv != null && !lv.done && lg != null) {
+            viewModelScope.launch { finishLive(lv, lg) }
+        }
         stack.removeAll { it is Route.Live }
         live = null
     }
