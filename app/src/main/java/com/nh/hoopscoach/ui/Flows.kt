@@ -609,13 +609,19 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League) {
             GroupList(list) { d ->
                 val t = lg.team(d.teamId)
                 val my = d.teamId == lg.userTeamId
+                val shoe = com.nh.hoopscoach.game.Shoes.draftShoeLine(d)
                 ListRow(onClick = if (d.pid >= 0 && lg.anyPlayer(d.pid) != null) ({ vm.openPlayer(d.pid) }) else null, modifier = if (my) Modifier.background(P.accentSoft) else Modifier) {
                     Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
                     Jersey(d.number, Color(t.primary), Color(t.secondary), 40.dp)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(d.playerName, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${t.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1)
+                        val nba = if (d.nba.isNotEmpty()) com.nh.hoopscoach.game.Nba.short(d.nba) else null
+                        Text(
+                            listOfNotNull(nba?.let { "→ $it" }, t.school, com.nh.hoopscoach.game.classLabel(d.cls), "${d.pos}").joinToString(" · "),
+                            style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        if (shoe.isNotEmpty()) Text(shoe, style = T.small, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text("${d.ovr}", style = T.numSm, color = tier(d.ovr))
                 }
@@ -757,6 +763,38 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
                         "The former walk-on came back a different player: ${gr?.before ?: "?"} → ${p.ovr} overall, with a ceiling of ${p.pot}.",
                         style = T.small, color = P.onHero.copy(alpha = 0.9f),
                     )
+                }
+            }
+        }
+        val shoeIds = os.shoeOffers.distinct().filter { lg.playerOrNull(it)?.shoeOffer?.isNotEmpty() == true }
+        if (shoeIds.isNotEmpty()) {
+            Section("Shoe deals")
+            Text(
+                "Personal endorsements from real brands. Pay comes from the company — not your NIL budget.",
+                style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp),
+            )
+            for (pid in shoeIds) {
+                val p = lg.player(pid)
+                Panel(Modifier.padding(bottom = 8.dp)) {
+                    Text(p.name, style = T.head, color = P.ink)
+                    Text(com.nh.hoopscoach.game.Shoes.offerLabel(p), style = T.bodyB, color = P.accent)
+                    Text(
+                        if (p.shoePay > 0) "Replaces his current ${com.nh.hoopscoach.game.Shoes.label(p)}."
+                        else "Stars without a deal get restless — especially Bag Chasers.",
+                        style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SecondaryButton("Decline", Modifier.weight(1f)) {
+                            vm.act { com.nh.hoopscoach.game.Shoes.declineOffer(it.player(pid)) }
+                        }
+                        PrimaryButton("Accept", Modifier.weight(1f)) {
+                            vm.act {
+                                com.nh.hoopscoach.game.Shoes.acceptOffer(it.player(pid))
+                                vm.toast("${p.name} signed with ${com.nh.hoopscoach.game.Shoes.ofPlayer(it.player(pid))?.label}")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -906,11 +944,14 @@ private fun LazyListScope.budgetStep(lg: League) {
             Text(if (d == 0) "Total budget unchanged from last year" else "${if (d > 0) "▲" else "▼"} ${money(kotlin.math.abs(d))} total budget vs last year", style = T.small, color = if (d > 0) P.good else if (d < 0) P.bad else P.sub)
         }
         Section("Where the money comes from")
+        val apparel = com.nh.hoopscoach.game.Shoes.of(t)
+        val apparelPay = com.nh.hoopscoach.game.Shoes.apparelMoney(t)
         GroupList(
             listOf(
                 Triple("Donor NIL pool", "Tracks prestige · ${prestigeLabel(t.prestige).lowercase()}", donor),
                 Triple("Fan support", "Fans are ${com.nh.hoopscoach.game.Fans.mood(t.fans).lowercase()}${if (t.homeGames > 0) " · ${fans(com.nh.hoopscoach.game.Fans.avgCrowd(t))} a night" else ""}", Finance.fanMoney(t)),
                 Triple("Conference revenue share", lg.conf(t.confId).name, rev),
+                Triple("Apparel partner", if (apparel != null) "${apparel.label} · ${t.apparelLeft} season${if (t.apparelLeft == 1) "" else "s"} left" else "No kit deal", apparelPay),
                 Triple("Performance bonuses", "${t.bonuses.size} active, capped at ${money(Finance.bonusCap(lg, t))}", applied),
             ),
         ) { (a, b, v) ->

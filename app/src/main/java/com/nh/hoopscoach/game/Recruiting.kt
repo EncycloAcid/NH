@@ -188,6 +188,15 @@ object Recruiting {
         var strength = (1.0 - gap.coerceAtLeast(0.0) / 40.0).coerceIn(0.3, 1.3) + if (gap < -20) 0.1 else 0.0
         if (pref == RecruitPref.BRAND) strength = strength.pow(1.6)
         out += Factor("Program strength", strength, "Recruiting Pull $pull; he's looking for about ${wants(r).roundToInt()}")
+        // Apparel partner: big shoe brands help with brand-minded and high-star recruits.
+        val shoe = Shoes.of(t)
+        if (shoe != null) {
+            var kit = 1.0 + shoe.pullBonus * 0.02
+            if (pref == RecruitPref.BRAND) kit += shoe.pullBonus * 0.03
+            if (r.p.stars >= 4 && shoe in listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS)) kit += 0.06
+            val kitPay = Shoes.apparelMoney(t)
+            out += Factor("Apparel deal", kit, "${shoe.label} school · $${kitPay}K/yr kit money")
+        }
         // Coach.
         val c = lg.coachOf(t)
         val coach = (0.8 + (c.rec + (if (t.id == lg.userTeamId) Assistants.rec(lg) else 0)) / 250.0) * if (c.has(CoachSkill.RECRUITER)) 1.08 else 1.0

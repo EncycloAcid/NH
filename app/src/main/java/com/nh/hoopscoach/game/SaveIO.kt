@@ -60,6 +60,7 @@ object SaveIO {
         if (!lg.pro) {
             Rivalries.ensure(lg)
             Brand.ensure(lg)
+            Shoes.ensure(lg)
             Recruiting.ensure(lg)
         }
         return lg

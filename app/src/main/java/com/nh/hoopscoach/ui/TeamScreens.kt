@@ -373,6 +373,28 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
         FanPanel(t)
         if (t.id == lg.userTeamId && !lg.playerMode) BusinessPanel(vm, lg, t)
         RivalsList(vm, lg, t)
+        Section("Apparel")
+        Panel {
+            val co = com.nh.hoopscoach.game.Shoes.of(t)
+            val kit = com.nh.hoopscoach.game.Shoes.apparelMoney(t)
+            if (co != null) {
+                Text(co.label, style = T.head, color = P.ink)
+                Text(co.blurb, style = T.small, color = P.sub)
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    Stat("Kit money", money(kit), Modifier.weight(1f), P.good)
+                    Stat("Pull", "+${co.pullBonus}", Modifier.weight(1f))
+                    Stat("Left", "${t.apparelLeft} yr", Modifier.weight(1f))
+                }
+            } else Text("No apparel partner yet.", style = T.body, color = P.sub)
+            val shoed = players.count { it.shoePay > 0 }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (shoed == 0) "No personal shoe deals on the roster."
+                else "$shoed player${if (shoed == 1) " has" else "s have"} a personal shoe deal (paid by the brand, not your budget).",
+                style = T.small, color = P.sub,
+            )
+        }
         Section("NIL")
         Panel {
             Row {
@@ -381,7 +403,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
                 Stat("Room", money(budget - spent), Modifier.weight(1f), if (budget >= spent) P.good else P.bad)
             }
             Spacer(Modifier.height(12.dp))
-            Bar(spent.toFloat() / budget, Modifier.fillMaxWidth(), color = if (spent > budget) P.bad else P.accent, height = 8.dp)
+            Bar(spent.toFloat() / budget.coerceAtLeast(1), Modifier.fillMaxWidth(), color = if (spent > budget) P.bad else P.accent, height = 8.dp)
             val under = players.filter { val e = Ratings.expectedNil(it); e - it.nil > maxOf(25, e / 12) }
             Spacer(Modifier.height(8.dp))
             Text(if (under.isEmpty()) "Everyone is paid at market value." else "${under.size} player${if (under.size > 1) "s are" else " is"} below market value. Open a player to adjust his deal.", style = T.small, color = if (under.isEmpty()) P.sub else P.warn)
@@ -454,6 +476,14 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             3 -> item {
                 ProgramNumbers(vm, lg, t)
                 FanPanel(t)
+                val co = com.nh.hoopscoach.game.Shoes.of(t)
+                if (co != null) {
+                    Section("Apparel")
+                    Panel {
+                        Text(co.label, style = T.head, color = P.ink)
+                        Text("${co.blurb} · ${money(com.nh.hoopscoach.game.Shoes.apparelMoney(t))}/yr kit money", style = T.small, color = P.sub)
+                    }
+                }
                 ProgramLegends(t) { vm.openPlayer(it) }
             }
             else -> item {

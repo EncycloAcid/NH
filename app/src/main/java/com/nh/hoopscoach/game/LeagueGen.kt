@@ -91,7 +91,9 @@ object LeagueGen {
             t.roster += p.id
         }
         Gameplan.autoAllocate(lg, t)
+        Shoes.assignApparel(t, force = true)
         Morale.setInitialNil(lg, t)
+        Shoes.seedRoster(lg, t)
     }
 
     /** A typical age for a class: high school seniors 17 or 18, freshmen 18 or 19, and a year more each class after. */

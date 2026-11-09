@@ -316,6 +316,14 @@ class Player(
     var usedMedicalRs: Boolean = false,
     /** Class labels get the RS prefix after any redshirt. */
     var rsClass: Boolean = false,
+    /** Personal shoe deal company (ShoeCo.name), pay in $K/season, seasons left. */
+    var shoe: String = "",
+    var shoePay: Int = 0,
+    var shoeLeft: Int = 0,
+    /** Pending endorsement offer for the user to accept or decline. */
+    var shoeOffer: String = "",
+    var shoeOfferPay: Int = 0,
+    var shoeOfferYears: Int = 0,
 ) {
     /** Out injured. */
     val out get() = injGames > 0
@@ -409,6 +417,10 @@ class Team(
     var legacy: Double = -1.0,
     /** Short-term national heat, 0-100. Big wins and March runs raise it; it fades. -1 until first computed. */
     var buzz: Double = -1.0,
+    /** Apparel / shoe company partner (ShoeCo.name). Empty until assigned. */
+    var apparel: String = "",
+    /** Seasons left on the school apparel contract. */
+    var apparelLeft: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -652,7 +664,17 @@ class Rivalry(
 }
 
 @Serializable
-class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1, var proTeam: String = "")
+class DraftPick(
+    val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String,
+    val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1,
+    /** NBA club that took him on Draft Night (college flavor). */
+    val nba: String = "",
+    /** NBA shoe company (ShoeCo.name) and first-year pay in $K. */
+    val shoe: String = "",
+    val shoePay: Int = 0,
+    /** Pro-career draft destination (era-aware team name), set when the hero enters the league. */
+    var proTeam: String = "",
+)
 
 @Serializable
 class HofEntry(val season: Int, val name: String, val pos: Pos, val school: String, val summary: String, val isCoach: Boolean = false)
@@ -1327,6 +1349,8 @@ class OffseasonState(
     var report: RoundReport? = null,
     /** Prospects nobody signed when the cycle ended. */
     var unsigned: Int = 0,
+    /** User roster players with a pending personal shoe offer this offseason. */
+    val shoeOffers: MutableList<Int> = mutableListOf(),
 )
 
 @Serializable

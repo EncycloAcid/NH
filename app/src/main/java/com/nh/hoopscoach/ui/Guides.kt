@@ -101,7 +101,14 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "• Donors: the biggest piece, and it grows faster than Prestige does.",
             "• Revenue share: set by your conference's level.",
             "• Fan support: excited fans add up to 20% to the donor money, apathetic ones take up to 20% away.",
+            "• Apparel partner: Nike, Jordan Brand, adidas, Under Armour, Puma, New Balance, Converse or Reebok pay kit money into your NIL pool and bump Recruiting Pull.",
             "• Performance bonuses: conference titles and deep March runs pay for a few seasons, up to 12% extra.",
+        ),
+        sec(
+            "Shoe deals",
+            "Star players can land personal endorsements from those same brands. The money is paid by the company, not your school budget, and it helps happiness — Bag Chasers care most.",
+            "Offers show up in Player Development each summer. Accept or decline on the player card or the development step. AI programs sign theirs automatically.",
+            "On Draft Night every pick is taken by a real NBA club and signs an NBA shoe deal. Lottery picks land signature-tier money with Nike, Jordan Brand or adidas; second-round deals are smaller.",
         ),
         sec(
             "Market value",
