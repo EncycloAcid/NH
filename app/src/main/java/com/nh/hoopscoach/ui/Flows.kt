@@ -516,13 +516,19 @@ private fun LazyListScope.draftStep(vm: GameViewModel, lg: League) {
             GroupList(list) { d ->
                 val t = lg.team(d.teamId)
                 val my = d.teamId == lg.userTeamId
+                val shoe = com.nh.hoopscoach.game.Shoes.draftShoeLine(d)
                 ListRow(onClick = if (d.pid >= 0 && lg.anyPlayer(d.pid) != null) ({ vm.openPlayer(d.pid) }) else null, modifier = if (my) Modifier.background(P.accentSoft) else Modifier) {
                     Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
                     Jersey(d.number, Color(t.primary), Color(t.secondary), 40.dp)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(d.playerName, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${t.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1)
+                        val nba = if (d.nba.isNotEmpty()) com.nh.hoopscoach.game.Nba.short(d.nba) else null
+                        Text(
+                            listOfNotNull(nba?.let { "→ $it" }, t.school, com.nh.hoopscoach.game.classLabel(d.cls), "${d.pos}").joinToString(" · "),
+                            style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        if (shoe.isNotEmpty()) Text(shoe, style = T.small, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text("${d.ovr}", style = T.numSm, color = tier(d.ovr))
                 }

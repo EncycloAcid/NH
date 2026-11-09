@@ -413,7 +413,10 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                             Text("${d.pick}", style = T.numSm, color = P.accent, modifier = Modifier.width(36.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(d.playerName, style = T.bodyB, color = if (d.teamId == lg.userTeamId) P.accent else P.ink)
-                                Text("${d.school} · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub)
+                                val nba = if (d.nba.isNotEmpty()) " → ${com.nh.hoopscoach.game.Nba.short(d.nba)}" else ""
+                                Text("${d.school}$nba · ${com.nh.hoopscoach.game.classLabel(d.cls)} · ${d.pos}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val shoe = com.nh.hoopscoach.game.Shoes.draftShoeLine(d)
+                                if (shoe.isNotEmpty()) Text(shoe, style = T.small, color = P.accent, maxLines = 1)
                             }
                             Text("${d.ovr}", style = T.numSm, color = tier(d.ovr))
                         }

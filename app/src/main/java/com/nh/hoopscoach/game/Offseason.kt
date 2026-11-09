@@ -186,15 +186,23 @@ object Offseason {
             .sortedByDescending { it.second }
             .map { it.first }
         val picks = pool.take(60)
+        val nbaOrder = Nba.order()
+        val byId = HashMap<Int, DraftPick>()
         picks.forEachIndexed { i, p ->
+            val pickNum = i + 1
             val t = lg.team(p.teamId)
-            lg.draftHistory += DraftPick(lg.season, i + 1, p.name, p.pos, t.id, t.school, p.year, p.ovr, p.look, p.number, p.id)
+            val nba = Nba.forPick(nbaOrder, pickNum)
+            val (co, pay) = Shoes.signNba(p, pickNum)
+            val dp = DraftPick(lg.season, pickNum, p.name, p.pos, t.id, t.school, p.year, p.ovr, p.look, p.number, p.id, nba, co.name, pay)
+            lg.draftHistory += dp
+            byId[p.id] = dp
             lg.coachOf(t).drafted++
-            p.awards += "${lg.season} Draft #${i + 1}"
+            p.awards += "${lg.season} Draft #${pickNum}"
             if (t.id == lg.userTeamId) {
                 os.draftedCount++
                 os.freedDraft += p.nil
-                lg.news += News(lg.season, lg.day, "${p.name} goes No. ${i + 1} overall in the draft", true)
+                val shoeBit = if (pickNum <= 14) " and signs with ${co.label} (${Shoes.moneyK(pay)}/yr)" else ""
+                lg.news += News(lg.season, lg.day, "${p.name} goes No. $pickNum to the $nba$shoeBit", true)
             }
         }
         val drafted = picks.map { it.id }.toSet()
@@ -208,7 +216,12 @@ object Offseason {
                     Legacy.honorPlayer(lg, t, p)
                     t.roster.remove(pid)
                     lg.removePlayer(p)
-                    Careers.keep(lg, p, t, if (pid in drafted) picks.indexOfFirst { it.id == pid } + 1 else 0)
+                    val dp = byId[pid]
+                    val how = if (dp != null) {
+                        val shoe = Shoes.draftShoeLine(dp).let { if (it.isEmpty()) "" else " · $it" }
+                        "Drafted No. ${dp.pick} by the ${dp.nba} in ${lg.season}$shoe"
+                    } else null
+                    Careers.keep(lg, p, t, dp?.pick ?: 0, how)
                 }
             }
         }

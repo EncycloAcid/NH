@@ -197,5 +197,76 @@ object Shoes {
         return "${co.label} · ${moneyK(p.shoeOfferPay)}/yr · ${p.shoeOfferYears} yr"
     }
 
-    private fun moneyK(v: Int) = if (v >= 1000) "$%.1fM".format(v / 1000.0) else "$${v}K"
+    /** NBA rookie shoe deal: lottery gets signature-tier money; second round stays modest. */
+    fun nbaDeal(pick: Int, p: Player): Pair<ShoeCo, Int> {
+        val co = when {
+            pick <= 5 -> Rng.weighted(listOf(ShoeCo.JORDAN, ShoeCo.NIKE, ShoeCo.ADIDAS)) {
+                when (it) { ShoeCo.JORDAN -> 1.4; ShoeCo.NIKE -> 1.3; else -> 0.7 }
+            }
+            pick <= 14 -> Rng.weighted(listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS, ShoeCo.PUMA)) {
+                when (it) { ShoeCo.NIKE -> 1.4; ShoeCo.JORDAN -> 1.0; ShoeCo.ADIDAS -> 1.1; else -> 0.6 }
+            }
+            pick <= 30 -> Rng.weighted(listOf(ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.UNDER_ARMOUR, ShoeCo.PUMA, ShoeCo.NEW_BALANCE)) { 1.0 + it.dealMult }
+            else -> Rng.weighted(ShoeCo.entries.toList()) { 1.4 - it.prestigeNeed / 100.0 }
+        }
+        val tier = when {
+            pick <= 3 -> 2200.0
+            pick <= 10 -> 1200.0
+            pick <= 14 -> 700.0
+            pick <= 30 -> 280.0
+            pick <= 45 -> 90.0
+            else -> 35.0
+        }
+        var pay = tier * co.dealMult * (0.85 + (p.ovr - 70).coerceIn(0, 25) * 0.02)
+        if (p.awards.any { it.contains("AA") || it.contains("MVP") }) pay *= 1.15
+        return co to (pay / 5).roundToInt().coerceAtLeast(10) * 5
+    }
+
+    /** Stamp an NBA shoe deal onto a drafted player and return the brand + pay. */
+    fun signNba(p: Player, pick: Int): Pair<ShoeCo, Int> {
+        val (co, pay) = nbaDeal(pick, p)
+        applyDeal(p, co, pay, years = if (pick <= 14) 5 else 3)
+        return co to pay
+    }
+
+    fun draftShoeLine(d: DraftPick): String {
+        val co = byId(d.shoe) ?: return ""
+        return "${co.label} · ${moneyK(d.shoePay)}/yr"
+    }
+
+    fun moneyK(v: Int) = if (v >= 1000) "$%.1fM".format(v / 1000.0) else "$${v}K"
+}
+
+/** Real NBA clubs used as draft destinations (flavor only). */
+object Nba {
+    val teams = listOf(
+        "Atlanta Hawks", "Boston Celtics", "Brooklyn Nets", "Charlotte Hornets", "Chicago Bulls",
+        "Cleveland Cavaliers", "Dallas Mavericks", "Denver Nuggets", "Detroit Pistons", "Golden State Warriors",
+        "Houston Rockets", "Indiana Pacers", "LA Clippers", "Los Angeles Lakers", "Memphis Grizzlies",
+        "Miami Heat", "Milwaukee Bucks", "Minnesota Timberwolves", "New Orleans Pelicans", "New York Knicks",
+        "Oklahoma City Thunder", "Orlando Magic", "Philadelphia 76ers", "Phoenix Suns", "Portland Trail Blazers",
+        "Sacramento Kings", "San Antonio Spurs", "Toronto Raptors", "Utah Jazz", "Washington Wizards",
+    )
+
+    /** One shuffled order for the night; each club picks once per round (picks 1–30 and 31–60). */
+    fun order(): List<String> = teams.shuffled(Rng.r)
+
+    fun forPick(order: List<String>, pick: Int): String {
+        val slot = (pick - 1) % order.size
+        return order[slot]
+    }
+
+    fun short(name: String) = when {
+        name.startsWith("LA ") -> "Clippers"
+        name.startsWith("Los Angeles ") -> "Lakers"
+        name.startsWith("Golden State ") -> "Warriors"
+        name.startsWith("Oklahoma City ") -> "Thunder"
+        name.startsWith("San Antonio ") -> "Spurs"
+        name.startsWith("Portland ") -> "Blazers"
+        name.startsWith("New Orleans ") -> "Pelicans"
+        name.startsWith("New York ") -> "Knicks"
+        name.startsWith("Philadelphia ") -> "76ers"
+        name.startsWith("Minnesota ") -> "Wolves"
+        else -> name.substringAfterLast(' ')
+    }
 }

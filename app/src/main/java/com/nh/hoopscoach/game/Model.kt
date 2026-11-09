@@ -471,7 +471,15 @@ class Rivalry(
 }
 
 @Serializable
-class DraftPick(val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String, val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1)
+class DraftPick(
+    val season: Int, val pick: Int, val playerName: String, val pos: Pos, val teamId: Int, val school: String,
+    val cls: Int, val ovr: Int, val look: Int = 0, val number: Int = 0, val pid: Int = -1,
+    /** NBA club that took him (flavor). */
+    val nba: String = "",
+    /** NBA shoe company (ShoeCo.name) and first-year pay in $K. */
+    val shoe: String = "",
+    val shoePay: Int = 0,
+)
 
 @Serializable
 class HofEntry(val season: Int, val name: String, val pos: Pos, val school: String, val summary: String, val isCoach: Boolean = false)

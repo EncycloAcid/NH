@@ -82,4 +82,36 @@ class ShoesTest {
         t.apparel = ShoeCo.NIKE.name
         assertEquals(3, Shoes.pullBonus(t))
     }
+
+    @Test
+    fun nbaRookieDealsScaleWithPick() {
+        Rng.r = Random(26)
+        val lg = LeagueGen.newLeague()
+        val p = lg.players.maxBy { it.ovr }
+        val top = Shoes.nbaDeal(1, p)
+        val mid = Shoes.nbaDeal(25, p)
+        val late = Shoes.nbaDeal(55, p)
+        assertTrue(top.second > mid.second && mid.second > late.second)
+        assertTrue(top.first in listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS))
+        val order = com.nh.hoopscoach.game.Nba.order()
+        assertEquals(30, order.toSet().size)
+        assertEquals(order[0], com.nh.hoopscoach.game.Nba.forPick(order, 1))
+        assertEquals(order[0], com.nh.hoopscoach.game.Nba.forPick(order, 31))
+    }
+
+    @Test
+    fun draftNightAssignsNbaTeamAndShoeDeal() {
+        Rng.r = Random(27)
+        val base = LeagueGen.newLeague()
+        val lg = Offseason.claimTeam(base, base.teams.maxBy { it.prestige }.id, "Test", "Coach")
+        lg.phase = Phase.WRAP_UP
+        Offseason.begin(lg)
+        Offseason.advance(lg) // Roster → Draft Night
+        val recent = lg.draftHistory.filter { it.season == lg.season }
+        assertEquals(60, recent.size)
+        assertTrue(recent.all { it.nba.isNotEmpty() && it.nba in com.nh.hoopscoach.game.Nba.teams })
+        assertTrue(recent.all { it.shoe.isNotEmpty() && it.shoePay > 0 })
+        assertTrue(recent.filter { it.pick <= 14 }.all { it.shoePay >= 100 })
+        assertEquals(30, recent.map { it.nba }.toSet().size)
+    }
 }

@@ -92,8 +92,16 @@ fun PipelinePanel(vm: GameViewModel, lg: League, t: Team) {
             for (d in picks.take(6)) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("#${d.pick}", style = T.numSm.copy(fontSize = 16.sp), color = if (d.pick <= 14) P.gold else P.accent, modifier = Modifier.width(44.dp))
-                    Text(d.playerName, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${d.season} · ${if (d.pick <= 14) "Lottery" else if (d.pick <= 30) "1st round" else "2nd round"}", style = T.small, color = P.sub)
+                    Column(Modifier.weight(1f)) {
+                        Text(d.playerName, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val nba = if (d.nba.isNotEmpty()) com.nh.hoopscoach.game.Nba.short(d.nba) else null
+                        val shoe = com.nh.hoopscoach.game.Shoes.byId(d.shoe)?.short
+                        Text(
+                            listOfNotNull(nba, shoe, "${d.season}").joinToString(" · "),
+                            style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(if (d.pick <= 14) "Lottery" else if (d.pick <= 30) "1st" else "2nd", style = T.small, color = P.sub)
                 }
             }
         }
