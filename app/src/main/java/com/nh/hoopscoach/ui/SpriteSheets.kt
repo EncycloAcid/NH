@@ -52,6 +52,32 @@ object SpriteSheets {
     fun shoulderDigit(digit: Int): Bitmap? =
         bitmap("sprites/numbers/shoulder/${digit.coerceIn(0, 9)}.png")
 
+    /** Isolated eyes (+ brows). Index 0 = keep the body's baked eyes. */
+    fun eyes(style: Int): Bitmap? {
+        val file = EYE_FILES.getOrNull(style) ?: return null
+        return bitmap("sprites/eyes/$file.png")
+    }
+
+    fun mouth(style: Int): Bitmap? {
+        val file = MOUTH_FILES.getOrNull(style) ?: return null
+        return bitmap("sprites/mouths/$file.png")
+    }
+
+    fun beard(style: Int): Bitmap? {
+        val file = BEARD_FILES.getOrNull(style) ?: return null
+        return bitmap("sprites/beards/$file.png")
+    }
+
+    fun headband(style: Int): Bitmap? {
+        val file = HEADBAND_FILES.getOrNull(style) ?: return null
+        return bitmap("sprites/headbands/$file.png")
+    }
+
+    fun eyewear(style: Int): Bitmap? {
+        val file = EYEWEAR_FILES.getOrNull(style) ?: return null
+        return bitmap("sprites/eyewear/$file.png")
+    }
+
     /** NBA / era abbr (or mascot key) → jersey file stem. */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         val keys = listOfNotNull(abbr?.uppercase(), slot?.uppercase(), name?.lowercase())
@@ -106,6 +132,51 @@ object SpriteSheets {
         "mohawk",                // 11 Mohawk
         "messy_waves",           // 12 Waves
         "braided_top_bun",       // 13 Man bun / top bun
+    )
+
+    // Face.eyes 0 = default (no overlay); 1..6 map to files.
+    private val EYE_FILES = arrayOf(
+        null,
+        "01_intense_focused",
+        "02_clutch_stare",
+        "03_confident_swagger",
+        "04_alert_court_vision",
+        "05_light_blue_eyes",
+        "06_emerald_green_eyes",
+    )
+
+    // Face.mouth 0 = neutral (no overlay).
+    private val MOUTH_FILES = arrayOf(
+        null,
+        "01_confident_grin",
+        "02_game_face_shout",
+        "03_athletic_mouthguard",
+    )
+
+    // Face.beard 0 = none; pack has stubble / goatee / full.
+    private val BEARD_FILES = arrayOf(
+        null,
+        "03_stubble_shadow", // Stubble
+        "02_goatee",         // Mustache → closest
+        "02_goatee",         // Goatee
+        "02_goatee",         // Chin strap → closest
+        "01_full_beard",     // Full beard
+    )
+
+    // Face.acc headband slots.
+    private val HEADBAND_FILES = arrayOf(
+        null,
+        "01_white_headband",
+        "02_red_headband",
+        "03_black_headband",
+        null, // goggles
+        null, // mask
+    )
+
+    private val EYEWEAR_FILES = arrayOf(
+        null, null, null, null,
+        "01_sports_rec_specs",
+        "02_protective_clear_mask",
     )
 
     private val JERSEY_BY_ABBR = mapOf(

@@ -27,6 +27,22 @@ object SpriteCompose {
     private const val CHEST_NUM_YF = 0.55f
     private const val SHOULDER_NUM_XF = 0.72f
     private const val SHOULDER_NUM_YF = 0.12f
+    // Face overlay anchors on the 512 body canvas (cropped parts centered here).
+    private const val EYE_CX = 255f
+    private const val EYE_CY = 145f
+    private const val EYE_MAX_W = 170
+    private const val MOUTH_CX = 255f
+    private const val MOUTH_CY = 225f
+    private const val MOUTH_MAX_W = 95
+    private const val BEARD_CX = 255f
+    private const val BEARD_CY = 248f
+    private const val BEARD_MAX_W = 140
+    private const val HEADBAND_CX = 255f
+    private const val HEADBAND_CY = 100f
+    private const val HEADBAND_MAX_W = 175
+    private const val EYEWEAR_CX = 255f
+    private const val EYEWEAR_CY = 148f
+    private const val EYEWEAR_MAX_W = 160
 
     private val HAIR_COLORS = intArrayOf(
         0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),
@@ -64,6 +80,15 @@ object SpriteCompose {
         blitOpaque(canvasBmp, body, 0, 0)
         body.recycle()
 
+        // Face extras from the separated pack: eyes → mouth → beard → hair → headband/eyewear.
+        placeOverlay(canvasBmp, SpriteSheets.eyes(f.eyes), EYE_CX, EYE_CY, EYE_MAX_W)
+        placeOverlay(canvasBmp, SpriteSheets.mouth(f.mouth), MOUTH_CX, MOUTH_CY, MOUTH_MAX_W)
+        val beardSrc = SpriteSheets.beard(f.beard)
+        if (beardSrc != null) {
+            val tinted = tintHair(beardSrc, HAIR_COLORS[f.hairColor.coerceIn(0, HAIR_COLORS.lastIndex)])
+            placeOverlay(canvasBmp, tinted, BEARD_CX, BEARD_CY, BEARD_MAX_W, recycle = tinted !== beardSrc)
+        }
+
         if (hairSrc != null) {
             val (hx, hy, hw, hh) = hairPlacement(hairSrc)
             val tinted = tintHair(hairSrc, HAIR_COLORS[f.hairColor.coerceIn(0, HAIR_COLORS.lastIndex)])
@@ -73,12 +98,36 @@ object SpriteCompose {
             if (tinted !== hairSrc) tinted.recycle()
         }
 
+        placeOverlay(canvasBmp, SpriteSheets.headband(f.acc), HEADBAND_CX, HEADBAND_CY, HEADBAND_MAX_W)
+        placeOverlay(canvasBmp, SpriteSheets.eyewear(f.acc), EYEWEAR_CX, EYEWEAR_CY, EYEWEAR_MAX_W)
+
         val out = Bitmap.createScaledBitmap(canvasBmp, N, N, false)
         canvasBmp.recycle()
         val px = IntArray(N * N)
         out.getPixels(px, 0, N, 0, 0, N, N)
         if (out !== canvasBmp) out.recycle()
         return px
+    }
+
+    /** Center a cropped face part on [cx],[cy], optionally capping width. */
+    private fun placeOverlay(
+        canvas: Bitmap,
+        src: Bitmap?,
+        cx: Float,
+        cy: Float,
+        maxW: Int,
+        recycle: Boolean = false,
+    ) {
+        if (src == null) return
+        val scale = if (src.width > maxW) maxW.toFloat() / src.width else 1f
+        val w = max(4, (src.width * scale).roundToInt())
+        val h = max(4, (src.height * scale).roundToInt())
+        val scaled = if (w == src.width && h == src.height) src else Bitmap.createScaledBitmap(src, w, h, false)
+        val x = (cx - w / 2f).roundToInt()
+        val y = (cy - h * 0.45f).roundToInt()
+        blitOpaque(canvas, scaled, x, y)
+        if (scaled !== src) scaled.recycle()
+        if (recycle) src.recycle()
     }
 
     /** Stamp chest + shoulder numbers at jersey-relative anchors. */

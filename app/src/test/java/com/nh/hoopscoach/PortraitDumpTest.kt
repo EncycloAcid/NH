@@ -28,18 +28,18 @@ class PortraitDumpTest {
             Triple(null, 0xFF13294B.toInt(), 0xFFE84A27.toInt()), // college recolor
         )
         val faces = listOf(
-            Face(5, 0, 3, 0, 5, 0, 1, 0, 0),   // chestnut, fade
-            Face(2, 1, 2, 1, 0, 1, 0, 1, 0),   // olive, slicked
-            Face(6, 2, 5, 0, 1, 0, 2, 0, 4),   // dark chocolate, afro
-            Face(1, 0, 10, 2, 3, 2, 0, 0, 0),  // fair peach, twists
-            Face(4, 3, 4, 0, 0, 0, 1, 2, 2),   // medium brown, flat-top
-            Face(7, 1, 9, 0, 5, 1, 1, 0, 0),   // deep ebony, locs
-            Face(3, 0, 8, 1, 2, 0, 0, 1, 0),   // caramel, cornrows
-            Face(0, 2, 11, 0, 0, 2, 2, 0, 5),  // pale ivory, mohawk
-            Face(5, 0, 6, 0, 4, 0, 0, 0, 0),   // high-top
-            Face(2, 1, 13, 4, 0, 1, 0, 1, 1),  // blond top bun
-            Face(6, 0, 12, 0, 5, 0, 1, 0, 0),  // waves
-            Face(4, 2, 1, 0, 0, 0, 0, 0, 3),   // buzz
+            Face(5, 0, 3, 0, 5, 1, 1, 1, 0),   // chestnut, fade, full beard, intense, grin
+            Face(2, 1, 2, 1, 0, 2, 0, 0, 4),   // olive, slicked, clutch, goggles
+            Face(6, 2, 5, 0, 1, 3, 2, 2, 3),   // dark chocolate, afro, swagger, shout, black HB
+            Face(1, 0, 10, 2, 3, 5, 0, 0, 0),  // fair peach, twists, blue eyes, goatee
+            Face(4, 3, 4, 0, 0, 4, 1, 3, 2),   // medium brown, flat-top, alert, mouthguard, red HB
+            Face(7, 1, 9, 0, 5, 1, 1, 1, 0),   // deep ebony, locs, full beard
+            Face(3, 0, 8, 1, 2, 6, 0, 1, 0),   // caramel, cornrows, green eyes
+            Face(0, 2, 11, 0, 0, 2, 2, 0, 5),  // pale ivory, mohawk, clear mask
+            Face(5, 0, 6, 0, 4, 1, 0, 0, 1),   // high-top, white HB
+            Face(2, 1, 13, 4, 0, 3, 0, 1, 0),  // blond top bun, swagger grin
+            Face(6, 0, 12, 0, 5, 4, 1, 2, 0),  // waves, full beard, alert shout
+            Face(4, 2, 1, 0, 1, 0, 0, 0, 3),   // buzz, stubble, black HB
         )
         val gear = Gear(undershirt = 1, sleeve = 1, sleeveColor = 2)
         val n = SpriteCompose.N

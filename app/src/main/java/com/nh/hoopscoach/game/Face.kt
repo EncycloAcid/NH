@@ -21,10 +21,10 @@ class Face(
             listOf("Bald", "Buzz", "Slicked", "Fade", "Flat-top", "Afro", "High-top", "Headband", "Cornrows", "Locs", "Twists", "Mohawk", "Waves", "Top bun"),
             listOf("Black", "Dark brown", "Brown", "Auburn", "Blond", "Platinum", "Gray", "Red"),
             listOf("None", "Stubble", "Mustache", "Goatee", "Chin strap", "Full beard"),
-            listOf("Normal", "Focused", "Wide"),
+            listOf("Default", "Intense", "Clutch", "Swagger", "Alert", "Blue", "Green"),
             listOf("Normal", "Thick", "Fierce"),
-            listOf("Neutral", "Smile", "Smirk"),
-            listOf("None", "White headband", "Team headband", "Goggles", "Earring", "Glasses"),
+            listOf("Neutral", "Grin", "Shout", "Mouthguard"),
+            listOf("None", "White headband", "Red headband", "Black headband", "Goggles", "Clear mask"),
         )
 
         private fun from(a: IntArray) = Face(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8])
@@ -53,8 +53,10 @@ class Face(
                 else listOf(0 to 0.2, 1 to 0.33, 2 to 0.25, 3 to 0.06, 4 to 0.13, 5 to 0.01, 7 to 0.02))
             val beardOdds = (0.18 + (p.age - 20) * 0.04).coerceIn(0.1, 0.7)
             val beard = if (r.nextDouble() > beardOdds) 0 else weighted(r, listOf(1 to 0.35, 2 to 0.08, 3 to 0.22, 4 to 0.12, 5 to 0.23))
-            val acc = weighted(r, listOf(0 to 0.84, 1 to 0.05, 2 to 0.04, 3 to 0.01, 4 to 0.05, 5 to 0.01))
-            return Face(skin, r.nextInt(4), hair, hairColor, beard, r.nextInt(3), r.nextInt(3), r.nextInt(3), acc)
+            val eyes = weighted(r, listOf(0 to 0.55, 1 to 0.12, 2 to 0.1, 3 to 0.08, 4 to 0.07, 5 to 0.04, 6 to 0.04))
+            val mouth = weighted(r, listOf(0 to 0.62, 1 to 0.2, 2 to 0.12, 3 to 0.06))
+            val acc = weighted(r, listOf(0 to 0.82, 1 to 0.05, 2 to 0.04, 3 to 0.05, 4 to 0.02, 5 to 0.02))
+            return Face(skin, r.nextInt(4), hair, hairColor, beard, eyes, r.nextInt(3), mouth, acc)
         }
 
         fun random(seed: Long): Face {
