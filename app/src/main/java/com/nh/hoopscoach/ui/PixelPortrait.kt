@@ -1,5 +1,13 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,10 +20,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -35,7 +47,7 @@ object Pixels {
     private val cache = android.util.LruCache<String, ImageBitmap>(120)
 
     fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear(), jersey: String? = null) =
-        "${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
+        "v2|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
 
@@ -81,16 +93,64 @@ fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: 
         }
     }
     val shape = RoundedCornerShape(size * 0.2f)
+    // Idle life: soft breathe + a quick blink, seeded per player so a roster isn't in sync.
+    val life = rememberInfiniteTransition(label = "portraitLife")
+    val phase = ((p.id * 37 + p.number * 13) % 1000) / 1000f
+    val breathe by life.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(2800 + (p.id % 7) * 120, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "breathe",
+    )
+    val blinkClock by life.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(3200 + (p.id % 11) * 90, easing = LinearEasing),
+            RepeatMode.Restart,
+        ),
+        label = "blink",
+    )
+    val blink = run {
+        val tBlink = (blinkClock + phase) % 1f
+        // Brief lids near the end of each cycle.
+        if (tBlink in 0.86f..0.92f) 1f else 0f
+    }
+    val breatheAmt = (breathe - 0.5f) * 0.03f
+
     Box(Modifier.size(size).clip(shape).background(Color(primary)), contentAlignment = androidx.compose.ui.Alignment.Center) {
         val b = bmp
         if (b != null) {
-            Image(
-                b, p.name, Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                filterQuality = FilterQuality.None,
-            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleY = 1f + breatheAmt
+                        translationY = -this.size.height * breatheAmt * 0.35f
+                    },
+            ) {
+                Image(
+                    b, p.name, Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    filterQuality = FilterQuality.None,
+                )
+                if (blink > 0f) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val h = this.size.height
+                        val w = this.size.width
+                        val eyeY = h * 0.30f
+                        val eyeH = h * 0.028f
+                        val eyeW = w * 0.07f
+                        val gap = w * 0.09f
+                        val cx = w / 2f
+                        val lid = Color(0xFF1A1210)
+                        drawRoundRect(lid, Offset(cx - gap - eyeW, eyeY), Size(eyeW, eyeH), CornerRadius(eyeH))
+                        drawRoundRect(lid, Offset(cx + gap, eyeY), Size(eyeW, eyeH), CornerRadius(eyeH))
+                    }
+                }
+            }
         } else {
-            // While it's drawn: his initials on his team's color.
             val fs = with(androidx.compose.ui.platform.LocalDensity.current) { (size * 0.34f).toSp() }
             androidx.compose.material3.Text(
                 "${p.first.take(1)}${p.last.take(1)}".uppercase(),

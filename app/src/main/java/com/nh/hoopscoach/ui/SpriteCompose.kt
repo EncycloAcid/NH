@@ -20,14 +20,13 @@ object SpriteCompose {
     private const val FACE_CX = 255f
     private const val FACE_CY = 168f
     private const val FACE_HOLE_TARGET = 160f
-    private const val JERSEY_SCALE = 1.186f
-    private const val JERSEY_X = 102
-    private const val JERSEY_Y = 195
-    // Anchors measured from the jersey art's baked #1 (chest + shoulder patch).
-    private const val CHEST_NUM_CX = 254f
-    private const val CHEST_NUM_CY = 458f
-    private const val SHOULDER_NUM_CX = 327f
-    private const val SHOULDER_NUM_CY = 260f
+    // Jersey-less body packs: black torso placeholder; jersey paints only onto that.
+    private const val JERSEY_SCALE = 1.10f
+    private const val JERSEY_Y = 244
+    // Number anchors as fractions of the placed jersey box (recomputed each render).
+    private const val CHEST_NUM_YF = 0.55f
+    private const val SHOULDER_NUM_XF = 0.72f
+    private const val SHOULDER_NUM_YF = 0.12f
 
     private val HAIR_COLORS = intArrayOf(
         0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),
@@ -43,21 +42,27 @@ object SpriteCompose {
         jerseyKey: String? = null,
     ): IntArray {
         val bodySrc = SpriteSheets.body(f.skin) ?: return fallback(f, primary, secondary, number, gear)
-        val canvasBmp = bodySrc.copy(Bitmap.Config.ARGB_8888, true)
-        stripDefaultJersey(canvasBmp)
-        val hairSrc = hairBitmap(f)
-        // Body sheet ships with a baked afro; clear it for bald or before a hair overlay.
-        if (f.hair == 0 || hairSrc != null) stripDefaultHair(canvasBmp)
-
+        // Jersey-less bodies leave a transparent torso hole: jersey draws behind, body/arms on top.
+        val canvasBmp = Bitmap.createBitmap(SRC, SRC, Bitmap.Config.ARGB_8888)
         val jersey = resolveJersey(jerseyKey, primary, secondary)
+        var jx = 0
+        var jw = 0
+        var jh = 0
         if (jersey != null) {
-            val jw = (jersey.width * JERSEY_SCALE).roundToInt()
-            val jh = (jersey.height * JERSEY_SCALE).roundToInt()
+            jw = (jersey.width * JERSEY_SCALE).roundToInt()
+            jh = (jersey.height * JERSEY_SCALE).roundToInt()
+            jx = (SRC - jw) / 2
             val scaled = Bitmap.createScaledBitmap(jersey, jw, jh, false)
-            blitOpaque(canvasBmp, scaled, JERSEY_X, JERSEY_Y)
+            blitOpaque(canvasBmp, scaled, jx, JERSEY_Y)
             if (scaled !== jersey) scaled.recycle()
-            applyJerseyNumber(canvasBmp, number)
+            applyJerseyNumber(canvasBmp, number, jx, JERSEY_Y, jw, jh)
         }
+
+        val body = bodySrc.copy(Bitmap.Config.ARGB_8888, true)
+        val hairSrc = hairBitmap(f)
+        if (f.hair == 0 || hairSrc != null) stripDefaultHair(body)
+        blitOpaque(canvasBmp, body, 0, 0)
+        body.recycle()
 
         if (hairSrc != null) {
             val (hx, hy, hw, hh) = hairPlacement(hairSrc)
@@ -76,24 +81,28 @@ object SpriteCompose {
         return px
     }
 
-    /** Wipe the jersey art's baked #1 and stamp the player's number on chest + shoulder. */
-    private fun applyJerseyNumber(canvas: Bitmap, number: Int) {
+    /** Stamp chest + shoulder numbers at jersey-relative anchors. */
+    private fun applyJerseyNumber(canvas: Bitmap, number: Int, jx: Int, jy: Int, jw: Int, jh: Int) {
         val n = number.coerceIn(0, 99)
-        eraseGlyphs(canvas, CHEST_NUM_CX, CHEST_NUM_CY, halfW = 70, halfH = 55)
-        eraseGlyphs(canvas, SHOULDER_NUM_CX, SHOULDER_NUM_CY, halfW = 34, halfH = 30)
+        val chestCx = jx + jw / 2f
+        val chestCy = jy + jh * CHEST_NUM_YF
+        val shoulderCx = jx + jw * SHOULDER_NUM_XF
+        val shoulderCy = jy + jh * SHOULDER_NUM_YF
+        eraseGlyphs(canvas, chestCx, chestCy, halfW = 70, halfH = 50)
+        eraseGlyphs(canvas, shoulderCx, shoulderCy, halfW = 34, halfH = 28)
         val chest = SpriteSheets.chestNumber(n) ?: return
         blitOpaque(
             canvas, chest,
-            (CHEST_NUM_CX - chest.width / 2f).roundToInt(),
-            (CHEST_NUM_CY - chest.height / 2f).roundToInt(),
+            (chestCx - chest.width / 2f).roundToInt(),
+            (chestCy - chest.height / 2f).roundToInt(),
         )
         val digits = n.toString().map { it - '0' }
         val digBmps = digits.mapNotNull { SpriteSheets.shoulderDigit(it) }
         if (digBmps.isEmpty()) return
         val overlap = 4
         val totalW = digBmps.sumOf { it.width } - overlap * (digBmps.size - 1)
-        var sx = (SHOULDER_NUM_CX - totalW / 2f).roundToInt()
-        val sy = (SHOULDER_NUM_CY - digBmps[0].height / 2f).roundToInt()
+        var sx = (shoulderCx - totalW / 2f).roundToInt()
+        val sy = (shoulderCy - digBmps[0].height / 2f).roundToInt()
         for (d in digBmps) {
             blitOpaque(canvas, d, sx, sy)
             sx += d.width - overlap
@@ -114,9 +123,11 @@ object SpriteCompose {
         var sg = 0
         var sb = 0
         var sn = 0
-        val sampleLeft = (x0 - 35).coerceAtLeast(0)
-        for (y in y0 until y1) {
-            for (x in sampleLeft until x0) {
+        // Sample jersey fabric from below the glyph (more reliable than the side on slim straps).
+        val sampleY0 = y1.coerceAtMost(h - 1)
+        val sampleY1 = (y1 + 28).coerceAtMost(h)
+        for (y in sampleY0 until sampleY1) {
+            for (x in x0 until x1) {
                 val c = px[y * w + x]
                 if (c ushr 24 < 200) continue
                 val r = (c shr 16) and 0xFF
@@ -143,10 +154,11 @@ object SpriteCompose {
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
                 val sum = r + g + b
+                // White/silver digits, black outlines, or strongly tinted digit fills (not fabric).
                 val brightOrDark = sum > 580 || sum < 110
-                // Colored digit fills (purple/red/gold on team jerseys) vs local fabric.
-                val farFromFabric = abs(r - fr) + abs(g - fg) + abs(b - fb) > 90
-                if (brightOrDark || farFromFabric) px[i] = fill
+                val tintedDigit = abs(r - fr) + abs(g - fg) + abs(b - fb) > 140 &&
+                    (abs(r - g) > 40 || abs(g - b) > 40)
+                if (brightOrDark || tintedDigit) px[i] = fill
             }
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)
@@ -214,34 +226,9 @@ object SpriteCompose {
 
     private fun resolveJersey(key: String?, primary: Int, secondary: Int): Bitmap? {
         if (key != null) SpriteSheets.jersey(key)?.let { return it }
-        val template = SpriteSheets.jersey("spurs") ?: SpriteSheets.jersey("nets") ?: return null
+        // College / custom teams: blank jersey recolored to primary/secondary (no NBA wordmark).
+        val template = SpriteSheets.jersey("blank") ?: SpriteSheets.jersey("nets") ?: return null
         return recolorJersey(template, primary or (0xFF shl 24), secondary or (0xFF shl 24))
-    }
-
-    /** Transparent-out the baked green jersey / yellow trim / white #1 on the body sheet. */
-    private fun stripDefaultJersey(bmp: Bitmap) {
-        val w = bmp.width
-        val h = bmp.height
-        val px = IntArray(w * h)
-        bmp.getPixels(px, 0, w, 0, 0, w, h)
-        for (y in 0 until h) {
-            if (y < 230) continue
-            for (x in 0 until w) {
-                val i = y * w + x
-                val c = px[i]
-                val a = c ushr 24
-                if (a < 32) continue
-                val r = (c shr 16) and 0xFF
-                val g = (c shr 8) and 0xFF
-                val b = c and 0xFF
-                val skinish = r > b + 20 && r > 80 && g < r
-                val green = dist(r, g, b, 57, 149, 88) < 90
-                val yellow = dist(r, g, b, 220, 200, 60) < 120 && !skinish
-                val white = dist(r, g, b, 240, 240, 240) < 40 && y > 260
-                if (green || yellow || white) px[i] = 0
-            }
-        }
-        bmp.setPixels(px, 0, w, 0, 0, w, h)
     }
 
     /** Rough bald: clear dark hair pixels on the crown (keeps face/skin). */
