@@ -123,8 +123,34 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
                 }
                 if (p.walkOn) Tag("WALK-ON", P.sub)
+                if (p.shoePay > 0) Tag(com.nh.hoopscoach.game.Shoes.ofPlayer(p)?.short?.uppercase() ?: "SHOE", P.gold)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
+            }
+            if (p.shoePay > 0 || p.shoeOffer.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+                    if (p.shoePay > 0) {
+                        Text("Shoe deal", style = T.label, color = P.sub)
+                        Text(com.nh.hoopscoach.game.Shoes.label(p), style = T.bodyB, color = P.ink)
+                        Text("${p.shoeLeft} season${if (p.shoeLeft == 1) "" else "s"} left · paid by the brand", style = T.small, color = P.sub)
+                    }
+                    if (mine && p.shoeOffer.isNotEmpty()) {
+                        if (p.shoePay > 0) Spacer(Modifier.height(8.dp))
+                        Text("New offer", style = T.label, color = P.accent)
+                        Text(com.nh.hoopscoach.game.Shoes.offerLabel(p), style = T.bodyB, color = P.accent)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SmallButton("Decline") { vm.act { com.nh.hoopscoach.game.Shoes.declineOffer(p) } }
+                            SmallButton("Accept", primary = true) {
+                                vm.act {
+                                    com.nh.hoopscoach.game.Shoes.acceptOffer(p)
+                                    vm.toast("Signed with ${com.nh.hoopscoach.game.Shoes.ofPlayer(p)?.label}")
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -428,6 +454,7 @@ private fun BioTab(lg: League, p: Player) {
             if (p.teamId >= 0) "Roster spot" to (if (p.walkOn) "Walk-on (no scholarship)" else "Scholarship") else null,
             "Position rank" to if (p.posRank > 0) "No. ${p.posRank} ${p.pos}" else "–",
             if (p.teamId >= 0) "NIL deal" to money(p.nil) else null,
+            if (p.shoePay > 0) "Shoe deal" to com.nh.hoopscoach.game.Shoes.label(p) else null,
         ),
     ) { (k, v) ->
         ListRow {

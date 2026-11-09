@@ -49,6 +49,7 @@ object SaveIO {
         repair(lg)
         Rivalries.ensure(lg)
         Brand.ensure(lg)
+        Shoes.ensure(lg)
         Recruiting.ensure(lg)
         return lg
     }

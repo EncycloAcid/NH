@@ -251,6 +251,7 @@ object Offseason {
             }
         }
         os.growth.sortByDescending { it.after - it.before }
+        Shoes.runOffseason(lg, os)
     }
 
     // ---------- recruiting rounds ----------

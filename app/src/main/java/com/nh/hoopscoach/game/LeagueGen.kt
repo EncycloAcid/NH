@@ -85,7 +85,9 @@ object LeagueGen {
             t.roster += p.id
         }
         Gameplan.autoAllocate(lg, t)
+        Shoes.assignApparel(t, force = true)
         Morale.setInitialNil(lg, t)
+        Shoes.seedRoster(lg, t)
     }
 
     fun makePlayer(lg: League, pos: Pos, year: Int, target: Int, teamId: Int): Player {

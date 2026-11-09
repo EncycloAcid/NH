@@ -45,6 +45,8 @@ object Morale {
             mins + 6 < exp -> "Wants more minutes."
             nilGap > 30 && p.has(Trait.BAG_CHASER) -> "Feels underpaid for his production."
             nilGap > 30 -> "NIL deal is below his market value."
+            Shoes.eligible(p) && p.shoePay == 0 && p.has(Trait.BAG_CHASER) -> "Wants a shoe deal to match his game."
+            Shoes.eligible(p) && p.shoePay == 0 -> "No personal shoe deal yet."
             t.winPct < 0.4 && t.gp > 5 -> "Frustrated with losing."
             else -> "Mood is slipping."
         }
@@ -59,8 +61,14 @@ object Morale {
         val expNil = Ratings.expectedNil(p).coerceAtLeast(5)
         var nil = ((p.nil - expNil).toDouble() / expNil * 35).coerceIn(-25.0, 10.0)
         if (nil < 0 && p.has(Trait.BAG_CHASER)) nil *= 1.8
+        var shoe = when {
+            p.shoePay > 0 -> (6.0 + p.shoePay / 25.0).coerceAtMost(16.0)
+            Shoes.eligible(p) -> -7.0
+            else -> 0.0
+        }
+        if (shoe < 0 && p.has(Trait.BAG_CHASER)) shoe *= 1.6
         val win = if (t.gp >= 4) (t.winPct - 0.5) * 24 else 0.0
-        var v = 68 + role + nil + win
+        var v = 68 + role + nil + shoe + win
         if (p.has(Trait.LOYAL)) v += 10
         if (p.has(Trait.DISLOYAL)) v -= 8
         if (lg.coachOf(t).has(CoachSkill.CULTURE)) v += 5

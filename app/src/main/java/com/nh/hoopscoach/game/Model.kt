@@ -167,6 +167,14 @@ class Player(
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
+    /** Personal shoe deal company (ShoeCo.name), pay in $K/season, seasons left. */
+    var shoe: String = "",
+    var shoePay: Int = 0,
+    var shoeLeft: Int = 0,
+    /** Pending endorsement offer for the user to accept or decline. */
+    var shoeOffer: String = "",
+    var shoeOfferPay: Int = 0,
+    var shoeOfferYears: Int = 0,
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"
@@ -238,6 +246,10 @@ class Team(
     var legacy: Double = -1.0,
     /** Short-term national heat, 0-100. Big wins and March runs raise it; it fades. -1 until first computed. */
     var buzz: Double = -1.0,
+    /** Apparel / shoe company partner (ShoeCo.name). Empty until assigned. */
+    var apparel: String = "",
+    /** Seasons left on the school apparel contract. */
+    var apparelLeft: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -613,6 +625,8 @@ class OffseasonState(
     var report: RoundReport? = null,
     /** Prospects nobody signed when the cycle ended. */
     var unsigned: Int = 0,
+    /** User roster players with a pending personal shoe offer this offseason. */
+    val shoeOffers: MutableList<Int> = mutableListOf(),
 )
 
 @Serializable
