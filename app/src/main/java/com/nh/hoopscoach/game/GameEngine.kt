@@ -39,16 +39,18 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /**
      * The rules of the level. NBA: four 12-minute quarters, a 24-second shot clock (14 after an
      * offensive rebound), six fouls to foul out, and the penalty from a team's fifth foul in a quarter
-     * (fourth in overtime) or its second in the last two minutes. College: two 20-minute halves, a
-     * 30-second shot clock (20 after an offensive rebound), five fouls, a one-and-one from the seventh
-     * team foul in a half and two shots from the tenth. Overtime is five minutes in both.
+     * (fourth in overtime) or its second in the last two minutes. College: two 20-minute halves, five
+     * fouls, a one-and-one from the seventh team foul in a half and two shots from the tenth, plus the
+     * season's shot clock and three-point line (see [EraRules]). Overtime is five minutes in both.
      */
     val regPeriods = if (lg.pro) 4 else 2
     val periodLen = if (lg.pro) 720.0 else 1200.0
     /** Half of regulation (24 minutes in the pros, 20 in college): the rotation and the win chart work in halves. */
     val half = if (lg.pro) 1440.0 else 1200.0
     private val foulLimit = if (lg.pro) 6 else 5
-    private val shotClock = if (lg.pro) 24.0 else 30.0
+    /** College rules for this season's era (shot clock, threes, bonus). */
+    val era: CollegeEra = EraRules.of(lg)
+    private val shotClock = if (lg.pro) 24.0 else era.maxPossLen
     var period = 1
         private set
     var clock = periodLen
@@ -256,15 +258,21 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val pMake = (makeChance(o, d, shooter, type, ds, trail) + bonus).coerceIn(0.12, 0.85)
         val fouled = Rng.chance(foulP)
         val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
-        val pts = if (type == 2) 3 else 2
+        val countsThree = type == 2 && (lg.pro || era.hasThrees)
+        val pts = if (countsThree) 3 else 2
         val sl = line(o, shooter)
         sl.fga++
-        if (type == 2) sl.tpa++
-        val what = when (type) { 0 -> "layup"; 1 -> "pull-up jumper"; else -> "three" }
+        if (countsThree) sl.tpa++
+        val what = when {
+            type == 0 -> "layup"
+            type == 1 -> "pull-up jumper"
+            countsThree -> "three"
+            else -> "long jumper"
+        }
         if (made) {
             chart(o, shooter, type, what, true)
             sl.fgm++; sl.pts += pts
-            if (type == 2) sl.tpm++
+            if (countsThree) sl.tpm++
             if (clutchTime) sl.clutch += pts
             val before = score[o] - score[d]
             val c = Clutch(o, shooter.name, what, period, clock, before, pts)
@@ -272,7 +280,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0) tyingShot = c
             scored(o, pts)
             if (passer != null) line(o, passer).ast++
-            log(o, "★ ${shooter.short} ${if (type == 2) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
+            log(o, "★ ${shooter.short} ${if (countsThree) "drains the three" else "scores on the $what"}${passer?.let { " (${it.short} assists)" } ?: ""}", pts)
             // The big moment came through: his celebration.
             Signature.celebrate(lg, shooter, true)?.let { log(o, "${shooter.short} $it", 0) }
             lg.road?.let { it.momentsWon++ }
@@ -290,7 +298,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             return
         }
         if (fouled) {
-            sl.fga--; if (type == 2) sl.tpa--
+            sl.fga--; if (countsThree) sl.tpa--
             val fouler = pickFouler(d, defense)
             line(d, fouler).pf++; teamFoul(d)
             log(d, "★ ${fouler.short} fouls ${shooter.short} on the $what", 0)
@@ -317,7 +325,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val coaching = if (lg.pro) 0.5 else 1.0
 
     /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
-    private val era = if (lg.pro) Eras.of(lg) else Era.TODAY
+    private val proEra = if (lg.pro) Eras.of(lg) else Era.TODAY
 
     // Coaching skills, plus the user's assistant coaches (see Assistants).
     private val skillOff = DoubleArray(2) { (if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0) + Assistants.off(lg, teams[it]) }
@@ -379,6 +387,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (pbp) {
             val a = teams[1]; val h = teams[0]
             log(-1, "Tip-off: ${a.school} at ${h.school}${if (game.neutral) " (neutral site)" else ""}", 0)
+            if (!lg.pro && era != CollegeEra.MODERN) log(-1, "Era rules: ${era.rulesSummary()}", 0)
         }
     }
 
@@ -471,9 +480,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Offense.UPTEMPO -> 14.0; Offense.GRIND -> 21.0; Offense.PERIMETER -> 16.6; Offense.INSIDE -> 17.6; else -> 17.2
         }
         when (def(1 - o)) { Defense.PRESS -> base -= 2.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
-        // The pro game is faster: a shorter shot clock and about 100 possessions a game.
-        if (lg.pro) base *= 0.81 * era.pace
-        // Nobody holds it past the shot clock.
+        if (lg.pro) base *= 0.81 * proEra.pace
+        else base *= era.pace
+        // Nobody holds it past the shot clock (or past the soft max in the stall-ball era).
         return (base * (0.6 + Rng.d() * 0.8)).coerceAtMost(shotClock - 0.5)
     }
 
@@ -490,8 +499,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun penaltyShots(d: Int): Int = if (lg.pro) {
         if (teamFouls[d] >= (if (overtime) 4 else 5) || lateFouls[d] >= 2) 2 else 0
     } else when {
-        teamFouls[d] >= 10 -> 2
-        teamFouls[d] >= 7 -> 1
+        teamFouls[d] >= era.doubleBonusFrom -> 2
+        teamFouls[d] >= era.oneAndOneFrom -> 1
         else -> 0
     }
 
@@ -825,8 +834,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             teamFoul(d)
             val shooter = Rng.weighted(offense) { it[Attr.HND].toDouble().pow(2) }
             val shots = penaltyShots(d)
-            if (shots == 0) log(d, "${fouler.short} fouls ${shooter.short} to stop the clock. Not in the penalty yet: side out", 0)
-            else {
+            if (shots == 0) {
+                log(d, "${fouler.short} fouls ${shooter.short} to stop the clock. Not in the penalty yet: side out", 0)
+                poss = o
+            } else {
                 log(d, "${fouler.short} fouls ${shooter.short} to stop the clock", 0)
                 bonusFreeThrows(o, shooter, offense, defense, shots)
             }
@@ -905,7 +916,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
 
         // Non-shooting foul: free throws only in the penalty; otherwise the offense keeps the ball.
-        if (Rng.chance(if (lg.pro) NON_SHOOTING_PRO * era.fouls else NON_SHOOTING_COLLEGE)) {
+        if (Rng.chance(if (lg.pro) NON_SHOOTING_PRO * proEra.fouls else NON_SHOOTING_COLLEGE * era.fouls)) {
             val fouler = pickFouler(d, defense)
             line(d, fouler).pf++
             teamFoul(d)
@@ -932,11 +943,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             var pMake = when (type) {
                 0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (id - n[5]) * 0.0038) * talent
                 1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (pd - n[6]) * 0.003) * talent
-                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (pd - n[6]) * 0.0026) * talent
+                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (pd - n[6]) * 0.0026) * talent + (if (lg.pro) 0.0 else era.threeMake)
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.
-            if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + era.fg
+            if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + proEra.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
@@ -956,19 +967,26 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
-            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * era.fouls else SHOOTING_FOUL_COLLEGE)
+            val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * proEra.fouls else SHOOTING_FOUL_COLLEGE * era.fouls)
             val fouled = Rng.chance(foulP)
             val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
-            val pts = if (type == 2) 3 else 2
+            // Before the three-point line, a long jumper is still just a two.
+            val countsThree = type == 2 && (lg.pro || era.hasThrees)
+            val pts = if (countsThree) 3 else 2
             val sl = line(o, shooter)
             sl.fga++
-            if (type == 2) sl.tpa++
-            val what = when (type) { 0 -> if (putback != null) "putback" else Rng.pick(listOf("layup", "dunk", "hook shot", "floater")); 1 -> "jumper"; else -> "three" }
+            if (countsThree) sl.tpa++
+            val what = when {
+                type == 0 -> if (putback != null) "putback" else Rng.pick(listOf("layup", "dunk", "hook shot", "floater"))
+                type == 1 -> "jumper"
+                lg.pro || era.hasThrees -> "three"
+                else -> "long jumper"
+            }
 
             if (made) {
                 chart(o, shooter, type, what, true)
                 sl.fgm++; sl.pts += pts
-                if (type == 2) sl.tpm++
+                if (countsThree) sl.tpm++
                 if (clutchTime) sl.clutch += pts
                 val before = score[o] - score[d]
                 val c = Clutch(o, shooter.name, what, period, clock, before, pts)
@@ -1002,17 +1020,17 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                         what == "dunk" && fouled -> highlight(o, shooter, "poster", Rng.flavorPick(listOf("$n posterizes $rim, and-one", "$n dunks all over $rim and draws the foul", "$n rises up over $rim for the and-one slam", "$n hammers it home on $rim, plus the foul")), 6.0 + v)
                         what == "dunk" && oop.isNotEmpty() && Rng.flavorChance(0.55) -> highlight(o, shooter, "dunk", Rng.flavorPick(listOf("$oop lobs, $n finishes the alley-oop", "$n catches the alley-oop from $oop and slams it", "$oop to $n: alley-oop")), 4.5 + v)
                         what == "dunk" -> highlight(o, shooter, "dunk", Rng.flavorPick(listOf("$n with a windmill on the break", "$n throws down a reverse jam", "$n tomahawks it home", "$n with a two-handed hammer in traffic", "$n spins baseline and throws it down")), 3.5 + v)
-                        type == 2 && goAhead -> highlight(o, shooter, "dagger", Rng.flavorPick(listOf("$n buries the go-ahead three", "$n hits the dagger three", "$n with the step-back three to take the lead")), 7.5 + v)
-                        type == 2 && clutchTime -> highlight(o, shooter, "three", Rng.flavorPick(listOf("$n drains a clutch three", "$n hits a big three in crunch time")), 4.5 + v)
-                        type == 2 && Rng.flavorChance(0.05) -> highlight(o, shooter, "three", Rng.flavorPick(listOf("$n pulls up from the logo, and it's good", "$n with a step-back three in a defender's face", "$n hits a three off one leg")), 4.0 + v)
+                        countsThree && goAhead -> highlight(o, shooter, "dagger", Rng.flavorPick(listOf("$n buries the go-ahead three", "$n hits the dagger three", "$n with the step-back three to take the lead")), 7.5 + v)
+                        countsThree && clutchTime -> highlight(o, shooter, "three", Rng.flavorPick(listOf("$n drains a clutch three", "$n hits a big three in crunch time")), 4.5 + v)
+                        countsThree && Rng.flavorChance(0.05) -> highlight(o, shooter, "three", Rng.flavorPick(listOf("$n pulls up from the logo, and it's good", "$n with a step-back three in a defender's face", "$n hits a three off one leg")), 4.0 + v)
                         goAhead -> highlight(o, shooter, "goahead", "$n puts them ahead late with a $what", 5.0 + v)
-                        type == 2 && fouled -> highlight(o, shooter, "four", Rng.flavorPick(listOf("$n hits a three and draws the foul", "$n with the four-point play")), 5.0 + v)
+                        countsThree && fouled -> highlight(o, shooter, "four", Rng.flavorPick(listOf("$n hits a three and draws the foul", "$n with the four-point play")), 5.0 + v)
                     }
                 }
-                val verb = Signature.made(lg, shooter, type, what) ?: when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
+                val verb = Signature.made(lg, shooter, type, what) ?: when { countsThree -> "drains a three"; type == 1 || type == 2 -> "hits a $what"; what == "dunk" -> "throws down a dunk"; else -> "scores on a $what" }
                 log(o, "${Signature.nick(lg, shooter)}${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
                 // Your player's celebration after a big one.
-                val bigOne = clock <= 1.0 || (clutchTime && before <= 0 && before + pts > 0) || (what == "dunk" && Rng.chance(0.25)) || (type == 2 && clutchTime && Rng.chance(0.4))
+                val bigOne = clock <= 1.0 || (clutchTime && before <= 0 && before + pts > 0) || (what == "dunk" && Rng.chance(0.25)) || (countsThree && clutchTime && Rng.chance(0.4))
                 Signature.celebrate(lg, shooter, bigOne)?.let { log(o, "${shooter.short} $it", 0) }
                 if (fouled) {
                     val fouler = pickFouler(d, defense)
@@ -1026,7 +1044,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             }
 
             if (fouled) {
-                sl.fga--; if (type == 2) sl.tpa--
+                sl.fga--; if (countsThree) sl.tpa--
                 val fouler = pickFouler(d, defense)
                 line(d, fouler).pf++; teamFoul(d)
                 log(d, "${fouler.short} fouls ${shooter.short} on the $what", 0)
@@ -1082,15 +1100,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val teamRebound get() = Rng.chance(if (lg.pro) 0.11 else 0.05)
 
     private fun shotType(o: Int, d: Int, p: Player, trail: Int): Int {
-        if (finalPeriod && clock < 25 && trail == -3) return 2
+        if (finalPeriod && clock < 25 && trail == -3 && (lg.pro || era.hasThrees)) return 2
         val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
-        // Modern pro bigs step out more than college bigs.
+        // Modern pro bigs step out more than college bigs; college eras scale volume separately.
         val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
-            else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> .95; Pos.PF -> .66; Pos.C -> .34 }
+            else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.15; Pos.SF -> .95; Pos.PF -> .55; Pos.C -> .16 }
         var wi = (p[Attr.INS] / skillScale).pow(3) * posIns * Tendency.inside(p)
         var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5 * Tendency.mid(p)
-        // In the pros nearly everyone can shoot it, so volume leans on the rating less than in college.
-        var w3 = (p[Attr.OUT] / skillScale).pow(if (lg.pro) 1.5 else 4.0) * pos3 * (if (lg.pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
+        // Pros: era threes from Eras.of. College: EraRules volume; with no line, OUT still feeds long jumpers that count as twos.
+        var w3 = if (lg.pro) (p[Attr.OUT] / skillScale).pow(1.5) * pos3 * 1.62 * proEra.threes * Tendency.three(p)
+            else (p[Attr.OUT] / skillScale).pow(4) * pos3 * 1.2 * (if (era.hasThrees) era.threes else 0.55) * Tendency.three(p)
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }

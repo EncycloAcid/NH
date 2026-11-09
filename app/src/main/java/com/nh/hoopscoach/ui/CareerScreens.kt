@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.CoachSkill
 import com.nh.hoopscoach.game.Coaching
+import com.nh.hoopscoach.game.CollegeEra
+import com.nh.hoopscoach.game.EraRules
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Names
@@ -264,6 +266,21 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     }
                 }
             }
+            if (!lg.pro) {
+                val era = EraRules.of(lg)
+                Section("Era rules · ${lg.season}")
+                Panel {
+                    Text(era.title, style = T.bodyB, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    Text(era.blurb, style = T.small, color = P.sub)
+                    Spacer(Modifier.height(8.dp))
+                    Text(era.rulesSummary(), style = T.small, color = P.ink)
+                    if (era != CollegeEra.MODERN) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Rules advance with NCAA history as seasons pass.", style = T.small, color = P.faint)
+                    }
+                }
+            }
             Section("Schools")
             Panel {
                 Text("Fix a name, nickname or colors for any school.", style = T.small, color = P.sub)
@@ -367,6 +384,8 @@ fun NewGameScreen(vm: GameViewModel) {
     var query by remember { mutableStateOf("") }
     var pick by remember { mutableIntStateOf(-1) }
     var mode by remember { mutableIntStateOf(if (vm.roadHero != null) 1 else 0) }
+    var eraIdx by remember { mutableIntStateOf(EraRules.pickable.indexOf(CollegeEra.MODERN).coerceAtLeast(0)) }
+    val eras = EraRules.pickable
     Column(Modifier.fillMaxSize().background(P.bg).statusBarsPadding()) {
         if (lg == null) { BusyScreen("Building your league"); return@Column }
         val header: @Composable () -> Unit = {
@@ -398,6 +417,22 @@ fun NewGameScreen(vm: GameViewModel) {
                         colors = fieldColors(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
                     OutlinedTextField(last, { last = it.take(18) }, placeholder = { Text("Last name", color = P.faint) }, singleLine = true, modifier = Modifier.weight(1f),
                         colors = fieldColors(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                }
+                Section("Era")
+                Chips(eras.map { it.label }, eraIdx, { i ->
+                    if (i != eraIdx) {
+                        eraIdx = i
+                        pick = -1
+                        vm.generateDraft(EraRules.startYear(eras[i]))
+                    }
+                })
+                val era = eras[eraIdx]
+                Panel(Modifier.padding(top = 10.dp)) {
+                    Text("${era.title} · ${EraRules.startYear(era)}", style = T.bodyB, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    Text(era.blurb, style = T.small, color = P.sub)
+                    Spacer(Modifier.height(8.dp))
+                    Text(era.rulesSummary(), style = T.small, color = P.ink)
                 }
                 Section("Choose a school")
                 OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Search ${lg.teams.size} schools", color = P.faint) },
