@@ -82,7 +82,9 @@ object Careers {
             val text = honor(code, p.pos) ?: continue
             bySeason.getOrPut(season) { mutableListOf() } += text to rank(code)
         }
-        val seasons = (p.career.map { it.season } + bySeason.keys + if (p.teamId >= 0 && p.stats.gp > 0) listOf(currentSeason) else emptyList()).toSortedSet().reversed()
+        // Prefer distinct().sortedDescending() over toSortedSet().reversed(): on JDK 21 the latter
+        // binds to SequencedCollection.reversed(), which does not exist on the Java 17 CI runners.
+        val seasons = (p.career.map { it.season } + bySeason.keys + if (p.teamId >= 0 && p.stats.gp > 0) listOf(currentSeason) else emptyList()).distinct().sortedDescending()
         return seasons.map { s -> SeasonHonors(s, bySeason[s].orEmpty().distinct().sortedByDescending { it.second }) }
     }
 
