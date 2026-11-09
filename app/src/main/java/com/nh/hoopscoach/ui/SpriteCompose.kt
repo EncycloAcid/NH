@@ -68,7 +68,12 @@ object SpriteCompose {
             jw = (jersey.width * JERSEY_SCALE).roundToInt()
             jh = (jersey.height * JERSEY_SCALE).roundToInt()
             jx = (SRC - jw) / 2
-            val scaled = Bitmap.createScaledBitmap(jersey, jw, jh, false)
+            // Wipe baked #1 on the jersey art before it goes on the body.
+            val clean = jersey.copy(Bitmap.Config.ARGB_8888, true)
+            eraseGlyphs(clean, jersey.width / 2f, jersey.height * 0.62f, halfW = 55, halfH = 48)
+            eraseGlyphs(clean, jersey.width * 0.72f, jersey.height * 0.14f, halfW = 28, halfH = 24)
+            val scaled = Bitmap.createScaledBitmap(clean, jw, jh, false)
+            if (clean !== jersey) clean.recycle()
             blitOpaque(canvasBmp, scaled, jx, JERSEY_Y)
             if (scaled !== jersey) scaled.recycle()
             applyJerseyNumber(canvasBmp, number, jx, JERSEY_Y, jw, jh)
@@ -98,7 +103,12 @@ object SpriteCompose {
             if (tinted !== hairSrc) tinted.recycle()
         }
 
-        placeOverlay(canvasBmp, SpriteSheets.headband(f.acc), HEADBAND_CX, HEADBAND_CY, HEADBAND_MAX_W)
+        // Hair style "Headband" always gets a clean black band; otherwise use Extras.
+        val headband = when {
+            f.hair == 7 -> SpriteSheets.bitmap("sprites/headbands/03_black_headband.png")
+            else -> SpriteSheets.headband(f.acc)
+        }
+        placeOverlay(canvasBmp, headband, HEADBAND_CX, HEADBAND_CY, HEADBAND_MAX_W)
         placeOverlay(canvasBmp, SpriteSheets.eyewear(f.acc), EYEWEAR_CX, EYEWEAR_CY, EYEWEAR_MAX_W)
 
         val out = Bitmap.createScaledBitmap(canvasBmp, N, N, false)
@@ -130,32 +140,21 @@ object SpriteCompose {
         if (recycle) src.recycle()
     }
 
-    /** Stamp chest + shoulder numbers at jersey-relative anchors. */
+    /** Stamp the chest number; wipe the jersey art's baked shoulder #1 (no second number — it ghosted). */
     private fun applyJerseyNumber(canvas: Bitmap, number: Int, jx: Int, jy: Int, jw: Int, jh: Int) {
         val n = number.coerceIn(0, 99)
         val chestCx = jx + jw / 2f
         val chestCy = jy + jh * CHEST_NUM_YF
         val shoulderCx = jx + jw * SHOULDER_NUM_XF
         val shoulderCy = jy + jh * SHOULDER_NUM_YF
-        eraseGlyphs(canvas, chestCx, chestCy, halfW = 70, halfH = 50)
-        eraseGlyphs(canvas, shoulderCx, shoulderCy, halfW = 34, halfH = 28)
+        eraseGlyphs(canvas, chestCx, chestCy, halfW = 72, halfH = 52)
+        eraseGlyphs(canvas, shoulderCx, shoulderCy, halfW = 40, halfH = 32)
         val chest = SpriteSheets.chestNumber(n) ?: return
         blitOpaque(
             canvas, chest,
             (chestCx - chest.width / 2f).roundToInt(),
             (chestCy - chest.height / 2f).roundToInt(),
         )
-        val digits = n.toString().map { it - '0' }
-        val digBmps = digits.mapNotNull { SpriteSheets.shoulderDigit(it) }
-        if (digBmps.isEmpty()) return
-        val overlap = 4
-        val totalW = digBmps.sumOf { it.width } - overlap * (digBmps.size - 1)
-        var sx = (shoulderCx - totalW / 2f).roundToInt()
-        val sy = (shoulderCy - digBmps[0].height / 2f).roundToInt()
-        for (d in digBmps) {
-            blitOpaque(canvas, d, sx, sy)
-            sx += d.width - overlap
-        }
     }
 
     /** Replace bright glyph / dark outline pixels in a box with nearby jersey fabric color. */
@@ -280,13 +279,26 @@ object SpriteCompose {
         return recolorJersey(template, primary or (0xFF shl 24), secondary or (0xFF shl 24))
     }
 
-    /** Rough bald: clear dark hair pixels on the crown (keeps face/skin). */
+    /** Clear the body's baked cut so a hair overlay (or bald) can sit cleanly. */
     private fun stripDefaultHair(bmp: Bitmap) {
         val w = bmp.width
         val h = bmp.height
         val px = IntArray(w * h)
         bmp.getPixels(px, 0, w, 0, 0, w, h)
-        for (y in 0 until min(210, h)) {
+        // Sample cheek skin as the keep-color.
+        var sr = 0; var sg = 0; var sb = 0; var sn = 0
+        for (y in 155 until 195) for (x in 220 until 290) {
+            val c = px[y * w + x]
+            if (c ushr 24 < 200) continue
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            if (r > g + 15 && r > 70) { sr += r; sg += g; sb += b; sn++ }
+        }
+        val fr = if (sn == 0) 140 else sr / sn
+        val fg = if (sn == 0) 90 else sg / sn
+        val fb = if (sn == 0) 70 else sb / sn
+        for (y in 0 until min(165, h)) {
             for (x in 0 until w) {
                 val i = y * w + x
                 val c = px[i]
@@ -294,9 +306,9 @@ object SpriteCompose {
                 val r = (c shr 16) and 0xFF
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
-                val dark = r < 90 && g < 70 && b < 60
-                val hairish = dark && r + g + b < 180 && abs(r - g) < 35
-                if (hairish) px[i] = 0
+                val skin = abs(r - fr) + abs(g - fg) + abs(b - fb) < 75 && r > g - 5 && r > 60
+                // Keep face flesh; drop dark hair, blond buzz tips, and stray outline above the brows.
+                if (!skin) px[i] = 0
             }
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)

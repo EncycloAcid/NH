@@ -6,6 +6,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.ui.SpriteCompose
 import com.nh.hoopscoach.ui.SpriteSheets
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,6 +15,17 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class SpriteLoadTest {
+    @Test
+    fun jerseyKeyUsesFranchiseSlotOnly() {
+        assertEquals("lakers", SpriteSheets.jerseyKey("LAL", "LAL", "Los Angeles Lakers"))
+        assertEquals("heat", SpriteSheets.jerseyKey("MIA", "MIA", "Miami Heat"))
+        // College: empty slot must not pick NBA art from abbr/mascot collisions.
+        assertNull(SpriteSheets.jerseyKey("MIA", "", "Miami Hurricanes"))
+        assertNull(SpriteSheets.jerseyKey("DUKE", "", "Duke Blue Devils"))
+        assertNull(SpriteSheets.jerseyKey("GONZ", "", "Gonzaga Bulldogs"))
+        assertNull(SpriteSheets.jerseyKey("IND", "", "Indiana Hoosiers"))
+    }
+
     @Test
     fun loadsAndCompositesFace() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()

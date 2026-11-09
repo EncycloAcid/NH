@@ -78,14 +78,15 @@ object SpriteSheets {
         return bitmap("sprites/eyewear/$file.png")
     }
 
-    /** NBA / era abbr (or mascot key) → jersey file stem. */
+    /**
+     * NBA franchise → jersey file stem.
+     * Only [slot] (today's franchise id) is trusted — college abbrs like MIA/IND/HOU collide with NBA
+     * codes, and mascot substrings ("bull" in Bulldogs, "sun" in Sun Devils) false-match.
+     * College teams leave [slot] empty → null → blank recolor in [SpriteCompose].
+     */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
-        val keys = listOfNotNull(abbr?.uppercase(), slot?.uppercase(), name?.lowercase())
-        for (k in keys) JERSEY_BY_ABBR[k]?.let { return it }
-        name?.lowercase()?.let { n ->
-            JERSEY_BY_NAME.entries.firstOrNull { n.contains(it.key) }?.value?.let { return it }
-        }
-        return null
+        val s = slot?.uppercase()?.takeIf { it.isNotBlank() } ?: return null
+        return JERSEY_BY_ABBR[s]
     }
 
     private fun open(path: String): InputStream? {
@@ -125,7 +126,7 @@ object SpriteSheets {
         "flat_top",              // 4 Flat-top
         "afro",                  // 5 Afro
         "high_top_fade",         // 6 High-top
-        "headband_with_curls",   // 7 Curls / headband
+        "curly_top_fade",        // 7 Headband (curls + separate headband overlay; pack file is broken)
         "cornrows",              // 8 Cornrows
         "dreadlocks",            // 9 Locs
         "twists",                // 10 Long / twists

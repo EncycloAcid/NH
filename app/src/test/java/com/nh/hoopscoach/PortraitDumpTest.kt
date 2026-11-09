@@ -39,7 +39,7 @@ class PortraitDumpTest {
             Face(5, 0, 6, 0, 4, 1, 0, 0, 1),   // high-top, white HB
             Face(2, 1, 13, 4, 0, 3, 0, 1, 0),  // blond top bun, swagger grin
             Face(6, 0, 12, 0, 5, 4, 1, 2, 0),  // waves, full beard, alert shout
-            Face(4, 2, 1, 0, 1, 0, 0, 0, 3),   // buzz, stubble, black HB
+            Face(4, 2, 7, 0, 1, 0, 0, 0, 0),   // headband style (curls + clean black band)
         )
         val gear = Gear(undershirt = 1, sleeve = 1, sleeveColor = 2)
         val n = SpriteCompose.N
