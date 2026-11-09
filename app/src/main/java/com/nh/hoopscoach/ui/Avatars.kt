@@ -27,32 +27,65 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.League
+import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Post
 import java.io.File
 
 /**
  * Profile pictures for the social feed. Real accounts show their own; your posts show the picture you
- * picked (a photo from your phone, your jersey, your team's logo or a cartoon); players show their
- * headshot or jersey, teams their logo, and everyone else a real face picked by their handle, so the
- * same fan always looks the same.
+ * picked; any player we can resolve by name or handle shows his real headshot or retro portrait;
+ * teams their logo; everyone else a face picked by their handle.
  */
 @Composable
 fun ProfilePic(lg: League?, p: Post, size: Dp = 36.dp) {
     val ctx = LocalContext.current
-    val img = remember(p.avatar) { if (p.avatar.isEmpty()) null else Logos.asset(ctx, "social/${p.avatar}.webp") }
+    // Official outlet / team account art wins — but never for kinds that are actual players.
+    val official = remember(p.avatar, p.kind) {
+        if (p.avatar.isEmpty() || p.kind in PLAYER_KINDS) null
+        else Logos.asset(ctx, "social/${p.avatar}.webp")
+    }
+    val pl = remember(lg, p.name, p.handle, p.kind) { lg?.let { resolvePlayer(it, p.name, p.handle) } }
     Box(Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
         when {
-            img != null -> Image(img, p.name, Modifier.size(size), contentScale = ContentScale.Crop)
+            official != null -> Image(official, p.name, Modifier.size(size), contentScale = ContentScale.Crop)
             lg != null && p.kind == "self" -> MyAvatar(lg, size)
-            lg != null && p.kind in setOf("teammate", "rival", "player") && player(lg, p.name) != null -> {
-                val pl = player(lg, p.name)!!
-                Box(Modifier.size(size).background(P.surface2), contentAlignment = Alignment.Center) { PlayerJersey(pl, lg.teams.getOrNull(pl.teamId), size) }
-            }
+            pl != null -> PlayerSocialPic(lg!!, pl, size)
             lg != null && p.kind == "team" && team(lg, p.name) != null -> TeamBadge(team(lg, p.name)!!, size)
             p.kind == "news" || p.kind == "league" -> Initials(p.name, size, P.ink)
             else -> RealFace(p.handle.ifEmpty { p.name }, p.name, size)
         }
     }
+}
+
+private val PLAYER_KINDS = setOf("teammate", "rival", "player", "recruit", "self")
+
+/** His in-game face: real NBA headshot when he has one, otherwise the retro portrait — always circular. */
+@Composable
+fun PlayerSocialPic(lg: League, pl: Player, size: Dp) {
+    val t = if (pl.teamId >= 0) runCatching { lg.team(pl.teamId) }.getOrNull() else null
+    Box(Modifier.size(size).clip(CircleShape).background(P.surface2), contentAlignment = Alignment.Center) {
+        PlayerJersey(pl, t, size)
+    }
+}
+
+/**
+ * Find a player by display name or @handle. Handles are usually "firstname lastname" with spaces and
+ * dots stripped, so teammates and rivals resolve even when the post kind is wrong.
+ */
+fun resolvePlayer(lg: League, name: String, handle: String = ""): Player? {
+    if (name.isBlank() && handle.isBlank()) return null
+    fun match(p: Player): Boolean {
+        if (name.isNotBlank() && p.name.equals(name, ignoreCase = true)) return true
+        val key = handle.ifBlank { name }.replace(" ", "").replace(".", "").lowercase()
+        if (key.length < 3) return false
+        val his = p.name.replace(" ", "").replace(".", "").lowercase()
+        return his == key || p.last.replace(".", "").lowercase() == key
+    }
+    lg.players.firstOrNull(::match)?.let { return it }
+    lg.alumni.firstOrNull(::match)?.let { return it }
+    // Hero / road player as a last resort (his own posts sometimes use a shortened name).
+    lg.hero?.takeIf(::match)?.let { return it }
+    return null
 }
 
 private val WOMEN = setOf("Dana", "Rae", "Priya", "Jules", "Jen", "Jenny", "Jess", "Jessica", "Sarah", "Ashley", "Emily", "Maria", "Megan", "Lauren", "Rachel",
@@ -85,7 +118,6 @@ fun RealFace(seed: String, name: String, size: Dp) {
     if (img != null) Image(img, name, Modifier.size(size).clip(CircleShape), contentScale = ContentScale.Crop) else Cartoon(seed, size)
 }
 
-private fun player(lg: League, name: String) = lg.players.firstOrNull { it.name == name } ?: lg.alumni.firstOrNull { it.name == name }
 private fun team(lg: League, name: String) = lg.teams.firstOrNull { it.name.equals(name, true) || it.school.equals(name, true) }
 
 /** The user's own picture, as he chose it. */
@@ -102,10 +134,12 @@ fun MyAvatar(lg: League, size: Dp) {
             if (bmp != null) Image(bmp, "Your profile picture", Modifier.size(size).clip(CircleShape), contentScale = ContentScale.Crop)
             else Cartoon(h?.name ?: "you", size)
         }
-        "logo" -> lg.teams.getOrNull(h?.teamId ?: -1)?.let { TeamBadge(it, size) } ?: Cartoon(h?.name ?: "you", size)
+        "logo" -> {
+            val t = h?.teamId?.takeIf { it >= 0 }?.let { runCatching { lg.team(it) }.getOrNull() }
+            if (t != null) TeamBadge(t, size) else Cartoon(h?.name ?: "you", size)
+        }
         "cartoon" -> Cartoon(h?.name ?: "you", size)
-        else -> if (h != null) Box(Modifier.size(size).clip(CircleShape).background(P.surface2), contentAlignment = Alignment.Center) { PlayerJersey(h, lg.teams.getOrNull(h.teamId), size) }
-        else Cartoon("you", size)
+        else -> if (h != null) PlayerSocialPic(lg, h, size) else Cartoon("you", size)
     }
 }
 
