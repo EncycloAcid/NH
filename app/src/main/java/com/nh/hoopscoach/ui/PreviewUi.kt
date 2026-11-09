@@ -8,8 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -61,6 +59,7 @@ import com.nh.hoopscoach.game.CollegeHistory
 import com.nh.hoopscoach.game.Team
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** The pages of the issue: section kicker and headline. */
 private fun pageIds(pv: Preview) = listOf("cover", "inside", "stories") + pv.features.indices.map { "f$it" } +
@@ -350,6 +349,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
                 Column(Modifier.weight(1f)) {
                     Text("NO. 1 · ${odd(to.title)} TO WIN IT ALL", style = T.label, color = accent)
                     Text(top.school.uppercase(), style = T.title.copy(fontSize = 32.sp, lineHeight = 32.sp), color = fg, maxLines = 2)
+                    Text(Previews.coverDek(lg, top), style = T.bodyB, color = fg)
                     if (star != null) Text("${star.name} · ${star.posLabel} · ${star.cls}", style = T.small, color = fg.copy(alpha = 0.85f))
                     Text("Projected ${pv.proj.getValue(top.id).w}-${pv.proj.getValue(top.id).l} · Final Four ${odd(to.f4)}", style = T.small, color = fg.copy(alpha = 0.85f))
                 }
@@ -543,7 +543,6 @@ private fun LazyListScope.topFive(vm: GameViewModel, lg: League, pv: Preview) {
     ranked(lg, pv).take(5).forEach { t -> item { Spacer(Modifier.height(12.dp)); TeamFeature(vm, lg, pv, t) } }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
     val pr = pv.proj.getValue(t.id)
@@ -552,7 +551,7 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
     val nc = Previews.newcomer(lg, t)
     val (st, ppg) = Previews.returning(lg, t)
     val (forIt, against) = Previews.case(lg, pv, t)
-    val (strengths, concerns) = Previews.scouting(lg, t)
+    val (strength, concern) = Previews.scoutingProse(lg, t)
     val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
     val ink = teamInk(t)
     Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(P.surface)) {
@@ -564,7 +563,7 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.school.uppercase(), style = T.title.copy(fontSize = 26.sp, lineHeight = 27.sp), color = fg, maxLines = 2)
-                        Text("${t.mascot} · ${lg.conf(t.confId).abbr}", style = T.small, color = fg.copy(alpha = 0.85f), maxLines = 1)
+                        Text("${t.mascot} · ${lg.conf(t.confId).abbr} · ${Previews.expectation(pr.nat)}", style = T.small, color = fg.copy(alpha = 0.85f), maxLines = 2)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -601,7 +600,7 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text("THE STAR", style = T.label.copy(fontSize = 9.sp), color = P.accent)
-                        Text("${star.name} · ${star.posLabel} · ${star.cls}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${star.name} · ${star.posLabel} · ${star.cls} · ${star.style.label}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(lastStats(star), style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1)
                     }
                     Ring(star.ovr, 38.dp, textSize = 14.sp)
@@ -627,10 +626,8 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             Text("WHY THEY WON'T", style = T.label, color = P.warn)
             Text(against, style = T.body, color = P.ink)
             Spacer(Modifier.height(10.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                strengths.forEach { Tag(it.uppercase(), P.good) }
-                concerns.forEach { Tag(it.uppercase(), P.warn) }
-            }
+            Text(strength, style = T.small, color = P.good)
+            Text(concern, style = T.small, color = P.warn)
         }
     }
 }
@@ -882,10 +879,12 @@ private fun LazyListScope.breakouts(vm: GameViewModel, lg: League, pv: Preview) 
         Deck("Next year's All-Americans, and stars hiding in plain sight.")
         Section("Breakout candidates")
         GroupList(players(lg, pv.breakouts), inset = 70.dp) { p ->
-            PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.posLabel} · ${p.cls}\nCeiling ${shown(p.pot)} · ${lastStats(p)}")
+            PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.posLabel} · ${p.cls}\n${Previews.breakoutLine(p)}")
         }
         Section("Under the radar")
-        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.posLabel} · ${p.cls}\n${lastStats(p)}") }
+        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p ->
+            PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.posLabel} · ${p.cls}\n${Previews.sleeperLine(lg, p)}")
+        }
     }
 }
 
@@ -927,7 +926,6 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
         val pr = pv.proj.getValue(t.id)
         val o = odds(pv, t)
         val mine = t.id == lg.userTeamId
-        val star = Previews.star(lg, t)
         Column(Modifier.fillMaxWidth().then(if (mine) Modifier.background(P.accentSoft) else Modifier).clickable { vm.push(Route.TeamPage(t.id)) }.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${pr.confRank}", style = T.numSm, color = if (mine) P.accent else P.sub, modifier = Modifier.width(30.dp))
@@ -947,8 +945,7 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
             }
             Spacer(Modifier.height(5.dp))
             GrowBar((o.conf / max).toFloat(), Modifier.fillMaxWidth().padding(start = 66.dp), teamInk(t), 4.dp)
-            val take = remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, t, 2, from = 1) }
-            Text(take.ifEmpty { star?.let { "${it.name} (${it.posLabel}, ${it.cls}) leads the way." } ?: "" }, style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
+            Text(Previews.confLine(lg, t, pr.confRank), style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
         }
     }
     Text("Right column: chance to win the regular-season title.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
@@ -1274,6 +1271,37 @@ private fun LazyListScope.gamesToWatch(vm: GameViewModel, lg: League, pv: Previe
 
 private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview) {
     item {
+        if (lg.user.gp > 0) {
+            Section("Scorecard so far")
+            val top25 = ranked(lg, pv).take(25)
+            val onPace = top25.count { t ->
+                t.w + t.l >= 5 && t.w.toDouble() / t.gp >=
+                    pv.proj.getValue(t.id).w / (pv.proj.getValue(t.id).w + pv.proj.getValue(t.id).l).toDouble() - 0.08
+            }
+            val f4Alive = pv.finalFour.count { id ->
+                val t = lg.team(id)
+                t.l <= (t.w + t.l) / 2 + 2
+            }
+            val u = lg.user
+            val mine = pv.proj.getValue(u.id)
+            Panel {
+                Text(
+                    "Of our preseason Top 25, $onPace are roughly on their projected win pace. $f4Alive of our Final Four picks still look like tournament teams.",
+                    style = T.body, color = P.ink,
+                )
+                Spacer(Modifier.height(8.dp))
+                val delta = u.w - (mine.w * u.gp / (mine.w + mine.l).coerceAtLeast(1).toDouble()).roundToInt()
+                Text(
+                    when {
+                        u.gp < 5 -> "${u.school} is ${u.record} — too early to grade the projection."
+                        delta >= 2 -> "${u.school} is beating the projection (${u.record} vs a ${mine.w}-${mine.l} pace)."
+                        delta <= -2 -> "${u.school} is behind the projection (${u.record}; we had them at ${mine.w}-${mine.l})."
+                        else -> "${u.school} is right about where we picked them (${u.record}, projected ${mine.w}-${mine.l})."
+                    },
+                    style = T.small, color = P.sub,
+                )
+            }
+        }
         Section("Final Four")
         Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -1298,7 +1326,11 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(t.school, style = T.bodyB, color = P.ink)
-                    Text("${lg.conf(t.confId).abbr} · No. ${pv.proj.getValue(t.id).nat} · Sweet 16 ${odd(odds(pv, t).s16)}", style = T.small, color = P.sub)
+                    Text(
+                        if (label == "Cinderella") "Mid-major path to a deep March run · No. ${pv.proj.getValue(t.id).nat}"
+                        else "Quietly built for a top-25 leap · No. ${pv.proj.getValue(t.id).nat}",
+                        style = T.small, color = P.sub,
+                    )
                 }
             }
         }

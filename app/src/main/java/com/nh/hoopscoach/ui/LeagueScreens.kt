@@ -408,15 +408,22 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TeamBadge(lg.team(s.champion), 40.dp)
                             Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Champion: ${lg.team(s.champion).name}", style = T.bodyB, color = P.ink)
-                                Text("Runner-up: ${lg.team(s.runnerUp).school}", style = T.small, color = P.sub)
+                            Column(Modifier.weight(1f)) {
+                                Text("${lg.team(s.champion).name}", style = T.bodyB, color = P.ink)
+                                Text("National champions", style = T.small, color = P.accent)
                             }
                         }
                         Spacer(Modifier.height(8.dp))
+                        Text(com.nh.hoopscoach.game.Reports.seasonCard(lg, s), style = T.body, color = P.ink)
+                        Spacer(Modifier.height(6.dp))
                         Text("Final Four: " + s.finalFour.joinToString(", ") { lg.team(it).school }, style = T.small, color = P.sub)
-                        s.awards.firstOrNull { it.award == "Nat MVP" }?.let { Text("Player of the Year: ${it.name}, ${lg.team(it.teamId).school}", style = T.small, color = P.ink) }
-                        if (s.cotyName.isNotEmpty()) Text("Coach of the Year: ${s.cotyName}", style = T.small, color = P.ink)
+                        s.awards.firstOrNull { it.award == "Nat MVP" }?.let {
+                            Text("POY: ${it.name} · ${it.line}", style = T.small, color = P.ink)
+                        }
+                        if (s.cotyName.isNotEmpty()) {
+                            val cotyLine = s.awards.firstOrNull { it.award == "COTY" }?.line
+                            Text("COTY: ${s.cotyName}" + (cotyLine?.let { " · $it" } ?: ""), style = T.small, color = P.ink)
+                        }
                     }
                 }
             }
@@ -430,6 +437,7 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                             Column(Modifier.weight(1f)) {
                                 Text(a.name, style = T.bodyB, color = P.ink)
                                 Text(lg.team(a.teamId).school, style = T.small, color = P.sub)
+                                Text(a.line, style = T.small, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }

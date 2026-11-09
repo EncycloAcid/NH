@@ -116,10 +116,14 @@ object Moments {
         val l = lg.team(g.opp(w.id))
         val mine = w.id == lg.userTeamId || l.id == lg.userTeamId
         val ws = b.seeds[w.id] ?: 0
+        val ls = b.seeds[l.id] ?: 0
+        val mop = lg.seasonAwards.firstOrNull { it.award == "MOP" }?.name
+            ?: lg.rosterOf(w).filter { it.tourney.gp > 0 }.maxByOrNull { it.tourney.pts }?.name
         lg.moments += Moment(
-            lg.season, lg.day, MomentKind.TITLE, stage(g), "${w.school} cuts down the nets",
-            "No. $ws ${w.school} beat ${l.school} ${g.scoreFor(w.id)}-${g.scoreFor(l.id)}${if (g.ot > 0) " in overtime" else ""} for the national title.",
-            w.id, l.id, ws, b.seeds[l.id] ?: 0, g.scoreFor(w.id), g.scoreFor(l.id), g.ot, mine, 130 + if (mine) 40 else 0, g.id,
+            lg.season, lg.day, MomentKind.TITLE, stage(g),
+            Reports.titleHeadline(w, l, ws, ls, margin(g), g.ot),
+            Reports.titleDetail(w, l, g, ws, ls, mop),
+            w.id, l.id, ws, ls, g.scoreFor(w.id), g.scoreFor(l.id), g.ot, mine, 130 + if (mine) 40 else 0, g.id,
         )
     }
 

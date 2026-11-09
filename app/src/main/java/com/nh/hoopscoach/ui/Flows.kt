@@ -134,6 +134,8 @@ private fun LazyListScope.seasonPage(vm: GameViewModel, lg: League, w: WrapUp) {
                 }
                 TeamBadge(t, 60.dp)
             }
+            Spacer(Modifier.height(12.dp))
+            Text(com.nh.hoopscoach.game.Reports.wrapLead(lg, w), style = T.body, color = P.onHero.copy(alpha = 0.92f))
             if (w.path.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 val big = w.path.size <= 6
@@ -210,6 +212,19 @@ private fun LazyListScope.awardsPage(vm: GameViewModel, lg: League) {
     }
     val national = vm.awardsScope == 0
     val list = if (national) lg.seasonAwards else lg.confAwards.filter { lg.team(it.teamId).confId == lg.user.confId }
+    if (national) {
+        val s = lg.history.lastOrNull()
+        if (s != null) item {
+            val titleGame = lg.ncaa?.gameIds?.lastOrNull()?.firstOrNull()?.takeIf { it >= 0 }?.let { lg.game(it) }
+            Section("National champions")
+            Panel {
+                Text(
+                    com.nh.hoopscoach.game.Reports.champReport(lg, lg.team(s.champion), lg.team(s.runnerUp), titleGame, list.firstOrNull { it.award == "MOP" }),
+                    style = T.body, color = P.ink,
+                )
+            }
+        }
+    }
     val mine = list.filter { it.teamId == lg.userTeamId }
     if (mine.isNotEmpty()) item {
         Section("Your honors")
@@ -244,7 +259,8 @@ private fun AwardRow(vm: GameViewModel, lg: League, a: AwardWinner, title: Strin
         Column(Modifier.weight(1f)) {
             if (title != null) Text(title.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent)
             Text(a.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${t.school} · ${a.line}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${t.school}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(a.line, style = T.small, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (p != null) Ring(p.ovr, 40.dp, textSize = 15.sp)
     }
