@@ -25,8 +25,9 @@ object Gameplan {
         fun rate(p: Player): Double = p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
             (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
             (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
-        // The injured don't get minutes (unless the team is too thin to manage without them).
-        val pool = lg.rosterOf(t).filter { !it.out }.takeIf { it.size >= 8 }.let { it ?: lg.rosterOf(t) }.sortedByDescending { rate(it) }.toMutableList()
+        // Academic redshirts stay off the depth chart; injured don't get minutes unless the team is too thin.
+        val active = Redshirts.available(lg, t)
+        val pool = active.filter { !it.out }.takeIf { it.size >= 8 }.let { it ?: active }.sortedByDescending { rate(it) }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
@@ -89,9 +90,13 @@ object Gameplan {
     fun validate(lg: League, t: Team) {
         val ids = t.roster.toSet()
         val slots = t.plan.slots
-        val broken = slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
+        val sitting = slots.any {
+            (it.starter >= 0 && lg.playerOrNull(it.starter)?.let(Redshirts::sitting) == true) ||
+                (it.reserve >= 0 && lg.playerOrNull(it.reserve)?.let(Redshirts::sitting) == true)
+        }
+        val broken = sitting || slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
             slots.flatMap { listOf(it.starter, it.reserve) }.filter { it != -1 }.let { it.size != it.toSet().size } ||
-            slots.any { it.starter == -1 && t.roster.size >= 5 } ||
+            slots.any { it.starter == -1 && Redshirts.available(lg, t).size >= 5 } ||
             (t.plan.auto && slots.any { sl -> sl.starter >= 0 && lg.playerOrNull(sl.starter)?.out == true })
         if (broken || t.plan.auto && !lg.humanCoach(t)) autoAllocate(lg, t)
     }
@@ -110,6 +115,11 @@ object Gameplan {
             if (s.reserve == pid) return "Rotation"
         }
         return "Bench"
+    }
+
+    fun role(lg: League, t: Team, pid: Int): String {
+        if (lg.playerOrNull(pid)?.let(Redshirts::sitting) == true) return "Redshirt"
+        return role(t, pid)
     }
 
     /** Team rating used for headers: minutes-weighted overall of the rotation. */

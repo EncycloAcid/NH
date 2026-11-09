@@ -212,6 +212,8 @@ object Recruiting {
         var minutes = when (ahead) { 0 -> 1.15; 1 -> 1.05; 2 -> 0.95; else -> 0.85 }
         if (pref == RecruitPref.MINUTES) minutes = minutes.pow(2)
         out += Factor("Playing time", minutes, when (ahead) { 0 -> "He'd start right away"; 1 -> "One player ahead of him"; else -> "$ahead players ahead of him" })
+        // Time to develop: a redshirt year behind a crowded depth chart for high-upside kids.
+        Redshirts.developFactor(lg, t, r, ahead)?.let { out += it }
         // Roster crowding at his position.
         val n = list.size
         val crowd = when { n <= 1 -> 1.15; n == 2 -> 1.0; n == 3 -> 0.88; else -> 0.75 }

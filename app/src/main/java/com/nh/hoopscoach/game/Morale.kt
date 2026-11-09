@@ -25,9 +25,11 @@ object Morale {
     }
 
     fun expectedMinutes(lg: League, t: Team, p: Player): Int {
+        if (Redshirts.sitting(p)) return 0
         // Hurt players don't expect minutes they can't play.
         if (p.out) return Gameplan.plannedMinutes(t, p.id)
-        val rank = lg.rosterOf(t).sortedByDescending { it.ovr }.indexOf(p)
+        val rank = Redshirts.available(lg, t).sortedByDescending { it.ovr }.indexOf(p)
+        if (rank < 0) return 0
         return when {
             rank < 5 -> 28
             rank < 8 -> 16
@@ -38,6 +40,8 @@ object Morale {
 
     /** Why a player is unhappy, for the Attention list. */
     fun reason(lg: League, t: Team, p: Player): String {
+        if (Redshirts.sitting(p) && p.has(Trait.AMBITIOUS)) return "Ambitious player restless on a redshirt year."
+        if (Redshirts.sitting(p)) return "Accepting a redshirt year to develop."
         val mins = Gameplan.plannedMinutes(t, p.id)
         val exp = expectedMinutes(lg, t, p)
         val nilGap = Ratings.expectedNil(p) - p.nil
@@ -53,15 +57,25 @@ object Morale {
     }
 
     fun target(lg: League, t: Team, p: Player): Double {
+        val expNil = Ratings.expectedNil(p).coerceAtLeast(5)
+        var nil = ((p.nil - expNil).toDouble() / expNil * 35).coerceIn(-25.0, 10.0)
+        if (nil < 0 && p.has(Trait.BAG_CHASER)) nil *= 1.8
+        val win = if (t.gp >= 4) (t.winPct - 0.5) * 24 else 0.0
+        if (Redshirts.sitting(p)) {
+            // Redshirts aren't judged on minutes; ambitious kids still chafe at sitting.
+            var v = 74.0 + nil * 0.7 + win * 0.4
+            if (p.has(Trait.AMBITIOUS)) v -= 10
+            if (p.has(Trait.TEAM_PLAYER) || p.has(Trait.GYM_RAT)) v += 6
+            if (p.has(Trait.LOYAL)) v += 10
+            if (p.has(Trait.DISLOYAL)) v -= 8
+            if (lg.coachOf(t).has(CoachSkill.CULTURE)) v += 5
+            return v.coerceIn(0.0, 100.0)
+        }
         val mins = Gameplan.plannedMinutes(t, p.id)
         val exp = expectedMinutes(lg, t, p)
         var role = ((mins - exp) * 1.3).coerceIn(-32.0, 10.0)
         if (role < 0 && p.has(Trait.AMBITIOUS)) role *= 1.5
         if (role < 0 && p.has(Trait.TEAM_PLAYER)) role *= 0.5
-        val expNil = Ratings.expectedNil(p).coerceAtLeast(5)
-        var nil = ((p.nil - expNil).toDouble() / expNil * 35).coerceIn(-25.0, 10.0)
-        if (nil < 0 && p.has(Trait.BAG_CHASER)) nil *= 1.8
-        val win = if (t.gp >= 4) (t.winPct - 0.5) * 24 else 0.0
         var v = 68 + role + nil + win
         if (p.has(Trait.LOYAL)) v += 10
         if (p.has(Trait.DISLOYAL)) v -= 8

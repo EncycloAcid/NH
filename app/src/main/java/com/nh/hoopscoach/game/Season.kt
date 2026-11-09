@@ -99,6 +99,7 @@ object Season {
         Morale.tick(lg)
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
         // Practice: everyone improves a little, bench players included — up to their ceiling, not past it.
+        // Academic redshirts lean on practice — a small XP bump for the year of development.
         for (t in lg.teams) {
             val dev = Coaching.devOf(lg.coachOf(t))
             for (pid in t.roster) {
@@ -106,7 +107,9 @@ object Season {
                 // Practice takes him to his ceiling, not past it (your own player excepted).
                 if (p.ovr >= p.pot && p.id != lg.heroId) continue
                 // Light practice XP: games do most of the growing, so the league doesn't creep up every day.
-                Ratings.addXp(p, (4 * Ratings.devRate(p, dev)).roundToInt())
+                val base = 4 * Ratings.devRate(p, dev)
+                val xp = if (Redshirts.sitting(p)) base * 1.25 else base
+                Ratings.addXp(p, xp.roundToInt())
                 Tryouts.checkStar(lg, t, p)
             }
         }

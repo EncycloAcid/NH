@@ -14,9 +14,10 @@ object Offseason {
 
     fun begin(lg: League) {
         if (lg.phase != Phase.WRAP_UP) return
+        Redshirts.aiFinishSeason(lg)
         val os = OffseasonState()
         val board = draftBoard(lg)
-        for (p in lg.rosterOf(lg.user).filter { it.year >= 4 }) {
+        for (p in lg.rosterOf(lg.user).filter { it.year >= 4 && it.redshirt != Redshirt.MEDICAL }) {
             os.graduates += GradEntry(p.id, p.name, p.pos, p.ovr, p.nil, Awards.line(p), gradNote(board[p.id]))
         }
         // In player mode the user decides for his own player.
@@ -118,6 +119,8 @@ object Offseason {
     }
 
     private fun toPortal(lg: League, p: Player, fromId: Int) {
+        // Resolve a redshirt year before he hits the portal so the flag doesn't linger into next season.
+        if (p.redshirt != Redshirt.NONE) Redshirts.advanceYear(p)
         p.teamId = -1
         p.transferFrom = fromId
         val r = Recruit(p, transfer = true)
@@ -205,10 +208,12 @@ object Offseason {
         }
         val drafted = picks.map { it.id }.toSet()
         // Seniors graduate, draftees leave, undrafted underclassmen return.
+        // Medical redshirts keep their eligibility and stay on the roster.
         for (t in lg.teams) {
             for (pid in t.roster.toList()) {
                 val p = lg.player(pid)
-                if (p.year >= 4 || pid in drafted) {
+                val graduate = p.year >= 4 && p.redshirt != Redshirt.MEDICAL
+                if (graduate || pid in drafted) {
                     if (t.id == lg.userTeamId && pid !in drafted) os.freedGrad += p.nil
                     hallOfFameCheck(lg, p, t)
                     Legacy.honorPlayer(lg, t, p)
@@ -249,7 +254,8 @@ object Offseason {
                 val gains = IntArray(10) { p.attrs[it] - attrs[it] }
                 val lbs = if (p.year <= 2) Rng.range(0, 8) else Rng.range(-2, 4)
                 p.weight += lbs
-                p.year++
+                // Academic and medical redshirts keep this class year.
+                Redshirts.advanceYear(p)
                 if (brokeOut) {
                     Tryouts.breakoutNews(lg, t, p, before)
                     if (t.id == lg.userTeamId) os.breakouts += pid
@@ -351,6 +357,7 @@ object Offseason {
         lg.norms = GameEngine.computeNorms(lg)
         lg.recruits = LeagueGen.recruitClass(lg)
         lg.recruitPoints = Recruiting.SCOUT_CAP / 2
+        Redshirts.aiPlan(lg)
         val u = lg.user
         lg.news += News(lg.season, 0, if (u.ap > 0) "${u.school} opens the season ranked No. ${u.ap}" else "${u.school} opens the season unranked", true)
         val preview = Previews.build(lg)

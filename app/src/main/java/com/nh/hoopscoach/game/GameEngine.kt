@@ -27,8 +27,11 @@ class PlayEvent(
 class GameEngine(private val lg: League, val game: Game, private val pbp: Boolean) {
     val teams = arrayOf(lg.team(game.home), lg.team(game.away))
     private val coaches = arrayOf(lg.coachOf(teams[0]), lg.coachOf(teams[1]))
-    // Who's dressed tonight: not the injured, nor a veteran resting (see Injuries).
-    private val rosters: Array<List<Player>> = arrayOf(Injuries.available(lg, teams[0], game), Injuries.available(lg, teams[1], game))
+    // Who's dressed tonight: not the injured, nor a veteran resting (see Injuries), nor academic redshirts.
+    private val rosters: Array<List<Player>> = arrayOf(
+        Injuries.available(lg, teams[0], game).filter { !Redshirts.sitting(it) },
+        Injuries.available(lg, teams[1], game).filter { !Redshirts.sitting(it) },
+    )
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>

@@ -63,7 +63,10 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
         ),
         sec(
             "Class and eligibility",
-            "Players have four seasons. Seniors graduate after the season, and your best underclassmen may declare for the draft. Unhappy players can enter the transfer portal in the offseason.",
+            "Players have four seasons of competition. Seniors graduate after the season, and your best underclassmen may declare for the draft. Unhappy players can enter the transfer portal in the offseason.",
+            "Academic redshirt: before a player has appeared in a game, sit him for the year. He stays off the depth chart, develops in practice, and keeps that class year. One per career.",
+            "Medical redshirt: after a season of four games or fewer, claim a hardship before Draft Night so his class year does not advance. One per career.",
+            "Redshirted players show as RS FR / RS SO and so on, and appear in their own Redshirts section on the roster.",
         ),
         sec(
             "Personality",
@@ -251,6 +254,7 @@ private val recruitingGuide: List<GSection> = listOf(
         "• Location: in-state and same-region schools have an edge.",
         "• Pro pipeline: your recent draft picks.",
         "• Playing time: how many players at his position are already as good as him.",
+        "• Time to develop: a redshirt year behind a crowded depth chart helps high-upside kids (and hurts minutes-first kids).",
         "• Roster crowding at his position.",
         "• His own preference.",
         "Your NIL offer works differently: it adds its own interest every round, on top of your points, even with no points on him. Matching his ask adds about 8 a round.",

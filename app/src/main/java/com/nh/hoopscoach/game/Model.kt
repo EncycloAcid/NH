@@ -150,6 +150,9 @@ enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON, PLAYOFFS }
 /** College basketball, or (once the user's player is drafted) the pro league. */
 enum class Level { COLLEGE, PRO }
 
+/** Active redshirt status for the season just played or underway. */
+enum class Redshirt { NONE, ACADEMIC, MEDICAL }
+
 enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT"), PLAYOFF("PO"), CUP("CUP") }
 
 @Serializable
@@ -305,6 +308,14 @@ class Player(
     var goatId: String = "",
     var parentA: String = "",
     var parentB: String = "",
+    /** Sitting out (academic) or hardship claimed (medical) this season. */
+    var redshirt: Redshirt = Redshirt.NONE,
+    /** Already used an academic redshirt earlier in his career. */
+    var usedAcademicRs: Boolean = false,
+    /** Already used a medical hardship earlier in his career. */
+    var usedMedicalRs: Boolean = false,
+    /** Class labels get the RS prefix after any redshirt. */
+    var rsClass: Boolean = false,
 ) {
     /** Out injured. */
     val out get() = injGames > 0
@@ -318,10 +329,13 @@ class Player(
     val ovr: Int get() = Ratings.ovr(pos, attrs)
     operator fun get(a: Attr) = attrs[a.ordinal]
     fun has(t: Trait) = t in traits
-    val cls get() = classLabel(year)
+    val cls get() = classLabel(year, rsClass || redshirt != Redshirt.NONE)
 }
 
-fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; PRO_YEAR -> "PRO"; else -> "GR" }
+fun classLabel(year: Int, rs: Boolean = false): String {
+    val base = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; PRO_YEAR -> "PRO"; else -> "GR" }
+    return if (rs && year in 1..4) "RS $base" else base
+}
 
 /** The class year every pro player carries. */
 const val PRO_YEAR = 9
