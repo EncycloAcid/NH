@@ -525,6 +525,14 @@ object Coaching {
         val oldTeam = lg.user
         val newTeam = lg.team(teamId)
         val me = lg.userCoach
+        // Walk-ons were his tryout picks; other programs don't carry any, so they leave with him
+        // (done before the switch so they stay on record as his former players).
+        lg.rosterOf(oldTeam).filter { it.walkOn && it.id != lg.heroId }.forEach { p ->
+            oldTeam.roster.remove(p.id)
+            lg.removePlayer(p)
+            Careers.keep(lg, p, oldTeam, 0, "Left ${oldTeam.school} when ${me.name} took the ${newTeam.school} job in ${lg.season}")
+        }
+        Gameplan.validate(lg, oldTeam)
         val other = lg.coachOf(newTeam)
         other.teamId = oldTeam.id
         oldTeam.coachId = other.id
