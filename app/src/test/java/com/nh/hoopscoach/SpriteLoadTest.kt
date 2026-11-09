@@ -20,11 +20,11 @@ class SpriteLoadTest {
         assertEquals("lakers", SpriteSheets.jerseyKey("LAL", "LAL", "Los Angeles Lakers"))
         assertEquals("heat", SpriteSheets.jerseyKey("MIA", "MIA", "Miami Heat"))
         // College: empty slot → college pack by school abbr (not NBA Heat/Pacers/etc.).
-        assertEquals("college_miami", SpriteSheets.jerseyKey("MIA", "", "Miami Hurricanes"))
-        assertEquals("college_duke", SpriteSheets.jerseyKey("DUKE", "", "Duke Blue Devils"))
-        assertEquals("college_gonzaga", SpriteSheets.jerseyKey("GONZ", "", "Gonzaga Bulldogs"))
-        assertEquals("college_indiana", SpriteSheets.jerseyKey("IND", "", "Indiana Hoosiers"))
-        assertEquals("college_uconn", SpriteSheets.jerseyKey("CONN", "", "UConn Huskies"))
+        assertEquals("48_miami", SpriteSheets.jerseyKey("MIA", "", "Miami Hurricanes"))
+        assertEquals("01_duke", SpriteSheets.jerseyKey("DUKE", "", "Duke Blue Devils"))
+        assertEquals("10_gonzaga", SpriteSheets.jerseyKey("GONZ", "", "Gonzaga Bulldogs"))
+        assertEquals("07_indiana", SpriteSheets.jerseyKey("IND", "", "Indiana Hoosiers"))
+        assertEquals("05_uconn", SpriteSheets.jerseyKey("CONN", "", "UConn Huskies"))
         // School without art still returns null → blank recolor.
         assertNull(SpriteSheets.jerseyKey("WAKE", "", "Wake Forest Demon Deacons"))
     }

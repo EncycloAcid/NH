@@ -8,7 +8,8 @@ import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Loads the user's modular basketball sprites from `assets/sprites/` (bodies, jerseys, hairstyles).
+ * Loads modular 512×512 character sprites from `assets/character/`.
+ * Every full-canvas layer is pre-aligned — draw at (0,0) with no offsets.
  * Call [install] once with the app's [AssetManager]; unit tests can skip it and read from disk.
  */
 object SpriteSheets {
@@ -29,15 +30,20 @@ object SpriteSheets {
 
     fun body(skin: Int): Bitmap? {
         val file = BODY_FILES[skin.coerceIn(0, BODY_FILES.lastIndex)]
-        return bitmap("sprites/bodies/$file.png")
+        return bitmap("character/bodies/$file.png")
     }
 
     fun hair(style: Int): Bitmap? {
         val file = HAIR_FILES[style] ?: return null
-        return bitmap("sprites/hairstyles/$file.png")
+        return bitmap("character/hairstyles/$file.png")
     }
 
-    fun jersey(key: String): Bitmap? = bitmap("sprites/jerseys/$key.png")
+    /** NBA key (`lakers`) or college key (`01_duke`). */
+    fun jersey(key: String): Bitmap? {
+        bitmap("character/nba_jerseys/$key.png")?.let { return it }
+        bitmap("character/college_jerseys/$key.png")?.let { return it }
+        return null
+    }
 
     /** Chest number 0–99 (and `00` via [zeroZero]). */
     fun chestNumber(number: Int, zeroZero: Boolean = false): Bitmap? {
@@ -46,43 +52,42 @@ object SpriteSheets {
             number in 0..99 -> number.toString()
             else -> number.coerceIn(0, 99).toString()
         }
-        return bitmap("sprites/numbers/chest/$name.png")
+        return bitmap("character/numbers/chest/$name.png")
     }
 
     fun shoulderDigit(digit: Int): Bitmap? =
-        bitmap("sprites/numbers/shoulder/${digit.coerceIn(0, 9)}.png")
+        bitmap("character/numbers/shoulder/${digit.coerceIn(0, 9)}.png")
 
     /** Isolated eyes (+ brows). Index 0 = keep the body's baked eyes. */
     fun eyes(style: Int): Bitmap? {
         val file = EYE_FILES.getOrNull(style) ?: return null
-        return bitmap("sprites/eyes/$file.png")
+        return bitmap("character/eyes/$file.png")
     }
 
     fun mouth(style: Int): Bitmap? {
         val file = MOUTH_FILES.getOrNull(style) ?: return null
-        return bitmap("sprites/mouths/$file.png")
+        return bitmap("character/mouths/$file.png")
     }
 
     fun beard(style: Int): Bitmap? {
         val file = BEARD_FILES.getOrNull(style) ?: return null
-        return bitmap("sprites/beards/$file.png")
+        return bitmap("character/beards/$file.png")
     }
 
     fun headband(style: Int): Bitmap? {
         val file = HEADBAND_FILES.getOrNull(style) ?: return null
-        return bitmap("sprites/headbands/$file.png")
+        return bitmap("character/headbands/$file.png")
     }
 
     fun eyewear(style: Int): Bitmap? {
         val file = EYEWEAR_FILES.getOrNull(style) ?: return null
-        return bitmap("sprites/eyewear/$file.png")
+        return bitmap("character/eyewear/$file.png")
     }
 
     /**
      * Jersey file stem for a team.
      * - NBA: [slot] (franchise id) → `lakers`, `celtics`, …
-     * - College: [abbr] → `college_duke`, `college_unc`, … when we have art; else null (blank recolor).
-     * Never fuzzy-match mascot names — "bull" in Bulldogs / college MIA≠Heat.
+     * - College: [abbr] → numbered college art (`01_duke`, …); else null (blank recolor).
      */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
@@ -119,7 +124,6 @@ object SpriteSheets {
 
     /**
      * Face.hair index → hairstyle file. Null = bald (no overlay; body hair is stripped).
-     * Extra styles (puffs, bleached crop) are reached via nearby options / hair color.
      */
     val HAIR_FILES = arrayOf(
         null,                    // 0 Bald
@@ -129,7 +133,7 @@ object SpriteSheets {
         "flat_top",              // 4 Flat-top
         "afro",                  // 5 Afro
         "high_top_fade",         // 6 High-top
-        "curly_top_fade",        // 7 Headband (curls + separate headband overlay; pack file is broken)
+        "curly_top_fade",        // 7 Headband (curls + separate headband overlay)
         "cornrows",              // 8 Cornrows
         "dreadlocks",            // 9 Locs
         "twists",                // 10 Long / twists
@@ -167,12 +171,12 @@ object SpriteSheets {
         "01_full_beard",     // Full beard
     )
 
-    // Face.acc headband slots.
+    // Face.acc headband slots (guide-named files also present for customizer).
     private val HEADBAND_FILES = arrayOf(
         null,
-        "01_white_headband",
-        "02_red_headband",
-        "03_black_headband",
+        "01_classic_white",
+        "02_bulls_red",
+        "03_stealth_black",
         null, // goggles
         null, // mask
     )
@@ -198,23 +202,23 @@ object SpriteSheets {
         "SAC" to "kings", "SAS" to "spurs", "SA" to "spurs", "UTA" to "jazz", "UTH" to "jazz",
     )
 
-    /** College school abbr → `college_*` jersey asset (48-school pack). */
+    /** College school abbr → numbered college jersey asset (48-school pack). */
     private val COLLEGE_BY_ABBR = mapOf(
-        "DUKE" to "college_duke", "UNC" to "college_unc", "UK" to "college_kentucky",
-        "KU" to "college_kansas", "CONN" to "college_uconn", "NOVA" to "college_villanova",
-        "IND" to "college_indiana", "MICH" to "college_michigan", "MSU" to "college_michigan_state",
-        "GONZ" to "college_gonzaga", "PUR" to "college_purdue", "UCLA" to "college_ucla",
-        "ARIZ" to "college_arizona", "HOU" to "college_houston", "TEX" to "college_texas",
-        "TENN" to "college_tennessee", "SYR" to "college_syracuse", "LOU" to "college_louisville",
-        "UVA" to "college_virginia", "MARQ" to "college_marquette", "CREI" to "college_creighton",
-        "BAY" to "college_baylor", "OSU" to "college_ohio_state", "ILL" to "college_illinois",
-        "BAMA" to "college_alabama", "AUB" to "college_auburn", "FLA" to "college_florida",
-        "ARK" to "college_arkansas", "ISU" to "college_iowa_state", "SDSU" to "college_san_diego_state",
-        "MEM" to "college_memphis", "SJU" to "college_st_johns", "GTWN" to "college_georgetown",
-        "NCST" to "college_nc_state", "WIS" to "college_wisconsin", "MD" to "college_maryland",
-        "IOWA" to "college_iowa", "ORE" to "college_oregon", "TTU" to "college_texas_tech",
-        "BYU" to "college_byu", "XAV" to "college_xavier", "HALL" to "college_seton_hall",
-        "PROV" to "college_providence", "SMC" to "college_saint_marys", "DAY" to "college_dayton",
-        "VCU" to "college_vcu", "FSU" to "college_florida_state", "MIA" to "college_miami",
+        "DUKE" to "01_duke", "UNC" to "02_unc", "UK" to "03_kentucky",
+        "KU" to "04_kansas", "CONN" to "05_uconn", "NOVA" to "06_villanova",
+        "IND" to "07_indiana", "MICH" to "08_michigan", "MSU" to "09_michigan_state",
+        "GONZ" to "10_gonzaga", "PUR" to "11_purdue", "UCLA" to "12_ucla",
+        "ARIZ" to "13_arizona", "HOU" to "14_houston", "TEX" to "15_texas",
+        "TENN" to "16_tennessee", "SYR" to "17_syracuse", "LOU" to "18_louisville",
+        "UVA" to "19_virginia", "MARQ" to "20_marquette", "CREI" to "21_creighton",
+        "BAY" to "22_baylor", "OSU" to "23_ohio_state", "ILL" to "24_illinois",
+        "BAMA" to "25_alabama", "AUB" to "26_auburn", "FLA" to "27_florida",
+        "ARK" to "28_arkansas", "ISU" to "29_iowa_state", "SDSU" to "30_san_diego_state",
+        "MEM" to "31_memphis", "SJU" to "32_st_johns", "GTWN" to "33_georgetown",
+        "NCST" to "34_nc_state", "WIS" to "35_wisconsin", "MD" to "36_maryland",
+        "IOWA" to "37_iowa", "ORE" to "38_oregon", "TTU" to "39_texas_tech",
+        "BYU" to "40_byu", "XAV" to "41_xavier", "HALL" to "42_seton_hall",
+        "PROV" to "43_providence", "SMC" to "44_saint_marys", "DAY" to "45_dayton",
+        "VCU" to "46_vcu", "FSU" to "47_florida_state", "MIA" to "48_miami",
     )
 }

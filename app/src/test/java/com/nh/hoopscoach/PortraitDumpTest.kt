@@ -25,7 +25,7 @@ class PortraitDumpTest {
             Triple("lakers", 0xFF552583.toInt(), 0xFFFDB927.toInt()),
             Triple("celtics", 0xFF007A33.toInt(), 0xFFBA9653.toInt()),
             Triple("heat", 0xFF98002E.toInt(), 0xFFF9A01B.toInt()),
-            Triple("college_duke", 0xFF003087.toInt(), 0xFFFFFFFF.toInt()), // college pack
+            Triple("01_duke", 0xFF003087.toInt(), 0xFFFFFFFF.toInt()), // college pack
         )
         val faces = listOf(
             Face(5, 0, 3, 0, 5, 1, 1, 1, 0),   // chestnut, fade, full beard, intense, grin

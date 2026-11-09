@@ -1,0 +1,36 @@
+{
+  "system": "512x512 Zero-Offset Modular Layering",
+  "canvas_dimensions": {
+    "width": 512,
+    "height": 512
+  },
+  "zero_offset_rule": "Every sprite in this pack is pre-aligned to a 512x512 canvas. In game engine code or Cursor, draw every layer at (0, 0) with width=512, height=512. No offsets, scale factors, or pivot calculations are needed.",
+  "exact_cutout_targets": {
+    "jersey_cutout_bounds": {
+      "x": 160,
+      "y": 235,
+      "width": 192,
+      "height": 277,
+      "center_x": 256,
+      "collar_v_point": {
+        "x": 256,
+        "y": 297
+      }
+    },
+    "hairline_cutout_bounds": {
+      "hairline_y": 84,
+      "center_x": 256,
+      "forehead_top_y": 84
+    }
+  },
+  "recommended_layering_order": [
+    "1. bodies_modular_torso_cutout_512x512/[skin_tone].png",
+    "2. eyes_512x512/[eye_style].png",
+    "3. mouths_and_expressions_512x512/[mouth_style].png",
+    "4. beards_512x512/[beard_style].png",
+    "5. nba_jerseys_512x512/[team].png OR college_jerseys_512x512/[team].png",
+    "6. headbands_512x512/[color].png",
+    "7. eyewear_512x512/[eyewear_style].png",
+    "8. hairstyles_512x512/[hair_style].png"
+  ]
+}
