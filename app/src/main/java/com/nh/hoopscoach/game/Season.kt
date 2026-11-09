@@ -96,11 +96,14 @@ object Season {
         Morale.tick(lg)
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
         // Practice: everyone improves a little, bench players included.
+        // Academic redshirts lean on practice — a small XP bump for the year of development.
         for (t in lg.teams) {
             val dev = Coaching.devOf(lg.coachOf(t))
             for (pid in t.roster) {
                 val p = lg.player(pid)
-                Ratings.addXp(p, (7 * Ratings.devRate(p, dev)).roundToInt())
+                val base = 7 * Ratings.devRate(p, dev)
+                val xp = if (Redshirts.sitting(p)) base * 1.25 else base
+                Ratings.addXp(p, xp.roundToInt())
                 Tryouts.checkStar(lg, t, p)
             }
         }

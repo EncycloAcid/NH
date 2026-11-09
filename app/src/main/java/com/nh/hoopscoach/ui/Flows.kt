@@ -48,6 +48,8 @@ import com.nh.hoopscoach.game.OffStep
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Ratings
+import com.nh.hoopscoach.game.Redshirt
+import com.nh.hoopscoach.game.Redshirts
 import com.nh.hoopscoach.game.Tryout
 import com.nh.hoopscoach.game.Tryouts
 import com.nh.hoopscoach.game.Season
@@ -411,7 +413,8 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
     val board = Offseason.draftBoard(lg)
     val entrants = lg.rosterOf(t).filter { it.year in 1..3 && (it.id in os.entrants || it.id in os.pitched) }
     val below = Offseason.belowMarket(lg)
-    val rest = lg.rosterOf(t).filter { it.year < 4 && it !in below && it !in entrants }.sortedByDescending { it.ovr }
+    val medical = lg.rosterOf(t).filter { Redshirts.canMedical(lg, it) || it.redshirt == Redshirt.MEDICAL }.sortedByDescending { it.ovr }
+    val rest = lg.rosterOf(t).filter { it.year < 4 && it !in below && it !in entrants && it !in medical }.sortedByDescending { it.ovr }
     item {
         Panel(padding = PaddingValues(vertical = 14.dp)) {
             StatRow(listOf(
@@ -420,6 +423,41 @@ private fun LazyListScope.rosterStep(vm: GameViewModel, lg: League) {
                 Triple("Budget", money(Finance.budget(lg, t)), null),
             ), style = T.numSm)
         }
+        if (medical.isNotEmpty()) {
+            Section("Medical redshirts")
+            Text(
+                "Players who appeared in ${Redshirts.MEDICAL_MAX_GAMES} games or fewer can claim a hardship year before Draft Night. Their class year will not advance.",
+                style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, bottom = 8.dp),
+            )
+        }
+    }
+    medical.forEach { p ->
+        item {
+            val claimed = p.redshirt == Redshirt.MEDICAL
+            Panel(Modifier.padding(bottom = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlayerJersey(p, t, 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, style = T.bodyB, color = P.ink)
+                        Text("${p.pos} · ${p.cls} · ${p.stats.gp} game${if (p.stats.gp == 1) "" else "s"}", style = T.small, color = P.sub)
+                        Text(if (claimed) "Hardship claimed — keeps this class year" else "Eligible for a medical redshirt", style = T.small, color = if (claimed) P.good else P.warn)
+                    }
+                    Ring(p.ovr, 42.dp)
+                }
+                if (!claimed) {
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryButton("Claim medical redshirt", Modifier.fillMaxWidth()) {
+                        vm.act {
+                            if (Redshirts.setMedical(it, p.id)) vm.toast("${p.short} keeps this year of eligibility")
+                            else vm.toast("Not eligible")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    item {
         Section("Draft decisions")
         Text(
             "Your best underclassmen can declare early. Pitch them to come back, or let them go: every player drafted from your program lifts recruiting for four years.",

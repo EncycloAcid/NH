@@ -72,6 +72,9 @@ enum class Defense(val label: String, val blurb: String) {
 
 enum class Phase { REGULAR, CONF_TOURNEY, NCAA, WRAP_UP, OFFSEASON }
 
+/** Active redshirt status for the season just played or underway. */
+enum class Redshirt { NONE, ACADEMIC, MEDICAL }
+
 enum class GameType(val short: String) { NONCONF("NC"), CONF("CONF"), EVENT("EVT"), CONF_TOURNEY("CT"), NCAA("NCAA"), NIT("NIT") }
 
 @Serializable
@@ -167,16 +170,27 @@ class Player(
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
+    /** Sitting out (academic) or hardship claimed (medical) this season. */
+    var redshirt: Redshirt = Redshirt.NONE,
+    /** Already used an academic redshirt earlier in his career. */
+    var usedAcademicRs: Boolean = false,
+    /** Already used a medical hardship earlier in his career. */
+    var usedMedicalRs: Boolean = false,
+    /** Class labels get the RS prefix after any redshirt. */
+    var rsClass: Boolean = false,
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"
     val ovr: Int get() = Ratings.ovr(pos, attrs)
     operator fun get(a: Attr) = attrs[a.ordinal]
     fun has(t: Trait) = t in traits
-    val cls get() = classLabel(year)
+    val cls get() = classLabel(year, rsClass || redshirt != Redshirt.NONE)
 }
 
-fun classLabel(year: Int) = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; else -> "GR" }
+fun classLabel(year: Int, rs: Boolean = false): String {
+    val base = when (year) { 0 -> "HS"; 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; else -> "GR" }
+    return if (rs && year in 1..4) "RS $base" else base
+}
 
 @Serializable
 class Slot(var starter: Int, var reserve: Int, var starterMin: Int, var starterUsg: Int, var reserveUsg: Int)

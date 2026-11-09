@@ -52,6 +52,7 @@ import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Pos
 import com.nh.hoopscoach.game.Rankings
 import com.nh.hoopscoach.game.Ratings
+import com.nh.hoopscoach.game.Redshirts
 import com.nh.hoopscoach.game.Schedule
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Team
@@ -106,10 +107,12 @@ private fun RingStat(label: String, v: Int) {
 
 fun LazyListScope.rosterList(vm: GameViewModel, lg: League, t: Team, mine: Boolean) {
     val roster = lg.rosterOf(t)
-    val starters = t.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.starter } }
-    val rotation = t.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.reserve } }
-    val bench = roster.filter { it !in starters && it !in rotation }.sortedByDescending { it.ovr }
-    for ((label, list) in listOf("Starting five" to starters, "Rotation" to rotation, "Bench" to bench)) {
+    val redshirts = roster.filter { Redshirts.sitting(it) }.sortedByDescending { it.ovr }
+    val active = roster.filter { !Redshirts.sitting(it) }
+    val starters = t.plan.slots.mapNotNull { s -> active.firstOrNull { it.id == s.starter } }
+    val rotation = t.plan.slots.mapNotNull { s -> active.firstOrNull { it.id == s.reserve } }
+    val bench = active.filter { it !in starters && it !in rotation }.sortedByDescending { it.ovr }
+    for ((label, list) in listOf("Starting five" to starters, "Rotation" to rotation, "Bench" to bench, "Redshirts" to redshirts)) {
         if (list.isEmpty()) continue
         item { Section(label) }
         item { GroupList(list, inset = 70.dp) { p -> RosterRow(vm, lg, t, p, mine) } }
@@ -127,6 +130,8 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (p.walkOn) { Spacer(Modifier.width(6.dp)); Tag("WALK-ON", P.sub) }
+                if (Redshirts.sitting(p)) { Spacer(Modifier.width(6.dp)); Tag("REDSHIRT", P.accent) }
+                else if (p.rsClass) { Spacer(Modifier.width(6.dp)); Tag("RS", P.sub) }
                 if (mine) when (Morale.mood(p)) {
                     Mood.TRANSFER -> { Spacer(Modifier.width(6.dp)); Tag("AT RISK", P.bad) }
                     Mood.UNHAPPY -> { Spacer(Modifier.width(6.dp)); Tag("UNHAPPY", P.warn) }
@@ -134,7 +139,12 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 }
             }
             Text(
-                "${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)}" + if (mins > 0) " · $mins min" else "",
+                "${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)}" +
+                    when {
+                        Redshirts.sitting(p) -> " · sitting out"
+                        mins > 0 -> " · $mins min"
+                        else -> ""
+                    },
                 style = T.small, color = P.sub, maxLines = 1,
             )
             if (p.stats.gp > 0) Text(statLine(p), style = T.small, color = P.sub, maxLines = 1)
@@ -211,17 +221,21 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             title = { Text("${if (starter) "Starting" else "Backup"} ${Pos.entries[idx].name}", style = T.head, color = P.ink) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { it.pos.ordinal == idx }.thenByDescending { it.ovr })) { p ->
+                    items(lg.rosterOf(t).sortedWith(compareByDescending<Player> { !Redshirts.sitting(it) }.thenByDescending { it.pos.ordinal == idx }.thenByDescending { it.ovr })) { p ->
+                        val sat = Redshirts.sitting(p)
                         Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable {
-                                choose = null
-                                vm.act { Gameplan.swapInto(it, it.user, idx, starter, p.id) }
-                            }.padding(vertical = 8.dp, horizontal = 4.dp),
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).then(
+                                if (sat) Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                else Modifier.clickable {
+                                    choose = null
+                                    vm.act { Gameplan.swapInto(it, it.user, idx, starter, p.id) }
+                                }.padding(vertical = 8.dp, horizontal = 4.dp),
+                            ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(p.pos.name, style = T.small, color = P.sub, modifier = Modifier.width(32.dp))
-                            Text(p.name, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(Gameplan.role(t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
+                            Text(p.name, style = T.bodyB, color = if (sat) P.faint else P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(Gameplan.role(lg, t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
                             Ring(p.ovr, 34.dp, textSize = 14.sp)
                         }
                     }

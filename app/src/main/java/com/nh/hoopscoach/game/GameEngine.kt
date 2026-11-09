@@ -23,7 +23,7 @@ class PlayEvent(
 class GameEngine(private val lg: League, val game: Game, private val pbp: Boolean) {
     val teams = arrayOf(lg.team(game.home), lg.team(game.away))
     private val coaches = arrayOf(lg.coachOf(teams[0]), lg.coachOf(teams[1]))
-    private val rosters: Array<List<Player>> = arrayOf(lg.rosterOf(teams[0]), lg.rosterOf(teams[1]))
+    private val rosters: Array<List<Player>> = arrayOf(Redshirts.available(lg, teams[0]), Redshirts.available(lg, teams[1]))
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>

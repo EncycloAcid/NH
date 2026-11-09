@@ -21,9 +21,10 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 - **Continue bar**: one bar above the tabs always shows what's next. Play the game live, sim it, or use the ⋮ menu to jump a week, to the conference tournament, to Selection Sunday, or to the end of the season.
 - **Today**: next opponent with win odds and a head-to-head comparison, recent form, conference standings, top performers and headlines. During tournaments it shows your road to the title and the current round.
 - **Team**
-  - *Roster*: starting five, rotation and bench with jersey numbers, rating rings and personality traits.
-  - *Lineup*: offense and defense styles, starter and backup at each position, a minutes slider, and optional usage tuning.
+  - *Roster*: starting five, rotation, bench and redshirts with jersey numbers, rating rings and personality traits.
+  - *Lineup*: offense and defense styles, starter and backup at each position, a minutes slider, and optional usage tuning. Academic redshirts stay off the depth chart.
   - *Develop*: XP progress and a training focus (archetype) for each player.
+  - *Redshirts*: academic (sit a full season before he plays a game; keeps the class year; one per career) and medical (≤4 games, claim before Draft Night; one per career). RS FR / RS SO labels, and a “Time to develop” recruiting pitch when the depth chart is crowded.
   - *Program*: Prestige, Legacy, Buzz, Program Pull, Conference Exposure, Expected Wins and the resume ceiling, plus NIL budget, locker-room mood and coaching staff.
   - The **i** button opens the **Program Guide**, with tabs for Players, NIL, Gameplan, Training and Program.
 - **Recruit**: a class of 1,600 high-school prospects plus the transfer portal. In season you scout and build your targets; after the season, recruiting runs in five rounds (details below). The **i** button opens the **Recruiting Guide**.

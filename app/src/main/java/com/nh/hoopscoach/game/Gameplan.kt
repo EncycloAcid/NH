@@ -16,7 +16,8 @@ object Gameplan {
 
     /** Picks starters and backups by position and splits the minutes. */
     fun autoAllocate(lg: League, t: Team) {
-        val pool = lg.rosterOf(t).sortedByDescending { it.ovr }.toMutableList()
+        // Academic redshirts stay off the depth chart for the season.
+        val pool = Redshirts.available(lg, t).sortedByDescending { it.ovr }.toMutableList()
         val starters = arrayOfNulls<Player>(5)
         val reserves = arrayOfNulls<Player>(5)
         fun take(pos: Pos): Player? {
@@ -49,9 +50,13 @@ object Gameplan {
     fun validate(lg: League, t: Team) {
         val ids = t.roster.toSet()
         val slots = t.plan.slots
-        val broken = slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
+        val sitting = slots.any {
+            (it.starter >= 0 && lg.playerOrNull(it.starter)?.let(Redshirts::sitting) == true) ||
+                (it.reserve >= 0 && lg.playerOrNull(it.reserve)?.let(Redshirts::sitting) == true)
+        }
+        val broken = sitting || slots.size != 5 || slots.any { (it.starter != -1 && it.starter !in ids) || (it.reserve != -1 && it.reserve !in ids) } ||
             slots.flatMap { listOf(it.starter, it.reserve) }.filter { it != -1 }.let { it.size != it.toSet().size } ||
-            slots.any { it.starter == -1 && t.roster.size >= 5 }
+            slots.any { it.starter == -1 && Redshirts.available(lg, t).size >= 5 }
         if (broken || t.plan.auto && t.id != lg.userTeamId) autoAllocate(lg, t)
     }
 
@@ -69,6 +74,11 @@ object Gameplan {
             if (s.reserve == pid) return "Rotation"
         }
         return "Bench"
+    }
+
+    fun role(lg: League, t: Team, pid: Int): String {
+        if (lg.playerOrNull(pid)?.let(Redshirts::sitting) == true) return "Redshirt"
+        return role(t, pid)
     }
 
     /** Team rating used for headers: minutes-weighted overall of the rotation. */

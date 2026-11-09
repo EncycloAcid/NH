@@ -57,6 +57,8 @@ import com.nh.hoopscoach.game.Morale
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Ratings
+import com.nh.hoopscoach.game.Redshirt
+import com.nh.hoopscoach.game.Redshirts
 import com.nh.hoopscoach.game.StatLine
 import com.nh.hoopscoach.game.Trait
 import com.nh.hoopscoach.game.Tryouts
@@ -102,7 +104,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${p.pos} · ${p.cls} · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
-                    if (team != null) Text("${team.school} · ${Gameplan.role(team, p.id)}", style = T.small, color = P.accent)
+                    if (team != null) Text("${team.school} · ${Gameplan.role(lg, team, p.id)}", style = T.small, color = P.accent)
                     else if (former != null) Text(p.left.ifEmpty { "Former ${former.school} player" }, style = T.small, color = P.accent)
                 }
             }
@@ -123,6 +125,9 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Tag(m.label.uppercase(), when (m) { Mood.HAPPY -> P.good; Mood.CONTENT -> P.sub; Mood.UNHAPPY -> P.warn; Mood.TRANSFER -> P.bad })
                 }
                 if (p.walkOn) Tag("WALK-ON", P.sub)
+                if (p.redshirt == Redshirt.ACADEMIC) Tag("ACADEMIC RS", P.accent)
+                if (p.redshirt == Redshirt.MEDICAL) Tag("MEDICAL RS", P.good)
+                else if (p.rsClass && p.redshirt == Redshirt.NONE) Tag("RS", P.sub)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
             }
@@ -132,6 +137,38 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (mine) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
                 if (mine) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
+            }
+            if (mine) {
+                val canAc = Redshirts.canAcademic(lg, p)
+                val canMed = Redshirts.canMedical(lg, p)
+                val sitting = p.redshirt == Redshirt.ACADEMIC
+                if (canAc || canMed || sitting || p.redshirt == Redshirt.MEDICAL || p.rsClass) {
+                    Spacer(Modifier.height(10.dp))
+                    Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+                        Text("Redshirt", style = T.bodyB, color = P.ink)
+                        Text(Redshirts.blurb(p), style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (sitting) SmallButton("Cancel academic RS") {
+                                vm.act {
+                                    if (Redshirts.setAcademic(it, p.id, false)) vm.toast("${p.short} is back in the rotation")
+                                    else vm.toast("Can't cancel this redshirt")
+                                }
+                            }
+                            if (canAc) SmallButton("Academic redshirt", primary = true) {
+                                vm.act {
+                                    if (Redshirts.setAcademic(it, p.id, true)) vm.toast("${p.short} will sit out this season")
+                                    else vm.toast("Can't redshirt him now")
+                                }
+                            }
+                            if (canMed) SmallButton("Medical redshirt", primary = true) {
+                                vm.act {
+                                    if (Redshirts.setMedical(it, p.id)) vm.toast("${p.short} keeps this year of eligibility")
+                                    else vm.toast("Not eligible for a medical redshirt")
+                                }
+                            }
+                        }
+                    }
+                }
             }
             if (mine && p.walkOn && team != null) {
                 val open = Tryouts.openScholarships(lg, team)
