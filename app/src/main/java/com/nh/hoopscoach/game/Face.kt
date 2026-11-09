@@ -1,7 +1,7 @@
 package com.nh.hoopscoach.game
 
 /**
- * A sports-card portrait: skin, head shape, hair and its color, facial hair, eyes, brows, mouth and an
+ * A retro bit portrait: skin, head shape, hair and its color, facial hair, eyes, brows, mouth and an
  * extra. A player without a custom one gets his own drawn from his look, the same every time.
  */
 class Face(

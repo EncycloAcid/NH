@@ -33,7 +33,7 @@ import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.League
 
 /**
- * The portrait maker: his sports-card portrait big, a row of parts (skin, face, hair, hair color, facial
+ * The portrait maker: his retro bit portrait big, a row of parts (skin, face, hair, hair color, facial
  * hair, eyes, brows, mouth, extras), and every option for the part as a little portrait of him with it.
  */
 @OptIn(ExperimentalLayoutApi::class)

@@ -260,7 +260,7 @@ fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, 
 @Composable
 fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
     val primary = t?.let { Color(it.primary) } ?: P.faint
-    // A real headshot when there is one (unless the setting draws everyone); otherwise his sports-card portrait.
+    // A real headshot when there is one (unless the setting draws everyone retro); otherwise his retro bit portrait.
     if (p.photo.isNotEmpty() && !LocalRetroAll.current) {
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val img = remember(p.photo) { Logos.asset(ctx, "nba/heads/${p.photo}.webp") }

@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Renders a grid of sports-card portraits to PPM so we can eyeball the redesign without a device.
+ * Renders a grid of retro bit portraits to PPM so we can eyeball the redesign without a device.
  * Run: ./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.PortraitDumpTest
  * Output: build/portraits/
  */
