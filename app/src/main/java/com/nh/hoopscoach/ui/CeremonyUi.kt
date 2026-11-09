@@ -117,7 +117,7 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
             val said = if (choosing && c.chosen >= 0) c.choiceReactions.getOrNull(c.chosen).orEmpty() + c.tributes else c.tributes
             if (said.isNotEmpty()) item {
                 Section(when (c.kind) { "retire" -> "Tributes"; "hire" -> "The reaction"; else -> "What they're saying" })
-                GroupList(said, inset = 60.dp) { ReactionRow(it.asReaction()) }
+                GroupList(said, inset = 60.dp) { ReactionRow(it.asReaction(), lg) }
             }
             if (c.coverage.isNotEmpty()) item {
                 Section("The coverage")

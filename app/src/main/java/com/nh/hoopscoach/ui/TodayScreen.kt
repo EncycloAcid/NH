@@ -263,7 +263,14 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
     // A real headshot when there is one (unless the setting draws everyone retro); otherwise his retro portrait.
     if (p.photo.isNotEmpty() && !LocalRetroAll.current) {
         val ctx = androidx.compose.ui.platform.LocalContext.current
-        val img = remember(p.photo) { Logos.asset(ctx, "nba/heads/${p.photo}.webp") }
+        // Prefer the stored path; if a trade moved him, also try "<current-team-slug>/<file>".
+        val img = remember(p.photo, t?.id) {
+            Logos.asset(ctx, "nba/heads/${p.photo}.webp")
+                ?: p.photo.substringAfterLast('/').takeIf { it.isNotEmpty() && t != null }?.let { file ->
+                    val slug = t!!.name.lowercase().replace(' ', '-').replace(".", "")
+                    Logos.asset(ctx, "nba/heads/$slug/$file.webp")
+                }
+        }
         if (img != null) {
             // A headshot on a soft team-colored plate, cropped to a circle from the top.
             Box(Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f))) {

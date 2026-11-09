@@ -29,8 +29,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Post
@@ -62,31 +69,102 @@ private fun kindLabel(kind: String) = when (kind) {
     "team" -> "Team"; "media" -> "Highlights"; "analyst" -> "Analyst"; "rival" -> "Your rival"; "teammate" -> "Teammate"; "hater" -> "Doubter"; "insider" -> "Insider"; "self" -> "You"; "league" -> "League"; "news" -> "News"; "player" -> "Player"; "coach" -> "Coach"; "recruit" -> "Recruit"; else -> "Fan"
 }
 
+/** Relative time against the league clock. */
+private fun whenAgo(lg: League?, p: Post): String {
+    if (lg == null) return "day ${p.day}"
+    if (p.season != lg.season) return "last season"
+    val d = (lg.day - p.day).coerceAtLeast(0)
+    return when (d) {
+        0 -> "just now"
+        1 -> "yesterday"
+        in 2..6 -> "${d}d ago"
+        else -> "day ${p.day}"
+    }
+}
+
+/** Mood emojis that make a post feel alive — derived from kind + text, stable per post. */
+private fun vibe(p: Post): String = when {
+    p.kind == "media" || p.text.contains("🚨") || p.text.contains("🔥") -> "🔥 👏 😮"
+    p.kind == "hater" -> "💀 🍿 😬"
+    p.kind == "team" && (p.text.contains("W") || p.text.contains("win", true)) -> "🏆 🙌 💙"
+    p.kind == "rival" -> "👀 😤 🫡"
+    p.kind == "analyst" || p.kind == "insider" -> "📊 🧠 ✍️"
+    p.kind == "news" -> "📰 💬"
+    else -> "❤️ 💬 🔁"
+}
+
 /** One post: avatar, name with a check if verified, handle and day, the text, and the likes. [onOpen] opens the story it's about. */
 @Composable
 fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
-    Row(Modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
-        // Everyone has a profile picture: real accounts their own, the rest drawn (see ProfilePic).
-        ProfilePic(lg, p, 36.dp)
+    var appeared by remember(p.season, p.day, p.handle, p.text) { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val enter by animateFloatAsState(if (appeared) 1f else 0f, tween(280), label = "post")
+    val replies = (p.likes / 17).coerceAtLeast(if (p.likes > 20) 1 else 0)
+    val reposts = (p.likes / 11).coerceAtLeast(if (p.likes > 40) 1 else 0)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = 0.35f + 0.65f * enter; translationY = (1f - enter) * 10f }
+            .then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            ProfilePic(lg, p, 40.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (p.verified) { Spacer(Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, "Verified", tint = P.accent, modifier = Modifier.size(14.dp)) }
+                    Spacer(Modifier.width(6.dp))
+                    Text("@${p.handle}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(" · ${whenAgo(lg, p)}", style = T.small, color = P.faint, maxLines = 1)
+                }
+                // A reply to a story says which one (the outlet's own post is the story).
+                if (p.re.isNotEmpty() && p.kind != "news") {
+                    Text("Replying to a story", style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.padding(top = 3.dp))
+                    Text(headline(p.re), style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(p.text, style = if (p.kind == "news") T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(top = 3.dp))
+                // Highlight / clip posts get a little media card so the feed isn't all text.
+                if (p.kind == "media" || (p.kind == "team" && p.gameId >= 0 && p.likes >= 80)) {
+                    Spacer(Modifier.height(8.dp))
+                    MediaCard(p, lg)
+                }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.85f), modifier = Modifier.size(13.dp).scale(if (appeared && p.likes > 200) 1.08f else 1f))
+                    Spacer(Modifier.width(3.dp))
+                    Text(Road.count(p.likes), style = T.small, color = P.sub)
+                    Spacer(Modifier.width(12.dp))
+                    Text("💬 ${Road.count(replies)}", style = T.small, color = P.sub)
+                    Spacer(Modifier.width(12.dp))
+                    Text("🔁 ${Road.count(reposts)}", style = T.small, color = P.sub)
+                    Spacer(Modifier.width(10.dp))
+                    Text(kindLabel(p.kind), style = T.small, color = kindColor(p.kind).copy(alpha = 0.85f))
+                    if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
+                }
+                Text(vibe(p), style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+    }
+}
+
+/** A faux clip / highlight tile under big posts. */
+@Composable
+private fun MediaCard(p: Post, lg: League?) {
+    val accent = kindColor(p.kind)
+    val pl = lg?.let { resolvePlayer(it, p.name, p.handle) }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.12f)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+            if (pl != null) PlayerSocialPic(lg!!, pl, 48.dp)
+            else Text("▶", style = T.head, color = accent)
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (p.verified) { Spacer(Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, "Verified", tint = P.accent, modifier = Modifier.size(14.dp)) }
-                Spacer(Modifier.width(6.dp))
-                Text("@${p.handle}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            }
-            // A reply to a story says which one (the outlet's own post is the story).
-            if (p.re.isNotEmpty() && p.kind != "news") Text("on: ${headline(p.re)}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
-            Text(p.text, style = if (p.kind == "news") T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(top = 2.dp))
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.7f), modifier = Modifier.size(13.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(Road.count(p.likes), style = T.small, color = P.sub)
-                Spacer(Modifier.width(10.dp))
-                Text("${kindLabel(p.kind)} · day ${p.day}", style = T.small, color = P.faint)
-                if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
-            }
+            Text(if (p.kind == "media") "Highlight clip" else "Game night", style = T.label.copy(fontSize = 10.sp), color = accent)
+            Text(p.text.take(72) + if (p.text.length > 72) "…" else "", style = T.small, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -247,7 +325,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                 // What people said: the players, coaches, analysts and fans, most liked first.
                 if (n.reactions.isNotEmpty()) {
                     Section("Reactions · ${n.reactions.size}")
-                    GroupList(n.reactions.sortedByDescending { it.likes }, inset = 60.dp) { r -> ReactionRow(r) }
+                    GroupList(n.reactions.sortedByDescending { it.likes }, inset = 60.dp) { r -> ReactionRow(r, lg) }
                 }
                 Column(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(Modifier.height(8.dp))
@@ -293,20 +371,24 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
 
 @Suppress("unused") private val keepColor = Color.Unspecified
 
-/** One reaction to a story: who said it (a real account's avatar, or initials tinted by the mood), their role, what they said, the likes. */
+/** One reaction to a story: who said it (player headshot when we know him, else a real account / face), their role, what they said, the likes. */
 @Composable
-fun ReactionRow(r: Reaction) {
+fun ReactionRow(r: Reaction, lg: League? = null) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
         val initials = r.who.split(" ").filter { it.isNotEmpty() && it.first().isLetter() }.take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val img = androidx.compose.runtime.remember(r.avatar) { if (r.avatar.isEmpty()) null else Logos.asset(ctx, "social/${r.avatar}.webp") }
+        val pl = remember(lg, r.who) { lg?.let { resolvePlayer(it, r.who) } }
         val mood = when (r.tone) { 1 -> P.good; -1 -> P.bad; else -> P.accent }
-        Box(Modifier.size(36.dp).clip(CircleShape).background(mood.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(mood.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
             when {
-                img != null -> androidx.compose.foundation.Image(img, r.who, Modifier.size(36.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                // Players always show their real headshot / portrait — even if a stock avatar was attached.
+                pl != null -> PlayerSocialPic(lg!!, pl, 40.dp)
+                img != null -> androidx.compose.foundation.Image(img, r.who, Modifier.size(40.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                 // Leagues and team accounts keep their initials; people get a face.
-                r.role.contains("League") || r.role.contains("team", ignoreCase = true) && !r.role.contains("Teammate") -> Text(initials, style = T.label, color = mood)
-                else -> RealFace(r.who, r.who, 36.dp)
+                r.role.contains("League") || (r.role.contains("team", ignoreCase = true) && !r.role.contains("Teammate") && !r.role.contains("coach", ignoreCase = true)) ->
+                    Text(initials, style = T.label, color = mood)
+                else -> RealFace(r.who, r.who, 40.dp)
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -314,13 +396,16 @@ fun ReactionRow(r: Reaction) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(r.who, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (r.verified) { Spacer(Modifier.width(4.dp)); Icon(Icons.Default.CheckCircle, "Verified", tint = P.accent, modifier = Modifier.size(14.dp)) }
+                Spacer(Modifier.width(6.dp))
+                Text(r.role, style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
-            Text(r.role, style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(r.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 2.dp))
             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Favorite, null, tint = P.bad.copy(alpha = 0.7f), modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(Road.count(r.likes), style = T.small, color = P.sub)
+                Spacer(Modifier.width(10.dp))
+                Text(if (r.tone > 0) "🔥 👏" else if (r.tone < 0) "😬 💀" else "💬 👀", style = T.small, color = P.faint)
             }
         }
     }
