@@ -24,7 +24,7 @@ object SpriteCompose {
     private const val JERSEY_SCALE = 1.10f
     private const val JERSEY_Y = 244
     // Number anchors as fractions of the placed jersey box (recomputed each render).
-    private const val CHEST_NUM_YF = 0.55f
+    private const val CHEST_NUM_YF = 0.60f
     private const val SHOULDER_NUM_XF = 0.72f
     private const val SHOULDER_NUM_YF = 0.12f
     // Face overlay anchors on the 512 body canvas (cropped parts centered here).
@@ -35,8 +35,8 @@ object SpriteCompose {
     private const val MOUTH_CY = 225f
     private const val MOUTH_MAX_W = 95
     private const val BEARD_CX = 255f
-    private const val BEARD_CY = 248f
-    private const val BEARD_MAX_W = 140
+    private const val BEARD_CY = 232f
+    private const val BEARD_MAX_W = 110
     private const val HEADBAND_CX = 255f
     private const val HEADBAND_CY = 100f
     private const val HEADBAND_MAX_W = 175
@@ -68,10 +68,11 @@ object SpriteCompose {
             jw = (jersey.width * JERSEY_SCALE).roundToInt()
             jh = (jersey.height * JERSEY_SCALE).roundToInt()
             jx = (SRC - jw) / 2
-            // Wipe baked #1 on the jersey art before it goes on the body.
+            // Wipe baked chest/shoulder #1 on the jersey art before it goes on the body.
             val clean = jersey.copy(Bitmap.Config.ARGB_8888, true)
-            eraseGlyphs(clean, jersey.width / 2f, jersey.height * 0.62f, halfW = 55, halfH = 48)
-            eraseGlyphs(clean, jersey.width * 0.72f, jersey.height * 0.14f, halfW = 28, halfH = 24)
+            eraseGlyphs(clean, jersey.width / 2f, jersey.height * 0.62f, halfW = 70, halfH = 55)
+            eraseGlyphs(clean, jersey.width * 0.78f, jersey.height * 0.12f, halfW = 42, halfH = 36)
+            eraseGlyphs(clean, jersey.width * 0.72f, jersey.height * 0.14f, halfW = 36, halfH = 30)
             val scaled = Bitmap.createScaledBitmap(clean, jw, jh, false)
             if (clean !== jersey) clean.recycle()
             blitOpaque(canvasBmp, scaled, jx, JERSEY_Y)
@@ -129,15 +130,57 @@ object SpriteCompose {
         recycle: Boolean = false,
     ) {
         if (src == null) return
-        val scale = if (src.width > maxW) maxW.toFloat() / src.width else 1f
-        val w = max(4, (src.width * scale).roundToInt())
-        val h = max(4, (src.height * scale).roundToInt())
-        val scaled = if (w == src.width && h == src.height) src else Bitmap.createScaledBitmap(src, w, h, false)
+        val cleaned = clearEdgeMatte(src)
+        val scale = if (cleaned.width > maxW) maxW.toFloat() / cleaned.width else 1f
+        val w = max(4, (cleaned.width * scale).roundToInt())
+        val h = max(4, (cleaned.height * scale).roundToInt())
+        val scaled = if (w == cleaned.width && h == cleaned.height) cleaned else Bitmap.createScaledBitmap(cleaned, w, h, false)
         val x = (cx - w / 2f).roundToInt()
         val y = (cy - h * 0.45f).roundToInt()
         blitOpaque(canvas, scaled, x, y)
-        if (scaled !== src) scaled.recycle()
+        if (scaled !== cleaned) scaled.recycle()
+        if (cleaned !== src) cleaned.recycle()
         if (recycle) src.recycle()
+    }
+
+    /** Drop near-black matte leftover from pack crops (edge-connected only). */
+    private fun clearEdgeMatte(src: Bitmap, thresh: Int = 42): Bitmap {
+        val w = src.width
+        val h = src.height
+        val out = src.copy(Bitmap.Config.ARGB_8888, true)
+        val px = IntArray(w * h)
+        out.getPixels(px, 0, w, 0, 0, w, h)
+        fun dark(i: Int): Boolean {
+            val c = px[i]
+            if (c ushr 24 == 0) return false
+            val r = (c shr 16) and 0xFF
+            val g = (c shr 8) and 0xFF
+            val b = c and 0xFF
+            return r + g + b <= thresh
+        }
+        val seen = BooleanArray(w * h)
+        val q = IntArray(w * h)
+        var qh = 0
+        var qt = 0
+        fun push(i: Int) {
+            if (seen[i] || !dark(i)) return
+            seen[i] = true
+            q[qt++] = i
+        }
+        for (x in 0 until w) { push(x); push((h - 1) * w + x) }
+        for (y in 0 until h) { push(y * w); push(y * w + (w - 1)) }
+        while (qh < qt) {
+            val i = q[qh++]
+            px[i] = 0
+            val x = i % w
+            val y = i / w
+            if (x > 0) push(i - 1)
+            if (x + 1 < w) push(i + 1)
+            if (y > 0) push(i - w)
+            if (y + 1 < h) push(i + w)
+        }
+        out.setPixels(px, 0, w, 0, 0, w, h)
+        return out
     }
 
     /** Stamp the chest number; wipe the jersey art's baked shoulder #1 (no second number — it ghosted). */
@@ -202,11 +245,11 @@ object SpriteCompose {
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
                 val sum = r + g + b
-                // White/silver digits, black outlines, or strongly tinted digit fills (not fabric).
+                // White/silver digits, black outlines, or any pixel far from sampled fabric
+                // (catches purple/red team digits that aren't near-white).
                 val brightOrDark = sum > 580 || sum < 110
-                val tintedDigit = abs(r - fr) + abs(g - fg) + abs(b - fb) > 140 &&
-                    (abs(r - g) > 40 || abs(g - b) > 40)
-                if (brightOrDark || tintedDigit) px[i] = fill
+                val farFromFabric = abs(r - fr) + abs(g - fg) + abs(b - fb) > 70
+                if (brightOrDark || farFromFabric) px[i] = fill
             }
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)
@@ -279,7 +322,7 @@ object SpriteCompose {
         return recolorJersey(template, primary or (0xFF shl 24), secondary or (0xFF shl 24))
     }
 
-    /** Clear the body's baked cut so a hair overlay (or bald) can sit cleanly. */
+    /** Clear baked hair / alignment guide ticks so a hair overlay (or bald) sits cleanly. */
     private fun stripDefaultHair(bmp: Bitmap) {
         val w = bmp.width
         val h = bmp.height
@@ -306,6 +349,12 @@ object SpriteCompose {
                 val r = (c shr 16) and 0xFF
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
+                val sum = r + g + b
+                // 1px hair-alignment ticks rising off the scalp.
+                if (y < 80 && sum < 120 && (x in 200..230 || x in 280..310)) {
+                    px[i] = 0
+                    continue
+                }
                 val skin = abs(r - fr) + abs(g - fg) + abs(b - fb) < 75 && r > g - 5 && r > 60
                 // Keep face flesh; drop dark hair, blond buzz tips, and stray outline above the brows.
                 if (!skin) px[i] = 0
