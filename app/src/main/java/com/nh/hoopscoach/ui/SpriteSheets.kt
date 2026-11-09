@@ -79,14 +79,17 @@ object SpriteSheets {
     }
 
     /**
-     * NBA franchise → jersey file stem.
-     * Only [slot] (today's franchise id) is trusted — college abbrs like MIA/IND/HOU collide with NBA
-     * codes, and mascot substrings ("bull" in Bulldogs, "sun" in Sun Devils) false-match.
-     * College teams leave [slot] empty → null → blank recolor in [SpriteCompose].
+     * Jersey file stem for a team.
+     * - NBA: [slot] (franchise id) → `lakers`, `celtics`, …
+     * - College: [abbr] → `college_duke`, `college_unc`, … when we have art; else null (blank recolor).
+     * Never fuzzy-match mascot names — "bull" in Bulldogs / college MIA≠Heat.
      */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
-        val s = slot?.uppercase()?.takeIf { it.isNotBlank() } ?: return null
-        return JERSEY_BY_ABBR[s]
+        val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
+        if (s != null) JERSEY_BY_ABBR[s]?.let { return it }
+        val a = abbr?.uppercase()?.takeIf { it.isNotBlank() } ?: return null
+        COLLEGE_BY_ABBR[a]?.let { return it }
+        return null
     }
 
     private fun open(path: String): InputStream? {
@@ -195,15 +198,23 @@ object SpriteSheets {
         "SAC" to "kings", "SAS" to "spurs", "SA" to "spurs", "UTA" to "jazz", "UTH" to "jazz",
     )
 
-    private val JERSEY_BY_NAME = mapOf(
-        "hawk" to "hawks", "celtic" to "celtics", "net" to "nets", "hornet" to "hornets",
-        "bull" to "bulls", "cavalier" to "cavs", "piston" to "pistons", "pacer" to "pacers",
-        "heat" to "heat", "buck" to "bucks", "knick" to "knicks", "magic" to "magic",
-        "76er" to "76ers", "sixer" to "76ers", "raptor" to "raptors", "wizard" to "wizards",
-        "bullet" to "wizards", "maverick" to "mavs", "nugget" to "nuggets", "warrior" to "warriors",
-        "rocket" to "rockets", "clipper" to "clippers", "laker" to "lakers",
-        "grizzlie" to "grizzlies_memphis", "timberwolf" to "timberwolves", "pelican" to "pelicans",
-        "thunder" to "thunder", "sonic" to "supersonics", "sun" to "suns",
-        "blazer" to "trail_blazers", "king" to "kings", "spur" to "spurs", "jazz" to "jazz",
+    /** College school abbr → `college_*` jersey asset (48-school pack). */
+    private val COLLEGE_BY_ABBR = mapOf(
+        "DUKE" to "college_duke", "UNC" to "college_unc", "UK" to "college_kentucky",
+        "KU" to "college_kansas", "CONN" to "college_uconn", "NOVA" to "college_villanova",
+        "IND" to "college_indiana", "MICH" to "college_michigan", "MSU" to "college_michigan_state",
+        "GONZ" to "college_gonzaga", "PUR" to "college_purdue", "UCLA" to "college_ucla",
+        "ARIZ" to "college_arizona", "HOU" to "college_houston", "TEX" to "college_texas",
+        "TENN" to "college_tennessee", "SYR" to "college_syracuse", "LOU" to "college_louisville",
+        "UVA" to "college_virginia", "MARQ" to "college_marquette", "CREI" to "college_creighton",
+        "BAY" to "college_baylor", "OSU" to "college_ohio_state", "ILL" to "college_illinois",
+        "BAMA" to "college_alabama", "AUB" to "college_auburn", "FLA" to "college_florida",
+        "ARK" to "college_arkansas", "ISU" to "college_iowa_state", "SDSU" to "college_san_diego_state",
+        "MEM" to "college_memphis", "SJU" to "college_st_johns", "GTWN" to "college_georgetown",
+        "NCST" to "college_nc_state", "WIS" to "college_wisconsin", "MD" to "college_maryland",
+        "IOWA" to "college_iowa", "ORE" to "college_oregon", "TTU" to "college_texas_tech",
+        "BYU" to "college_byu", "XAV" to "college_xavier", "HALL" to "college_seton_hall",
+        "PROV" to "college_providence", "SMC" to "college_saint_marys", "DAY" to "college_dayton",
+        "VCU" to "college_vcu", "FSU" to "college_florida_state", "MIA" to "college_miami",
     )
 }

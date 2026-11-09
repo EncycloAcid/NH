@@ -18,13 +18,14 @@ object SpriteCompose {
 
     private const val SRC = 512
     private const val FACE_CX = 255f
-    private const val FACE_CY = 168f
-    private const val FACE_HOLE_TARGET = 160f
-    // Jersey-less body packs: black torso placeholder; jersey paints only onto that.
-    private const val JERSEY_SCALE = 1.10f
-    private const val JERSEY_Y = 244
+    private const val FACE_CY = 152f
+    private const val FACE_HOLE_TARGET = 175f
+    // Jersey-less bodies: transparent torso; jersey draws behind. Keep the full jersey
+    // (and chest number) inside the 512 canvas — oversized scale pushed numbers off-screen.
+    private const val JERSEY_SCALE = 1.08f
+    private const val JERSEY_Y = 252
     // Number anchors as fractions of the placed jersey box (recomputed each render).
-    private const val CHEST_NUM_YF = 0.60f
+    private const val CHEST_NUM_YF = 0.50f
     private const val SHOULDER_NUM_XF = 0.72f
     private const val SHOULDER_NUM_YF = 0.12f
     // Face overlay anchors on the 512 body canvas (cropped parts centered here).
@@ -96,12 +97,14 @@ object SpriteCompose {
         }
 
         if (hairSrc != null) {
-            val (hx, hy, hw, hh) = hairPlacement(hairSrc)
-            val tinted = tintHair(hairSrc, HAIR_COLORS[f.hairColor.coerceIn(0, HAIR_COLORS.lastIndex)])
+            val cleaned = clearEdgeMatte(hairSrc, thresh = 36)
+            val (hx, hy, hw, hh) = hairPlacement(cleaned)
+            val tinted = tintHair(cleaned, HAIR_COLORS[f.hairColor.coerceIn(0, HAIR_COLORS.lastIndex)])
             val scaled = Bitmap.createScaledBitmap(tinted, hw, hh, false)
             blitOpaque(canvasBmp, scaled, hx, hy)
             if (scaled !== tinted) scaled.recycle()
-            if (tinted !== hairSrc) tinted.recycle()
+            if (tinted !== cleaned) tinted.recycle()
+            if (cleaned !== hairSrc) cleaned.recycle()
         }
 
         // Hair style "Headband" always gets a clean black band; otherwise use Extras.
@@ -245,11 +248,12 @@ object SpriteCompose {
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
                 val sum = r + g + b
-                // White/silver digits, black outlines, or any pixel far from sampled fabric
-                // (catches purple/red team digits that aren't near-white).
+                // Only wipe digit ink (white/silver, black outline, or saturated tint vs fabric).
+                // A broad "far from fabric" wipe left flat color boxes over team wordmarks.
                 val brightOrDark = sum > 580 || sum < 110
-                val farFromFabric = abs(r - fr) + abs(g - fg) + abs(b - fb) > 70
-                if (brightOrDark || farFromFabric) px[i] = fill
+                val tintedDigit = abs(r - fr) + abs(g - fg) + abs(b - fb) > 160 &&
+                    (abs(r - g) > 45 || abs(g - b) > 45) && sum in 80..700
+                if (brightOrDark || tintedDigit) px[i] = fill
             }
         }
         bmp.setPixels(px, 0, w, 0, 0, w, h)

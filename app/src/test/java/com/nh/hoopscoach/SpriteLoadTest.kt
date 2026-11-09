@@ -16,14 +16,17 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class SpriteLoadTest {
     @Test
-    fun jerseyKeyUsesFranchiseSlotOnly() {
+    fun jerseyKeyUsesSlotForNbaAndAbbrForCollege() {
         assertEquals("lakers", SpriteSheets.jerseyKey("LAL", "LAL", "Los Angeles Lakers"))
         assertEquals("heat", SpriteSheets.jerseyKey("MIA", "MIA", "Miami Heat"))
-        // College: empty slot must not pick NBA art from abbr/mascot collisions.
-        assertNull(SpriteSheets.jerseyKey("MIA", "", "Miami Hurricanes"))
-        assertNull(SpriteSheets.jerseyKey("DUKE", "", "Duke Blue Devils"))
-        assertNull(SpriteSheets.jerseyKey("GONZ", "", "Gonzaga Bulldogs"))
-        assertNull(SpriteSheets.jerseyKey("IND", "", "Indiana Hoosiers"))
+        // College: empty slot → college pack by school abbr (not NBA Heat/Pacers/etc.).
+        assertEquals("college_miami", SpriteSheets.jerseyKey("MIA", "", "Miami Hurricanes"))
+        assertEquals("college_duke", SpriteSheets.jerseyKey("DUKE", "", "Duke Blue Devils"))
+        assertEquals("college_gonzaga", SpriteSheets.jerseyKey("GONZ", "", "Gonzaga Bulldogs"))
+        assertEquals("college_indiana", SpriteSheets.jerseyKey("IND", "", "Indiana Hoosiers"))
+        assertEquals("college_uconn", SpriteSheets.jerseyKey("CONN", "", "UConn Huskies"))
+        // School without art still returns null → blank recolor.
+        assertNull(SpriteSheets.jerseyKey("WAKE", "", "Wake Forest Demon Deacons"))
     }
 
     @Test
