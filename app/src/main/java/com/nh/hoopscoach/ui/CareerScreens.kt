@@ -246,8 +246,8 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Retro portraits for everyone", style = T.bodyB, color = P.ink)
-                        Text("Draw real players as retro portraits too, instead of their headshots.", style = T.small, color = P.sub)
+                        Text("Drawn portraits for everyone", style = T.bodyB, color = P.ink)
+                        Text("Draw real players as sports-card portraits too, instead of their headshots.", style = T.small, color = P.sub)
                     }
                     androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }

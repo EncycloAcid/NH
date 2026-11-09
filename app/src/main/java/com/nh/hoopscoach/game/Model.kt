@@ -1383,7 +1383,7 @@ class League(
     var nextAssistantId: Int = 1,
     /** The user's head-to-head with every coach he's faced, and how heated each one is. */
     var coachRivals: MutableList<CoachRival> = mutableListOf(),
-    /** Draw every player as a retro portrait, real headshots included. */
+    /** Draw every player as a sports-card portrait, real headshots included. */
     var retroAll: Boolean = false,
     /** Picks every social account's profile picture: random for each save, the same all through it. */
     var pfpSeed: Long = 0,

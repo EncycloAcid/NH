@@ -67,7 +67,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         item {
             BackBar("Edit player", p.name, onBack = { vm.back() })
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                // His retro portrait: tap it to open the portrait maker.
+                // His portrait: tap it to open the portrait maker.
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.clickable { vm.push(Route.Portrait(p.id)) }) { PixelPortrait(p, t, 84.dp) }
                     Text("Edit portrait", style = T.small, color = P.accent, modifier = Modifier.clickable { vm.push(Route.Portrait(p.id)) }.padding(top = 4.dp))

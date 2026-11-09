@@ -25,10 +25,10 @@ import com.nh.hoopscoach.game.Team
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Draw every player as a retro portrait, real headshots included (a setting). */
+/** Draw every player as a sports-card portrait, real headshots included (a setting). */
 val LocalRetroAll = compositionLocalOf { false }
 
-/** Cel-shaded anime portraits (see [CelRender]), cached once drawn. */
+/** Sports-card portraits (see [CelRender]), cached once drawn. */
 object Pixels {
     const val N = CelRender.N
     private val cache = android.util.LruCache<String, ImageBitmap>(200)
