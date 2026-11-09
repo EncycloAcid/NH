@@ -62,6 +62,8 @@ sealed interface Route {
     data object Staff : Route
     data object MyPlayer : Route
     data class Portrait(val playerId: Int) : Route
+    data object TopTen : Route
+    data object Mixtape : Route
 }
 
 /** A game being watched possession by possession. */

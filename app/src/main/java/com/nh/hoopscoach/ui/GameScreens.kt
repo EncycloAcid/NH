@@ -337,6 +337,7 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
             Spacer(Modifier.height(8.dp))
             CrowdLine(lg, g)
             if (g.played && lg.rivalry(g) != null) { Spacer(Modifier.height(10.dp)); NewspaperBanner(vm, lg, g, onClick = null) }
+            if (g.played) PlayerOfTheGame(vm, lg, g)
             val b = g.box
             if (b != null) {
                 Spacer(Modifier.height(10.dp))

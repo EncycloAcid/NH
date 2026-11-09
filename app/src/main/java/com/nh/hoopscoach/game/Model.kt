@@ -196,6 +196,13 @@ class GameLogEntry(
     val pts: Int, val reb: Int, val ast: Int, val stl: Int, val blk: Int, val tov: Int, val min: Int,
 )
 
+/** One highlight play: who, against whom, what happened, when, and how big it was (for the Top 10). */
+@Serializable
+class Highlight(
+    val season: Int, val day: Int, val gameId: Int, val pid: Int, val name: String, val teamId: Int, val oppId: Int,
+    val kind: String, val text: String, val time: String, val score: Double,
+)
+
 @Serializable
 class Player(
     val id: Int,
@@ -1388,6 +1395,12 @@ class League(
     val jerseyTop: MutableList<Int> = mutableListOf(),
     val jerseyLast: MutableList<Int> = mutableListOf(),
     var jerseySeason: Int = 0,
+    /** Highlights (see [Highlights]): today's best plays so far, the last night's Top 10 and its day, and the user's own best plays this season. */
+    val dayPlays: MutableList<Highlight> = mutableListOf(),
+    var topPlays: List<Highlight> = emptyList(),
+    var topDay: Int = -1,
+    var topSeason: Int = 0,
+    val myPlays: MutableList<Highlight> = mutableListOf(),
     var usaGolds: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()

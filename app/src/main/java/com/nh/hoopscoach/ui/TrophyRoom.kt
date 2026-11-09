@@ -41,6 +41,22 @@ fun TrophyRoomLink(vm: GameViewModel, lg: League) {
             Chevron()
         }
     }
+    // His season's best plays, right under the trophies.
+    val plays = com.nh.hoopscoach.game.Highlights.mixtape(lg)
+    if (plays.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Panel(onClick = { vm.push(Route.Mixtape) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🎬", style = T.title.copy(fontSize = 26.sp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Season mixtape", style = T.bodyB, color = P.ink)
+                    Text("${plays.size} plays · best: ${plays.first().text}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Chevron()
+            }
+        }
+    }
 }
 
 @Composable

@@ -1861,6 +1861,8 @@ object Sim {
     fun playDay(lg: League) {
         val day = lg.day
         if (lg.pro) ProSeason.playDay(lg) else Season.playDay(lg)
+        // Last night's Top 10.
+        runCatching { Highlights.rank(lg, day) }
         // The farewell tour's stops.
         if (lg.pro) runCatching { FarewellTour.afterDay(lg, day) }
         // The hometown kid: coming home, leaving, and home games in his city.

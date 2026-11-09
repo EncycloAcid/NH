@@ -79,6 +79,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     var finished = false
         private set
     val events = ArrayList<PlayEvent>()
+    /** The game's highlight plays, kept even when there's no play-by-play (see [Highlights]). */
+    private val plays = ArrayList<Highlight>()
+
+    /** A play worth showing: [base] is how big it is before star power and the moment. */
+    private fun highlight(side: Int, p: Player, kind: String, text: String, base: Double) {
+        val star = when (Trades.tier(p)) { "Franchise" -> 2.2; "All-Star" -> 1.3; "Starter" -> 0.4; else -> 0.0 }
+        val sec = clock.roundToInt().coerceAtLeast(0)
+        val time = (if (period > regPeriods) "OT" else if (lg.pro) "Q$period" else "H$period") + " " + "%d:%02d".format(sec / 60, sec % 60)
+        plays += Highlight(lg.season, lg.day, game.id, p.id, p.name, teams[side].id, teams[1 - side].id, kind, text, time, base + star)
+    }
 
     /** A made basket late in a period, kept to spot buzzer-beaters. [margin] is the shooting team's margin before the shot. */
     class Clutch(val side: Int, val name: String, val shot: String, val period: Int, val clock: Double, val margin: Int, val pts: Int)
@@ -263,6 +273,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             // The big moment came through: his celebration.
             Signature.celebrate(lg, shooter, true)?.let { log(o, "${shooter.short} $it", 0) }
             lg.road?.let { it.momentsWon++ }
+            highlight(o, shooter, if (clock <= 2.0 && before <= 0) "winner" else "moment",
+                if (clock <= 2.0 && before <= 0 && before + pts > 0) "${shooter.name} wins it at the buzzer" else "${shooter.name} comes through in the big moment with a $what", if (clock <= 2.0 && before <= 0 && before + pts > 0) 14.0 else 6.5)
             lastMoment = if (passer != null) "Assist! ${shooter.short} buries the three." else "Bucket! ${shooter.short} hits the $what."
             if (fouled) {
                 val fouler = pickFouler(d, defense)
@@ -967,6 +979,28 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                         astText = " (${passer.short} assists)"
                     }
                 }
+                // Highlights: dunks (and posters), clutch threes, game-winners.
+                run {
+                    val winner = finalPeriod && clock <= 2.0 && before <= 0 && before + pts > 0
+                    val tie = finalPeriod && clock <= 2.0 && before < 0 && before + pts == 0
+                    val goAhead = clutchTime && clock <= 60.0 && before <= 0 && before + pts > 0
+                    val rim = defense.maxByOrNull { it[Attr.BLK] }?.name ?: "the defense"
+                    val oop = astText.substringAfter("(", "").substringBefore(" assists", "").trim()
+                    val n = shooter.name
+                    val v = Rng.d() * 2.5
+                    when {
+                        winner -> highlight(o, shooter, "winner", Rng.pick(listOf("$n wins it at the buzzer", "$n with the game-winner as time expires", "$n buries the buzzer-beater")), 14.0 + v)
+                        tie -> highlight(o, shooter, "tie", Rng.pick(listOf("$n ties it at the buzzer to force overtime", "$n sends it to overtime at the horn")), 11.0 + v)
+                        what == "dunk" && fouled -> highlight(o, shooter, "poster", Rng.pick(listOf("$n posterizes $rim, and-one", "$n dunks all over $rim and draws the foul", "$n rises up over $rim for the and-one slam", "$n hammers it home on $rim, plus the foul")), 6.0 + v)
+                        what == "dunk" && oop.isNotEmpty() && Rng.chance(0.55) -> highlight(o, shooter, "dunk", Rng.pick(listOf("$oop lobs, $n finishes the alley-oop", "$n catches the alley-oop from $oop and slams it", "$oop to $n: alley-oop")), 4.5 + v)
+                        what == "dunk" -> highlight(o, shooter, "dunk", Rng.pick(listOf("$n with a windmill on the break", "$n throws down a reverse jam", "$n tomahawks it home", "$n with a two-handed hammer in traffic", "$n spins baseline and throws it down")), 3.5 + v)
+                        type == 2 && goAhead -> highlight(o, shooter, "dagger", Rng.pick(listOf("$n buries the go-ahead three", "$n hits the dagger three", "$n with the step-back three to take the lead")), 7.5 + v)
+                        type == 2 && clutchTime -> highlight(o, shooter, "three", Rng.pick(listOf("$n drains a clutch three", "$n hits a big three in crunch time")), 4.5 + v)
+                        type == 2 && Rng.chance(0.05) -> highlight(o, shooter, "three", Rng.pick(listOf("$n pulls up from the logo, and it's good", "$n with a step-back three in a defender's face", "$n hits a three off one leg")), 4.0 + v)
+                        goAhead -> highlight(o, shooter, "goahead", "$n puts them ahead late with a $what", 5.0 + v)
+                        type == 2 && fouled -> highlight(o, shooter, "four", Rng.pick(listOf("$n hits a three and draws the foul", "$n with the four-point play")), 5.0 + v)
+                    }
+                }
                 val verb = Signature.made(lg, shooter, type, what) ?: when (type) { 2 -> "drains a three"; 1 -> "hits a $what"; else -> if (what == "dunk") "throws down a dunk" else "scores on a $what" }
                 log(o, "${Signature.nick(lg, shooter)}${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
                 // Your player's celebration after a big one.
@@ -1002,6 +1036,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) * spec(it) }
                 line(d, b).blk++
                 blocked = true
+                if (type == 0) highlight(d, b, "block", Rng.pick(listOf("${b.name} swats ${shooter.name} at the rim", "${b.name} pins ${shooter.name}'s layup off the glass", "${b.name} sends ${shooter.name}'s shot into the stands", "${b.name} meets ${shooter.name} at the rim and rejects it")) +
+                    if (clutchTime) " to save the lead" else "", (if (clutchTime) 6.0 else 3.0) + Rng.d() * 2.5)
                 log(d, "${b.short} blocks ${shooter.short}!", 0)
             } else log(o, "${shooter.short} misses the $what", 0)
             val reb = rebound(o, offense, defense, blocked)
@@ -1242,6 +1278,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             tot.gp = 1
             if (counts) t.totals.add(tot)
         }
+        runCatching { Highlights.afterGame(lg, plays) }
         NewsDesk.note(lg, game, teams, lines, score)
         runCatching { Injuries.afterGame(lg, game, teams, lines) }
         runCatching { Marquee.afterGame(lg, game, teams, lines, score) }

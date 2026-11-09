@@ -158,6 +158,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item { HeroTodayCard(vm, lg) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
+        item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
         if (lg.phase == Phase.REGULAR) item { NbaPreviewCard(vm, lg) }
