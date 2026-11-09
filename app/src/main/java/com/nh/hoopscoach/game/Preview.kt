@@ -73,7 +73,8 @@ object Previews {
 
         val active = lg.players.filter { it.teamId >= 0 }
         fun value(p: Player) = p.ovr + (p.career.lastOrNull()?.s?.ppg ?: 0.0) * 0.25
-        val allAmerica = active.sortedByDescending { value(it) }.take(15).map { it.id }
+        // All-America with positional balance on the first team, then best available.
+        val allAmerica = allAmericaTeams(active, ::value)
         val freshmen = active.filter { it.year == 1 && it.recruitRank > 0 }.sortedByDescending { it.ovr }.take(10).map { it.id }
         val transfers = active.filter { p -> p.career.isNotEmpty() && p.career.last().teamId >= 0 && p.career.last().teamId != p.teamId }
             .sortedByDescending { it.ovr }.take(10).map { it.id }
@@ -81,14 +82,16 @@ object Previews {
             .sortedByDescending { it.pot * 2 + it.ovr }.take(6).map { it.id }
         val underRadar = active.filter { lg.conf(lg.team(it.teamId).confId).tier >= 1 && it.id !in allAmerica }
             .sortedByDescending { value(it) }.take(6).map { it.id }
-        val dpoy = active.maxByOrNull { Ratings.defense(it) + it.ovr * 0.2 }?.id ?: -1
+        val dpoy = active.maxByOrNull { Ratings.defense(it) * 1.4 + it.ovr * 0.15 }?.id ?: -1
         val confPoy = HashMap<Int, Int>()
         for (c in lg.confs) {
             c.teamIds.flatMap { lg.team(it).roster }.map { lg.player(it) }.maxByOrNull { value(it) }?.let { confPoy[c.id] = it.id }
         }
-        val finalFour = byElo.take(4).map { it.id }
-        val sleeper = byElo.drop(25).firstOrNull { lg.conf(it.confId).tier >= 1 }?.id ?: byElo[25].id
-        val cinderella = byElo.firstOrNull { lg.conf(it.confId).tier >= 2 }?.id ?: sleeper
+        // Champion favorite, two other blue bloods, and one darkhorse from outside the top 8.
+        val finalFour = finalFourPicks(byElo)
+        val sleeper = byElo.drop(20).take(40).firstOrNull { lg.conf(it.confId).tier <= 1 && it.id !in finalFour }?.id
+            ?: byElo.drop(25).firstOrNull { it.id !in finalFour }?.id ?: byElo[25].id
+        val cinderella = byElo.firstOrNull { lg.conf(it.confId).tier >= 2 && it.id !in finalFour && it.id != sleeper }?.id ?: sleeper
         // Coach of the Year pick: the biggest projected jump from last season.
         val coty = lg.teams.filter { it.history.isNotEmpty() && nat.getValue(it.id) <= 60 }
             .maxByOrNull { proj.getValue(it.id).w - it.history.last().w }?.id ?: byElo[0].id
@@ -118,6 +121,28 @@ object Previews {
     }
 
     private val NCAA_RESULTS = setOf("National Champion", "Runner-Up", "Final Four", "Elite Eight", "Sweet 16", "Round of 32", "Round of 64", "First Four")
+
+    /** First team prefers one player per position; second and third fill with the next-best available. */
+    private fun allAmericaTeams(active: List<Player>, value: (Player) -> Double): List<Int> {
+        val pool = active.sortedByDescending(value).toMutableList()
+        val first = mutableListOf<Player>()
+        for (pos in Pos.entries) {
+            val pick = pool.firstOrNull { it.pos == pos } ?: continue
+            first += pick
+            pool.remove(pick)
+        }
+        while (first.size < 5 && pool.isNotEmpty()) first += pool.removeAt(0)
+        val rest = pool.take(10)
+        return (first + rest).map { it.id }
+    }
+
+    /** Favorite, two contenders from the top 8, and one darkhorse from 9–20 so the page isn't just the Top 4. */
+    private fun finalFourPicks(byElo: List<Team>): List<Int> {
+        val champ = byElo.first().id
+        val contenders = byElo.drop(1).take(7).shuffled(Rng.r).take(2).map { it.id }
+        val dark = byElo.drop(8).take(12).shuffled(Rng.r).first().id
+        return listOf(champ) + contenders + dark
+    }
 
     /** Five predictions to argue about. */
     private fun boldPredictions(lg: League, pv: Preview): List<String> {
@@ -183,6 +208,34 @@ object Previews {
         return pct.take(2).map { it.first } to pct.takeLast(2).reversed().map { it.first }
     }
 
+    /** Magazine-style scouting sentences built from [scouting]. */
+    fun scoutingProse(lg: League, t: Team): Pair<String, String> {
+        val (good, bad) = scouting(lg, t)
+        val strength = when (good.first()) {
+            "Perimeter shooting" -> "They can heat up from deep and punish soft closeouts"
+            "Finishing inside" -> "They live at the rim and get to the line"
+            "Ball handling" -> "They take care of the ball and create for each other"
+            "Rebounding" -> "They own the glass on both ends"
+            "Perimeter defense" -> "They can switch and pressure on the perimeter"
+            "Rim protection" -> "They erase mistakes at the rim"
+            "Depth" -> "They can go nine deep without falling off a cliff"
+            else -> "They have a veteran core that knows how to win"
+        }
+        val strength2 = good.getOrNull(1)?.lowercase()?.let { " and ${it}" } ?: ""
+        val concern = when (bad.first()) {
+            "Perimeter shooting" -> "the jump shot has to travel"
+            "Finishing inside" -> "they need more punch inside"
+            "Ball handling" -> "turnovers could bury them on the road"
+            "Rebounding" -> "they can get pushed around on the glass"
+            "Perimeter defense" -> "guards will have to prove they can stay in front"
+            "Rim protection" -> "the paint is a soft spot"
+            "Depth" -> "a short bench leaves little margin for foul trouble"
+            else -> "youth will cost them some nights"
+        }
+        val concern2 = bad.getOrNull(1)?.lowercase()?.let { ", and $it is a question mark" } ?: ""
+        return "$strength$strength2." to "On the other side, $concern$concern2."
+    }
+
     /** This season's issue, built now if the save predates the full magazine. */
     fun current(lg: League): Preview {
         val p = lg.preview
@@ -213,15 +266,84 @@ object Previews {
         else -> if (result.startsWith("NIT")) "went to the NIT" else "missed the NCAA Tournament"
     }
 
-    /** A short write-up: how last season went and who to watch. */
+    /** A short write-up: how last season went and who to watch — no raw overalls. */
     fun blurb(lg: League, t: Team): String {
         val last = t.history.lastOrNull()
-        val parts = mutableListOf<String>()
-        if (last != null) parts += "Went ${last.w}-${last.l} and ${lastSeason(last.result)} last season."
-        star(lg, t)?.let { s -> parts += "${s.name} (${s.pos}, ${s.cls}, ${s.ovr}) is the headliner." }
-        newcomer(lg, t)?.let { nc -> parts += "${nc.name} is the newcomer to watch." }
-        return parts.joinToString(" ")
+        val s = star(lg, t)
+        val nc = newcomer(lg, t)
+        val (good, _) = scouting(lg, t)
+        val open = when {
+            last == null -> "${t.school} opens a new chapter under ${lg.coachOf(t).name}."
+            last.result == "National Champion" -> "The defending champions (${last.w}-${last.l}) are back with unfinished business."
+            last.result in setOf("Runner-Up", "Final Four", "Elite Eight") -> "After they ${lastSeason(last.result)} (${last.w}-${last.l}), the bar is set high."
+            last.result in NCAA_RESULTS -> "A ${last.w}-${last.l} team that ${lastSeason(last.result)} last March."
+            last.w >= 20 -> "Won ${last.w} games a year ago but ${lastSeason(last.result)} — this group wants a different ending."
+            else -> "Coming off ${last.w}-${last.l} and a season that ${lastSeason(last.result)}."
+        }
+        val head = s?.let {
+            val style = it.style.label.lowercase()
+            when {
+                it.year >= 4 -> "${it.name}, a senior $style, is the headliner."
+                isNewcomer(it) -> "${it.name} arrives as the new face of the program."
+                else -> "${it.name} (${it.pos}, ${it.cls}) sets the tone as a $style."
+            }
+        }
+        val add = nc?.let {
+            if (it.year == 1 && it.recruitRank > 0) "${it.name}, the ${it.stars}★ signee, is the freshman to watch."
+            else "${it.name} is the newcomer who could change the rotation."
+        }
+        val edge = "The staff hangs its hat on ${good.first().lowercase()}."
+        return listOfNotNull(open, head, add, edge).joinToString(" ")
     }
+
+    /** One line for a conference predicted-finish row. */
+    fun confLine(lg: League, t: Team, confRank: Int): String {
+        val s = star(lg, t) ?: return "A workmanlike group looking for its identity."
+        val nc = newcomer(lg, t)
+        return when {
+            confRank == 1 -> "Our pick to win it, built around ${s.name}."
+            confRank == 2 -> "The top challenger if ${s.name} stays healthy."
+            confRank <= 4 -> listOfNotNull(
+                "${s.name} gives them a chance on any night.",
+                nc?.let { "${it.last} is the X-factor." },
+            ).joinToString(" ")
+            confRank <= lg.conf(t.confId).teamIds.size / 2 -> "Dangerous when ${s.name} gets going; consistency is the question."
+            else -> "Rebuilding pieces, with ${s.name} as the bright spot."
+        }
+    }
+
+    /** Why this player is on the breakouts page. */
+    fun breakoutLine(p: Player): String {
+        val gap = p.pot - p.ovr
+        return when {
+            gap >= 12 && p.year == 2 -> "Sophomore with a star's ceiling — the leap could be loud."
+            gap >= 12 -> "Huge upside as a ${p.cls.lowercase()} ${p.pos}; the tools are ahead of the production."
+            p.year == 2 -> "Ready for a bigger role after a quiet freshman year."
+            p.career.lastOrNull()?.let { it.s.ppg in 8.0..14.0 } == true -> "Averaged %.1f points last season and looks primed for more.".format(p.career.last().s.ppg)
+            else -> "The staff sees a bigger role — and a bigger number — this winter."
+        }
+    }
+
+    /** Why a mid-major star is under the radar. */
+    fun sleeperLine(lg: League, p: Player): String {
+        val t = lg.team(p.teamId)
+        val conf = lg.conf(t.confId)
+        return "${p.name} would be a household name in a power league; instead he carries ${t.school} in the ${conf.abbr}."
+    }
+
+    /** Cover dek that changes with the story. */
+    fun coverDek(lg: League, top: Team): String {
+        val last = top.history.lastOrNull()
+        val s = star(lg, top)
+        return when {
+            last?.result == "National Champion" -> "Can ${possessive(top.school)} repeat?"
+            last?.result in setOf("Runner-Up", "Final Four") -> "From last March to No. 1 — is this the year?"
+            s != null && s.year >= 4 -> "${s.name}'s last dance at the top of the poll."
+            else -> "Is this ${possessive(top.school)} year?"
+        }
+    }
+
+    private fun possessive(s: String) = if (s.endsWith("s", ignoreCase = true)) "$s'" else "$s's"
 
     /** What the program should expect from its preseason ranking. */
     fun expectation(nat: Int) = when {

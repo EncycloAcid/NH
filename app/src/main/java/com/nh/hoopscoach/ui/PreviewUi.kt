@@ -71,7 +71,6 @@ private fun pages(lg: League) = listOf(
 private fun topTeam(lg: League, pv: Preview): Team = lg.team(pv.proj.entries.first { it.value.nat == 1 }.key)
 private fun ranked(lg: League, pv: Preview): List<Team> = pv.proj.entries.sortedBy { it.value.nat }.map { lg.team(it.key) }
 private fun players(lg: League, ids: List<Int>): List<Player> = ids.mapNotNull { lg.playerOrNull(it) }.filter { it.teamId >= 0 }
-private fun possessive(s: String) = if (s.endsWith("s")) "$s'" else "$s's"
 
 @Composable
 fun PreviewScreen(vm: GameViewModel, lg: League) {
@@ -196,15 +195,15 @@ private fun LazyListScope.cover(lg: League, pv: Preview, onRead: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("NO. 1", style = T.label, color = accent)
                     Text(top.school.uppercase(), style = T.title.copy(fontSize = 34.sp, lineHeight = 34.sp), color = fg)
-                    Text("Is this ${possessive(top.school)} year?", style = T.bodyB, color = fg)
+                    Text(Previews.coverDek(lg, top), style = T.bodyB, color = fg)
                     if (star != null) Text("${star.name} · ${star.pos} · ${star.cls}", style = T.small, color = fg.copy(alpha = 0.85f))
                 }
             }
             Spacer(Modifier.height(18.dp))
             CoverLine("Top 25", "${r[1].school} and ${r[2].school} chase ${r[0].school}", fg, accent)
-            if (aa != null) CoverLine("All-America", "${aa.name} leads our preseason team", fg, accent)
+            if (aa != null) CoverLine("All-America", "${aa.name} headlines our first team", fg, accent)
             CoverLine("Team report", "${u.school}: picked ${Previews.ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}, No. ${mine.nat} nationally", fg, accent)
-            CoverLine("Plus", "All 32 conferences, the freshman class, the transfer portal and our Final Four", fg, accent)
+            CoverLine("Plus", "All 32 conferences, the freshman class, the portal, breakouts and our Final Four", fg, accent)
             Spacer(Modifier.height(12.dp))
             Text("15 pages · swipe to turn →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
         }
@@ -247,7 +246,7 @@ private fun LazyListScope.topFive(vm: GameViewModel, lg: League, pv: Preview) {
         item {
             val pr = pv.proj.getValue(t.id)
             val star = Previews.star(lg, t)
-            val (strengths, concerns) = Previews.scouting(lg, t)
+            val (strength, concern) = Previews.scoutingProse(lg, t)
             Spacer(Modifier.height(10.dp))
             Panel(onClick = { vm.push(Route.TeamPage(t.id)) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -256,7 +255,7 @@ private fun LazyListScope.topFive(vm: GameViewModel, lg: League, pv: Preview) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.school.uppercase(), style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${t.mascot} · ${lg.conf(t.confId).abbr} · projected ${pr.w}-${pr.l}", style = T.small, color = P.sub, maxLines = 1)
+                        Text("${t.mascot} · ${lg.conf(t.confId).abbr} · projected ${pr.w}-${pr.l} · ${Previews.expectation(pr.nat)}", style = T.small, color = P.sub, maxLines = 2)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -268,14 +267,14 @@ private fun LazyListScope.topFive(vm: GameViewModel, lg: League, pv: Preview) {
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("STAR", style = T.label.copy(fontSize = 9.sp), color = P.accent)
-                            Text("${star.name} · ${star.pos} · ${star.cls}", style = T.bodyB, color = P.ink)
+                            Text("${star.name} · ${star.pos} · ${star.cls} · ${star.style.label}", style = T.bodyB, color = P.ink)
                         }
                         Ring(star.ovr, 38.dp, textSize = 14.sp)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Text("Strengths: ${strengths.joinToString(", ")}", style = T.small, color = P.good)
-                Text("Concerns: ${concerns.joinToString(", ")}", style = T.small, color = P.warn)
+                Text(strength, style = T.small, color = P.good)
+                Text(concern, style = T.small, color = P.warn)
             }
         }
     }
@@ -411,9 +410,13 @@ private fun LazyListScope.breakouts(vm: GameViewModel, lg: League, pv: Preview) 
     item {
         Deck("Next year's All-Americans, and stars hiding in plain sight.")
         Section("Breakout candidates")
-        GroupList(players(lg, pv.breakouts), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.pos} · ${p.cls}${lastLine(p)}") }
+        GroupList(players(lg, pv.breakouts), inset = 70.dp) { p ->
+            PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} · ${p.pos} · ${p.cls}${lastLine(p)}\n${Previews.breakoutLine(p)}")
+        }
         Section("Under the radar")
-        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p -> PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.pos} · ${p.cls}${lastLine(p)}") }
+        GroupList(players(lg, pv.underRadar), inset = 70.dp) { p ->
+            PlayerLine(vm, lg, lg.team(p.teamId), p, "${lg.team(p.teamId).school} (${lg.conf(lg.team(p.teamId).confId).abbr}) · ${p.pos} · ${p.cls}${lastLine(p)}\n${Previews.sleeperLine(lg, p)}")
+        }
     }
 }
 
@@ -458,7 +461,7 @@ private fun ConferenceDepth(vm: GameViewModel, lg: League, pv: Preview, confId: 
                     Text("  now ${Previews.ordinal(n)}", style = T.small, color = when { n < pr.confRank -> P.good; n > pr.confRank -> P.bad; else -> P.sub })
                 }
             }
-            if (star != null) Text("${star.name} (${star.pos}, ${star.cls}) leads the way.", style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 2.dp))
+            Text(Previews.confLine(lg, t, pr.confRank), style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 2.dp))
         }
     }
     Text("Projected conference record · overall record.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
@@ -519,7 +522,7 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
     val starters = u.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.starter } }
     val bench = u.plan.slots.mapNotNull { s -> roster.firstOrNull { it.id == s.reserve } }
     val newcomers = roster.filter { Previews.isNewcomer(it) }.sortedByDescending { it.ovr }
-    val (strengths, concerns) = Previews.scouting(lg, u)
+    val (strength, concern) = Previews.scoutingProse(lg, u)
     item {
         Spacer(Modifier.height(8.dp))
         Panel {
@@ -556,10 +559,10 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
         Section("Scouting report")
         Panel {
             Text("STRENGTHS", style = T.label, color = P.good)
-            Text(strengths.joinToString(" · "), style = T.bodyB, color = P.ink)
+            Text(strength, style = T.body, color = P.ink)
             Spacer(Modifier.height(8.dp))
             Text("CONCERNS", style = T.label, color = P.warn)
-            Text(concerns.joinToString(" · "), style = T.bodyB, color = P.ink)
+            Text(concern, style = T.body, color = P.ink)
         }
         val circle = lg.games.filter { it.involves(u.id) && it.day <= com.nh.hoopscoach.game.Schedule.REG_DAYS }
             .filter { g -> lg.rivalry(g) != null || pv.proj.getValue(g.opp(u.id)).nat <= 25 }.sortedBy { it.day }.take(6)
@@ -703,7 +706,11 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(t.school, style = T.bodyB, color = P.ink)
-                    Text("${lg.conf(t.confId).abbr} · No. ${pv.proj.getValue(t.id).nat} in our rankings", style = T.small, color = P.sub)
+                    Text(
+                        if (label == "Cinderella") "Mid-major path to a deep March run · No. ${pv.proj.getValue(t.id).nat}"
+                        else "Quietly built for a top-25 leap · No. ${pv.proj.getValue(t.id).nat}",
+                        style = T.small, color = P.sub,
+                    )
                 }
             }
         }
