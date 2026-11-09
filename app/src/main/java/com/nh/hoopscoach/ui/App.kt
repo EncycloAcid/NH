@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.League
@@ -74,6 +75,7 @@ object NavIcons {
 
 @Composable
 fun App(vm: GameViewModel) {
+    SpriteSheets.install(LocalContext.current.assets)
     val lg = vm.league
     val user = lg?.user
     HoopsTheme(user?.let { Color(it.primary) }, user?.let { Color(it.secondary) }) {

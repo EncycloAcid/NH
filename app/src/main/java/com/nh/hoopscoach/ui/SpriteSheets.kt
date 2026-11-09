@@ -1,0 +1,124 @@
+package com.nh.hoopscoach.ui
+
+import android.content.res.AssetManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
+import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Loads the user's modular basketball sprites from `assets/sprites/` (bodies, jerseys, hairstyles).
+ * Call [install] once with the app's [AssetManager]; unit tests can skip it and read from disk.
+ */
+object SpriteSheets {
+    @Volatile private var assets: AssetManager? = null
+    private val cache = ConcurrentHashMap<String, Bitmap>()
+
+    fun install(am: AssetManager) {
+        assets = am
+    }
+
+    fun bitmap(path: String): Bitmap? {
+        cache[path]?.let { return it }
+        val bmp = open(path)?.use { BitmapFactory.decodeStream(it) } ?: return null
+        val immutable = if (bmp.isMutable) bmp.copy(Bitmap.Config.ARGB_8888, false) else bmp
+        cache[path] = immutable
+        return immutable
+    }
+
+    fun body(skin: Int): Bitmap? {
+        val file = BODY_FILES[skin.coerceIn(0, BODY_FILES.lastIndex)]
+        return bitmap("sprites/bodies/$file.png")
+    }
+
+    fun hair(style: Int): Bitmap? {
+        val file = HAIR_FILES[style] ?: return null
+        return bitmap("sprites/hairstyles/$file.png")
+    }
+
+    fun jersey(key: String): Bitmap? = bitmap("sprites/jerseys/$key.png")
+
+    /** NBA / era abbr (or mascot key) → jersey file stem. */
+    fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
+        val keys = listOfNotNull(abbr?.uppercase(), slot?.uppercase(), name?.lowercase())
+        for (k in keys) JERSEY_BY_ABBR[k]?.let { return it }
+        name?.lowercase()?.let { n ->
+            JERSEY_BY_NAME.entries.firstOrNull { n.contains(it.key) }?.value?.let { return it }
+        }
+        return null
+    }
+
+    private fun open(path: String): InputStream? {
+        try {
+            assets?.open(path)?.let { return it }
+        } catch (_: Exception) { /* fall through to disk */ }
+        val candidates = listOf(
+            File("src/main/assets/$path"),
+            File("app/src/main/assets/$path"),
+            File("../app/src/main/assets/$path"),
+            File(path),
+        )
+        return candidates.firstOrNull { it.isFile }?.inputStream()
+    }
+
+    /** Face.skin 0..7 (porcelain→ebony) → body file (pale→deep). */
+    private val BODY_FILES = arrayOf(
+        "08_pale_ivory",
+        "07_fair_peach",
+        "06_olive_bronze",
+        "05_warm_caramel",
+        "04_medium_brown",
+        "03_chestnut_brown",
+        "02_dark_chocolate",
+        "01_deep_ebony",
+    )
+
+    /**
+     * Face.hair index → hairstyle file. Null = bald (no overlay; body hair is stripped).
+     * Extra styles (puffs, bleached crop) are reached via nearby options / hair color.
+     */
+    val HAIR_FILES = arrayOf(
+        null,                    // 0 Bald
+        "buzz_cut",              // 1 Buzz
+        "slicked_back_hair",     // 2 Short / slicked
+        "curly_top_fade",        // 3 Fade
+        "flat_top",              // 4 Flat-top
+        "afro",                  // 5 Afro
+        "high_top_fade",         // 6 High-top
+        "headband_with_curls",   // 7 Curls / headband
+        "cornrows",              // 8 Cornrows
+        "dreadlocks",            // 9 Locs
+        "twists",                // 10 Long / twists
+        "mohawk",                // 11 Mohawk
+        "messy_waves",           // 12 Waves
+        "braided_top_bun",       // 13 Man bun / top bun
+    )
+
+    private val JERSEY_BY_ABBR = mapOf(
+        "ATL" to "hawks", "BOS" to "celtics", "BKN" to "nets", "NJN" to "nets",
+        "CHA" to "hornets", "CHH" to "hornets", "CHO" to "hornets",
+        "CHI" to "bulls", "CLE" to "cavs", "DET" to "pistons", "IND" to "pacers",
+        "MIA" to "heat", "MIL" to "bucks", "NYK" to "knicks", "ORL" to "magic",
+        "PHI" to "76ers", "TOR" to "raptors", "WAS" to "wizards", "WSB" to "wizards",
+        "DAL" to "mavs", "DEN" to "nuggets", "GSW" to "warriors", "GS" to "warriors",
+        "HOU" to "rockets", "LAC" to "clippers", "LAL" to "lakers",
+        "MEM" to "grizzlies_memphis", "VAN" to "grizzlies_retro",
+        "MIN" to "timberwolves", "NOP" to "pelicans", "NOH" to "pelicans", "NOK" to "pelicans",
+        "OKC" to "thunder", "SEA" to "supersonics",
+        "PHX" to "suns", "PHO" to "suns", "POR" to "trail_blazers",
+        "SAC" to "kings", "SAS" to "spurs", "SA" to "spurs", "UTA" to "jazz", "UTH" to "jazz",
+    )
+
+    private val JERSEY_BY_NAME = mapOf(
+        "hawk" to "hawks", "celtic" to "celtics", "net" to "nets", "hornet" to "hornets",
+        "bull" to "bulls", "cavalier" to "cavs", "piston" to "pistons", "pacer" to "pacers",
+        "heat" to "heat", "buck" to "bucks", "knick" to "knicks", "magic" to "magic",
+        "76er" to "76ers", "sixer" to "76ers", "raptor" to "raptors", "wizard" to "wizards",
+        "bullet" to "wizards", "maverick" to "mavs", "nugget" to "nuggets", "warrior" to "warriors",
+        "rocket" to "rockets", "clipper" to "clippers", "laker" to "lakers",
+        "grizzlie" to "grizzlies_memphis", "timberwolf" to "timberwolves", "pelican" to "pelicans",
+        "thunder" to "thunder", "sonic" to "supersonics", "sun" to "suns",
+        "blazer" to "trail_blazers", "king" to "kings", "spur" to "spurs", "jazz" to "jazz",
+    )
+}

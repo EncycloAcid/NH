@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
@@ -28,20 +29,27 @@ import kotlinx.coroutines.withContext
 /** Draw every player as a retro bit portrait, real headshots included (a setting). */
 val LocalRetroAll = compositionLocalOf { false }
 
-/** Retro bit-pixel portraits (see [CelRender]), cached once drawn. */
+/** Layered sprite portraits from the user's body/jersey/hair packs, cached once drawn. */
 object Pixels {
-    const val N = CelRender.N
-    private val cache = android.util.LruCache<String, ImageBitmap>(400)
+    const val N = SpriteCompose.N
+    private val cache = android.util.LruCache<String, ImageBitmap>(120)
 
-    fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear()) =
-        "${f.encode()}|$primary|$secondary|$number|${gear.encode()}"
+    fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear(), jersey: String? = null) =
+        "${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
 
-    fun bitmap(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear()): ImageBitmap {
-        val key = key(f, primary, secondary, number, gear)
+    fun bitmap(
+        f: Face,
+        primary: Long,
+        secondary: Long,
+        number: Int,
+        gear: Gear = Gear(),
+        jersey: String? = null,
+    ): ImageBitmap {
+        val key = key(f, primary, secondary, number, gear, jersey)
         cache.get(key)?.let { return it }
-        val px = CelRender.render(f, primary.toInt(), secondary.toInt(), number, gear)
+        val px = SpriteCompose.render(f, primary.toInt(), secondary.toInt(), number, gear, jersey)
         val bmp = android.graphics.Bitmap.createBitmap(px, N, N, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
         cache.put(key, bmp)
         return bmp
@@ -52,19 +60,25 @@ object Pixels {
 fun warmPortraits(lg: com.nh.hoopscoach.game.League) {
     val t = lg.teams.getOrNull(lg.userTeamId) ?: return
     val all = lg.retroAll
+    val jersey = SpriteSheets.jerseyKey(t.abbr, t.slot, t.name)
     for (p in lg.rosterOf(t)) if (all || p.photo.isEmpty()) {
-        runCatching { Pixels.bitmap(Face.of(p), t.primary, t.secondary, p.number, Gear.decode(p.gear)) }
+        runCatching { Pixels.bitmap(Face.of(p), t.primary, t.secondary, p.number, Gear.decode(p.gear), jersey) }
     }
 }
 
 /** His portrait, drawn off the main thread the first time; a team-colored card shows until it's ready. */
 @Composable
 fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: Gear = Gear.decode(p.gear)) {
+    val ctx = LocalContext.current
+    SpriteSheets.install(ctx.assets)
     val primary = t?.primary ?: 0xFF5C6B7AL
     val secondary = t?.secondary ?: 0xFFFFFFFFL
-    val key = Pixels.key(face, primary, secondary, p.number, gear)
+    val jersey = SpriteSheets.jerseyKey(t?.abbr, t?.slot, t?.name)
+    val key = Pixels.key(face, primary, secondary, p.number, gear, jersey)
     val bmp by produceState(Pixels.cached(key), key) {
-        if (value == null) value = withContext(Dispatchers.Default) { Pixels.bitmap(face, primary, secondary, p.number, gear) }
+        if (value == null) value = withContext(Dispatchers.Default) {
+            Pixels.bitmap(face, primary, secondary, p.number, gear, jersey)
+        }
     }
     val shape = RoundedCornerShape(size * 0.2f)
     Box(Modifier.size(size).clip(shape).background(Color(primary)), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -72,7 +86,7 @@ fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: 
         if (b != null) {
             Image(
                 b, p.name, Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds,
+                contentScale = ContentScale.Fit,
                 filterQuality = FilterQuality.None,
             )
         } else {

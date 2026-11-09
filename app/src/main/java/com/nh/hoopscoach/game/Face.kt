@@ -1,8 +1,9 @@
 package com.nh.hoopscoach.game
 
 /**
- * A retro bit portrait: skin, head shape, hair and its color, facial hair, eyes, brows, mouth and an
- * extra. A player without a custom one gets his own drawn from his look, the same every time.
+ * Portrait parts over the user's modular sprites: skin tone body, hairstyle (+ color), plus legacy
+ * face extras (beard/eyes/brows/mouth/acc) kept for saves. A player without a custom one gets his
+ * own from his look, the same every time.
  */
 class Face(
     val skin: Int, val head: Int, val hair: Int, val hairColor: Int, val beard: Int,
@@ -15,9 +16,9 @@ class Face(
     companion object {
         val PARTS = listOf("Skin", "Face", "Hair", "Hair color", "Facial hair", "Eyes", "Brows", "Mouth", "Extras")
         val OPTIONS = listOf(
-            listOf("Porcelain", "Fair", "Light", "Tan", "Bronze", "Brown", "Deep", "Ebony"),
+            listOf("Pale ivory", "Fair peach", "Olive bronze", "Warm caramel", "Medium brown", "Chestnut", "Dark chocolate", "Deep ebony"),
             listOf("Oval", "Round", "Square", "Long"),
-            listOf("Bald", "Buzz", "Short", "Fade", "Flat-top", "Afro", "High-top", "Curls", "Cornrows", "Locs", "Long", "Mohawk", "Waves", "Man bun"),
+            listOf("Bald", "Buzz", "Slicked", "Fade", "Flat-top", "Afro", "High-top", "Headband", "Cornrows", "Locs", "Twists", "Mohawk", "Waves", "Top bun"),
             listOf("Black", "Dark brown", "Brown", "Auburn", "Blond", "Platinum", "Gray", "Red"),
             listOf("None", "Stubble", "Mustache", "Goatee", "Chin strap", "Full beard"),
             listOf("Normal", "Focused", "Wide"),
