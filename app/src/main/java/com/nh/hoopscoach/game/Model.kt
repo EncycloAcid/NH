@@ -44,7 +44,6 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
     STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
     ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
-    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
     TWO_WAY_GUARD("Two-Way Guard", "2WG", listOf(Attr.OUT, Attr.HND, Attr.PER), "Hits threes off the bounce and picks up the ball full court"),
     PEST("Pest", "PES", listOf(Attr.PAS, Attr.PER, Attr.STL), "Hounds the ball for 94 feet and makes the simple pass"),
     MICROWAVE("Microwave", "MIC", listOf(Attr.INS, Attr.OUT, Attr.HND), "Instant offense: gets to the rim or pulls up from deep the moment he checks in"),
