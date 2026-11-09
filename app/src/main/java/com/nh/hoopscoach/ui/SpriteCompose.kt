@@ -23,9 +23,9 @@ object SpriteCompose {
 
     // Chest number on the aligned jersey cutout (collar V at y≈297).
     private const val CHEST_NUM_CX = 256f
-    private const val CHEST_NUM_CY = 430f
-    private const val SHOULDER_NUM_CX = 320f
-    private const val SHOULDER_NUM_CY = 270f
+    private const val CHEST_NUM_CY = 420f
+    private const val SHOULDER_NUM_CX = 318f
+    private const val SHOULDER_NUM_CY = 278f
 
     private val HAIR_COLORS = intArrayOf(
         0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),

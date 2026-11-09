@@ -45,18 +45,22 @@ fun BasketballCharacterCanvas(
         Bitmap.createBitmap(px, SpriteCompose.N, SpriteCompose.N, Bitmap.Config.ARGB_8888).asImageBitmap()
     }
 
+    val shape = RoundedCornerShape(corner)
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(corner))
-            .background(background),
+            .clip(shape)
+            .background(background, shape),
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val dstSize = IntSize(size.width.toInt(), size.height.toInt())
+        Canvas(Modifier.fillMaxSize()) {
+            // Integer dst size keeps nearest-neighbor pixels crisp when scaled up.
+            val side = minOf(size.width.toInt(), size.height.toInt()).coerceAtLeast(1)
+            val ox = ((size.width.toInt() - side) / 2).coerceAtLeast(0)
+            val oy = ((size.height.toInt() - side) / 2).coerceAtLeast(0)
             drawImage(
                 image = image,
-                dstOffset = IntOffset.Zero,
-                dstSize = dstSize,
+                dstOffset = IntOffset(ox, oy),
+                dstSize = IntSize(side, side),
                 filterQuality = FilterQuality.None,
             )
         }

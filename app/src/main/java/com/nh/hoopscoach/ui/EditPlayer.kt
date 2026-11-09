@@ -39,6 +39,7 @@ import com.nh.hoopscoach.game.Pos
 import com.nh.hoopscoach.game.Ratings
 import kotlin.math.roundToInt
 
+
 /** Edit one of your players: look, name, number, position, size, background and play style. */
 @Composable
 fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {

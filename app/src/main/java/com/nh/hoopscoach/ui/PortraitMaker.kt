@@ -121,7 +121,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     number = p.number,
                     background = Color.Transparent,
                     corner = 0.dp,
-                    modifier = Modifier.fillMaxSize().padding(6.dp),
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
                 )
             }
         }
