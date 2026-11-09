@@ -40,7 +40,15 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     RIM_RUNNER("Rim Runner", "RUN", listOf(Attr.INS, Attr.REB, Attr.BLK), "Sprints the floor and finishes lobs and putbacks above the rim"),
     POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
     STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
-    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends");
+    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
+    TWO_WAY_GUARD("Two-Way Guard", "TWG", listOf(Attr.OUT, Attr.PER, Attr.STL), "Scores enough to keep defenses honest and locks up on the other end"),
+    VOLUME_SCORER("Volume Scorer", "VOL", listOf(Attr.INS, Attr.MID, Attr.OUT), "Primary option who can get buckets from every level, night after night"),
+    CORNER_SPECIALIST("Corner Specialist", "CRN", listOf(Attr.OUT, Attr.PER, Attr.REB), "Spots up in the corner, crashes the glass and holds his own on defense"),
+    TRANSITION_FINISHER("Transition Finisher", "TRN", listOf(Attr.INS, Attr.HND, Attr.STL), "Turns steals and outlets into easy points in the open floor"),
+    MIDRANGE_ASSASSIN("Midrange Assassin", "MDA", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives in the midrange and creates pull-ups off the dribble"),
+    SWITCH_BIG("Switch Big", "SWB", listOf(Attr.PER, Attr.IDF, Attr.REB), "Can guard one through five and cleans the glass"),
+    PURE_POINT("Pure Point", "PPT", listOf(Attr.HND, Attr.PAS, Attr.PER), "Pass-first floor general who sets up teammates and pressures the ball"),
+    FACILITATING_WING("Facilitating Wing", "FCW", listOf(Attr.MID, Attr.PAS, Attr.PER), "Wing who makes the right read, hits the open midrange and checks the other wing");
 }
 
 enum class Trait(val label: String, val good: Boolean) {
@@ -167,6 +175,15 @@ class Player(
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
+    /** 2K-style build title from his attribute shape (e.g. "Two-Way 3-Level Scorer"). */
+    var buildName: String = "",
+    /** Closest NBA-legend flavor matches (display names). */
+    var likeA: String = "",
+    var likeB: String = "",
+    /** Provenance when a GOAT preset or offspring was applied. */
+    var goatId: String = "",
+    var parentA: String = "",
+    var parentB: String = "",
 ) {
     val name get() = "$first $last"
     val short get() = "${first.first()}. $last"

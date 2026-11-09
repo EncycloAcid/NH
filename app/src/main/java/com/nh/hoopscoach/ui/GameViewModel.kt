@@ -51,6 +51,7 @@ sealed interface Route {
     data object WrapUp : Route
     data object Preview : Route
     data class EditPlayer(val playerId: Int) : Route
+    data class BuildLab(val playerId: Int) : Route
     data object RecruitPreview : Route
 }
 

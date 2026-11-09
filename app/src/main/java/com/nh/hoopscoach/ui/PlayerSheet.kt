@@ -126,10 +126,21 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
             }
+            if (p.buildName.isNotEmpty() || p.likeA.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+                    if (p.buildName.isNotEmpty()) Text(p.buildName, style = T.bodyB, color = P.ink)
+                    if (p.likeA.isNotEmpty()) {
+                        val likes = listOf(p.likeA, p.likeB).filter { it.isNotEmpty() }.joinToString(" · ")
+                        Text("Closest to: $likes", style = T.small, color = P.accent, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mine) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (mine) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
+                if (mine) SmallButton("Build Lab") { vm.sheet = null; vm.push(Route.BuildLab(p.id)) }
                 if (mine) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
             }
@@ -420,6 +431,8 @@ private fun BioTab(lg: League, p: Player) {
         listOfNotNull(
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
+            "Build" to p.buildName.ifEmpty { p.style.label },
+            if (p.likeA.isNotEmpty()) "Closest to" to listOf(p.likeA, p.likeB).filter { it.isNotEmpty() }.joinToString(" · ") else null,
             "Recruit rating" to when {
                 p.recruitRank > 0 -> "${p.stars}★ · No. ${p.recruitRank} overall"
                 p.tryout > 0 -> "Unrated · made the team at ${p.tryout} tryouts"

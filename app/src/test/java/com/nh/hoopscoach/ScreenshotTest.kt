@@ -436,6 +436,7 @@ class ScreenshotTest {
         vm.push(Route.TeamPage(lg.teams.first { it.school == "Duke" }.id)); shot("${tag}09_teampage"); vm.back()
         vm.push(Route.RecruitView(lg.recruits.first().p.id)); shot("${tag}10_recruit_detail"); vm.back()
         vm.push(Route.Focus(lg.user.roster.first())); shot("${tag}11_focus"); vm.back()
+        vm.push(Route.BuildLab(lg.user.roster.first())); shot("${tag}11b_build_lab"); vm.back()
 
         while (lg.phase == Phase.REGULAR) Season.playDay(lg)
         vm.install(lg); shot("${tag}12_conf_tourney")
