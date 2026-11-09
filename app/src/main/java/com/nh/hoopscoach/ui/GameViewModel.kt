@@ -186,10 +186,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- new game ----------
 
-    fun generateDraft() {
+    fun generateDraft(startYear: Int = 2026) {
         busy = "Building your league"
         viewModelScope.launch {
-            val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague() }
+            val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
             draft = lg
             busy = null
         }
