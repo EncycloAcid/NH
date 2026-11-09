@@ -39,6 +39,19 @@ object SpriteSheets {
 
     fun jersey(key: String): Bitmap? = bitmap("sprites/jerseys/$key.png")
 
+    /** Chest number 0–99 (and `00` via [zeroZero]). */
+    fun chestNumber(number: Int, zeroZero: Boolean = false): Bitmap? {
+        val name = when {
+            zeroZero -> "00"
+            number in 0..99 -> number.toString()
+            else -> number.coerceIn(0, 99).toString()
+        }
+        return bitmap("sprites/numbers/chest/$name.png")
+    }
+
+    fun shoulderDigit(digit: Int): Bitmap? =
+        bitmap("sprites/numbers/shoulder/${digit.coerceIn(0, 9)}.png")
+
     /** NBA / era abbr (or mascot key) → jersey file stem. */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         val keys = listOfNotNull(abbr?.uppercase(), slot?.uppercase(), name?.lowercase())

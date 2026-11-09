@@ -23,6 +23,11 @@ object SpriteCompose {
     private const val JERSEY_SCALE = 1.186f
     private const val JERSEY_X = 102
     private const val JERSEY_Y = 195
+    // Anchors measured from the jersey art's baked #1 (chest + shoulder patch).
+    private const val CHEST_NUM_CX = 254f
+    private const val CHEST_NUM_CY = 458f
+    private const val SHOULDER_NUM_CX = 327f
+    private const val SHOULDER_NUM_CY = 260f
 
     private val HAIR_COLORS = intArrayOf(
         0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),
@@ -51,6 +56,7 @@ object SpriteCompose {
             val scaled = Bitmap.createScaledBitmap(jersey, jw, jh, false)
             blitOpaque(canvasBmp, scaled, JERSEY_X, JERSEY_Y)
             if (scaled !== jersey) scaled.recycle()
+            applyJerseyNumber(canvasBmp, number)
         }
 
         if (hairSrc != null) {
@@ -62,14 +68,88 @@ object SpriteCompose {
             if (tinted !== hairSrc) tinted.recycle()
         }
 
-        // Jersey number is baked into team sprites; college recolors keep the template mark.
-
         val out = Bitmap.createScaledBitmap(canvasBmp, N, N, false)
         canvasBmp.recycle()
         val px = IntArray(N * N)
         out.getPixels(px, 0, N, 0, 0, N, N)
         if (out !== canvasBmp) out.recycle()
         return px
+    }
+
+    /** Wipe the jersey art's baked #1 and stamp the player's number on chest + shoulder. */
+    private fun applyJerseyNumber(canvas: Bitmap, number: Int) {
+        val n = number.coerceIn(0, 99)
+        eraseGlyphs(canvas, CHEST_NUM_CX, CHEST_NUM_CY, halfW = 70, halfH = 55)
+        eraseGlyphs(canvas, SHOULDER_NUM_CX, SHOULDER_NUM_CY, halfW = 34, halfH = 30)
+        val chest = SpriteSheets.chestNumber(n) ?: return
+        blitOpaque(
+            canvas, chest,
+            (CHEST_NUM_CX - chest.width / 2f).roundToInt(),
+            (CHEST_NUM_CY - chest.height / 2f).roundToInt(),
+        )
+        val digits = n.toString().map { it - '0' }
+        val digBmps = digits.mapNotNull { SpriteSheets.shoulderDigit(it) }
+        if (digBmps.isEmpty()) return
+        val overlap = 4
+        val totalW = digBmps.sumOf { it.width } - overlap * (digBmps.size - 1)
+        var sx = (SHOULDER_NUM_CX - totalW / 2f).roundToInt()
+        val sy = (SHOULDER_NUM_CY - digBmps[0].height / 2f).roundToInt()
+        for (d in digBmps) {
+            blitOpaque(canvas, d, sx, sy)
+            sx += d.width - overlap
+        }
+    }
+
+    /** Replace bright glyph / dark outline pixels in a box with nearby jersey fabric color. */
+    private fun eraseGlyphs(bmp: Bitmap, cx: Float, cy: Float, halfW: Int, halfH: Int) {
+        val w = bmp.width
+        val h = bmp.height
+        val x0 = (cx - halfW).roundToInt().coerceIn(0, w - 1)
+        val x1 = (cx + halfW).roundToInt().coerceIn(0, w)
+        val y0 = (cy - halfH).roundToInt().coerceIn(0, h - 1)
+        val y1 = (cy + halfH).roundToInt().coerceIn(0, h)
+        val px = IntArray(w * h)
+        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        var sr = 0
+        var sg = 0
+        var sb = 0
+        var sn = 0
+        val sampleLeft = (x0 - 35).coerceAtLeast(0)
+        for (y in y0 until y1) {
+            for (x in sampleLeft until x0) {
+                val c = px[y * w + x]
+                if (c ushr 24 < 200) continue
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val sum = r + g + b
+                if (sum in 101..649) {
+                    sr += r; sg += g; sb += b; sn++
+                }
+            }
+        }
+        val fill = if (sn == 0) 0xFF404040.toInt() else {
+            0xFF000000.toInt() or ((sr / sn) shl 16) or ((sg / sn) shl 8) or (sb / sn)
+        }
+        val fr = (fill shr 16) and 0xFF
+        val fg = (fill shr 8) and 0xFF
+        val fb = fill and 0xFF
+        for (y in y0 until y1) {
+            for (x in x0 until x1) {
+                val i = y * w + x
+                val c = px[i]
+                if (c ushr 24 < 32) continue
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val sum = r + g + b
+                val brightOrDark = sum > 580 || sum < 110
+                // Colored digit fills (purple/red/gold on team jerseys) vs local fabric.
+                val farFromFabric = abs(r - fr) + abs(g - fg) + abs(b - fb) > 90
+                if (brightOrDark || farFromFabric) px[i] = fill
+            }
+        }
+        bmp.setPixels(px, 0, w, 0, 0, w, h)
     }
 
     /** Copy only opaque-enough source pixels so transparent holes never clear the destination. */
