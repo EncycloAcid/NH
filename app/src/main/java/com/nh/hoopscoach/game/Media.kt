@@ -39,11 +39,20 @@ object Media {
         val feed = if (league) r.leagueFeed else r.feed
         // Nobody posts the exact same thing twice in a row of posts.
         if (feed.takeLast(40).any { it.text == text }) return
-        val acct = if (avatar.isNotEmpty()) null else when {
-            kind == "league" || name == "NBA" || name == "NCAA" -> SocialAccounts.league(lg)
-            kind == "team" -> SocialAccounts.forTeam(lg, name)
+        // Team / league / highlight posts always take the pack account. Voices that already carry a
+        // real avatar (pundit, insider) keep it; generic placeholders get upgraded.
+        val acct = when {
+            kind == "league" || name.equals("NBA", true) || name.equals("NCAA", true) || name.contains("March Madness", true) ->
+                SocialAccounts.league(lg)
+            kind == "team" -> {
+                val t = lg.teams.firstOrNull { it.name.equals(name, true) || "${it.school} ${it.mascot}".equals(name, true) }
+                if (t != null) SocialAccounts.forTeam(lg, t) else SocialAccounts.forTeam(lg, name)
+            }
             kind == "media" -> SocialAccounts.pick(lg, "highlights")
-            kind == "insider" && handle == "nbainsider" -> SocialAccounts.pick(lg, "insider")
+            kind == "insider" && (avatar.isEmpty() || handle in setOf("nbainsider", "hoopsinsider")) ->
+                SocialAccounts.pick(lg, "insider")
+            kind == "analyst" && avatar.isEmpty() ->
+                SocialAccounts.pick(lg, "person") ?: SocialAccounts.pick(lg, "analyst")
             else -> null
         }
         // Made-up names for the league account in eras before social media, at the right level.
@@ -53,7 +62,8 @@ object Media {
         if (feed.size > keep) feed.subList(0, feed.size - keep).clear()
     }
 
-    fun say(lg: League, v: Voice, kind: String, text: String, likes: Int) = post(lg, v.name, v.handle, kind, text, likes, v.verified, avatar = v.avatar)
+    fun say(lg: League, v: Voice, kind: String, text: String, likes: Int) =
+        post(lg, v.name, v.handle, kind, text, likes, v.verified, avatar = v.avatar)
 
     /** Likes as a share of his following, with some luck. */
     fun likes(lg: League, share: Double): Int {
@@ -65,14 +75,15 @@ object Media {
     fun fanName() = Rng.pick(listOf("Big ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} ${Rng.pick(Names.last).first()}.", "Courtside ${Rng.pick(Names.first)}", "${Rng.pick(Names.first)} from section ${Rng.range(101, 330)}"))
     fun hater() = Rng.pick(listOf("Hot Takes Only" to "hottakes_only", "Overrated Watch" to "overratedwatch", "Real Hoops Fan" to "realhoopsfan_", "Bench Mob" to "benchmob99"))
 
-    /** An analyst with a first-person take: a real one (a person, not an outlet) or one of the made-up regulars. */
+    /** An analyst with a first-person take: a real pack account in today's game, else a made-up regular. */
     fun pundit(lg: League): Voice {
-        if (Rng.chance(if (lg.pro) 0.35 else 0.6)) SocialAccounts.pick(lg, "person")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
+        SocialAccounts.pick(lg, "person")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
+        SocialAccounts.pick(lg, "analyst")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
         val (n, h) = Rng.pick(ANALYSTS)
         return Voice(n, h)
     }
 
-    /** An insider: a real one at his level, or a made-up one. */
+    /** An insider: a real one at his level, or a made-up one only when the pack has none. */
     fun insider(lg: League): Voice = SocialAccounts.pick(lg, "insider")?.let { Voice(it.name, it.handle, it.avatar, it.verified) }
         ?: if (lg.pro) Voice("NBA Insider", "nbainsider") else Voice("Hoops Insider", "hoopsinsider")
 

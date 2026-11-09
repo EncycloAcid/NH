@@ -11,16 +11,53 @@ object SocialAccounts {
     private val all: List<Account> by lazy {
         (SocialAccounts::class.java.getResourceAsStream("/social/accounts.tsv")?.bufferedReader(Charsets.UTF_8)?.use { it.readLines() } ?: emptyList())
             .filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split("|") }.filter { it.size >= 6 }
-            .map { Account(it[0], it[1], it[2], it[3].toLongOrNull() ?: 0, it[4] == "1", it[5]) }
+            .map { raw ->
+                val handle = raw[2].ifBlank { raw[5] }.ifBlank { slug(raw[1]) }
+                Account(raw[0], raw[1], handle, raw[3].toLongOrNull() ?: 0, raw[4] == "1", raw[5])
+            }
     }
 
-    private fun today(lg: League) = if (lg.pro) Eras.of(lg) == Era.TODAY else lg.era == Era.TODAY.name
+    fun isToday(lg: League) = if (lg.pro) Eras.of(lg) == Era.TODAY else lg.era == Era.TODAY.name
+
+    private fun today(lg: League) = isToday(lg)
+
+    /** Digits-and-letters only, with OKC normalized so pack names match in-game names. */
+    private fun dig(s: String): String = s.lowercase()
+        .replace("oklahoma city", "okc")
+        .replace("okc thunder", "okcthunder")
+        .replace(Regex("[^a-z0-9]"), "")
+
+    private fun slug(name: String): String = name.replace(Regex("[^A-Za-z0-9]+"), "").ifBlank { "hoops" }
 
     /** A team's own account: "Denver Nuggets" in the pros, "North Carolina Tar Heels" in college. */
     fun forTeam(lg: League, name: String): Account? {
         if (!today(lg)) return null
         val type = if (lg.pro) "nba team" else "college mbb"
-        return all.firstOrNull { it.type == type && it.name.equals(name, ignoreCase = true) }
+        val pool = all.filter { it.type == type }
+        val want = dig(name)
+        pool.firstOrNull { dig(it.name) == want }?.let { return it }
+        // Last word when unique (Nuggets, Lakers, Tar Heels → Heels is weak; require longer tokens).
+        val last = name.trim().split(Regex("\\s+")).lastOrNull()?.let(::dig).orEmpty()
+        if (last.length >= 5) {
+            val hits = pool.filter { dig(it.name).endsWith(last) || dig(it.name.substringAfterLast(' ')) == last }
+            if (hits.size == 1) return hits[0]
+        }
+        // Soft contains both ways for odd pack casing ("Miami HEAT", "NEW YORK KNICKS").
+        pool.firstOrNull { val k = dig(it.name); k.contains(want) || want.contains(k) }?.let { return it }
+        return null
+    }
+
+    /** Resolve from the live [Team] so blank pack handles still get a real-looking @abbrMBB / @abbr. */
+    fun forTeam(lg: League, t: Team): Account? {
+        val found = forTeam(lg, t.name) ?: forTeam(lg, "${t.school} ${t.mascot}")
+        if (found != null) {
+            if (found.handle.isNotBlank()) return found
+            val fallback = found.avatar.ifBlank { if (lg.pro) t.abbr else "${t.abbr}MBB" }
+            return Account(found.type, found.name.ifBlank { t.name }, fallback, found.followers, found.verified, found.avatar)
+        }
+        if (!today(lg)) return null
+        // Pack miss: still post under a stable team handle derived from the abbr.
+        return Account(if (lg.pro) "nba team" else "college mbb", t.name, if (lg.pro) t.abbr else "${t.abbr}MBB", 0, false, "")
     }
 
     /** Outlets that only cover the pros, or only the college game: neither turns up at the other level. */
@@ -44,10 +81,10 @@ object SocialAccounts {
             "person" -> if (lg.pro) all.filter { it.type == "analyst" } else all.filter { it.type in listOf("cbb analyst", "cbb analytics", "bracketology") && it.name != "Ken Pomeroy" }
             "insider" -> all.filter { it.type in (if (lg.pro) listOf("insider") else listOf("cbb insider", "recruiting")) }
             else -> return null
-        }.filter { it.handle != "wojespn" && it.name !in wrongLevel } // Woj retired in 2024; the rest are fair game.
+        }.filter { it.handle.isNotBlank() && it.handle != "wojespn" && it.name !in wrongLevel } // Woj retired in 2024; the rest are fair game.
         return if (pool.isEmpty()) null else Rng.pick(pool)
     }
 
     /** The league's own account: the NBA, or the NCAA. */
-    fun league(lg: League): Account? = if (!today(lg)) null else all.firstOrNull { it.type == "league" && it.handle == (if (lg.pro) "NBA" else "NCAA") }
+    fun league(lg: League): Account? = if (!today(lg)) null else all.firstOrNull { it.type == "league" && it.handle.equals(if (lg.pro) "NBA" else "NCAA", true) }
 }
