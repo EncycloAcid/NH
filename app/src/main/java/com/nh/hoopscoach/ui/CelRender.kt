@@ -3,39 +3,100 @@ package com.nh.hoopscoach.ui
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
 import kotlin.math.abs
-import kotlin.math.hypot
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
- * Retro bit full-body portraits in the style of a handheld sports sprite: a 64×64 player mid-dribble
- * with a thick black outline and flat cell shading. Skin, hair, face, jersey, number, undershirt,
- * sleeves, wristbands, shoes and legs come from [Face] and [Gear] in his team's colors. Shown with
- * hard pixel edges.
+ * Retro bit player sprites: the 64×64 dribble pixel art from the reference, customizable by [Face],
+ * [Gear], team colors and jersey number. Shown with hard pixel edges on a transparent background.
  */
 object CelRender {
     const val N = 64
-    private const val OUTLINE = 0xFF141414.toInt()
-    private const val WHITE = 0xFFF4F4F4.toInt()
+    private const val OUTLINE = 0xFF0C0A0A.toInt()
+    private const val WHITE = 0xFFF8F8F8.toInt()
     private const val BLACK = 0xFF1E1E22.toInt()
-    private const val BALL = 0xFFE07030.toInt()
-    private const val BALL_D = 0xFFB04818.toInt()
-    private const val BALL_L = 0xFFF0A050.toInt()
+    private const val BALL_HI = 0xFFFAD248.toInt()
+    private const val BALL = 0xFFF28C24.toInt()
+    private const val BALL_MID = 0xFFDA6618.toInt()
+    private const val BALL_DARK = 0xFFAC4414.toInt()
 
     private val SKIN = intArrayOf(
-        0xFFF6D7C3.toInt(), 0xFFEBC2A1.toInt(), 0xFFDDA679.toInt(), 0xFFC68A5C.toInt(),
-        0xFFA86E45.toInt(), 0xFF8A5534.toInt(), 0xFF6B3F26.toInt(), 0xFF4E2C1A.toInt(),
+        0xFFF6D7C3.toInt(), 0xFFEBC2A1.toInt(), 0xFFDDA679.toInt(), 0xFFD08852.toInt(),
+        0xFFD0744A.toInt(), 0xFF9A5A36.toInt(), 0xFF734126.toInt(), 0xFF4E2B18.toInt(),
     )
     private val HAIR = intArrayOf(
-        0xFF1A1A1A.toInt(), 0xFF3B2416.toInt(), 0xFF6A4325.toInt(), 0xFF9C5A2E.toInt(),
-        0xFFD8B366.toInt(), 0xFFE8E2D0.toInt(), 0xFF8D8D8D.toInt(), 0xFFB3262E.toInt(),
+        0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),
+        0xFFDAB458.toInt(), 0xFFECE6D4.toInt(), 0xFF8E9096.toInt(), 0xFFC22E2E.toInt(),
     )
 
-    // 3x5 digits.
     private val DIGITS = listOf(
         "111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
         "111100111001111", "111100111101111", "111001010010010", "111101111101111", "111101111001111",
+    )
+
+    private val BASE = arrayOf(
+        "................................................................",
+        "............................######..............................",
+        ".........................###HHHHHH##............................",
+        "........................#HHHHHHHHHHH##..........................",
+        ".......................#HHHHHHHHHHhhhh#.........................",
+        "......................#HHHHHhHHhhhHhHhh#........................",
+        ".....................#HHHHHHHHHHHHHHHHH#........................",
+        ".....................#HHHHHHHHHHHHHHHHH#........................",
+        ".....................#HHHH############H#........................",
+        ".....................#HHH#ssSSSSSSSSS#H#........................",
+        ".....................#HH#ssSSSSSSSSSSS##........................",
+        ".....................##H#s#####SSSS##S#.........................",
+        "....................#ss##ssssssSSSSW#S#.........................",
+        "....................#s#S#ssSW#sSSSSW#S#.........................",
+        "....................#ssssssSsssSSSS##S#.........................",
+        ".....................#s#sssSsssSSSS##S#.........................",
+        "......................##sssSSSSSSSSSSS#.........................",
+        "........................#sssSSSSSSSSSS#.........................",
+        "........................##ssSS#####SS#..........................",
+        "........................##sssSSSSSSS#...........................",
+        ".....................####S#ssssssss#............................",
+        "...................####TJ#T#sssss###............................",
+        "..................#ssss#STSCsssS#.#S#..........######...........",
+        ".................#sSSSss#TJ#SSSSC#JTs#........#dbbBBB##.........",
+        "................#sSSSSss#TJCsSS#CJJT#s#......#ddmbbBbdB#........",
+        "................#sSSssss#TJJCs#CCJJT#s#....###dmmbbBbbBB#.......",
+        "..............##sSSSssss#TJJJJJJJJJT#s#....#dbbbbbdbdbBBb#......",
+        ".............##SSSss##ss#TJJJJJJJJJT#s#....#dddbbbbdbbBbb#......",
+        "............#sSSSss#SS##SJJJJJJJJJJ##sS#..#mmmbbmddbmbdBBB#.....",
+        "...........#ssSSss###ssSJJJJJJJJJJJ#ssSS###mmmbbbbddbdBBbb#.....",
+        "...........#sSSss#..#jjJJJJJJJJJJJJ#ssSSmm#mmmbbmdbbdbdbbb#.....",
+        "...........#SSss#...#jjJJJJJJJJJJJJ##ssSmm#dmmmdbbbmbbbdbm#.....",
+        "..........#sSsss#...#jjJJJJJJJJJJJ#.##ssdd#dddmbbbdbbdbbmm#.....",
+        "..........#sSss#....#jjJJJJJJJJJJJ#...#sdd##ddmbbbdbbdbbm#......",
+        ".........#ssSs#....#jjjJJJJJJJJJJJ#....###.#dddmbdbbbdbmm#......",
+        ".........#ssSs#....#jjjJJJJJJJJJJJ#.........#ddmddmmmdmm#.......",
+        ".........#ssSs#...#jjjjjjJJJJJJJJJ#..........#dddmmmmdd#........",
+        "........#sSS#ss#..#jjjjjjJJJJJJJJ#............#dddmmm##.........",
+        "........#sS#.##s#.#j########jjjjj#.............######...........",
+        "........#sS#...##.#jjTJJJJJJ#####...............................",
+        ".........#s#......#jjTTJJJJJJJJj#...............................",
+        "..........##......#jjjTTJJJJJJJJj#..............................",
+        "..................#jjjjTTJJJJJJJJJ#.............................",
+        "...................#jjjjTTJJJJJJTTT#............................",
+        "...................###jjjTTJJJTl#####...........................",
+        "...................#j#jjjjTTJT#llllll#..........................",
+        "...................##j#jjjjTT#llLLLLL#..........................",
+        "...................#jjj#jjjTT#lllLLLLl#.........................",
+        "..................#Tjjjj##jjT#llllLLLL#.........................",
+        ".................#l#Tjjjjj#jT##lllLLLL#.........................",
+        "................#lll#Tjjjjj##..#llllLL##........................",
+        "...............#lllLL#Tjjjj#....#llllLL#........................",
+        "..............#llLLLLL#TTL#......#lllLL##.......................",
+        ".........###.#llLLLLll####.......#llllLL#.......................",
+        "........#UU####LLLlll#............##lllL##......................",
+        ".......##UU#UU#LLLl##...............#llL###.....................",
+        "......#T#UUUuUUUU##.................#lluuUU#####................",
+        "......#T#UUUUu###....................##UU#uUUUUU#...............",
+        "......#W#UUUUuuu#....................#U##UUUUUU#W#..............",
+        ".......#W#UUUuuW#...................#uuUUUUUUU#W#...............",
+        ".......#W#UUUUUW#...................#uuuUU####W#................",
+        ".......#WW#UUUUu#...................#uuu##.#WW#.................",
+        "........#W#WWWWW#....................#uu#.####..................",
+        ".........#######......................####......................",
     )
 
     private fun shade(c: Int, f: Double): Int {
@@ -50,7 +111,7 @@ object CelRender {
 
     private fun lum(c: Int) = ((c shr 16 and 0xFF) * 0.3 + (c shr 8 and 0xFF) * 0.59 + (c and 0xFF) * 0.11) / 255.0
 
-    private fun gearColor(i: Int, team: Int, trim: Int) = when (i) {
+    private fun gearCol(i: Int, team: Int, trim: Int) = when (i) {
         1 -> WHITE
         2 -> BLACK
         3 -> trim
@@ -58,486 +119,214 @@ object CelRender {
     }
 
     fun render(f: Face, primary: Int, secondary: Int, number: Int, gear: Gear = Gear()): IntArray {
-        val px = IntArray(N * N) // transparent bg
-        val fig = BooleanArray(N * N)
-        fun inb(x: Int, y: Int) = x in 0 until N && y in 0 until N
-        fun set(x: Int, y: Int, c: Int, figure: Boolean = true) {
-            if (!inb(x, y)) return
-            px[y * N + x] = c
-            if (figure) fig[y * N + x] = true
-        }
-        fun fill(x0: Int, y0: Int, x1: Int, y1: Int, c: Int) {
-            for (y in y0..y1) for (x in x0..x1) set(x, y, c)
-        }
-        fun oval(cx: Double, cy: Double, rx: Double, ry: Double, c: Int, shadow: Int? = null, lightFromLeft: Boolean = true) {
-            val x0 = (cx - rx).toInt() - 1; val x1 = (cx + rx).toInt() + 1
-            val y0 = (cy - ry).toInt() - 1; val y1 = (cy + ry).toInt() + 1
-            for (y in y0..y1) for (x in x0..x1) {
-                val nx = (x + 0.5 - cx) / rx; val ny = (y + 0.5 - cy) / ry
-                if (nx * nx + ny * ny <= 1.0) {
-                    val col = if (shadow != null && ((lightFromLeft && nx > 0.35) || (!lightFromLeft && nx < -0.35) || ny > 0.55)) shadow else c
-                    set(x, y, col)
-                }
-            }
-        }
-        fun disc(cx: Int, cy: Int, r: Int, c: Int, shadow: Int? = null) = oval(cx + 0.5, cy + 0.5, r + 0.5, r + 0.5, c, shadow)
+        val g = Array(N) { BASE[it].toCharArray() }
+        fun setc(x: Int, y: Int, ch: Char) { if (x in 0 until N && y in 0 until N) g[y][x] = ch }
 
-        val skin = SKIN[f.skin.coerceIn(0, 7)]
-        val skinD = shade(skin, -0.18)
-        val skinL = shade(skin, 0.1)
-        val hair = HAIR[f.hairColor.coerceIn(0, 7)]
-        val hairD = shade(hair, -0.28)
-        val hairL = if (f.hairColor in 4..6) shade(hair, 0.16) else shade(hair, 0.22)
-        val jersey = primary or (0xFF shl 24)
-        val trim = secondary or (0xFF shl 24)
-        val jerseyD = shade(jersey, -0.22)
-        val trimD = shade(trim, -0.2)
-        val numCol = when {
-            abs(lum(trim) - lum(jersey)) >= 0.2 -> trim
-            lum(jersey) > 0.45 -> OUTLINE
-            else -> WHITE
-        }
-        val shirt = when (gear.undershirt) { 1 -> WHITE; 2 -> BLACK; 3 -> jersey; else -> 0 }
-        val sleeveCol = gearColor(gear.sleeveColor, jersey, trim)
-        val sleeveD = shade(sleeveCol, -0.2)
-        val shoe = gearColor(gear.shoeColor, jersey, trim)
-        val shoeD = shade(shoe, -0.25)
-        val shoeAcc = if (lum(shoe) > 0.5) BLACK else WHITE
-        val legsCol = when (gear.legs) {
-            1 -> BLACK; 2 -> WHITE; 3, 4 -> gearColor(0, jersey, trim); else -> 0
-        }
-        val legsD = if (legsCol != 0) shade(legsCol, -0.2) else 0
-        val wrist = when (gear.wristbands) { 1 -> WHITE; 2 -> BLACK; 3 -> jersey; else -> 0 }
-
-        // ---------- pose anchors: mid-stride dribble, like the reference ----------
-        val hx = 30; val hy = 11
-        val neckY = 17
-        val torsoTop = 18; val torsoBot = 33
-        val hipY = 34
-        val ballX = 50; val ballY = 50
-
-        // ---------- back leg (viewer's left, planted) ----------
-        for (y in hipY..47) {
-            val t = (y - hipY) / 13.0
-            val cx = 20 - (t * 5).roundToInt()
-            val half = 5
-            for (x in cx - half..cx + half) {
-                val covered = legsCol != 0 && (gear.legs in setOf(1, 2, 4) || y >= 40)
-                val col = if (covered) (if (x > cx + 1) legsD else legsCol) else if (x > cx + 1) skinD else skin
-                set(x, y, col)
+        // ---------- customize hair silhouette ----------
+        val hStyle = f.hair.coerceIn(0, 13)
+        if (hStyle == 0) {
+            // Bald: strip hair rows to scalp skin, re-outline top.
+            for (y in 1..11) for (x in 20..40) if (g[y][x] == 'H' || g[y][x] == 'h') {
+                g[y][x] = if (y <= 3) '.' else if (x < 26) 's' else 'S'
             }
-        }
-        for (y in 48..56) {
-            val t = (y - 48) / 8.0
-            val cx = 15 - (t * 2).roundToInt()
-            val half = if (y < 54) 3 else 2
-            for (x in cx - half..cx + half) {
-                val covered = legsCol != 0 && gear.legs in setOf(1, 2, 4)
-                val col = if (covered) (if (x > cx + 1) legsD else legsCol) else if (x > cx + 1) skinD else skin
-                set(x, y, col)
+        } else if (hStyle == 1) {
+            // Buzz: lower crown by 2 px.
+            for (y in 1..3) for (x in 20..40) if (g[y][x] != '.') g[y][x] = '.'
+        } else if (hStyle == 4 || hStyle == 6) {
+            // Flat-top / High-top: squared block top.
+            val topY = if (hStyle == 6) 0 else 1
+            for (y in topY..7) for (x in 22..38) {
+                g[y][x] = if (y == topY && x in 27..35) 'h' else 'H'
             }
-        }
-        drawShoe(gear.shoes, 10, 57, shoe, shoeD, shoeAcc, facingRight = false, ::set, ::fill)
-
-        // ---------- front leg (viewer's right, striding) ----------
-        for (y in hipY..46) {
-            val t = (y - hipY) / 12.0
-            val cx = 36 + (t * 8).roundToInt()
-            val half = 5
-            for (x in cx - half..cx + half) {
-                val covered = legsCol != 0 && (gear.legs in setOf(1, 2, 4) || y >= 40)
-                val col = if (covered) (if (x > cx + 1) legsD else legsCol) else if (x > cx + 1) skinD else skin
-                set(x, y, col)
+        } else if (hStyle == 5 || hStyle == 7) {
+            // Afro / Curls: rounded puff around crown.
+            val rad = if (hStyle == 5) 10.2 else 8.8
+            for (y in 0..14) for (x in 18..42) {
+                val d = kotlin.math.hypot((x - 30.0), (y - 6.5) * 1.15)
+                if (d <= rad && g[y][x] == '.') g[y][x] = if ((x + y) % 5 == 0) 'h' else 'H'
             }
-        }
-        for (y in 47..55) {
-            val t = (y - 47) / 8.0
-            val cx = 44 + (t * 3).roundToInt()
-            val half = if (y < 53) 3 else 2
-            for (x in cx - half..cx + half) {
-                val covered = legsCol != 0 && gear.legs in setOf(1, 2, 4)
-                val col = if (covered) (if (x > cx + 1) legsD else legsCol) else if (x > cx + 1) skinD else skin
-                set(x, y, col)
+        } else if (hStyle == 8) {
+            // Cornrows: striped rows across scalp.
+            for (y in 2..8) for (x in 22..38) if (g[y][x] == 'H' || g[y][x] == 'h') {
+                g[y][x] = if (x % 2 == 0) 'H' else 's'
             }
-        }
-        if (gear.legs == 3) {
-            for (y in 43..47) for (x in 38..48) if (y * N + x in fig.indices && fig[y * N + x]) {
-                set(x, y, if (x > 44) legsD else legsCol)
+        } else if (hStyle == 9 || hStyle == 10) {
+            // Locs / Long: locks hanging behind neck/ear on left.
+            for (y in 9..20) for (x in 18..22) {
+                if (g[y][x] == '.') g[y][x] = if (hStyle == 9 && (x + y) % 2 == 0) 'h' else 'H'
             }
-        }
-        drawShoe(gear.shoes, 44, 56, shoe, shoeD, shoeAcc, facingRight = true, ::set, ::fill)
-
-        // ---------- shorts (over the tights) ----------
-        for (y in hipY - 1..hipY + 7) {
-            val half = when (y - hipY) {
-                -1 -> 9; 0 -> 10; 1 -> 11; 2 -> 11; 3 -> 10; 4 -> 9; 5 -> 8; else -> 7
+        } else if (hStyle == 11) {
+            // Mohawk: strip sides of crown, tall center crest.
+            for (y in 1..6) for (x in 21..39) if (g[y][x] in "Hh#" && abs(x - 30) > 3) g[y][x] = '.'
+            for (y in 0..7) for (x in 28..32) g[y][x] = if (y == 0) 'h' else 'H'
+        } else if (hStyle == 12) {
+            // Waves: alternating horizontal ripple.
+            for (y in 3..7) for (x in 22..38) if (g[y][x] == 'H' || g[y][x] == 'h') {
+                g[y][x] = if (y % 2 == 0) 'H' else 'h'
             }
-            for (x in 30 - half..30 + half) {
-                val stripe = x - 30 == (y - hipY) + 3 || x - 30 == (y - hipY) + 4
-                set(x, y, when {
-                    stripe && x > 30 -> trim
-                    x > 30 + half - 2 -> jerseyD
-                    else -> jersey
-                })
-            }
-        }
-        for (x in 22..38) set(x, hipY + 7, trimD)
-
-        // ---------- torso / jersey ----------
-        for (y in torsoTop..torsoBot) {
-            val t = (y - torsoTop).toDouble() / (torsoBot - torsoTop)
-            val half = (8 + t * 3).roundToInt()
-            // Slight lean toward the dribble side.
-            val lean = ((y - torsoTop) / 5)
-            for (x in hx - half + lean..hx + half + lean) {
-                set(x, y, if (x > hx + half + lean - 2) jerseyD else jersey)
-            }
-        }
-        // Armholes trim
-        for (y in torsoTop + 1..torsoTop + 8) {
-            set(hx - 8, y, trim); set(hx + 8, y, trim)
-        }
-        // V-neck
-        if (gear.undershirt > 0) {
-            for (y in torsoTop..torsoTop + 4) for (x in hx - 2..hx + 2) {
-                if (abs(x - hx) + (y - torsoTop) < 4) set(x, y, shirt)
-            }
-            set(hx - 2, torsoTop, trim); set(hx + 2, torsoTop, trim)
-            set(hx - 1, torsoTop + 1, trim); set(hx + 1, torsoTop + 1, trim)
-            set(hx, torsoTop + 2, trim)
-        } else {
-            for (y in torsoTop..torsoTop + 3) {
-                set(hx - 2 + (y - torsoTop), y, trim)
-                set(hx + 2 - (y - torsoTop), y, trim)
-            }
-            set(hx, torsoTop + 3, skin)
-            set(hx - 1, torsoTop + 2, skin); set(hx + 1, torsoTop + 2, skin)
-        }
-        // Number on chest
-        val digits = number.coerceIn(0, 99).toString()
-        val nw = digits.length * 3 + (digits.length - 1)
-        var nx = hx - nw / 2
-        val ny = torsoTop + 8
-        for (ch in digits) {
-            val pat = DIGITS[ch - '0']
-            for (i in 0 until 15) if (pat[i] == '1') set(nx + i % 3, ny + i / 3, numCol)
-            nx += 4
+        } else if (hStyle == 13) {
+            // Man bun: knot at top-back of head.
+            for (y in 0..4) for (x in 20..25) g[y][x] = if (y == 1 && x == 23) 'h' else 'H'
         }
 
-        // ---------- arms ----------
-        // Back arm (viewer's left): bent near waist
-        for (y in 20..28) {
-            val cx = hx - 9 - ((y - 20) / 3)
-            for (x in cx - 2..cx + 2) set(x, y, if (x > cx) skinD else skin)
+        // ---------- eyes / brows / mouth ----------
+        if (f.eyes == 1) { // focused: 1px shorter eyes
+            setc(29, 12, 's'); setc(35, 12, 'S')
+        } else if (f.eyes == 2) { // wide: extra white highlight
+            setc(28, 12, 'W'); setc(36, 12, 'W')
         }
-        for (y in 28..34) {
-            val cx = hx - 11 + ((y - 28) / 2)
-            for (x in cx - 2..cx + 2) set(x, y, if (x > cx) skinD else skin)
+        if (f.brows == 1) { // thick brows
+            for (x in 26..30) setc(x, 10, '#')
+        } else if (f.brows == 2) { // angled fierce brow
+            setc(26, 10, '#'); setc(30, 12, '#')
         }
-        // Fist near hip
-        disc(hx - 9, 35, 2, skin, skinD)
-        if (wrist != 0) fill(hx - 12, 32, hx - 8, 33, wrist)
-
-        // Dribble arm (viewer's right): reaching down to the ball
-        for (y in 20..28) {
-            val cx = hx + 10 + ((y - 20) / 3)
-            val onSleeve = gear.sleeve == 1 || gear.sleeve == 3
-            for (x in cx - 3..cx + 3) {
-                val col = if (onSleeve && y <= 27) (if (x > cx) sleeveD else sleeveCol) else if (x > cx) skinD else skin
-                set(x, y, col)
-            }
-        }
-        for (y in 29..48) {
-            val t = (y - 29) / 19.0
-            val cx = hx + 14 + (t * 10).roundToInt()
-            val onSleeve = (gear.sleeve == 1 || gear.sleeve == 3) && y <= 34
-            for (x in cx - 3..cx + 3) {
-                val col = if (onSleeve) (if (x > cx) sleeveD else sleeveCol) else if (x > cx) skinD else skin
-                set(x, y, col)
-            }
-        }
-        // Hand on the ball
-        disc(ballX - 1, ballY - 5, 3, skin, skinD)
-        if (wrist != 0) fill(ballX - 5, 43, ballX, 44, wrist)
-
-        // Opposite sleeve if both / right arm (viewer's left)
-        if (gear.sleeve == 2 || gear.sleeve == 3) {
-            for (y in 20..26) {
-                val cx = hx - 9 - ((y - 20) / 3)
-                for (x in cx - 2..cx + 2) set(x, y, if (x > cx) sleeveD else sleeveCol)
-            }
+        if (f.mouth == 1) { // smile
+            setc(29, 17, '#'); setc(34, 17, '#'); setc(30, 18, 'W'); setc(31, 18, 'W'); setc(32, 18, 'W')
+        } else if (f.mouth == 2) { // smirk
+            setc(29, 17, '#'); setc(33, 18, 'S')
         }
 
-        // ---------- ball ----------
-        disc(ballX, ballY, 5, BALL, BALL_D)
-        // Seam + highlight
-        for (a in -4..4) {
-            set(ballX + a, ballY, OUTLINE)
-            set(ballX, ballY + a, OUTLINE)
-        }
-        set(ballX - 2, ballY - 3, BALL_L); set(ballX - 3, ballY - 2, BALL_L)
-
-        // ---------- neck ----------
-        fill(hx - 2, neckY - 1, hx + 2, torsoTop, skin)
-        set(hx + 2, neckY, skinD); set(hx + 2, neckY + 1, skinD)
-
-        // ---------- head ----------
-        val (rx, ryTop, ryBot) = when (f.head.coerceIn(0, 3)) {
-            1 -> Triple(7, 6, 7)   // round
-            2 -> Triple(7, 5, 8)   // square
-            3 -> Triple(6, 7, 9)   // long
-            else -> Triple(7, 6, 8)
-        }
-        for (y in hy - ryTop..hy + ryBot) {
-            val t = if (y <= hy) (hy - y).toDouble() / ryTop else (y - hy).toDouble() / ryBot
-            val hw = (rx * (1 - t * t * 0.85)).roundToInt().coerceAtLeast(2)
-            for (x in hx - hw..hx + hw) {
-                val col = when {
-                    x >= hx + hw - 1 -> skinD
-                    x == hx - hw + 1 && y in hy - 2..hy + 3 -> skinL
-                    y >= hy + ryBot - 1 -> skinD
-                    else -> skin
-                }
-                set(x, y, col)
-            }
-        }
-        // Ears
-        set(hx - rx - 1, hy, skin); set(hx - rx - 1, hy + 1, skinD)
-        set(hx + rx + 1, hy, skinD); set(hx + rx + 1, hy + 1, skinD)
-
-        // Eyes
-        val eyeY = hy
-        when (f.eyes.coerceIn(0, 2)) {
-            1 -> { // focused: smaller dark
-                set(hx - 3, eyeY, OUTLINE); set(hx - 2, eyeY, OUTLINE)
-                set(hx + 2, eyeY, OUTLINE); set(hx + 3, eyeY, OUTLINE)
-            }
-            2 -> { // wide
-                fill(hx - 4, eyeY - 1, hx - 2, eyeY, WHITE)
-                fill(hx + 2, eyeY - 1, hx + 4, eyeY, WHITE)
-                set(hx - 3, eyeY, OUTLINE); set(hx + 3, eyeY, OUTLINE)
-                set(hx - 4, eyeY - 1, WHITE)
-            }
-            else -> {
-                set(hx - 3, eyeY, WHITE); set(hx - 2, eyeY, OUTLINE)
-                set(hx + 2, eyeY, OUTLINE); set(hx + 3, eyeY, WHITE)
-            }
-        }
-        // Brows
-        val brow = if (f.hair == 0 && f.hairColor >= 4) hairD else shade(hair, -0.1)
-        when (f.brows.coerceIn(0, 2)) {
-            1 -> {
-                fill(hx - 4, eyeY - 3, hx - 1, eyeY - 2, brow)
-                fill(hx + 1, eyeY - 3, hx + 4, eyeY - 2, brow)
-            }
-            2 -> {
-                set(hx - 4, eyeY - 3, brow); set(hx - 3, eyeY - 2, brow); set(hx - 2, eyeY - 2, brow)
-                set(hx + 2, eyeY - 2, brow); set(hx + 3, eyeY - 2, brow); set(hx + 4, eyeY - 3, brow)
-            }
-            else -> {
-                fill(hx - 4, eyeY - 2, hx - 1, eyeY - 2, brow)
-                fill(hx + 1, eyeY - 2, hx + 4, eyeY - 2, brow)
-            }
-        }
-        // Nose
-        set(hx, eyeY + 2, skinD); set(hx, eyeY + 3, skinD); set(hx - 1, eyeY + 4, shade(skin, -0.28))
-        // Mouth
-        val lip = mix(shade(skin, -0.35), 0xFF8A2F2F.toInt(), 0.28)
-        val my = eyeY + 6
-        when (f.mouth.coerceIn(0, 2)) {
-            1 -> { fill(hx - 2, my, hx + 2, my, lip); set(hx - 3, my - 1, lip); set(hx + 3, my - 1, lip) }
-            2 -> { fill(hx - 1, my, hx + 2, my, lip); set(hx + 3, my - 1, lip) }
-            else -> fill(hx - 2, my, hx + 2, my, lip)
+        // ---------- facial hair ('F' = beard) ----------
+        val beard = f.beard.coerceIn(0, 5)
+        if (beard == 2 || beard == 3) { // mustache / goatee
+            for (x in 29..34) setc(x, 17, 'F')
+            if (beard == 3) for (y in 19..20) for (x in 30..33) if (g[y][x] in "Ss#") setc(x, y, 'F')
+        } else if (beard == 4) { // chin strap
+            for (y in 15..19) for (x in 24..36) if (g[y][x] in "Ss" && (x <= 25 || y >= 19)) setc(x, y, 'F')
+        } else if (beard == 5) { // full beard
+            for (y in 16..20) for (x in 24..37) if (g[y][x] in "Ss" && !(y == 18 && x in 30..33)) setc(x, y, 'F')
         }
 
-        // Facial hair
-        val fh = shade(hair, -0.05)
-        val chinY = hy + ryBot
-        when (f.beard.coerceIn(0, 5)) {
-            1 -> for (y in my..chinY) for (x in hx - 5..hx + 5) {
-                val i = y * N + x
-                if (i in fig.indices && fig[i] && (x + y) % 2 == 0 && px[i] != lip) {
-                    set(x, y, mix(px[i], fh, 0.55))
-                }
-            }
-            2 -> fill(hx - 2, my - 1, hx + 2, my - 1, fh)
-            3 -> {
-                fill(hx - 2, my - 1, hx + 2, my - 1, fh)
-                set(hx - 2, my, fh); set(hx + 2, my, fh)
-                fill(hx - 1, my + 1, hx + 1, chinY, fh)
-            }
-            4 -> for (y in eyeY + 2..chinY) {
-                set(hx - 5, y, fh); set(hx + 5, y, fh)
-                if (y >= chinY - 1) fill(hx - 5, y, hx + 5, y, fh)
-            }
-            5 -> for (y in my - 1..chinY) for (x in hx - 5..hx + 5) {
-                val i = y * N + x
-                if (i in fig.indices && fig[i] && !(y == my && x in hx - 2..hx + 2)) {
-                    set(x, y, if (x >= hx + 4) shade(fh, -0.2) else fh)
-                }
-            }
-        }
-
-        // Hair
-        drawHair(f.hair.coerceIn(0, 13), hx, hy, rx, ryTop, hair, hairD, hairL, skin, ::set, ::fill, ::disc)
-
-        // Accessories
+        // ---------- extras (headband / glasses / goggles / earring) ----------
         when (f.acc.coerceIn(0, 5)) {
             1, 2 -> {
-                val band = if (f.acc == 1) WHITE else trim
-                fill(hx - rx, hy - 3, hx + rx, hy - 2, band)
-                if (f.acc == 1) fill(hx - rx, hy - 2, hx + rx, hy - 2, shade(WHITE, -0.12))
-                else fill(hx - rx, hy - 2, hx + rx, hy - 2, jersey)
+                val ch = if (f.acc == 1) 'W' else 'T'
+                for (y in 8..9) for (x in 22..38) if (g[y][x] != '.') g[y][x] = ch
             }
             3 -> { // goggles
-                val frame = 0xFF2B2B2B.toInt()
-                fill(hx - 5, eyeY - 1, hx + 5, eyeY + 1, frame)
-                fill(hx - 4, eyeY, hx - 2, eyeY, mix(WHITE, 0xFF88CCFF.toInt(), 0.5))
-                fill(hx + 2, eyeY, hx + 4, eyeY, mix(WHITE, 0xFF88CCFF.toInt(), 0.5))
+                for (x in 26..38) { setc(x, 11, '#'); setc(x, 14, '#') }
+                for (y in 12..13) { setc(27, y, 'W'); setc(34, y, 'W') }
             }
-            4 -> set(hx - rx - 1, hy + 2, 0xFFF2C14E.toInt())
+            4 -> setc(21, 15, 'T') // gold earring on ear
             5 -> { // glasses
-                val frame = 0xFF222222.toInt()
-                fill(hx - 5, eyeY - 1, hx - 1, eyeY - 1, frame)
-                fill(hx + 1, eyeY - 1, hx + 5, eyeY - 1, frame)
-                set(hx - 5, eyeY, frame); set(hx - 1, eyeY, frame)
-                set(hx + 1, eyeY, frame); set(hx + 5, eyeY, frame)
-                set(hx, eyeY - 1, frame)
+                for (x in 26..38) setc(x, 11, '#')
+                setc(26, 12, '#'); setc(31, 12, '#'); setc(38, 12, '#')
             }
         }
 
-        // Thick silhouette outline
-        val out = px.copyOf()
-        for (y in 0 until N) for (x in 0 until N) {
-            if (!fig[y * N + x]) continue
-            var edge = false
-            for (dy in -1..1) for (dx in -1..1) {
-                if (dx == 0 && dy == 0) continue
-                val xx = x + dx; val yy = y + dy
-                if (xx !in 0 until N || yy !in 0 until N || !fig[yy * N + xx]) { edge = true; break }
+        // ---------- chest number (up to 2 digits in 26..35, 25..34) ----------
+        val digits = number.coerceIn(0, 99).toString()
+        if (digits.length == 1) {
+            val pat = DIGITS[digits[0] - '0']
+            // Scale 3x5 -> 4x8 to match reference's bold chest number.
+            for (dy in 0 until 8) for (dx in 0 until 4) {
+                val sy = dy * 5 / 8; val sx = dx * 3 / 4
+                if (pat[sy * 3 + sx] == '1') setc(28 + dx, 27 + dy, 'N')
             }
-            // Draw outline onto neighboring empty pixels for a thick comic outline.
-            if (edge) {
-                for (dy in -1..1) for (dx in -1..1) {
-                    val xx = x + dx; val yy = y + dy
-                    if (xx in 0 until N && yy in 0 until N && !fig[yy * N + xx]) out[yy * N + xx] = OUTLINE
+        } else {
+            var ox = 26
+            for (d in digits) {
+                val pat = DIGITS[d - '0']
+                for (dy in 0 until 6) for (dx in 0 until 3) {
+                    val sy = dy * 5 / 6
+                    if (pat[sy * 3 + dx] == '1') setc(ox + dx, 28 + dy, 'N')
+                }
+                ox += 4
+            }
+        }
+
+        // Re-ensure 4-connected outline '#' around any modified silhouette pixels.
+        val snap = Array(N) { g[it].clone() }
+        for (y in 0 until N) for (x in 0 until N) {
+            val ch = snap[y][x]
+            if (ch == '.' || ch == '#') continue
+            for ((dx, dy) in listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) {
+                val nx = x + dx; val ny = y + dy
+                if (nx !in 0 until N || ny !in 0 until N || snap[ny][nx] == '.') {
+                    g[y][x] = '#'
+                    break
                 }
             }
+        }
+
+        // ---------- resolve palette ----------
+        val skin = SKIN[f.skin.coerceIn(0, 7)]
+        val skinD = shade(skin, -0.22)
+        val hair = HAIR[f.hairColor.coerceIn(0, 7)]
+        val hairHi = if (f.hairColor == 0) 0xFF766052.toInt() else shade(hair, 0.28)
+        val beardCol = shade(hair, -0.08)
+        val jersey = primary or (0xFF shl 24)
+        val jerseyD = shade(jersey, -0.32)
+        val trim = secondary or (0xFF shl 24)
+        val numCol = when {
+            abs(lum(trim) - lum(jersey)) >= 0.2 -> WHITE
+            lum(jersey) > 0.55 -> OUTLINE
+            else -> WHITE
+        }
+        val collarCol = when (gear.undershirt) {
+            1 -> WHITE
+            2 -> BLACK
+            3 -> jersey
+            else -> WHITE
+        }
+        val sleeveCol = gearCol(gear.sleeveColor, jersey, trim)
+        val sleeveD = shade(sleeveCol, -0.25)
+        val wristCol = when (gear.wristbands) {
+            1 -> WHITE; 2 -> BLACK; 3 -> trim; else -> 0
+        }
+        val legBase = when (gear.legs) {
+            0 -> skin
+            1 -> BLACK
+            2 -> WHITE
+            else -> if (abs(lum(trim) - lum(jersey)) > 0.15) trim else shade(jersey, -0.35)
+        }
+        val legDark = if (gear.legs == 0) skinD else shade(legBase, -0.25)
+        val shoeCol = if (gear.shoeColor == 0) jersey else gearCol(gear.shoeColor, jersey, trim)
+        val shoeDark = shade(shoeCol, -0.32)
+
+        val out = IntArray(N * N)
+        for (y in 0 until N) for (x in 0 until N) {
+            val ch = g[y][x]
+            if (ch == '.') { out[y * N + x] = 0; continue }
+            var c = when (ch) {
+                '#' -> OUTLINE
+                'H' -> hair
+                'h' -> hairHi
+                'F' -> beardCol
+                'S' -> skin
+                's' -> skinD
+                'J' -> jersey
+                'j' -> jerseyD
+                'T' -> trim
+                'C' -> collarCol
+                'N' -> numCol
+                'W' -> WHITE
+                'L' -> legBase
+                'l' -> legDark
+                'U' -> shoeCol
+                'u' -> shoeDark
+                'B' -> BALL_HI
+                'b' -> BALL
+                'm' -> BALL_MID
+                'd' -> BALL_DARK
+                else -> OUTLINE
+            }
+            // Stubble dither on lower face
+            if (beard == 1 && y in 15..19 && x in 24..36 && (ch == 'S' || ch == 's') && (x + y) % 2 == 0) {
+                c = mix(c, beardCol, 0.45)
+            }
+            // Arm sleeves: back arm (x<21, y in 23..34) = right arm; front dribble arm (x in 34..41, y in 22..32) = left arm
+            if ((ch == 'S' || ch == 's') && y in 22..35) {
+                val onBackArm = x < 21 && (gear.sleeve == 2 || gear.sleeve == 3)
+                val onFrontArm = x in 34..41 && (gear.sleeve == 1 || gear.sleeve == 3)
+                if (onBackArm || onFrontArm) c = if (ch == 's') sleeveD else sleeveCol
+            }
+            // Wristbands near hands
+            if (wristCol != 0 && (ch == 'S' || ch == 's')) {
+                if ((x < 16 && y in 35..36) || (x in 36..41 && y in 30..31)) c = wristCol
+            }
+            out[y * N + x] = c
         }
         return out
-    }
-
-    private fun drawShoe(
-        style: Int, x: Int, y: Int, shoe: Int, shoeD: Int, accent: Int, facingRight: Boolean,
-        set: (Int, Int, Int) -> Unit, fill: (Int, Int, Int, Int, Int) -> Unit,
-    ) {
-        val dir = if (facingRight) 1 else -1
-        // Sole
-        run {
-            val x0 = min(x, x + 8 * dir); val x1 = max(x, x + 8 * dir)
-            fill(x0, y + 2, x1, y + 3, BLACK)
-        }
-        // Body
-        when (style.coerceIn(0, 5)) {
-            0, 4 -> { // low / speed
-                val x0 = min(x, x + 7 * dir); val x1 = max(x, x + 7 * dir)
-                fill(x0, y, x1, y + 2, shoe)
-                set(x + 6 * dir, y, shoeD)
-            }
-            1 -> { // mid
-                val x0 = min(x, x + 7 * dir); val x1 = max(x, x + 7 * dir)
-                fill(x0, y - 1, x1, y + 2, shoe)
-                val a0 = min(x, x + 2 * dir); val a1 = max(x, x + 2 * dir)
-                fill(a0, y - 1, a1, y, accent)
-            }
-            2, 3, 5 -> { // high / retro / signature
-                val x0 = min(x, x + 7 * dir); val x1 = max(x, x + 7 * dir)
-                fill(x0, y - 3, x1, y + 2, shoe)
-                val a0 = min(x, x + 3 * dir); val a1 = max(x, x + 3 * dir)
-                fill(a0, y - 3, a1, y - 1, accent)
-                set(x + 5 * dir, y - 1, accent)
-            }
-        }
-        // Toe highlight
-        set(x + (if (facingRight) 6 else -6), y + 1, shoeD)
-    }
-
-    private fun drawHair(
-        style: Int, hx: Int, hy: Int, rx: Int, ryTop: Int,
-        hair: Int, hairD: Int, hairL: Int, skin: Int,
-        set: (Int, Int, Int) -> Unit,
-        fill: (Int, Int, Int, Int, Int) -> Unit,
-        disc: (Int, Int, Int, Int, Int?) -> Unit,
-    ) {
-        val top = hy - ryTop
-        fun scalp(extraTop: Int = 0, down: Int = 3, side: Int = 1, pat: (Int, Int) -> Int = { _, _ -> hair }) {
-            for (y in top - extraTop..top + down) for (x in hx - rx - side..hx + rx + side) {
-                val onHead = y >= top && abs(x - hx) <= rx + (if (y <= top + 2) side else 0)
-                val above = y < top && abs(x - hx) <= rx - (top - y) + 1
-                if (onHead || above) set(x, y, pat(x, y))
-            }
-        }
-        when (style) {
-            0 -> set(hx - 2, top + 1, shade(skin, 0.1)) // bald highlight
-            1 -> scalp(0, 2, 1) { x, y -> if ((x + y) % 2 == 0) hair else mix(hair, skin, 0.4) }
-            2 -> {
-                scalp(1, 3, 1)
-                set(hx - 3, top - 1, hairL); set(hx - 2, top - 1, hairL)
-            }
-            3 -> {
-                scalp(1, 2, 0)
-                for (y in top + 2..top + 5) {
-                    set(hx - rx, y, mix(hair, skin, 0.45))
-                    set(hx + rx, y, mix(hair, skin, 0.45))
-                }
-                set(hx - 2, top - 1, hairL)
-            }
-            4 -> { // flat-top
-                fill(hx - rx - 1, top - 4, hx + rx + 1, top + 1, hair)
-                fill(hx - rx, top - 4, hx + rx, top - 4, hairL)
-            }
-            5 -> { // afro
-                disc(hx, hy - 2, 10, hair, hairD)
-                for (i in 0..8) set(hx - 6 + i * 2, hy - 8 + (i % 3), hairL)
-            }
-            6 -> { // high-top
-                fill(hx - rx, top - 7, hx + rx, top + 1, hair)
-                fill(hx - rx + 1, top - 7, hx + rx - 1, top - 7, hairL)
-                set(hx + rx, top - 3, hairD)
-            }
-            7 -> { // curls
-                disc(hx, hy - 1, 8, hair, hairD)
-                scalp(2, 2, 2) { x, y -> if ((x + y) % 3 == 0) hairD else if ((x * 2 + y) % 5 == 0) hairL else hair }
-            }
-            8 -> scalp(1, 4, 1) { x, _ -> if (x % 2 == 0) hair else mix(hair, skin, 0.55) } // cornrows
-            9 -> { // locs
-                scalp(1, 3, 2) { x, _ -> if (x % 2 == 0) hairD else hair }
-                for (y in hy..hy + 10) for (x in hx - rx - 2..hx + rx + 2 step 2) {
-                    if (abs(x - hx) >= rx - 1) set(x, y, if (x % 4 == 0) hairD else hair)
-                }
-            }
-            10 -> { // long
-                scalp(1, 3, 2)
-                for (y in hy..hy + 12) {
-                    set(hx - rx - 1, y, hair); set(hx + rx + 1, y, hairD)
-                    if (y % 3 == 0) { set(hx - rx - 2, y, hair); set(hx + rx + 2, y, hair) }
-                }
-                fill(hx - 1, top, hx + 1, top + 3, hairD) // part
-            }
-            11 -> { // mohawk
-                fill(hx - 2, top - 6, hx + 2, top + 2, hair)
-                fill(hx - 1, top - 6, hx + 1, top - 6, hairL)
-                for (y in top..top + 3) {
-                    set(hx - rx, y, mix(hair, skin, 0.5))
-                    set(hx + rx, y, mix(hair, skin, 0.5))
-                }
-            }
-            12 -> scalp(1, 3, 1) { _, y -> if ((y - top) % 2 == 0) hairD else hair } // waves
-            13 -> { // man bun
-                scalp(1, 2, 1)
-                disc(hx, top - 3, 3, hair, hairD)
-                set(hx - 1, top - 5, hairL)
-            }
-        }
     }
 }
