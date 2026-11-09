@@ -47,9 +47,12 @@ object Pixels {
     private val cache = android.util.LruCache<String, ImageBitmap>(120)
 
     fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear(), jersey: String? = null) =
-        "v8|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
+        "v9|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
+
+    /** Drop cached portraits so a newly saved face shows up on the roster. */
+    fun clear() { cache.evictAll() }
 
     fun bitmap(
         f: Face,

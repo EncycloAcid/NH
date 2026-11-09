@@ -1,6 +1,10 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,9 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.nh.hoopscoach.game.Arch
+import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Legacy
@@ -33,7 +39,7 @@ import com.nh.hoopscoach.game.Pos
 import com.nh.hoopscoach.game.Ratings
 import kotlin.math.roundToInt
 
-/** Edit one of your players: name, number, position, size, background and play style. */
+/** Edit one of your players: look, name, number, position, size, background and play style. */
 @Composable
 fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     val p = lg.playerOrNull(playerId)
@@ -42,6 +48,8 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         return
     }
     val t = lg.team(p.teamId)
+    val jerseyKey = SpriteSheets.jerseyKey(t.abbr, t.slot, t.name)
+    val face = Face.of(p)
     var first by remember(playerId) { mutableStateOf(p.first) }
     var last by remember(playerId) { mutableStateOf(p.last) }
     var number by remember(playerId) { mutableIntStateOf(p.number) }
@@ -63,32 +71,78 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
     val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
     if (style !in styles) style = styles.first()
+
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            BackBar("Edit player", p.name, onBack = { vm.back() })
-            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                // His portrait: tap it to open the portrait maker.
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.clickable { vm.push(Route.Portrait(p.id)) }) { PixelPortrait(p, t, 84.dp) }
-                    Text("Edit portrait", style = T.small, color = P.accent, modifier = Modifier.clickable { vm.push(Route.Portrait(p.id)) }.padding(top = 4.dp))
+            BackBar("Customize player", p.name, onBack = { vm.back() })
+
+            // Live look card — tap to open the full customizer
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Gutter, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(P.surface)
+                    .border(1.dp, P.line, RoundedCornerShape(20.dp))
+                    .clickable { vm.push(Route.Portrait(p.id)) }
+                    .padding(14.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BasketballCharacterCanvas(
+                        face = face,
+                        jerseyKey = jerseyKey,
+                        primary = t.primary.toInt(),
+                        secondary = t.secondary.toInt(),
+                        number = number,
+                        background = Color(0xFF1A1714),
+                        corner = 14.dp,
+                        modifier = Modifier.size(112.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("PLAYER LOOK", style = T.label, color = P.accent)
+                        Text(
+                            first.ifBlank { "First" }.uppercase(),
+                            style = T.label,
+                            color = P.sub,
+                        )
+                        Text(
+                            last.ifBlank { "Last" }.uppercase(),
+                            style = T.title,
+                            color = P.ink,
+                            maxLines = 1,
+                        )
+                        Text(
+                            "$pos · ${p.cls} · ${Ratings.heightLabel(height)}",
+                            style = T.small,
+                            color = P.sub,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Edit portrait →",
+                            style = T.bodyB,
+                            color = P.accent,
+                        )
+                    }
+                    Ring(ovr, 52.dp, label = "OVR", textSize = 18.sp())
                 }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(first.ifBlank { "First" }.uppercase(), style = T.label, color = P.sub)
-                    Text(last.ifBlank { "Last" }.uppercase(), style = T.title, color = P.ink, maxLines = 1)
-                    Text("$pos · ${p.cls} · ${Ratings.heightLabel(height)} · $weight lbs", style = T.small, color = P.sub)
-                    Text("${style.label} · ${t.school}", style = T.small, color = P.accent)
-                }
-                Ring(ovr, 52.dp, label = "OVR", textSize = 18.sp())
             }
 
             Section("Name")
             Panel {
-                OutlinedTextField(first, { first = it.take(16) }, label = { Text("First name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                OutlinedTextField(
+                    first, { first = it.take(16) },
+                    label = { Text("First name") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(last, { last = it.take(18) }, label = { Text("Last name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                OutlinedTextField(
+                    last, { last = it.take(18) },
+                    label = { Text("Last name") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                )
             }
 
             Section("Jersey number")
@@ -97,22 +151,43 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     SmallButton("−10") { number = (number - 10).coerceIn(0, 99) }
                     Spacer(Modifier.width(6.dp))
                     SmallButton("−") { number = (number - 1).coerceIn(0, 99) }
-                    Text("$number", style = T.num, color = if (numberProblem == null) P.ink else P.bad, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Text(
+                        "$number",
+                        style = T.num,
+                        color = if (numberProblem == null) P.ink else P.bad,
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
                     SmallButton("+") { number = (number + 1).coerceIn(0, 99) }
                     Spacer(Modifier.width(6.dp))
                     SmallButton("+10") { number = (number + 10).coerceIn(0, 99) }
                 }
-                if (numberProblem != null) { Spacer(Modifier.height(6.dp)); Text(numberProblem, style = T.small, color = P.bad) }
+                if (numberProblem != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(numberProblem, style = T.small, color = P.bad)
+                }
             }
 
             Section("Position")
             Segmented(Pos.entries.map { it.name }, pos.ordinal, { pos = Pos.entries[it] })
             val seconds = listOf<Pos?>(null) + Ratings.secondOptions(pos)
-            Text("SECOND POSITION", style = T.label, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 12.dp, bottom = 6.dp))
-            Segmented(seconds.map { it?.name ?: "None" }, seconds.indexOf(pos2).coerceAtLeast(0), { pos2 = seconds[it] })
             Text(
-                if (pos == p.pos) "His overall is rated for the position he plays." else "At $pos his overall would be ${shown(ovr)} (now ${shown(p.ovr)} at ${p.pos}). Ratings don't change, only how they're weighed.",
-                style = T.small, color = if (pos == p.pos) P.sub else P.warn, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
+                "SECOND POSITION",
+                style = T.label,
+                color = P.sub,
+                modifier = Modifier.padding(start = Gutter + 4.dp, top = 12.dp, bottom = 6.dp),
+            )
+            Segmented(
+                seconds.map { it?.name ?: "None" },
+                seconds.indexOf(pos2).coerceAtLeast(0),
+                { pos2 = seconds[it] },
+            )
+            Text(
+                if (pos == p.pos) "His overall is rated for the position he plays."
+                else "At $pos his overall would be ${shown(ovr)} (now ${shown(p.ovr)} at ${p.pos}). Ratings don't change, only how they're weighed.",
+                style = T.small,
+                color = if (pos == p.pos) P.sub else P.warn,
+                modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
             )
 
             Section("Size")
@@ -125,24 +200,43 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
 
             Section("Play style")
-            Picker("Archetype", style.label, styles.map { it.label to it.blurb }, Modifier.padding(horizontal = Gutter).fillMaxWidth()) { style = styles[it] }
+            Picker(
+                "Archetype",
+                style.label,
+                styles.map { it.label to it.blurb },
+                Modifier.padding(horizontal = Gutter).fillMaxWidth(),
+            ) { style = styles[it] }
             Text(
                 "The archetype is his identity: it's the training focus that suits him best. It doesn't change his ratings.",
-                style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
+                style = T.small,
+                color = P.sub,
+                modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
             )
 
             Section("Background")
             Panel {
-                OutlinedTextField(town, { town = it.take(28) }, label = { Text("Hometown") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                OutlinedTextField(
+                    town, { town = it.take(28) },
+                    label = { Text("Hometown") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(school, { school = it.take(28) }, label = { Text("High school") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                OutlinedTextField(
+                    school, { school = it.take(28) },
+                    label = { Text("High school") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                )
             }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SecondaryButton("Cancel", Modifier.weight(1f)) { vm.back() }
-                PrimaryButton("Save", Modifier.weight(1f), enabled = first.isNotBlank() && last.isNotBlank() && numberProblem == null) {
+                PrimaryButton(
+                    "Save",
+                    Modifier.weight(1f),
+                    enabled = first.isNotBlank() && last.isNotBlank() && numberProblem == null,
+                ) {
                     val f = first.trim(); val l = last.trim(); val tn = town.trim(); val hs = school.trim()
                     val n = number; val ps = pos; val ps2 = pos2; val h = height; val w = weight; val st = style
                     vm.act {
@@ -153,7 +247,9 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                         if (hs.isNotEmpty()) pl.highSchool = hs
                         pl.style = st
                         val tm = it.team(pl.teamId)
-                        if (moved) { if (tm.plan.auto) Gameplan.autoAllocate(it, tm) else Gameplan.validate(it, tm) }
+                        if (moved) {
+                            if (tm.plan.auto) Gameplan.autoAllocate(it, tm) else Gameplan.validate(it, tm)
+                        }
                     }
                     vm.toast("Saved")
                     vm.back()
