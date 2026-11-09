@@ -95,12 +95,14 @@ object Season {
         Fans.drift(lg)
         Morale.tick(lg)
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
-        // Practice: everyone improves a little, bench players included.
+        // Practice: everyone improves a little, bench players included — up to their ceiling, not past it.
         for (t in lg.teams) {
             val dev = Coaching.devOf(lg.coachOf(t))
             for (pid in t.roster) {
                 val p = lg.player(pid)
-                Ratings.addXp(p, (7 * Ratings.devRate(p, dev)).roundToInt())
+                if (p.ovr >= p.pot) continue
+                // Light practice XP: games do most of the growing, so the league doesn't creep up every day.
+                Ratings.addXp(p, (4 * Ratings.devRate(p, dev)).roundToInt())
                 Tryouts.checkStar(lg, t, p)
             }
         }

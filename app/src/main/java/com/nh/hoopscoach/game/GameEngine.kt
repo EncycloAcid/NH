@@ -65,6 +65,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val n: DoubleArray = lg.norms ?: computeNorms(lg).also { lg.norms = it }
     private val skillOff = DoubleArray(2) { if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0 }
     private val skillDef = DoubleArray(2) { if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0 }
+    /**
+     * How much a rating gap moves the game. Top-heavy rosters need the star's edge to show up in
+     * make%, turnovers and boards; 1.0 left blue bloods too close to mid-majors once norms recentered.
+     */
+    private val talent = TALENT
+    /** Shot-selection scale tracked to the league's starters, so mix stays stable if ratings drift. */
+    private val skillScale = ((n[0] + n[1] + n[2]) / 3.0).coerceIn(55.0, 80.0)
 
     companion object {
         /**
@@ -73,6 +80,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
          * The offsets keep the original calibration: center = norm + offset.
          */
         private val OFFSET = doubleArrayOf(-1.31, -2.63, 0.48, -0.41, -3.43, -2.8, -1.45, -3.92, -2.93)
+        /** Rating sensitivity for college games (see [talent]). */
+        const val TALENT = 1.15
 
         fun computeNorms(lg: League): DoubleArray {
             val sums = DoubleArray(9)
@@ -248,7 +257,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val pasAvg = offense.map { it[Attr.PAS] }.average()
 
         // Turnover
-        var pTo = 0.168 + (stealD - n[7]) * 0.0018 - (handler[Attr.HND] - n[3]) * 0.0018 - (pasAvg - n[4]) * 0.0008
+        var pTo = 0.168 + ((stealD - n[7]) * 0.0018 - (handler[Attr.HND] - n[3]) * 0.0018 - (pasAvg - n[4]) * 0.0008) * talent
         when (def(d)) { Defense.PRESS -> pTo += 0.035; Defense.PACKLINE -> pTo -= 0.012; Defense.ZONE -> pTo -= 0.006; else -> {} }
         when (off(o)) { Offense.UPTEMPO -> pTo += 0.01; Offense.GRIND -> pTo -= 0.012; else -> {} }
         pTo -= (coaches[o].off - 70) * 0.0004
@@ -282,12 +291,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         var attempts = 0
         while (attempts < 6) {
             attempts++
-            val shooter = putback ?: Rng.weighted(offense) { usage(o, it).pow(1.1) * (Ratings.offense(it) / 70.0).pow(1.2) }
+            val shooter = putback ?: Rng.weighted(offense) { usage(o, it).pow(1.1) * (Ratings.offense(it) / skillScale).pow(1.25) }
             val type = if (putback != null) 0 else shotType(o, d, shooter, trail)
             var pMake = when (type) {
-                0 -> 0.522 + (shooter[Attr.INS] - n[0]) * 0.0055 - (intD - n[5]) * 0.0038
-                1 -> 0.365 + (shooter[Attr.MID] - n[1]) * 0.0047 - (perD - n[6]) * 0.003
-                else -> 0.312 + (shooter[Attr.OUT] - n[2]) * 0.0043 - (perD - n[6]) * 0.0026
+                0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (intD - n[5]) * 0.0038) * talent
+                1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (perD - n[6]) * 0.003) * talent
+                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (perD - n[6]) * 0.0026) * talent
             }
             if (putback != null) pMake += 0.06
             pMake += (coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006 + skillOff[o] - skillDef[d]
@@ -385,9 +394,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (period >= 2 && clock < 25 && trail == -3) return 2
         val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
         val pos3 = when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.15; Pos.SF -> .95; Pos.PF -> .55; Pos.C -> .16 }
-        var wi = (p[Attr.INS] / 70.0).pow(3) * posIns
-        var wm = (p[Attr.MID] / 70.0).pow(3) * 0.5
-        var w3 = (p[Attr.OUT] / 70.0).pow(4) * pos3 * 1.2
+        var wi = (p[Attr.INS] / skillScale).pow(3) * posIns
+        var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5
+        var w3 = (p[Attr.OUT] / skillScale).pow(4) * pos3 * 1.2
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }
@@ -409,7 +418,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val d = 1 - o
         val oR = offense.map { it[Attr.REB] }.average()
         val dR = defense.map { it[Attr.REB] }.average()
-        var pOff = 0.29 + (oR - dR) * 0.004
+        var pOff = 0.29 + (oR - dR) * 0.004 * talent
         if (off(o) == Offense.INSIDE) pOff += 0.02
         if (off(o) == Offense.UPTEMPO) pOff -= 0.02
         if (def(d) == Defense.ZONE) pOff += 0.02
@@ -525,9 +534,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                         st.pts, st.reb, st.ast, st.stl, st.blk, st.tov, (st.sec / 60.0).roundToInt(),
                     )
                 }
-                // Development: playing time and production earn XP.
-                val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side]))
-                Ratings.addXp(p, xp.roundToInt())
+                // Development: playing time and production earn XP, but not past his ceiling.
+                if (p.ovr < p.pot) {
+                    val xp = (st.sec / 60.0 * 0.9 + (st.pts + st.reb + st.ast) * 0.6) * Ratings.devRate(p, Coaching.devOf(coaches[side]))
+                    Ratings.addXp(p, xp.roundToInt())
+                }
                 Records.checkGame(lg, p, t, st)
                 Careers.track(lg, p, st, game, t.id)
             }

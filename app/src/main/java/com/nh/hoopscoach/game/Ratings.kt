@@ -139,6 +139,8 @@ object Ratings {
         }
         p.seasonLevels++
         p.careerLevels++
+        // He grew past his ceiling: the ceiling was wrong, not the growth.
+        if (p.ovr > p.pot) p.pot = p.ovr
         return raised
     }
 
@@ -147,14 +149,16 @@ object Ratings {
     /** Development speed multiplier from potential headroom and coaching. */
     fun devRate(p: Player, coachDev: Int): Double {
         val gap = (p.pot - p.ovr).toDouble()
+        if (gap <= 0) return 0.0
         val potF = (gap / 10.0).coerceIn(0.12, 1.6)
         var r = (0.55 + coachDev / 100.0) * potF
         if (p.has(Trait.GYM_RAT)) r *= 1.25
-        if (p.has(Trait.LATE_BLOOMER)) r *= 1.2
+        if (p.has(Trait.LATE_BLOOMER)) r *= 1.35
         return r
     }
 
     fun addXp(p: Player, amount: Int) {
+        if (amount <= 0 || p.ovr >= p.pot) return
         p.xp += amount
         while (p.xp >= xpNeeded()) {
             p.xp -= xpNeeded()
@@ -163,6 +167,7 @@ object Ratings {
                 p.seasonLevels++
                 p.careerLevels++
             } else levelUp(p, p.focus)
+            if (p.ovr >= p.pot) { p.xp = 0; break }
         }
     }
 
@@ -174,6 +179,7 @@ object Ratings {
                 val i = a.ordinal
                 if (p.attrs[i] < 99) { p.attrs[i] += 1; p.seasonGains[i] += 1 }
             }
+            if (p.ovr > p.pot) p.pot = p.ovr
         }
     }
 
@@ -181,10 +187,11 @@ object Ratings {
     fun offseasonGrowth(p: Player, coachDev: Int): Int {
         val before = p.ovr
         val gap = p.pot - before
-        var gain = if (gap > 0) gap * (0.28 + Rng.d() * 0.22) + Rng.gauss() * 1.2 else Rng.gauss() * 1.0
+        // Close about a fifth to a third of the remaining gap each summer — not half — so the league doesn't inflate.
+        var gain = if (gap > 0) gap * (0.18 + Rng.d() * 0.16) + Rng.gauss() * 0.9 else Rng.gauss() * 0.55
         gain *= 0.85 + coachDev / 330.0
         if (p.has(Trait.GYM_RAT)) gain *= 1.15
-        if (p.has(Trait.LATE_BLOOMER)) gain *= 1.2
+        if (p.has(Trait.LATE_BLOOMER)) gain *= 1.35
         // One attribute point moves the overall by roughly 0.14, so scale up.
         val steps = (gain * 7.3).roundToInt()
         val w = when (p.pos) {
@@ -196,7 +203,8 @@ object Ratings {
         }
         val idx = (0 until 10).toList()
         if (steps > 0) {
-            repeat(steps) {
+            var left = steps
+            while (left-- > 0 && (gap <= 0 || p.ovr < p.pot)) {
                 val i = Rng.weighted(idx) { w[it] * (if (p.attrs[it] >= 99) 0.0 else 1.0) }
                 p.attrs[i] = min(99, p.attrs[i] + 1)
             }
@@ -206,6 +214,7 @@ object Ratings {
                 p.attrs[i] = max(20, p.attrs[i] - 1)
             }
         }
+        if (p.ovr > p.pot) p.pot = p.ovr
         return p.ovr - before
     }
 }
