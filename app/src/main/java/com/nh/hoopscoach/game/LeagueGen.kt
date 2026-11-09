@@ -64,12 +64,17 @@ object LeagueGen {
     }
 
     private val ROSTER_POS = listOf(Pos.PG, Pos.PG, Pos.SG, Pos.SG, Pos.SG, Pos.SF, Pos.SF, Pos.SF, Pos.PF, Pos.PF, Pos.PF, Pos.C, Pos.C)
-    private val QUALITY = intArrayOf(8, 6, 4, 3, 2, 0, -2, -4, -6, -8, -10, -12, -14)
+    /**
+     * Within-roster talent shape. Index 0 is the star, 1 the sidekick, then starters taper into
+     * role players and a deep bench. The old flat +8..+2 for the first five packed every blue-blood
+     * with four or five near-stars; college teams should feel top-heavy, not five deep of 85+.
+     */
+    private val QUALITY = intArrayOf(10, 2, -2, -5, -7, -10, -12, -14, -16, -18, -20, -22, -24)
 
     private fun buildRoster(lg: League, t: Team) {
         val q = 58 + t.prestige * 0.26
         val positions = ROSTER_POS.toMutableList()
-        // One good player at each position first, then the rest.
+        // Star and sidekick land first (random positions), then the rest of the depth chart.
         val firstFive = Pos.entries.shuffled(Rng.r)
         val order = mutableListOf<Pos>()
         order += firstFive
