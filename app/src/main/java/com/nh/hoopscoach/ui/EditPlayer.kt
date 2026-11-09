@@ -84,47 +84,57 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     .clip(RoundedCornerShape(20.dp))
                     .background(P.surface)
                     .border(1.dp, P.line, RoundedCornerShape(20.dp))
-                    .clickable { vm.push(Route.Portrait(p.id)) }
-                    .padding(14.dp),
+                    .clickable { vm.push(Route.Portrait(p.id)) },
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BasketballCharacterCanvas(
-                        face = face,
-                        jerseyKey = jerseyKey,
-                        primary = t.primary.toInt(),
-                        secondary = t.secondary.toInt(),
-                        number = number,
-                        background = Color(0xFF1A1714),
-                        corner = 14.dp,
-                        modifier = Modifier.size(112.dp),
+                Row {
+                    Box(
+                        Modifier
+                            .width(6.dp)
+                            .height(140.dp)
+                            .background(Color(t.primary)),
                     )
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("PLAYER LOOK", style = T.label, color = P.accent)
-                        Text(
-                            first.ifBlank { "First" }.uppercase(),
-                            style = T.label,
-                            color = P.sub,
+                    Row(
+                        Modifier.padding(14.dp).weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        BasketballCharacterCanvas(
+                            face = face,
+                            jerseyKey = jerseyKey,
+                            primary = t.primary.toInt(),
+                            secondary = t.secondary.toInt(),
+                            number = number,
+                            background = Color(0xFF1A1714),
+                            corner = 14.dp,
+                            modifier = Modifier.size(112.dp),
                         )
-                        Text(
-                            last.ifBlank { "Last" }.uppercase(),
-                            style = T.title,
-                            color = P.ink,
-                            maxLines = 1,
-                        )
-                        Text(
-                            "$pos · ${p.cls} · ${Ratings.heightLabel(height)}",
-                            style = T.small,
-                            color = P.sub,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Edit portrait →",
-                            style = T.bodyB,
-                            color = P.accent,
-                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("PLAYER LOOK", style = T.label, color = P.accent)
+                            Text(
+                                first.ifBlank { "First" }.uppercase(),
+                                style = T.label,
+                                color = P.sub,
+                            )
+                            Text(
+                                last.ifBlank { "Last" }.uppercase(),
+                                style = T.title,
+                                color = P.ink,
+                                maxLines = 1,
+                            )
+                            Text(
+                                "$pos · ${p.cls} · ${Ratings.heightLabel(height)}",
+                                style = T.small,
+                                color = P.sub,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Customize look →",
+                                style = T.bodyB,
+                                color = P.accent,
+                            )
+                        }
+                        Ring(ovr, 52.dp, label = "OVR", textSize = 18.sp())
                     }
-                    Ring(ovr, 52.dp, label = "OVR", textSize = 18.sp())
                 }
             }
 
