@@ -320,7 +320,16 @@ object Season {
         val f4 = ncaa.rounds[4].filter { it >= 0 }
         for (id in f4) { lg.team(id).finalFours++; lg.coachOf(lg.team(id)).finalFours++ }
         val runnerUp = ncaa.rounds[5].first { it != ncaa.champion }
-        lg.news += News(lg.season, lg.day, "${champ.school} are national champions!", champ.id == lg.userTeamId)
+        val titleGame = ncaa.gameIds.lastOrNull()?.firstOrNull()?.takeIf { it >= 0 }?.let { lg.game(it) }
+        val ws = ncaa.seeds[champ.id] ?: 0
+        val ls = ncaa.seeds[runnerUp] ?: 0
+        lg.news += News(
+            lg.season, lg.day,
+            Reports.titleHeadline(champ, lg.team(runnerUp), ws, ls, titleGame?.let { kotlin.math.abs(it.hs - it.aws) } ?: 0, titleGame?.ot ?: 0),
+            champ.id == lg.userTeamId,
+            titleGame?.id ?: -1,
+            "moment",
+        )
 
         val confChamps = HashMap<Int, Int>()
         for (b in lg.confBrackets) {

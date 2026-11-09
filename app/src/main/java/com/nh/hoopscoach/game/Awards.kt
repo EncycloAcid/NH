@@ -31,8 +31,20 @@ object Awards {
     }
 
     private fun give(lg: League, list: MutableList<AwardWinner>, award: String, p: Player, t: Team) {
-        list += AwardWinner(award, p.id, p.name, t.id, line(p))
+        list += AwardWinner(award, p.id, p.name, t.id, Reports.awardLine(award, p, t))
         p.awards += "${lg.season} $award"
+    }
+
+    /** Prefer one player per position, then fill with the next-best available. */
+    private fun balancedTeam(pool: List<Pair<Player, Team>>, n: Int): List<Pair<Player, Team>> {
+        val ranked = pool.sortedByDescending { score(it.first, it.second) }.toMutableList()
+        val out = mutableListOf<Pair<Player, Team>>()
+        for (pos in Pos.entries) {
+            val i = ranked.indexOfFirst { it.first.pos == pos }
+            if (i >= 0) out += ranked.removeAt(i)
+        }
+        while (out.size < n && ranked.isNotEmpty()) out += ranked.removeAt(0)
+        return out.take(n)
     }
 
     /** End of the regular season: conference honors. */
@@ -43,14 +55,15 @@ object Awards {
             if (pool.isEmpty()) continue
             val ranked = pool.sortedByDescending { score(it.first, it.second) }
             give(lg, out, "Conf POY", ranked[0].first, ranked[0].second)
-            ranked.take(5).forEach { give(lg, out, "All-Conf 1st", it.first, it.second) }
-            pool.maxByOrNull { defScore(it.first) }?.let { give(lg, out, "Conf DPOY", it.first, it.second) }
+            balancedTeam(pool, 5).forEach { give(lg, out, "All-Conf 1st", it.first, it.second) }
+            // DPOY: prefer a defender who also played winning basketball, not a pure block specialist on a bad team.
+            pool.maxByOrNull { defScore(it.first) + it.second.winPct * 4 }?.let { give(lg, out, "Conf DPOY", it.first, it.second) }
             pool.filter { it.first.year == 1 }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "Conf FOY", it.first, it.second) }
             val coty = c.teamIds.map { lg.team(it) }.maxByOrNull { it.w - it.expWins + it.cw * 0.2 }
             if (coty != null) {
                 val coach = lg.coachOf(coty)
                 coach.confCoty++
-                out += AwardWinner("Conf COTY", -coach.id, coach.name, coty.id, "${coty.record} (${coty.confRecord} conf)")
+                out += AwardWinner("Conf COTY", -coach.id, coach.name, coty.id, Reports.coachAwardLine(coty, 0))
             }
         }
         lg.confAwards = out
@@ -62,24 +75,27 @@ object Awards {
         val pool = eligible(lg)
         val ranked = pool.sortedByDescending { score(it.first, it.second) }
         if (ranked.isNotEmpty()) give(lg, out, "Nat MVP", ranked[0].first, ranked[0].second)
-        ranked.take(5).forEach { give(lg, out, "AA 1st", it.first, it.second) }
-        ranked.drop(5).take(5).forEach { give(lg, out, "AA 2nd", it.first, it.second) }
-        ranked.drop(10).take(5).forEach { give(lg, out, "AA 3rd", it.first, it.second) }
-        pool.maxByOrNull { defScore(it.first) }?.let { give(lg, out, "DPOY", it.first, it.second) }
+        val aa = balancedTeam(pool, 15)
+        aa.take(5).forEach { give(lg, out, "AA 1st", it.first, it.second) }
+        aa.drop(5).take(5).forEach { give(lg, out, "AA 2nd", it.first, it.second) }
+        aa.drop(10).take(5).forEach { give(lg, out, "AA 3rd", it.first, it.second) }
+        pool.maxByOrNull { defScore(it.first) + it.second.winPct * 4 }?.let { give(lg, out, "DPOY", it.first, it.second) }
         pool.filter { it.first.year == 1 }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "FOY", it.first, it.second) }
         for (pos in Pos.entries) pool.filter { it.first.pos == pos }.maxByOrNull { score(it.first, it.second) }?.let { give(lg, out, "Pos OY", it.first, it.second) }
 
-        // Tournament awards from NCAA stats.
+        // Tournament awards from NCAA stats. MOP is almost always from the champion.
         val ncaa = lg.ncaa
         if (ncaa != null && ncaa.champion >= 0) {
             val f4 = ncaa.rounds.getOrNull(4)?.filter { it >= 0 } ?: emptyList()
             val tp = f4.flatMap { tid -> lg.team(tid).roster.map { lg.player(it) to lg.team(tid) } }
                 .filter { it.first.tourney.gp > 0 }
-                .sortedByDescending { (p, t) -> tScore(p) + if (t.id == ncaa.champion) 4 else 0 }
+                .sortedByDescending { (p, t) -> tScore(p) + if (t.id == ncaa.champion) 8 else 0 }
             tp.firstOrNull()?.let { (p, t) ->
-                out += AwardWinner("MOP", p.id, p.name, t.id, tLine(p)); p.awards += "${lg.season} MOP"
+                out += AwardWinner("MOP", p.id, p.name, t.id, Reports.awardLine("MOP", p, t)); p.awards += "${lg.season} MOP"
             }
-            tp.take(5).forEach { (p, t) -> out += AwardWinner("All-Tourn", p.id, p.name, t.id, tLine(p)); p.awards += "${lg.season} All-Tourn" }
+            // All-Tournament: prefer the champion's stars, then the rest of the Final Four.
+            val allT = tp.sortedByDescending { (p, t) -> tScore(p) + if (t.id == ncaa.champion) 6 else 2 }.take(5)
+            allT.forEach { (p, t) -> out += AwardWinner("All-Tourn", p.id, p.name, t.id, Reports.awardLine("All-Tourn", p, t)); p.awards += "${lg.season} All-Tourn" }
         }
 
         // Coach of the year: biggest over-performance, with a bump for March.
@@ -88,7 +104,7 @@ object Awards {
             val c = lg.coachOf(best)
             c.natCoty++
             lg.cotyCoachId = c.id
-            out += AwardWinner("COTY", -c.id, c.name, best.id, best.record)
+            out += AwardWinner("COTY", -c.id, c.name, best.id, Reports.coachAwardLine(best, tourneyRound(lg, best.id)))
         }
         lg.seasonAwards = out
     }
@@ -97,8 +113,6 @@ object Awards {
         val s = p.tourney
         return s.ppg + 1.1 * s.rpg + 1.4 * s.apg + 1.5 * (s.spg + s.bpg) + s.gp * 1.5
     }
-
-    private fun tLine(p: Player) = "%.1f ppg · %.1f rpg in March".format(p.tourney.ppg, p.tourney.rpg)
 
     /** 0 = missed, 1 = made the field (First Four or Round of 64) ... 6 = runner-up, 7 = champion. */
     fun tourneyRound(lg: League, teamId: Int): Int {
