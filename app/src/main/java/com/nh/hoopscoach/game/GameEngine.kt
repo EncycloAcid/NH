@@ -308,8 +308,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /**
      * How much ratings matter. Pro ratings sit close together, so the same rating gap has to count for more
      * there, or the best teams barely win more than the rest. Coaches matter less than players in the pros.
+     * College uses [TALENT] so blue bloods separate from mid-majors once norms recentered.
      */
-    private val talent = if (lg.pro) PRO_TALENT else 1.0
+    private val talent = if (lg.pro) PRO_TALENT else TALENT
     private val coaching = if (lg.pro) 0.5 else 1.0
 
     /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
@@ -318,6 +319,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     // Coaching skills, plus the user's assistant coaches (see Assistants).
     private val skillOff = DoubleArray(2) { (if (coaches[it].has(CoachSkill.OFF_TACTICIAN)) 0.008 else 0.0) + Assistants.off(lg, teams[it]) }
     private val skillDef = DoubleArray(2) { (if (coaches[it].has(CoachSkill.DEF_TACTICIAN)) 0.008 else 0.0) + Assistants.def(lg, teams[it]) }
+    /** Shot-selection scale tracked to the league's starters, so mix stays stable if ratings drift. */
+    private val skillScale = ((n[0] + n[1] + n[2]) / 3.0).coerceIn(55.0, 80.0)
 
     companion object {
         /**
@@ -326,6 +329,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
          * The offsets keep the original calibration: center = norm + offset.
          */
         private val OFFSET = doubleArrayOf(-1.31, -2.63, 0.48, -0.41, -3.43, -2.8, -1.45, -3.92, -2.93)
+        /** Rating sensitivity for college games (see [talent]). */
+        const val TALENT = 1.15
 
         /** Chance of a non-shooting foul on a possession, and a scale on shooting fouls, set so fouls and free throws match each level. */
         /** Rating sensitivity in the pros (see [talent]). */
@@ -519,8 +524,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
      */
     private fun pickShooter(o: Int, offense: List<Player>): Player {
         val w = offense.map {
-            if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / 70.0).pow(0.6) * proShotPos(it.pos)
-            else usage(o, it).pow(1.1) * (Ratings.offense(it) / 70.0).pow(1.2)
+            if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / skillScale).pow(0.6) * proShotPos(it.pos)
+            else usage(o, it).pow(1.1) * (Ratings.offense(it) / skillScale).pow(1.25)
         }.toMutableList()
         if (lg.pro && w.size > 1) {
             val top = w.indices.maxBy { w[it] }
@@ -1079,10 +1084,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         // Modern pro bigs step out more than college bigs.
         val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
             else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.1; Pos.SF -> .95; Pos.PF -> .66; Pos.C -> .34 }
-        var wi = (p[Attr.INS] / 70.0).pow(3) * posIns * Tendency.inside(p)
-        var wm = (p[Attr.MID] / 70.0).pow(3) * 0.5 * Tendency.mid(p)
+        var wi = (p[Attr.INS] / skillScale).pow(3) * posIns * Tendency.inside(p)
+        var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5 * Tendency.mid(p)
         // In the pros nearly everyone can shoot it, so volume leans on the rating less than in college.
-        var w3 = (p[Attr.OUT] / 70.0).pow(if (lg.pro) 1.5 else 4.0) * pos3 * (if (lg.pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
+        var w3 = (p[Attr.OUT] / skillScale).pow(if (lg.pro) 1.5 else 4.0) * pos3 * (if (lg.pro) 1.62 * era.threes else 1.2) * Tendency.three(p)
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }
@@ -1264,7 +1269,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                         st.pts, st.reb, st.ast, st.stl, st.blk, st.tov, (st.sec / 60.0).roundToInt(),
                     )
                 }
-                // Development: playing time and production earn XP.
+                // Development: playing time and production earn XP, but not past his ceiling.
                 // Pros grow slower in season, and not past their ceiling, so the league's ratings hold steady.
                 // First-year pros stop at the rookie cap of 83 until their first summer.
                 val proRate = if (!lg.pro) (if (p.ovr >= p.pot && p.id != lg.heroId) 0.0 else 1.0) else if (p.ovr >= p.pot || (ProLeague.cappedRookie(lg, p) && p.ovr >= ProLeague.ROOKIE_MAX)) 0.0 else 0.35

@@ -1,5 +1,6 @@
 package com.nh.hoopscoach.game
 
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -176,6 +177,15 @@ object Tryouts {
         p.story = 1
         p.pot = maxOf(p.pot, Rng.range(84, 93))
         if (Trait.LATE_BLOOMER !in p.traits) p.traits += Trait.LATE_BLOOMER
+        // The breakout summer is the leap: close about a third of the new gap right away so he
+        // becomes a rotation player now and a star over the next year or two — not in four summers.
+        val leap = ((p.pot - p.ovr) * 0.35).roundToInt().coerceIn(5, 14)
+        val idx = (0 until 10).toList()
+        repeat(leap * 7) {
+            val i = Rng.pick(idx)
+            p.attrs[i] = min(99, p.attrs[i] + 1)
+        }
+        if (p.ovr > p.pot) p.pot = p.ovr
         return true
     }
 

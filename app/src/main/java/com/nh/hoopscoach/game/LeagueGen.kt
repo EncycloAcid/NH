@@ -69,10 +69,11 @@ object LeagueGen {
      * role players and a deep bench. The old flat +8..+2 for the first five packed every blue-blood
      * with four or five near-stars; college teams should feel top-heavy, not five deep of 85+.
      */
-    private val QUALITY = intArrayOf(10, 2, -2, -5, -7, -10, -12, -14, -16, -18, -20, -22, -24)
+    private val QUALITY = intArrayOf(10, 2, -2, -5, -7, -9, -11, -13, -15, -16, -17, -18, -19)
 
     private fun buildRoster(lg: League, t: Team) {
-        val q = 58 + t.prestige * 0.26
+        // Centered so a mid-major sits in the mid-60s and a blue blood's star still reaches the low 90s.
+        val q = 60 + t.prestige * 0.25
         val positions = ROSTER_POS.toMutableList()
         // Star and sidekick land first (random positions), then the rest of the depth chart.
         val firstFive = Pos.entries.shuffled(Rng.r)
@@ -103,6 +104,7 @@ object LeagueGen {
         val first = if (country != null) Rng.pick(Names.intlFirst.getValue(country)) else Rng.pick(Names.first)
         val last = if (country != null) Rng.pick(Names.intlLast.getValue(country)) else Rng.pick(Names.last)
         val height = Ratings.heightFor(pos)
+        // Headroom is real but rare: most players climb a few points, not a full tier.
         val growthLeft = when (year) { 1 -> Rng.range(4, 12); 2 -> Rng.range(3, 9); 3 -> Rng.range(1, 6); else -> Rng.range(0, 3) }
         val p = Player(
             id = lg.nextPlayerId++,
