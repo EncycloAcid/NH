@@ -256,6 +256,14 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                     Stat("NIL ask", money(r.nilAsk), Modifier.weight(1f), style = T.numSm)
                     Stat("Scouted", if (r.scouted) "Yes" else "No", Modifier.weight(1f), if (r.scouted) P.good else P.sub, T.numSm)
                 }
+                if (p.buildName.isNotEmpty() || p.likeA.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    if (p.buildName.isNotEmpty()) Text(p.buildName, style = T.bodyB, color = P.ink)
+                    if (p.likeA.isNotEmpty()) {
+                        val likes = listOf(p.likeA, p.likeB).filter { it.isNotEmpty() }.joinToString(" · ")
+                        Text("Closest to: $likes", style = T.small, color = P.accent)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Tag("WANTS", P.accent)

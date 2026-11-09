@@ -162,6 +162,16 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             }
             Text(playsLike(p), style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
             if (p.gear.isNotEmpty()) Text("Gear: " + com.nh.hoopscoach.game.Gear.decode(p.gear).describe(), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp).padding(bottom = 4.dp))
+            if (p.buildName.isNotEmpty() || p.likeA.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+                    if (p.buildName.isNotEmpty()) Text(p.buildName, style = T.bodyB, color = P.ink)
+                    if (p.likeA.isNotEmpty()) {
+                        val likes = listOf(p.likeA, p.likeB).filter { it.isNotEmpty() }.joinToString(" · ")
+                        Text("Closest to: $likes", style = T.small, color = P.accent, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            }
             Spacer(Modifier.height(6.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // In player mode you only manage yourself, and your NIL comes from your deal.
@@ -170,6 +180,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
                 if (yourself) SmallButton("Customize", primary = true) { vm.sheet = null; vm.push(Route.MyPlayer) }
+                if (coaching || yourself) SmallButton("Build Lab") { vm.sheet = null; vm.push(Route.BuildLab(p.id)) }
                 if (coaching || yourself) SmallButton("Edit") { vm.sheet = null; vm.push(Route.EditPlayer(p.id)) }
                 if (coaching || yourself || (mine && com.nh.hoopscoach.game.NbaCoach.active(lg))) SmallButton("Portrait") { vm.sheet = null; vm.push(Route.Portrait(p.id)) }
                 SmallButton(if (p.favorite) "Unstar" else "Star") { vm.act { p.favorite = !p.favorite } }
@@ -513,6 +524,8 @@ private fun BioTab(lg: League, p: Player) {
             if (p.age > 0) "Age" to "${p.age}" else null,
             "Hometown" to p.hometown,
             "High school" to p.highSchool,
+            "Build" to p.buildName.ifEmpty { p.style.label },
+            if (p.likeA.isNotEmpty()) "Closest to" to listOf(p.likeA, p.likeB).filter { it.isNotEmpty() }.joinToString(" · ") else null,
             "Recruit rating" to when {
                 p.recruitRank > 0 -> "${p.stars}★ · No. ${p.recruitRank} overall"
                 p.tryout > 0 -> "Unrated · made the team at ${p.tryout} tryouts"

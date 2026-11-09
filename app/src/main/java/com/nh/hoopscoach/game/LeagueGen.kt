@@ -131,6 +131,8 @@ object LeagueGen {
         p.posRank = (p.recruitRank / 5.0 + Rng.range(-3, 3)).roundToInt().coerceAtLeast(1)
         p.happiness = Rng.range(55, 85)
         p.age = collegeAge(year)
+        // HS recruits get a second star pass in recruitClass before the GOAT roll.
+        if (year != 0) Builds.maybeGoatShape(p) else Builds.stampFlavor(p)
         p.pos2 = Ratings.secondFor(pos, p.attrs)
         return p
     }
@@ -169,6 +171,8 @@ object LeagueGen {
             posCount[pos] = (posCount[pos] ?: 0) + 1
             p.posRank = posCount[pos]!!
             p.happiness = 75
+            // Stars were overwritten after makePlayer's GOAT roll — re-roll flavor for the true star tier.
+            Builds.maybeGoatShape(p)
             val r = Recruit(p)
             r.nilAsk = (Ratings.expectedNil(p) * (1.0 + (p.stars - 2) * 0.35)).roundToInt() / 5 * 5
             r.estOvr = (ovr + Rng.range(-6, 6)).coerceIn(30, 99)

@@ -104,22 +104,27 @@ object Ratings {
     fun stylesFor(p: Player): List<Arch> = styles(p.pos) + (p.pos2?.let { styles(it) } ?: emptyList())
 
     fun styles(pos: Pos): List<Arch> = when (pos) {
-        // Every archetype belongs to one position.
+        // Every archetype belongs to one position (HEAD roster set + GOAT Build Lab additions).
         Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER,
             Arch.SCORING_POINT, Arch.SPEEDSTER, Arch.PNR_MAESTRO, Arch.POINT_OF_ATTACK,
-            Arch.JUMBO_PLAYMAKER, Arch.PULL_UP_ARTIST, Arch.TWO_WAY_POINT, Arch.CRAFTY_FINISHER)
+            Arch.JUMBO_PLAYMAKER, Arch.PULL_UP_ARTIST, Arch.TWO_WAY_POINT, Arch.CRAFTY_FINISHER,
+            Arch.PURE_POINT, Arch.MIDRANGE_ASSASSIN)
         Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD,
             Arch.SPOT_UP, Arch.MIDRANGE_MAESTRO, Arch.DOWNHILL_GUARD, Arch.SPARK_PLUG,
-            Arch.SECONDARY_CREATOR, Arch.PERIMETER_STOPPER, Arch.CRASH_GUARD, Arch.OFF_BALL_CUTTER)
+            Arch.SECONDARY_CREATOR, Arch.PERIMETER_STOPPER, Arch.CRASH_GUARD, Arch.OFF_BALL_CUTTER,
+            Arch.TRANSITION_FINISHER, Arch.VOLUME_SCORER)
         Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING,
             Arch.THREE_LEVEL, Arch.POST_WING, Arch.CORNER_SPECIALIST, Arch.TWO_WAY_WING,
-            Arch.SHOT_MAKER, Arch.CONNECTOR, Arch.RANGY_DEFENDER, Arch.TRANSITION_WING)
+            Arch.SHOT_MAKER, Arch.CONNECTOR, Arch.RANGY_DEFENDER, Arch.TRANSITION_WING,
+            Arch.FACILITATING_WING)
         Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR,
             Arch.LOW_POST_FOUR, Arch.PLAYMAKING_FOUR, Arch.DUNKER_SPOT, Arch.DEFENSIVE_FOUR,
-            Arch.STRETCH_REBOUNDER, Arch.TWO_WAY_FOUR, Arch.SHORT_ROLL, Arch.BRUISER)
+            Arch.STRETCH_REBOUNDER, Arch.TWO_WAY_FOUR, Arch.SHORT_ROLL, Arch.BRUISER,
+            Arch.SWITCH_BIG, Arch.FACILITATING_WING, Arch.TRANSITION_FINISHER)
         Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN,
             Arch.GLASS_CLEANER, Arch.ELBOW_HUB, Arch.MOBILE_BIG, Arch.PAINT_BEAST,
-            Arch.LOB_THREAT, Arch.SPACING_FIVE, Arch.POST_PLAYMAKER, Arch.SHOT_BLOCKER)
+            Arch.LOB_THREAT, Arch.SPACING_FIVE, Arch.POST_PLAYMAKER, Arch.SHOT_BLOCKER,
+            Arch.SWITCH_BIG)
     }
 
     /** Build an attribute set whose overall lands near [target]. */

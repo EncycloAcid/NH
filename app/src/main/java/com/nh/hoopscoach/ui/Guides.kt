@@ -85,6 +85,7 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "Walk-ons and your roster",
             "Walk-ons don't use one of your 13 scholarships. Each preseason you can hold tryouts, and once in a while a walk-on turns into a real player.",
             "Tap Edit on any of your own players to change his name, number, position, size, archetype or background.",
+            "Build Lab lets you reshape a roster player with a GOAT preset, an offspring blend of two legends, or custom attribute sliders. Overall stays near where it was. Every player also gets a build name and closest-to legend tags.",
         ),
     ),
     "NIL" to listOf(
@@ -155,7 +156,12 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
         ),
         sec(
             "Training focus",
-            "Each level-up raises the three ratings of the player's training focus by 1. The focus is an archetype: 20 play styles, from Floor General to Stretch Five. Choose Manual to bank level-ups and spend them later.",
+            "Each level-up raises the three ratings of the player's training focus by 1. The focus is an archetype: 28 play styles, from Floor General and Sharpshooter to Two-Way Guard, Pure Point, Switch Big and Facilitating Wing. Choose Manual to bank level-ups and spend them later.",
+        ),
+        sec(
+            "Build Lab",
+            "On your roster, open Build Lab from the player card or Edit player. Pick a GOAT preset (flavor-only NBA legend names), blend two parents into an offspring, or redistribute attributes yourself.",
+            "The lab keeps overall near the current rating, assigns the best-fitting play style, and shows a 2K-style build name plus the closest legend matches.",
         ),
         sec(
             "Summer development",

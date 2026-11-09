@@ -223,6 +223,14 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                 color = P.sub,
                 modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp),
             )
+            Panel(Modifier.padding(bottom = 8.dp), onClick = { vm.push(Route.BuildLab(playerId)) }) {
+                Text("Build Lab", style = T.head, color = P.accent)
+                Text(
+                    if (p.buildName.isNotEmpty()) "${p.buildName} · reshape with GOAT presets, offspring or custom sliders"
+                    else "GOAT presets, offspring hybrids or custom sliders — reshapes ratings like 2K",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp),
+                )
+            }
 
             Section("Background")
             Panel {

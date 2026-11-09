@@ -44,6 +44,7 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     POINT_CENTER("Point Center", "PTC", listOf(Attr.INS, Attr.PAS, Attr.REB), "Big man who runs the offense from the post and the elbows"),
     STRETCH_FIVE("Stretch Five", "ST5", listOf(Attr.OUT, Attr.IDF, Attr.BLK), "Center who protects the rim and pulls opposing bigs out to the arc"),
     ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
+    ENFORCER("Enforcer", "ENF", listOf(Attr.INS, Attr.IDF, Attr.REB), "Physical big who owns the paint on both ends"),
     TWO_WAY_GUARD("Two-Way Guard", "2WG", listOf(Attr.OUT, Attr.HND, Attr.PER), "Hits threes off the bounce and picks up the ball full court"),
     PEST("Pest", "PES", listOf(Attr.PAS, Attr.PER, Attr.STL), "Hounds the ball for 94 feet and makes the simple pass"),
     MICROWAVE("Microwave", "MIC", listOf(Attr.INS, Attr.OUT, Attr.HND), "Instant offense: gets to the rim or pulls up from deep the moment he checks in"),
@@ -107,7 +108,15 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     LOB_THREAT("Lob Threat", "LOB", listOf(Attr.INS, Attr.PER, Attr.BLK), "Rolls hard, catches everything above the rim and switches onto guards"),
     SPACING_FIVE("Pick-and-Pop Five", "SP5", listOf(Attr.MID, Attr.OUT, Attr.REB), "Center who pops to the arc on offense and still owns the defensive glass"),
     POST_PLAYMAKER("Post Playmaker", "PPM", listOf(Attr.INS, Attr.MID, Attr.PAS), "Draws double teams on the block and picks them apart with his passing"),
-    SHOT_BLOCKER("Shot Blocker", "SWT", listOf(Attr.IDF, Attr.STL, Attr.BLK), "Times every shot at the rim: blocks, deflections and steals in the paint");
+    SHOT_BLOCKER("Shot Blocker", "SWT", listOf(Attr.IDF, Attr.STL, Attr.BLK), "Times every shot at the rim: blocks, deflections and steals in the paint"),
+    // GOAT Build Lab archetypes (PR #7)
+    VOLUME_SCORER("Volume Scorer", "VOL", listOf(Attr.INS, Attr.MID, Attr.OUT), "Primary option who can get buckets from every level, night after night"),
+    TRANSITION_FINISHER("Transition Finisher", "TRF", listOf(Attr.INS, Attr.HND, Attr.STL), "Turns steals and outlets into easy points in the open floor"),
+    MIDRANGE_ASSASSIN("Midrange Assassin", "MDA", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives in the midrange and creates pull-ups off the dribble"),
+    SWITCH_BIG("Switch Big", "SBG", listOf(Attr.PER, Attr.IDF, Attr.REB), "Can guard one through five and cleans the glass"),
+    PURE_POINT("Pure Point", "PPT", listOf(Attr.HND, Attr.PAS, Attr.PER), "Pass-first floor general who sets up teammates and pressures the ball"),
+    FACILITATING_WING("Facilitating Wing", "FCW", listOf(Attr.MID, Attr.PAS, Attr.PER), "Wing who makes the right read, hits the open midrange and checks the other wing");
+
 }
 
 enum class Trait(val label: String, val good: Boolean) {
@@ -288,6 +297,15 @@ class Player(
     var structure: String = "",
     /** An extension signed during the season: his salary from next season (0 when none). */
     var nextSalary: Int = 0,
+    /** 2K-style build title from his attribute shape (e.g. "Two-Way 3-Level Scorer"). */
+    var buildName: String = "",
+    /** Closest NBA-legend flavor matches (display names). */
+    var likeA: String = "",
+    var likeB: String = "",
+    /** Provenance when a GOAT preset or offspring was applied. */
+    var goatId: String = "",
+    var parentA: String = "",
+    var parentB: String = "",
 ) {
     /** Out injured. */
     val out get() = injGames > 0

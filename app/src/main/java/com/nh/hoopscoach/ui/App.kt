@@ -214,6 +214,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.NbaPreview -> NbaPreviewScreen(vm, lg)
         is Route.News -> NewsScreen(vm, lg)
         is Route.EditPlayer -> EditPlayerScreen(vm, lg, r.playerId)
+        is Route.BuildLab -> BuildLabScreen(vm, lg, r.playerId)
         is Route.RecruitPreview -> RecruitPreviewScreen(vm, lg)
         is Route.Social -> SocialScreen(vm, lg)
         is Route.Article -> ArticleScreen(vm, lg, r.newsIndex)

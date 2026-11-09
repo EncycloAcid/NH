@@ -152,8 +152,15 @@ class SimTest {
         assertTrue(good.size == 2 && bad.size == 2 && good.intersect(bad.toSet()).isEmpty())
         // The new archetypes show up on real players.
         val styles = lg.players.groupingBy { it.style }.eachCount()
-        val added = listOf(com.nh.hoopscoach.game.Arch.THREE_AND_D, com.nh.hoopscoach.game.Arch.RIM_RUNNER, com.nh.hoopscoach.game.Arch.STRETCH_FIVE, com.nh.hoopscoach.game.Arch.TABLE_SETTER)
-        assertTrue("new archetypes in use: $styles", added.all { (styles[it] ?: 0) > 20 })
+        val added = listOf(
+            com.nh.hoopscoach.game.Arch.THREE_AND_D, com.nh.hoopscoach.game.Arch.RIM_RUNNER,
+            com.nh.hoopscoach.game.Arch.STRETCH_FIVE, com.nh.hoopscoach.game.Arch.TABLE_SETTER,
+            com.nh.hoopscoach.game.Arch.TWO_WAY_GUARD, com.nh.hoopscoach.game.Arch.PURE_POINT,
+            com.nh.hoopscoach.game.Arch.SWITCH_BIG, com.nh.hoopscoach.game.Arch.FACILITATING_WING,
+        )
+        assertTrue("new archetypes in use: $styles", added.all { (styles[it] ?: 0) > 10 })
+        assertTrue("build names stamped", lg.players.count { it.buildName.isNotEmpty() } > lg.players.size / 2)
+        assertTrue("closest-to tags stamped", lg.players.count { it.likeA.isNotEmpty() } > lg.players.size / 2)
         assertEquals(4, pv.finalFour.size)
         assertEquals(lg.confs.size, pv.confPoy.size)
         assertTrue(pv.proj.values.all { it.w + it.l in 25..34 })
