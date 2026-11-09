@@ -26,7 +26,13 @@ class PreviewContentTest {
         val (s, c) = Previews.scoutingProse(lg, top)
         assertTrue(s.endsWith("."))
         assertTrue(c.endsWith("."))
+        assertFalse("scouting prose jammed a raw label onto a clause: $s", Regex("""closeouts and [a-z]""").containsMatchIn(s.lowercase()))
+        assertTrue(c.startsWith("The worry:"))
         assertTrue(Previews.coverDek(lg, top).isNotBlank())
+
+        val letter = Previews.editorsLetter(lg, pv)
+        val f4Names = pv.finalFour.map { lg.team(it).school }
+        assertTrue("editor letter should mention the actual Final Four pick", f4Names.count { name -> letter.any { it.contains(name) } } >= 2)
 
         val aa = pv.allAmerica.take(5).map { lg.player(it).pos }
         assertEquals("first team should cover five positions", Pos.entries.toSet(), aa.toSet())

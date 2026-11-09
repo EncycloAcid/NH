@@ -181,7 +181,16 @@ object Previews {
             append(". ")
             if (champ != null) append(if (champ.id == top.id) "The defending champions have the look of a repeat. " else "Defending champion ${champ.school} starts at No. ${pv.proj.getValue(champ.id).nat}. ")
         }
-        out += "Behind them, ${ranked[1].school}, ${ranked[2].school} and ${ranked[3].school} round out our Final Four, and ${lg.team(pv.sleeper).school} is the team nobody wants to see in March."
+        val f4 = pv.finalFour.map { lg.team(it) }
+        val others = f4.drop(1).joinToString(", ") { it.school }.let { names ->
+            val lastComma = names.lastIndexOf(", ")
+            if (lastComma < 0) names else names.replaceRange(lastComma, lastComma + 1, " and")
+        }
+        out += if (f4.size >= 4) {
+            "We have ${others} joining ${f4[0].school} in our Final Four, and ${lg.team(pv.sleeper).school} is the sleeper nobody wants to see in March."
+        } else {
+            "Behind them, ${ranked[1].school}, ${ranked[2].school} and ${ranked[3].school} round out our Final Four, and ${lg.team(pv.sleeper).school} is the team nobody wants to see in March."
+        }
         out += "${u.school} comes in at No. ${mine.nat} and picked ${ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}. Turn to the team report for the full breakdown."
         return out
     }
@@ -211,18 +220,17 @@ object Previews {
     /** Magazine-style scouting sentences built from [scouting]. */
     fun scoutingProse(lg: League, t: Team): Pair<String, String> {
         val (good, bad) = scouting(lg, t)
-        val strength = when (good.first()) {
-            "Perimeter shooting" -> "They can heat up from deep and punish soft closeouts"
-            "Finishing inside" -> "They live at the rim and get to the line"
-            "Ball handling" -> "They take care of the ball and create for each other"
-            "Rebounding" -> "They own the glass on both ends"
-            "Perimeter defense" -> "They can switch and pressure on the perimeter"
-            "Rim protection" -> "They erase mistakes at the rim"
-            "Depth" -> "They can go nine deep without falling off a cliff"
-            else -> "They have a veteran core that knows how to win"
+        fun strengthOf(area: String) = when (area) {
+            "Perimeter shooting" -> "they can heat up from deep and punish soft closeouts"
+            "Finishing inside" -> "they live at the rim and get to the line"
+            "Ball handling" -> "they take care of the ball and create for each other"
+            "Rebounding" -> "they own the glass on both ends"
+            "Perimeter defense" -> "they can switch and pressure on the perimeter"
+            "Rim protection" -> "they erase mistakes at the rim"
+            "Depth" -> "they can go nine deep without falling off a cliff"
+            else -> "they have a veteran core that knows how to win"
         }
-        val strength2 = good.getOrNull(1)?.lowercase()?.let { " and ${it}" } ?: ""
-        val concern = when (bad.first()) {
+        fun concernOf(area: String) = when (area) {
             "Perimeter shooting" -> "the jump shot has to travel"
             "Finishing inside" -> "they need more punch inside"
             "Ball handling" -> "turnovers could bury them on the road"
@@ -232,8 +240,18 @@ object Previews {
             "Depth" -> "a short bench leaves little margin for foul trouble"
             else -> "youth will cost them some nights"
         }
-        val concern2 = bad.getOrNull(1)?.lowercase()?.let { ", and $it is a question mark" } ?: ""
-        return "$strength$strength2." to "On the other side, $concern$concern2."
+        val strength = buildString {
+            append(strengthOf(good.first()).replaceFirstChar { it.uppercase() })
+            good.getOrNull(1)?.let { append(", and ${strengthOf(it)}") }
+            append(".")
+        }
+        val concern = buildString {
+            append("The worry: ")
+            append(concernOf(bad.first()))
+            bad.getOrNull(1)?.let { append(", and ${concernOf(it)}") }
+            append(".")
+        }
+        return strength to concern
     }
 
     /** This season's issue, built now if the save predates the full magazine. */
@@ -276,9 +294,9 @@ object Previews {
             last == null -> "${t.school} opens a new chapter under ${lg.coachOf(t).name}."
             last.result == "National Champion" -> "The defending champions (${last.w}-${last.l}) are back with unfinished business."
             last.result in setOf("Runner-Up", "Final Four", "Elite Eight") -> "After they ${lastSeason(last.result)} (${last.w}-${last.l}), the bar is set high."
-            last.result in NCAA_RESULTS -> "A ${last.w}-${last.l} team that ${lastSeason(last.result)} last March."
+            last.result in NCAA_RESULTS -> "Went ${last.w}-${last.l} and ${lastSeason(last.result)} last March."
             last.w >= 20 -> "Won ${last.w} games a year ago but ${lastSeason(last.result)} — this group wants a different ending."
-            else -> "Coming off ${last.w}-${last.l} and a season that ${lastSeason(last.result)}."
+            else -> "Coming off a ${last.w}-${last.l} year that ${lastSeason(last.result)}."
         }
         val head = s?.let {
             val style = it.style.label.lowercase()

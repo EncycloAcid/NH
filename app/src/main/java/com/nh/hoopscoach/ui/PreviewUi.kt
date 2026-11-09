@@ -48,6 +48,7 @@ import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Team
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** The 15 pages of the issue: section kicker and headline. */
 private fun pages(lg: League) = listOf(
@@ -684,6 +685,34 @@ private fun LazyListScope.gamesToWatch(vm: GameViewModel, lg: League, pv: Previe
 
 private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview) {
     item {
+        if (lg.user.gp > 0) {
+            Section("Scorecard so far")
+            val top25 = ranked(lg, pv).take(25)
+            val onPace = top25.count { t -> t.w + t.l >= 5 && t.w.toDouble() / t.gp >= pv.proj.getValue(t.id).w / (pv.proj.getValue(t.id).w + pv.proj.getValue(t.id).l).toDouble() - 0.08 }
+            val f4Alive = pv.finalFour.count { id ->
+                val t = lg.team(id)
+                t.l <= (t.w + t.l) / 2 + 2
+            }
+            val u = lg.user
+            val mine = pv.proj.getValue(u.id)
+            Panel {
+                Text(
+                    "Of our preseason Top 25, $onPace are roughly on their projected win pace. $f4Alive of our Final Four picks still look like tournament teams.",
+                    style = T.body, color = P.ink,
+                )
+                Spacer(Modifier.height(8.dp))
+                val delta = u.w - (mine.w * u.gp / (mine.w + mine.l).coerceAtLeast(1).toDouble()).roundToInt()
+                Text(
+                    when {
+                        u.gp < 5 -> "${u.school} is ${u.record} — too early to grade the projection."
+                        delta >= 2 -> "${u.school} is beating the projection (${u.record} vs a ${mine.w}-${mine.l} pace)."
+                        delta <= -2 -> "${u.school} is behind the projection (${u.record}; we had them at ${mine.w}-${mine.l})."
+                        else -> "${u.school} is right about where we picked them (${u.record}, projected ${mine.w}-${mine.l})."
+                    },
+                    style = T.small, color = P.sub,
+                )
+            }
+        }
         Section("Final Four")
         Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
