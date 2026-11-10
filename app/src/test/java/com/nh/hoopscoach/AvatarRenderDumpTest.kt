@@ -38,7 +38,13 @@ class AvatarRenderDumpTest {
             Case("11_knicks8_ebony_bald_fullbeard", Face(7, 0, 0, 0, 5, 0, 0, 0, 3), "knicks", 8),
             Case("12_wolves3_darkchoc_afro", Face(6, 0, 5, 0, 0, 0, 0, 0, 0), "timberwolves", 3),
         )
-        for (c in cases) {
+        val teams = listOf("timberwolves", "lakers", "celtics", "heat", "01_duke", "knicks", "bulls")
+        val hairCases = (0..13).flatMap { hair ->
+            listOf(6, 0, 3).map { skin ->
+                Case("hair_%02d_skin%d".format(hair, skin), Face(skin, 0, hair, if (skin == 0) 2 else 0, 0, 0, 0, 0, 0), teams[(hair + skin) % teams.size], 3)
+            }
+        }
+        for (c in cases + hairCases) {
             val px = SpriteCompose.render(c.face, 0xFF0C2340.toInt(), 0xFF78BE20.toInt(), c.number, c.gear, c.jersey)
             writePpm(File(out, "${c.name}.ppm"), px, SpriteCompose.N, SpriteCompose.N)
         }

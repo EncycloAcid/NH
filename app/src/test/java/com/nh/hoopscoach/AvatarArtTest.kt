@@ -43,13 +43,25 @@ class AvatarArtTest {
     }
 
     @Test
-    fun bodiesLeaveTheTorsoToTheJersey() {
-        // The jersey layer has open neck/arm holes; a body with a shirt baked into its torso shows
-        // through them. Sample spots the jersey covers on every body.
+    fun bodiesHaveAWholeHeadAndTorso() {
         for (skin in 0..7) {
             val body = SpriteSheets.body(skin)!!
-            for ((x, y) in listOf(257 to 400, 312 to 305, 250 to 330, 200 to 450)) {
-                assertTrue("body $skin paints the torso at ($x,$y)", body.getPixel(x, y) ushr 24 < 16)
+            fun solid(x: Int, y: Int) = body.getPixel(x, y) ushr 24 >= 128
+            // Cranium under the hair: no flat-cut scalp, no stray strands beside it.
+            for ((x, y) in listOf(256 to 56, 210 to 70, 300 to 70, 200 to 100, 311 to 100)) {
+                assertTrue("body $skin has no scalp at ($x,$y)", solid(x, y))
+            }
+            for (y in 0 until 116) for (x in 0 until 512) {
+                if (x in 186..325) continue
+                assertTrue("body $skin has a stray pixel at ($x,$y)", !solid(x, y))
+            }
+            // Torso between the arms, so the jersey's armholes never show the background.
+            for (y in 290 until 500 step 5) {
+                var x = 0
+                while (x < 256 && !solid(x, y)) x++
+                while (x < 256 && solid(x, y)) x++
+                if (x >= 205) continue
+                for (xx in x until 306) assertTrue("body $skin has a gap beside the arm at ($xx,$y)", solid(xx, y))
             }
         }
     }
@@ -63,7 +75,10 @@ class AvatarArtTest {
             val b = SpriteCompose.render(Face(7, 0, 1, 0, 0, 0, 0, 0, 0), 0, 0, 3, jerseyKey = jersey)
             val n = SpriteCompose.N
             var diff = 0
-            for (y in 152 until 236) for (x in 96 until 172) if (a[y * n + x] != b[y * n + x]) diff++
+            // Chest and strap digit cutouts in the jersey pack (256 scale), with a margin.
+            for ((xr, yr) in listOf((116 until 142) to (173 until 218), (148 until 164) to (140 until 166))) {
+                for (y in yr) for (x in xr) if (a[y * n + x] != b[y * n + x]) diff++
+            }
             assertEquals("$jersey: body shows through the jersey at $diff pixels", 0, diff)
         }
     }
