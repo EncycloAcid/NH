@@ -77,11 +77,6 @@ object SpriteCompose {
             applyChestNumber(canvas, number)
         }
 
-        val headband = when {
-            f.hair == 7 -> SpriteSheets.bitmap("character/headbands/03_stealth_black.png")
-            else -> SpriteSheets.headband(f.acc)
-        }
-        blitLayer(canvas, headband)
         blitLayer(canvas, SpriteSheets.eyewear(f.acc))
 
         val hairSrc = hairBitmap(f)
@@ -90,6 +85,13 @@ object SpriteCompose {
             blitLayer(canvas, tinted)
             if (tinted !== hairSrc) tinted.recycle()
         }
+
+        // Headbands sit over the hair: the hair now covers the whole scalp down to the hairline.
+        val headband = when {
+            f.hair == 7 -> SpriteSheets.bitmap("character/headbands/03_stealth_black.png")
+            else -> SpriteSheets.headband(f.acc)
+        }
+        blitLayer(canvas, headband)
 
         val out = Bitmap.createScaledBitmap(canvas, N, N, false)
         canvas.recycle()

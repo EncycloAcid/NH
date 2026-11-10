@@ -39,12 +39,21 @@ class AvatarRenderDumpTest {
             Case("12_wolves3_darkchoc_afro", Face(6, 0, 5, 0, 0, 0, 0, 0, 0), "timberwolves", 3),
         )
         val teams = listOf("timberwolves", "lakers", "celtics", "heat", "01_duke", "knicks", "bulls")
+        val hairColors = intArrayOf(0, 1, 2, 3, 6, 7)
         val hairCases = (0..13).flatMap { hair ->
-            listOf(6, 0, 3).map { skin ->
-                Case("hair_%02d_skin%d".format(hair, skin), Face(skin, 0, hair, if (skin == 0) 2 else 0, 0, 0, 0, 0, 0), teams[(hair + skin) % teams.size], 3)
+            listOf(7, 3, 0).mapIndexed { i, skin ->
+                val color = hairColors[(hair + i * 2) % hairColors.size]
+                Case("hair_%02d_skin%d".format(hair, skin), Face(skin, 0, hair, color, 0, 0, 0, 0, 0), teams[(hair + skin) % teams.size], 3)
+            }
+        } + listOf(7, 3, 0).map { skin ->
+            Case("hair_01b_blond_skin%d".format(skin), Face(skin, 0, 1, 4, 0, 0, 0, 0, 0), "lakers", 3)
+        }
+        val jerseyCases = listOf("lakers", "celtics", "bulls", "warriors", "heat", "01_duke").flatMapIndexed { i, team ->
+            listOf(6, 1).map { skin ->
+                Case("team_${team}_skin$skin", Face(skin, 0, listOf(3, 6, 9, 12, 2, 13)[i], 0, 0, 0, 0, 0, 0), team, 23)
             }
         }
-        for (c in cases + hairCases) {
+        for (c in cases + hairCases + jerseyCases) {
             val px = SpriteCompose.render(c.face, 0xFF0C2340.toInt(), 0xFF78BE20.toInt(), c.number, c.gear, c.jersey)
             writePpm(File(out, "${c.name}.ppm"), px, SpriteCompose.N, SpriteCompose.N)
         }

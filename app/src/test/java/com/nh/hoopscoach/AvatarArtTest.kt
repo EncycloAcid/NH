@@ -55,13 +55,48 @@ class AvatarArtTest {
                 if (x in 186..325) continue
                 assertTrue("body $skin has a stray pixel at ($x,$y)", !solid(x, y))
             }
-            // Torso between the arms, so the jersey's armholes never show the background.
-            for (y in 290 until 500 step 5) {
-                var x = 0
-                while (x < 256 && !solid(x, y)) x++
-                while (x < 256 && solid(x, y)) x++
-                if (x >= 205) continue
-                for (xx in x until 306) assertTrue("body $skin has a gap beside the arm at ($xx,$y)", solid(xx, y))
+        }
+    }
+
+    @Test
+    fun armsJoinEveryJerseyAtTheArmholes() {
+        // From the shoulder down to the armpit, everything between the arm and the jersey's
+        // armhole must be body (shoulder/chest skin), never background.
+        val jerseys = listOf("nba_jerseys", "college_jerseys").flatMap { dir ->
+            File(assetDir(), dir).listFiles { f -> f.name.endsWith(".png") }.orEmpty().map { "character/$dir/${it.name}" }
+        }
+        for (skin in 0..7) {
+            val body = SpriteSheets.body(skin)!!
+            for (path in jerseys) {
+                val jersey = SpriteSheets.bitmap(path)!!
+                fun body(x: Int, y: Int) = body.getPixel(x, y) ushr 24 >= 128
+                fun shirt(x: Int, y: Int) = jersey.getPixel(x, y) ushr 24 >= 128
+                for (y in 266 until 334 step 2) {
+                    // The arm's inner edge is at x=163 / 348 on these rows; from there to the
+                    // jersey's armhole must be solid.
+                    for (x in 162 until 256) {
+                        if (shirt(x, y)) break
+                        assertTrue("body $skin + $path: background at ($x,$y)", body(x, y))
+                    }
+                    for (x in 349 downTo 256) {
+                        if (shirt(x, y)) break
+                        assertTrue("body $skin + $path: background at ($x,$y)", body(x, y))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun everyHairstyleCoversTheScalp() {
+        // Probe the crown, the temples and the sideburns: hair must sit on the head there, with no
+        // scalp gap or float. Mohawk sides are shaved stubble, which is translucent but present.
+        val probes = listOf(256 to 46, 230 to 50, 282 to 50, 206 to 76, 305 to 76, 196 to 104, 315 to 104)
+        for (style in 1 until SpriteSheets.HAIR_FILES.size) {
+            val hair = SpriteSheets.hair(style) ?: continue
+            for ((x, y) in probes) {
+                val a = hair.getPixel(x, y) ushr 24
+                assertTrue("hair style $style leaves the scalp bare at ($x,$y)", a >= 60)
             }
         }
     }
