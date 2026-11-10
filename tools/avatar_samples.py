@@ -13,26 +13,27 @@ HAIR_COLORS = (0x2E2A2A, 0x4A2E1E, 0x6E4628, 0xA2562A,
                0xDAB458, 0xECE6D4, 0x8E9096, 0xC22E2E)
 
 
-def mouth_base(body):
-    body = body.copy()
-    pixels = body.load()
-    for y in range(191, 211):
-        left, right = pixels[226, y], pixels[286, y]
-        for x in range(226, 287):
-            blend = min(1, (x - 225) / 5, (287 - x) / 5, (y - 190) / 3, (211 - y) / 4)
-            skin = tuple((left[c] * (286 - x) + right[c] * (x - 226)) // 60 for c in range(3))
-            pixels[x, y] = tuple(int(skin[c] * blend + pixels[x, y][c] * (1 - blend))
-                                 for c in range(3)) + (pixels[x, y][3],)
-    return body
+def tint_mouth(body, mouth):
+    mouth = mouth.copy()
+    pixels = mouth.load()
+    for y in range(193, 219):
+        left, right = body.getpixel((226, y)), body.getpixel((286, y))
+        for x in range(229, 283):
+            r, g, b, a = pixels[x, y]
+            if a and r == b and g == 0:
+                skin = tuple((left[c] * (286 - x) + right[c] * (x - 226)) // 60 for c in range(3))
+                pixels[x, y] = tuple(c * r // (192 if i == 0 else 224) for i, c in enumerate(skin)) + (a,)
+    return mouth
 
 
 def composite(paths, hair_color=0, root=ROOT, replace_mouth=True):
     result = Image.new("RGBA", (512, 512))
+    body = next((Image.open(root / p) for p in paths if Path(p).parts[0] == "bodies"), None)
     for path in paths:
         layer = Image.open(root / path)
         assert layer.mode == "RGBA" and layer.size == (512, 512), path
-        if replace_mouth and Path(path).parts[0] == "bodies" and any(Path(p).parts[0] == "mouths" for p in paths):
-            layer = mouth_base(layer)
+        if replace_mouth and body is not None and Path(path).parts[0] == "mouths":
+            layer = tint_mouth(body, layer)
         if hair_color and Path(path).parts[0] in ("hairstyles", "beards"):
             color = HAIR_COLORS[hair_color]
             pixels = []
@@ -60,6 +61,14 @@ def main():
     assert not (ROOT / "numbers/chest").exists()
     assert all((ROOT / f"numbers/{n}.png").is_file() for n in range(100))
     assert composite([]).getbbox() is None
+    assert len({Image.open(p).getchannel("A").tobytes() for p in files["bodies"]}) == 1
+    for path in files["mouths"]:
+        mouth = Image.open(path)
+        assert mouth.getbbox()[2] - mouth.getbbox()[0] == 54, path
+        assert all(mouth.getpixel((x, y))[3] == 255 for y in (200, 201) for x in range(232, 280)), path
+    for path in files["hairstyles"]:
+        hair = Image.open(path)
+        assert all(hair.getpixel((x, y))[3] == 255 for y in range(84, 88) for x in range(205, 307)), path
     try:
         composite(["missing.png"])
         raise AssertionError("Missing layers must fail the host check")
@@ -99,18 +108,40 @@ def main():
             draw.text((x + 3, y + 192), f"{col + 1} {name[:22]}", fill="white")
     sheet.save(out / "contact-sheet.png")
 
-    edge_paths = files["hairstyles"] + files["beards"] + files["headbands"] + files["eyewear"]
+    edge_paths = files["hairstyles"] + files["beards"] + files["headbands"] + files["eyewear"] + files["eyes"]
     edge_sheet = Image.new("RGB", (6 * 350, ((len(edge_paths) + 5) // 6) * 174), "#232933")
     edge_draw = ImageDraw.Draw(edge_sheet)
     for i, path in enumerate(edge_paths):
-        avatar = composite([str(files["bodies"][0].relative_to(ROOT)), str(path.relative_to(ROOT))])
-        face = avatar.crop((90, 0, 425, 280)).resize((175, 146), Image.Resampling.NEAREST)
         x, y = i % 6 * 350, i // 6 * 174
-        for offset, color in ((0, "#070a0f"), (175, "#eeeeee")):
+        for offset, color, body in ((0, "#070a0f", files["bodies"][0]), (175, "#eeeeee", files["bodies"][-1])):
+            avatar = composite([str(body.relative_to(ROOT)), str(path.relative_to(ROOT))])
+            face = avatar.crop((90, 0, 425, 280)).resize((175, 146), Image.Resampling.NEAREST)
             edge_sheet.paste(color, (x + offset, y, x + offset + 175, y + 146))
             edge_sheet.paste(face, (x + offset, y), face)
         edge_draw.text((x + 3, y + 150), path.stem, fill="white")
     edge_sheet.save(out / "edge-sheet.png")
+
+    hair_sheet = Image.new("RGB", (5 * 380, 3 * 285), "#404955")
+    hair_draw = ImageDraw.Draw(hair_sheet)
+    for i, path in enumerate(files["hairstyles"]):
+        avatar = composite([str(files["bodies"][-1].relative_to(ROOT)), str(path.relative_to(ROOT))])
+        face = avatar.crop((130, 0, 385, 175)).resize((380, 261), Image.Resampling.NEAREST)
+        x, y = i % 5 * 380, i // 5 * 285
+        hair_sheet.paste(face, (x, y), face)
+        hair_draw.text((x + 4, y + 264), path.stem, fill="white")
+    hair_sheet.save(out / "hairline-sheet.png")
+
+    jerseys = sorted(ROOT.glob("*_jerseys/*.png"))
+    jersey_sheet = Image.new("RGB", (6 * 256, ((len(jerseys) + 5) // 6) * 286), "#404955")
+    jersey_draw = ImageDraw.Draw(jersey_sheet)
+    for i, jersey in enumerate(jerseys):
+        avatar = composite([str(files["bodies"][i % 8].relative_to(ROOT)), str(jersey.relative_to(ROOT)),
+                            "numbers/23.png", "hairstyles/buzz_cut.png"])
+        small = avatar.resize((256, 256), Image.Resampling.NEAREST)
+        x, y = i % 6 * 256, i // 6 * 286
+        jersey_sheet.paste(small, (x, y), small)
+        jersey_draw.text((x + 5, y + 260), jersey.stem, fill="white")
+    jersey_sheet.save(out / "jersey-sheet.png")
 
     if len(sys.argv) > 2:
         before = Path(sys.argv[2])
@@ -125,10 +156,11 @@ def main():
                     x, y = (skin_col * 2 + col) * 530, row * 520
                     zoom.paste("#111722" if skin_col == 0 else "#eeeeee", (x, y, x + 530, y + 490))
                     zoom.paste(face, (x, y), face)
-                    zoom_draw.text((x + 6, y + 496), f"{'AFTER' if col else 'BEFORE'} {body.stem} {mouth.stem}", fill="white")
+                    zoom_draw.text((x + 6, y + 496), f"{'AFTER .129' if col else 'BEFORE .127'} {body.stem} {mouth.stem}", fill="white")
         zoom.save(out / "faces-before-after.png")
         print(f"Wrote zoomed faces-before-after.png using {before}")
     print(f"PASS: {len(assets)} RGBA 512x512 layers; numbers 0-99; empty/error cases")
+    print("PASS: all eight body silhouettes match; full-width mouths cover baked lip seams; all 15 hairstyles cover cranium top")
     print(f"Wrote 12 avatars + 32 all-skin mouth/puff samples + contact-sheet.png + edge-sheet.png to {out}")
 
 

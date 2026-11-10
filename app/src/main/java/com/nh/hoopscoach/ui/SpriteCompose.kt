@@ -34,9 +34,10 @@ object SpriteCompose {
         val beard = SpriteSheets.beard(f.beard)
         val hair = if (f.hair == 1 && f.hairColor >= 4)
             SpriteSheets.bitmap("character/hairstyles/bleached_blonde_crop.png") else SpriteSheets.hair(f.hair)
-        val mouth = SpriteSheets.mouth(f.mouth)
+        val body = SpriteSheets.body(f.skin)
+        val mouth = SpriteSheets.mouth(f.mouth)?.let { if (body != null) tintMouth(body, it) else it }
         return composite(listOfNotNull(
-            SpriteSheets.body(f.skin)?.let { if (mouth != null) mouthBase(it) else it },
+            body,
             SpriteSheets.bitmap(SpriteSheets.jerseyPath(jerseyKey)),
             SpriteSheets.chestNumber(number),
             mouth,
@@ -54,28 +55,30 @@ object SpriteCompose {
         }
         val colored = layers.filter { it.first.startsWith("character/hairstyles/") || it.first.startsWith("character/beards/") }
             .map { it.second }.toSet()
-        val hasMouth = layers.any { it.first.startsWith("character/mouths/") }
+        val body = layers.firstOrNull { it.first.startsWith("character/bodies/") }?.second
         return composite(layers.map { (path, bitmap) ->
-            if (hasMouth && path.startsWith("character/bodies/")) mouthBase(bitmap) else bitmap
+            if (body != null && path.startsWith("character/mouths/")) tintMouth(body, bitmap) else bitmap
         }, look.hairColorIndex, colored)
     }
 
-    internal fun mouthBase(body: Bitmap): Bitmap {
-        require(body.width == N && body.height == N) { "Avatar layers must be ${N}x$N" }
+    internal fun tintMouth(body: Bitmap, mouth: Bitmap): Bitmap {
+        require(body.width == N && body.height == N && mouth.width == N && mouth.height == N) {
+            "Avatar layers must be ${N}x$N"
+        }
         val pixels = IntArray(N * N)
-        body.getPixels(pixels, 0, N, 0, 0, N, N)
-        for (y in 191..210) {
-            val left = pixels[y * N + 226]
-            val right = pixels[y * N + 286]
-            for (x in 226..286) {
-                val blend = minOf(1f, (x - 225) / 5f, (287 - x) / 5f,
-                    (y - 190) / 3f, (211 - y) / 4f)
-                val original = pixels[y * N + x]
+        mouth.getPixels(pixels, 0, N, 0, 0, N, N)
+        for (y in 193..218) {
+            val left = body.getPixel(226, y)
+            val right = body.getPixel(286, y)
+            for (x in 229..282) {
+                val value = pixels[y * N + x]
+                val shade = (value ushr 16) and 255
+                if (value ushr 24 == 0 || (value and 0xFFFF) != shade) continue
                 fun channel(shift: Int): Int {
                     val skin = (((left ushr shift) and 255) * (286 - x) + ((right ushr shift) and 255) * (x - 226)) / 60
-                    return (skin * blend + ((original ushr shift) and 255) * (1 - blend)).toInt()
+                    return skin * shade / (if (shift == 16) 192 else 224)
                 }
-                pixels[y * N + x] = (pixels[y * N + x] and 0xFF000000.toInt()) or
+                pixels[y * N + x] = (value and 0xFF000000.toInt()) or
                     (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
             }
         }

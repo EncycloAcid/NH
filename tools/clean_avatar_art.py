@@ -1,4 +1,4 @@
-"""Rebuild the .128 art cleanup from an unmodified aligned asset directory.
+"""Rebuild avatar art from the original .127 aligned asset directory.
 
 Usage: python tools/clean_avatar_art.py SOURCE_CHARACTER_DIR DEST_CHARACTER_DIR
 Requires Pillow. All coordinates remain on the original 512px canvas.
@@ -7,7 +7,7 @@ import sys
 import shutil
 from pathlib import Path
 from statistics import median
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageDraw
 
 
 def clean_fringe(image, preserve_opaque=False):
@@ -44,30 +44,63 @@ def clean_fringe(image, preserve_opaque=False):
 
 
 def clean_mouth(image, name):
-    crop, dy = {
-        "01_confident_grin": ((244, 201, 269, 213), -5),
-        "02_game_face_shout": ((249, 199, 268, 217), -3),
-        "03_athletic_mouthguard": ((245, 196, 270, 219), 0),
-    }[name]
     out = Image.new("RGBA", image.size)
-    out.paste(image.crop(crop), (crop[0], crop[1] + dy))
+    draw = ImageDraw.Draw(out)
+    def lip(shade):
+        return (shade, 0, shade, 255)
+    if name == "01_confident_grin":
+        rows = [(193, 195, 239, 272), (196, 198, 233, 278),
+                (199, 201, 229, 282), (202, 204, 232, 279),
+                (205, 207, 237, 274), (208, 209, 243, 268)]
+    else:
+        rows = [(193, 195, 239, 272), (196, 198, 233, 278),
+                (199, 204, 229, 282), (205, 210, 232, 279),
+                (211, 215, 238, 273), (216, 218, 244, 267)]
+    for top, bottom, left, right in rows:
+        draw.rectangle((left, top, right, bottom), fill=lip(120))
+    draw.rectangle((253, 193, 258, 195), fill=(0, 0, 0, 0))
+    if name == "01_confident_grin":
+        draw.polygon([(232, 197), (238, 199), (273, 199), (279, 197),
+                      (276, 203), (270, 206), (241, 206), (235, 203)], fill=lip(48))
+        draw.rectangle((239, 199, 272, 201), fill=(235, 229, 209, 255))
+        draw.rectangle((242, 202, 269, 202), fill=(165, 163, 151, 255))
+        draw.rectangle((243, 207, 268, 208), fill=lip(168))
+    else:
+        draw.polygon([(239, 196), (272, 196), (278, 199), (278, 207),
+                      (272, 213), (266, 216), (245, 216), (239, 213),
+                      (233, 207), (233, 199)], fill=lip(40))
+        draw.rectangle((240, 197, 271, 200), fill=(235, 229, 209, 255))
+        draw.rectangle((242, 201, 269, 201), fill=(165, 163, 151, 255))
+        if name == "02_game_face_shout":
+            draw.rectangle((246, 210, 265, 213), fill=(128, 48, 54, 255))
+            draw.rectangle((249, 210, 262, 211), fill=(168, 75, 76, 255))
+        else:
+            draw.rectangle((238, 200, 273, 206), fill=(42, 111, 109, 255))
+            draw.rectangle((241, 200, 270, 203), fill=(114, 181, 165, 255))
+            draw.rectangle((244, 200, 267, 201), fill=(182, 210, 186, 255))
+            draw.rectangle((244, 207, 267, 208), fill=(21, 63, 63, 255))
+        draw.rectangle((247, 217, 264, 218), fill=lip(156))
     return out
 
 
-def clean_puffs(image):
+def clean_puffs(image, curls):
     image = image.copy()
-    original = image.copy()
     for y in range(51):
         for x in range(180, 336):
             if image.getpixel((x, y)) == (24, 18, 15, 255):
                 image.putpixel((x, y), (0, 0, 0, 0))
-    for y in range(75, 101):
-        for x in range(190, 322):
-            if ((x - 256) / 70) ** 2 + ((y - 78) / 24) ** 2 <= 1:
-                if image.getpixel((x, y))[3] < 255:
-                    sample = original.getpixel((x, 54 + (y - 75) % 24))
-                    image.putpixel((x, y), sample if sample[3] == 255 else (24, 18, 15, 255))
-    return image
+    wings = Image.new("RGBA", image.size)
+    wings.paste(image.crop((0, 0, 221, 512)), (0, 0))
+    wings.paste(image.crop((291, 0, 512, 512)), (291, 0))
+    base = Image.new("RGBA", image.size)
+    crown = curls.crop((160, 4, 353, 88)).resize((193, 44), Image.Resampling.NEAREST)
+    base.paste(crown, (160, 44))
+    for x in range(198, 314):
+        bottom = 89 + int(((x - 256) / 60) ** 2 * 9) + (x // 6) % 2
+        for y in range(87, bottom + 1):
+            color = curls.getpixel((x, 55 + (y - 87) * 2))
+            base.putpixel((x, y), (11, 9, 12, 255) if y >= bottom - 1 else color)
+    return Image.alpha_composite(base, wings)
 
 
 def main():
@@ -79,7 +112,7 @@ def main():
             if folder == "mouths":
                 image = clean_mouth(image, path.stem)
             if path.stem == "double_afro_puffs":
-                image = clean_puffs(image)
+                image = clean_puffs(image, Image.open(source / "hairstyles/curly_top_fade.png").convert("RGBA"))
             if folder == "mouths":
                 count = 0
             else:
