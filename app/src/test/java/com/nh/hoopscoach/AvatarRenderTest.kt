@@ -91,4 +91,57 @@ class AvatarRenderTest {
         assertEquals(0, colored[0])
         assertArrayEquals(base, SpriteCompose.composite(listOf(hair), 7))
     }
+
+    @Test fun mouthReplacementUsesEachBodiesOwnSkinWithoutChangingCachedBody() {
+        for ((skin, name) in PlayerLook.skinTones.withIndex()) {
+            val body = SpriteSheets.bitmap("character/bodies/$name.png")!!
+            val original = IntArray(512 * 512)
+            body.getPixels(original, 0, 512, 0, 0, 512, 512)
+            val base = SpriteCompose.mouthBase(body)
+            val after = IntArray(512 * 512)
+            body.getPixels(after, 0, 512, 0, 0, 512, 512)
+            assertArrayEquals(original, after)
+            assertEquals(body.getPixel(220, 200), base.getPixel(220, 200))
+            assertNotEquals(body.getPixel(256, 200), base.getPixel(256, 200))
+            val left = body.getPixel(226, 200)
+            val right = body.getPixel(286, 200)
+            for (shift in listOf(16, 8, 0)) {
+                assertEquals((((left ushr shift) and 255) + ((right ushr shift) and 255)) / 2,
+                    (base.getPixel(256, 200) ushr shift) and 255)
+            }
+            for (mouth in 1..3) {
+                val look = PlayerLook(skinToneIndex = skin, mouthIndex = mouth)
+                val paths = SpriteCompose.lookLayers(look, null, 0)
+                val layers = paths.map { SpriteSheets.bitmap(it)!! }.toMutableList()
+                layers[0] = base
+                assertArrayEquals("skin $skin mouth $mouth", SpriteCompose.composite(layers),
+                    SpriteCompose.renderLook(look, null, 0))
+            }
+            val neutral = PlayerLook(skinToneIndex = skin)
+            assertArrayEquals(SpriteCompose.composite(SpriteCompose.lookLayers(neutral, null, 0)
+                .map { SpriteSheets.bitmap(it)!! }), SpriteCompose.renderLook(neutral, null, 0))
+        }
+    }
+
+    @Test fun mouthReplacementPreservesTransparentPixels() {
+        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        assertTrue(SpriteCompose.composite(listOf(SpriteCompose.mouthBase(clear))).all { it == 0 })
+    }
+
+    @Test fun legacyFaceAlsoReplacesBakedMouth() {
+        val face = Face(4, 0, 0, 0, 0, 0, 0, 1, 0)
+        val layers = listOfNotNull(
+            SpriteCompose.mouthBase(SpriteSheets.body(face.skin)!!),
+            SpriteSheets.bitmap(SpriteSheets.jerseyPath(null)),
+            SpriteSheets.chestNumber(0),
+            SpriteSheets.mouth(face.mouth),
+        )
+        assertNotNull(SpriteSheets.mouth(face.mouth))
+        assertArrayEquals(SpriteCompose.composite(layers), SpriteCompose.render(face, 0, 0, 0))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun mouthReplacementRejectsCroppedBody() {
+        SpriteCompose.mouthBase(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))
+    }
 }
