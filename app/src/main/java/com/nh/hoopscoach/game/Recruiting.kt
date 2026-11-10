@@ -23,6 +23,30 @@ object Recruiting {
     const val COST_SCOUT = 5
     const val SCOUT_CAP = 60
     const val STEP = 5
+    const val SCOUT_MAX = 3
+
+    /** What the board shows for a prospect's overall and ceiling. */
+    data class Fog(
+        val ovrLo: Int, val ovrHi: Int, val potLo: Int, val potHi: Int,
+        val midOvr: Int, val midPot: Int, val level: Int,
+    ) {
+        val known get() = level >= SCOUT_MAX
+        val ovrSpan get() = ovrHi - ovrLo
+        val label get() = when (level) {
+            0 -> "Unscouted"
+            1 -> "Film session"
+            2 -> "Campus visit"
+            else -> "Fully scouted"
+        }
+        val nextAction get() = when (level) {
+            0 -> "Watch film"
+            1 -> "Campus visit"
+            2 -> "Full report"
+            else -> "Scouted"
+        }
+        fun ovrText() = if (known) "$midOvr" else if (ovrSpan <= 2) "$midOvr" else "$ovrLo–$ovrHi"
+        fun potText() = if (known) "$midPot" else if (potHi - potLo <= 2) "$midPot" else "$potLo–$potHi"
+    }
 
     // ---------- roster room ----------
 
@@ -57,21 +81,93 @@ object Recruiting {
 
     fun round(lg: League) = lg.offseason?.round ?: 0
 
-    // ---------- scouting ----------
+    // ---------- scouting fog ----------
 
-    fun dailyScouting(lg: League) = 10 + lg.userCoach.rec / 10
+    fun dailyScouting(lg: League) = 10 + lg.userCoach.rec / 10 + (Assistants.rec(lg) / 5)
 
     /** In season: scouting points refill a little every game day. */
     fun tick(lg: League) { lg.recruitPoints = (lg.recruitPoints + dailyScouting(lg)).coerceAtMost(SCOUT_CAP) }
 
+    /** Cost of the next look; a recruiting assistant shaves a point or two. */
+    fun scoutCost(lg: League, r: Recruit): Int {
+        if (r.scoutLevel >= SCOUT_MAX || r.scouted) return 0
+        val base = when (r.scoutLevel) { 0 -> COST_SCOUT; 1 -> COST_SCOUT + 2; else -> COST_SCOUT + 4 }
+        return (base - (Assistants.rec(lg) / 4)).coerceAtLeast(3)
+    }
+
+    /** Older saves only had a point estimate — recover noise from that so fog still works. */
+    private fun ensureNoise(r: Recruit) {
+        if (r.scouted || r.scoutLevel > 0) return
+        if (r.noiseO != 0 || r.noiseP != 0) return
+        if (r.estOvr <= 0) return
+        r.noiseO = (r.estOvr - r.p.ovr).coerceIn(-14, 14)
+        r.noiseP = (r.estPot - r.p.pot).coerceIn(-16, 16)
+    }
+
+    /**
+     * Progressive fog: level 0 is a wide range, each scout step (film → campus visit → full report)
+     * pulls the estimate toward his real OVR/POT and shrinks the band.
+     */
+    fun fog(r: Recruit): Fog {
+        ensureNoise(r)
+        val level = when {
+            r.scouted -> SCOUT_MAX
+            else -> r.scoutLevel.coerceIn(0, SCOUT_MAX)
+        }
+        val k = 1.0 - level / SCOUT_MAX.toDouble()
+        val midO = (r.p.ovr + r.noiseO * k).roundToInt()
+        val midP = maxOf(midO, (r.p.pot + r.noiseP * k).roundToInt())
+        val wO = (1 + 9 * k).roundToInt().coerceAtLeast(if (level >= SCOUT_MAX) 0 else 1)
+        val wP = (2 + 12 * k).roundToInt().coerceAtLeast(if (level >= SCOUT_MAX) 0 else 1)
+        return if (level >= SCOUT_MAX) Fog(r.p.ovr, r.p.ovr, r.p.pot, r.p.pot, r.p.ovr, r.p.pot, SCOUT_MAX)
+        else Fog(
+            (midO - wO).coerceIn(30, 99), (midO + wO).coerceIn(30, 99),
+            (midP - wP).coerceIn(30, 99), (midP + wP).coerceIn(30, 99),
+            midO.coerceIn(30, 99), midP.coerceIn(30, 99), level,
+        )
+    }
+
+    /** Stamp the board's current mid estimates from the fog (sorting / legacy UI). */
+    fun refreshEstimate(r: Recruit) {
+        val f = fog(r)
+        r.estOvr = f.midOvr
+        r.estPot = f.midPot.coerceAtLeast(r.estOvr)
+        r.scouted = f.known
+        if (f.known) r.scoutLevel = SCOUT_MAX
+    }
+
+    /** Roll the hidden first-look noise for a new HS or portal target. */
+    fun seedFog(r: Recruit, known: Boolean = false) {
+        if (known) {
+            r.noiseO = 0; r.noiseP = 0
+            r.scoutLevel = SCOUT_MAX
+            r.scouted = true
+            r.estOvr = r.p.ovr
+            r.estPot = r.p.pot
+            return
+        }
+        // Bigger stars get slightly wider first-look error — the dramatic miss/steal.
+        val starBoost = (r.p.stars - 2).coerceIn(0, 3)
+        r.noiseO = (Rng.gauss() * (5.5 + starBoost)).roundToInt().coerceIn(-14, 14)
+        r.noiseP = (Rng.gauss() * (7.0 + starBoost)).roundToInt().coerceIn(-16, 16)
+        r.scoutLevel = 0
+        r.scouted = false
+        refreshEstimate(r)
+    }
+
+    /** One step deeper: film → campus visit → full report. */
     fun scout(lg: League, r: Recruit): Boolean {
-        if (r.scouted || lg.recruitPoints < COST_SCOUT) return false
-        lg.recruitPoints -= COST_SCOUT
-        r.scouted = true
-        r.estOvr = r.p.ovr
-        r.estPot = r.p.pot
+        if (r.scoutLevel >= SCOUT_MAX || r.scouted) return false
+        val cost = scoutCost(lg, r)
+        if (lg.recruitPoints < cost) return false
+        lg.recruitPoints -= cost
+        r.scoutLevel = (r.scoutLevel + 1).coerceAtMost(SCOUT_MAX)
+        refreshEstimate(r)
         return true
     }
+
+    fun scoutLabel(r: Recruit) = fog(r).label
+    fun scoutNext(r: Recruit) = fog(r).nextAction
 
     fun addToBoard(lg: League, r: Recruit) { r.onBoard = true; @Suppress("UNUSED_VARIABLE") val u = lg }
 

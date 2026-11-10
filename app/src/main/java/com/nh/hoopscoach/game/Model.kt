@@ -568,7 +568,16 @@ class Recruit(
     /** Interest in each school still in the race, 0-100. */
     var interest: MutableMap<Int, Int> = mutableMapOf(),
     var committed: Int = -1,
+    /** True once [scoutLevel] reaches 3 (real OVR/POT known). Kept for older saves. */
     var scouted: Boolean = false,
+    /**
+     * How deep the user has scouted him: 0 unscouted, 1 film, 2 campus visit, 3 full report.
+     * Each step narrows the OVR/POT fog toward his real ratings.
+     */
+    var scoutLevel: Int = 0,
+    /** Hidden noise on the first look; scouting shrinks how much of it you still see. */
+    var noiseO: Int = 0,
+    var noiseP: Int = 0,
     var onBoard: Boolean = false,
     var nilAsk: Int = 0,
     var nilOffer: Int = 0,

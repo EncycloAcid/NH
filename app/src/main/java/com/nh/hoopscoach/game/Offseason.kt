@@ -125,9 +125,8 @@ object Offseason {
         p.transferFrom = fromId
         val r = Recruit(p, transfer = true)
         r.nilAsk = Ratings.expectedNil(p)
-        r.scouted = true
-        r.estOvr = p.ovr
-        r.estPot = p.pot
+        // Your own cuts are known; everyone else's portal targets start fogged.
+        Recruiting.seedFog(r, known = fromId == lg.userTeamId)
         r.pref = Recruiting.pickPref(if (p.ovr >= 75) 4 else 3)
         val target = (p.ovr * 1.35 - 28).coerceIn(10.0, 99.0)
         val k = Rng.range(3, 5)

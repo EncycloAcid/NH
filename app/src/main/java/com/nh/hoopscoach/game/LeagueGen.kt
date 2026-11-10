@@ -177,8 +177,7 @@ object LeagueGen {
             Builds.maybeGoatShape(p)
             val r = Recruit(p)
             r.nilAsk = (Ratings.expectedNil(p) * (1.0 + (p.stars - 2) * 0.35)).roundToInt() / 5 * 5
-            r.estOvr = (ovr + Rng.range(-6, 6)).coerceIn(30, 99)
-            r.estPot = (p.pot + Rng.range(-7, 7)).coerceIn(r.estOvr, 99)
+            Recruiting.seedFog(r)
             r.pref = Recruiting.pickPref(p.stars)
             out += r
         }

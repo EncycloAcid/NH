@@ -86,7 +86,7 @@ fun LazyListScope.recruitBoard(vm: GameViewModel, lg: League) {
             Spacer(Modifier.height(10.dp))
             Text(
                 if (cycle) "Recruiting Pull $pull" + Recruiting.classRank(lg, u.id).let { if (it > 0) " · class ranked No. $it" else "" } + ". Points stay on a prospect until you move them or he commits somewhere."
-                else "Scouting a prospect costs ${Recruiting.COST_SCOUT} points and shows his real ratings. Add the ones you like to your targets.",
+                else "Scouting clears the fog in three looks — film, a campus visit, then a full report. Each costs scouting points and narrows his OVR/POT range. Add the ones you like to your targets.",
                 style = T.small, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             )
         }
@@ -198,9 +198,10 @@ fun RecruitRow(vm: GameViewModel, lg: League, r: Recruit, ctx: Recruiting.Ctx) {
             }
         }
         Spacer(Modifier.width(10.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(38.dp)) {
-            Text(grade(r.estOvr), style = T.numSm, color = tier(r.estOvr + 4))
-            Text(grade(r.estPot), style = T.small.copy(fontSize = 12.sp), color = P.sub)
+        val fog = remember(r.scoutLevel, r.scouted, r.estOvr, r.estPot, r.noiseO, r.noiseP) { Recruiting.fog(r) }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(44.dp)) {
+            Text(if (fog.known) grade(fog.midOvr) else fog.ovrText(), style = T.numSm.copy(fontSize = if (fog.known) 14.sp else 11.sp), color = tier(fog.midOvr + 4))
+            Text(if (fog.known) grade(fog.midPot) else fog.potText(), style = T.small.copy(fontSize = 10.sp), color = P.sub)
         }
     }
 }
@@ -238,6 +239,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar(p.name, if (r.transfer) "Transfer · ${p.pos} · ${p.cls}" else "${p.stars}-star ${p.pos} · No. ${p.recruitRank} nationally · No. ${p.posRank} ${p.pos}", onBack = { vm.back() })
+            val fog = remember(r.scoutLevel, r.scouted, r.estOvr, r.estPot, r.noiseO, r.noiseP, p.ovr, p.pot) { Recruiting.fog(r) }
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -246,15 +248,19 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                         Text(if (r.transfer && p.transferFrom >= 0) "Leaving ${lg.team(p.transferFrom).school}" else "${p.hometown} · ${p.highSchool}", style = T.small, color = P.sub)
                         if (p.traits.isNotEmpty()) Text(p.traits.joinToString(" · ") { it.label }, style = T.small, color = P.sub)
                     }
-                    Ring(r.estOvr, 52.dp, label = if (r.scouted) "OVR" else "EST", textSize = 18.sp)
+                    Ring(fog.midOvr, 52.dp, label = if (fog.known) "OVR" else "EST", textSize = 18.sp)
                     Spacer(Modifier.width(8.dp))
-                    Ring(r.estPot, 52.dp, label = "POT", textSize = 18.sp)
+                    Ring(fog.midPot, 52.dp, label = "POT", textSize = 18.sp)
+                }
+                if (!fog.known) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Scout range · OVR ${fog.ovrText()} · POT ${fog.potText()}", style = T.small, color = P.accent)
                 }
                 Spacer(Modifier.height(10.dp))
                 Row {
                     Stat("Style", p.style.short, Modifier.weight(1f), style = T.numSm)
                     Stat("NIL ask", money(r.nilAsk), Modifier.weight(1f), style = T.numSm)
-                    Stat("Scouted", if (r.scouted) "Yes" else "No", Modifier.weight(1f), if (r.scouted) P.good else P.sub, T.numSm)
+                    Stat("Scout", fog.label, Modifier.weight(1f), if (fog.known) P.good else P.sub, T.numSm)
                 }
                 if (p.buildName.isNotEmpty() || p.likeA.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -288,15 +294,31 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
             } else {
                 Section("Scouting · ${lg.recruitPoints} points")
                 Panel {
+                    val fogNow = Recruiting.fog(r)
+                    val cost = Recruiting.scoutCost(lg, r)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SmallButton("Scout · ${Recruiting.COST_SCOUT}", Modifier.weight(1f), enabled = !r.scouted) { vm.act { if (!Recruiting.scout(it, r)) vm.toast("Not enough scouting points") } }
+                        SmallButton(
+                            if (fogNow.known) "Fully scouted" else "${fogNow.nextAction} · $cost",
+                            Modifier.weight(1f),
+                            enabled = !fogNow.known,
+                            primary = !fogNow.known,
+                        ) {
+                            vm.act {
+                                if (!Recruiting.scout(it, r)) vm.toast("Not enough scouting points")
+                                else vm.toast(Recruiting.fog(r).label)
+                            }
+                        }
                         if (r.onBoard) SmallButton("Remove target", Modifier.weight(1f)) { vm.act { Recruiting.removeFromBoard(it, r) } }
-                        else SmallButton("Add to targets", Modifier.weight(1f), primary = true) { vm.act { Recruiting.addToBoard(it, r) } }
+                        else SmallButton("Add to targets", Modifier.weight(1f), primary = fogNow.known) { vm.act { Recruiting.addToBoard(it, r) } }
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        if (lg.phase == Phase.OFFSEASON) "Recruiting points go on prospects once the five rounds begin, after the NIL budget step."
-                        else "Recruiting runs in five rounds after the season. Build your board now, and his interest will be waiting.",
+                        when {
+                            fogNow.known -> "You know his real ratings. " + if (lg.phase == Phase.OFFSEASON) "Put recruiting points on him once the five rounds begin." else "Add him to your board before the offseason."
+                            fogNow.level == 0 -> "Watch film to shrink a wide OVR/POT band. Campus visits and a full report clear the rest."
+                            fogNow.level == 1 -> "Film is in. A campus visit tightens the range further."
+                            else -> "One more look — the full report — reveals his true overall and ceiling."
+                        },
                         style = T.small, color = P.sub,
                     )
                 }

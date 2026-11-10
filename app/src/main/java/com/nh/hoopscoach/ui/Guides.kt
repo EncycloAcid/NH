@@ -121,6 +121,12 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "Money promised to recruits who commit counts against next year's budget.",
         ),
         sec(
+            "Scouting fog",
+            "Unscouted prospects and portal targets show a wide OVR/POT range, not their real numbers. Five-stars can look worse or better than they are — that's the miss or the steal.",
+            "Spend scouting points in three looks: watch film, a campus visit, then a full report. Each step pulls the estimate toward the truth and shrinks the band. A recruiting assistant makes looks cheaper and refills points a little faster.",
+            "Players you cut into the portal stay fully known; everyone else's portal entries start fogged.",
+        ),
+        sec(
             "Offseason",
             "Graduates, draft picks and transfers free up money in the Roster & NIL step. The NIL Budget step shows next year's number before recruiting starts.",
         ),
