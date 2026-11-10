@@ -3,6 +3,7 @@ package com.nh.hoopscoach.ui
 import android.graphics.Bitmap
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -14,6 +15,7 @@ import kotlin.math.roundToInt
  * Architecture (matches the Jetpack Compose customizer guide):
  * every layer is pre-aligned — draw at (0,0) with matching 512 size, no custom offsets.
  * Layer order: body → eyes → mouth → beard → jersey → headband → eyewear → hair.
+ * Layers that are not 512×512 have no anchor and are skipped rather than guessed at.
  * Output is a square ARGB bitmap ([N]×[N]), nearest-neighbor scaled for crisp pixels.
  */
 object SpriteCompose {
@@ -26,6 +28,21 @@ object SpriteCompose {
     private const val CHEST_NUM_CY = 420f
     private const val SHOULDER_NUM_CX = 318f
     private const val SHOULDER_NUM_CY = 278f
+
+    // Transparent digit cutouts in the jersey pack: enclosed holes this big, below the collar.
+    private const val CUTOUT_MIN_AREA = 120
+    private const val CUTOUT_MIN_Y = 285
+    private const val CUTOUT_RIM = 1
+    // How far (sum of RGB deltas) a strap pixel must be from the fabric to count as a printed mark.
+    private const val MARK_DISTANCE = 90
+    // Edge pixels next to a wiped digit that are this far off the fabric get wiped as well.
+    private const val EDGE_DISTANCE = 40
+    // Patches grow from fabric within this distance of the jersey's main color first.
+    private const val FABRIC_DISTANCE = 140
+    private const val NUMBER_AREA_X0 = 186
+    private const val NUMBER_AREA_X1 = 354
+    private const val NUMBER_AREA_Y0 = 248
+    private const val NUMBER_AREA_Y1 = 475
 
     private val HAIR_COLORS = intArrayOf(
         0xFF2E2A2A.toInt(), 0xFF4A2E1E.toInt(), 0xFF6E4628.toInt(), 0xFFA2562A.toInt(),
@@ -54,13 +71,9 @@ object SpriteCompose {
             if (tinted !== beardSrc) tinted.recycle()
         }
 
-        val jersey = resolveJersey(jerseyKey, primary, secondary)
+        val jersey = cleanJersey(jerseyKey, primary, secondary)
         if (jersey != null) {
-            val clean = jersey.copy(Bitmap.Config.ARGB_8888, true)
-            eraseGlyphs(clean, CHEST_NUM_CX, CHEST_NUM_CY, halfW = 70, halfH = 55)
-            eraseGlyphs(clean, SHOULDER_NUM_CX, SHOULDER_NUM_CY, halfW = 36, halfH = 30)
-            blitLayer(canvas, clean)
-            if (clean !== jersey) clean.recycle()
+            blitLayer(canvas, jersey)
             applyChestNumber(canvas, number)
         }
 
@@ -86,16 +99,320 @@ object SpriteCompose {
         return px
     }
 
-    /** Draw a 512 layer at (0,0). Smaller legacy crops are centered as a fallback. */
+    /**
+     * Draw a pre-aligned 512 layer at (0,0). Anything else is a raw crop with no anchor; centering
+     * one drops it in the middle of the canvas (a beard crop lands as a black bar across the mouth),
+     * so it is skipped instead.
+     */
     private fun blitLayer(dst: Bitmap, src: Bitmap?) {
         if (src == null) return
-        if (src.width == SRC && src.height == SRC) {
-            blitOpaque(dst, src, 0, 0)
-            return
+        if (!isAligned(src)) return
+        blitOpaque(dst, src, 0, 0)
+    }
+
+    /** True for a layer that can be drawn at (0,0) on the shared canvas. */
+    fun isAligned(src: Bitmap): Boolean = src.width == SRC && src.height == SRC
+
+    /**
+     * Removes the jersey art's baked number so only the player's own number shows:
+     * fills the transparent digit cutouts the jersey pack ships with (otherwise the body layer
+     * shows through them as a "1"), wipes the printed digits around them, and repaints both from
+     * the surrounding fabric.
+     */
+    private fun cleanNumberAreas(bmp: Bitmap) {
+        val w = bmp.width
+        val h = bmp.height
+        val px = IntArray(w * h)
+        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        val kill = BooleanArray(w * h)
+        val cutout = markEnclosedCutouts(px, w, h, kill)
+        markGlyphs(px, w, h, kill, CHEST_NUM_CX, CHEST_NUM_CY, halfW = 70, halfH = 55)
+        markGlyphs(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 5f, halfW = 36, halfH = 35)
+        markIsolatedMarks(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 9f, halfW = 36, halfH = 39)
+        // The cutouts' anti-aliased rims (white edge, dark outline) sit just outside the boxes.
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = y * w + x
+            if (kill[i] || px[i] ushr 24 < 32 || !isGlyphTone(px[i])) continue
+            if (nearCutout(cutout, w, h, x, y, CUTOUT_RIM)) kill[i] = true
         }
-        val x = (SRC - src.width) / 2
-        val y = (SRC - src.height) / 2
-        blitOpaque(dst, src, x, y)
+        val fabric = dominantColor(px, w, NUMBER_AREA_X0, NUMBER_AREA_X1, NUMBER_AREA_Y0, NUMBER_AREA_Y1)
+        inpaint(px, w, h, kill, fabric)
+        bmp.setPixels(px, 0, w, 0, 0, w, h)
+    }
+
+    /**
+     * Marks transparent regions fully enclosed by jersey fabric below the collar: the digit
+     * cutouts. The neck, armholes and the small collar gaps are reachable from the border or sit
+     * above [CUTOUT_MIN_Y], so they stay open.
+     */
+    private fun markEnclosedCutouts(px: IntArray, w: Int, h: Int, kill: BooleanArray): BooleanArray {
+        val outside = BooleanArray(w * h)
+        val queue = IntArray(w * h)
+        var head = 0
+        var tail = 0
+        fun seed(i: Int) {
+            if (!outside[i] && px[i] ushr 24 < 16) { outside[i] = true; queue[tail++] = i }
+        }
+        for (x in 0 until w) { seed(x); seed((h - 1) * w + x) }
+        for (y in 0 until h) { seed(y * w); seed(y * w + w - 1) }
+        while (head < tail) {
+            val i = queue[head++]
+            val x = i % w
+            val y = i / w
+            if (x > 0) seed(i - 1)
+            if (x < w - 1) seed(i + 1)
+            if (y > 0) seed(i - w)
+            if (y < h - 1) seed(i + w)
+        }
+        val cutout = BooleanArray(w * h)
+        val seen = BooleanArray(w * h)
+        for (start in 0 until w * h) {
+            if (outside[start] || seen[start] || px[start] ushr 24 >= 16) continue
+            head = 0
+            tail = 0
+            seen[start] = true
+            queue[tail++] = start
+            var minY = h
+            while (head < tail) {
+                val i = queue[head++]
+                val x = i % w
+                val y = i / w
+                if (y < minY) minY = y
+                for (n in intArrayOf(if (x > 0) i - 1 else -1, if (x < w - 1) i + 1 else -1, if (y > 0) i - w else -1, if (y < h - 1) i + w else -1)) {
+                    if (n < 0 || seen[n] || outside[n] || px[n] ushr 24 >= 16) continue
+                    seen[n] = true
+                    queue[tail++] = n
+                }
+            }
+            if (tail >= CUTOUT_MIN_AREA && minY >= CUTOUT_MIN_Y) {
+                for (k in 0 until tail) { cutout[queue[k]] = true; kill[queue[k]] = true }
+            }
+        }
+        return cutout
+    }
+
+    private fun nearCutout(cutout: BooleanArray, w: Int, h: Int, x: Int, y: Int, r: Int): Boolean {
+        for (dy in -r..r) {
+            val yy = y + dy
+            if (yy < 0 || yy >= h) continue
+            for (dx in -r..r) {
+                val xx = x + dx
+                if (xx in 0 until w && cutout[yy * w + xx]) return true
+            }
+        }
+        return false
+    }
+
+    /** Bright digit fill or dark digit outline. */
+    private fun isGlyphTone(c: Int): Boolean {
+        val sum = ((c shr 16) and 0xFF) + ((c shr 8) and 0xFF) + (c and 0xFF)
+        return sum > 580 || sum < 110
+    }
+
+    /** Marks printed digit pixels (bright, dark, or strongly tinted vs. the fabric) in a box. */
+    private fun markGlyphs(px: IntArray, w: Int, h: Int, kill: BooleanArray, cx: Float, cy: Float, halfW: Int, halfH: Int) {
+        val x0 = (cx - halfW).roundToInt().coerceIn(0, w - 1)
+        val x1 = (cx + halfW).roundToInt().coerceIn(0, w)
+        val y0 = (cy - halfH).roundToInt().coerceIn(0, h - 1)
+        val y1 = (cy + halfH).roundToInt().coerceIn(0, h)
+        val fabric = fabricBelow(px, w, h, x0, x1, y1) ?: return
+        val fr = (fabric shr 16) and 0xFF
+        val fg = (fabric shr 8) and 0xFF
+        val fb = fabric and 0xFF
+        for (y in y0 until y1) {
+            for (x in x0 until x1) {
+                val i = y * w + x
+                val c = px[i]
+                if (c ushr 24 < 32) continue
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val sum = r + g + b
+                val tintedDigit = abs(r - fr) + abs(g - fg) + abs(b - fb) > 160 &&
+                    (abs(r - g) > 45 || abs(g - b) > 45) && sum in 80..700
+                if (isGlyphTone(c) || tintedDigit) kill[i] = true
+            }
+        }
+        // Take the digits' anti-aliased edge too, or repainting smears it inward as a pale ghost.
+        val base = dominantColor(px, w, x0, x1, y0, y1) ?: return
+        repeat(3) {
+            val grow = ArrayList<Int>()
+            for (y in y0 until y1) for (x in x0 until x1) {
+                val i = y * w + x
+                val c = px[i]
+                if (kill[i] || c ushr 24 < 32 || colorDistance(c, base) <= EDGE_DISTANCE) continue
+                if ((x > 0 && kill[i - 1]) || (x < w - 1 && kill[i + 1]) ||
+                    (y > 0 && kill[i - w]) || (y < h - 1 && kill[i + w])
+                ) grow.add(i)
+            }
+            for (i in grow) kill[i] = true
+        }
+    }
+
+    private fun colorDistance(a: Int, b: Int): Int =
+        abs(((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)) +
+            abs(((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)) +
+            abs((a and 0xFF) - (b and 0xFF))
+
+    /**
+     * Marks any off-fabric shape that sits wholly inside a box: the strap digit, whatever its
+     * color. Stripes, trim and collar lines run into the box edge, so they are left alone.
+     */
+    private fun markIsolatedMarks(px: IntArray, w: Int, h: Int, kill: BooleanArray, cx: Float, cy: Float, halfW: Int, halfH: Int) {
+        val x0 = (cx - halfW).roundToInt().coerceIn(0, w - 1)
+        val x1 = (cx + halfW).roundToInt().coerceIn(0, w)
+        val y0 = (cy - halfH).roundToInt().coerceIn(0, h - 1)
+        val y1 = (cy + halfH).roundToInt().coerceIn(0, h)
+        val fabric = dominantColor(px, w, x0, x1, y0, y1) ?: return
+        val bw = x1 - x0
+        val bh = y1 - y0
+        val off = BooleanArray(bw * bh)
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val c = px[y * w + x]
+            if (c ushr 24 < 32) continue
+            if (colorDistance(c, fabric) > MARK_DISTANCE) off[(y - y0) * bw + (x - x0)] = true
+        }
+        val seen = BooleanArray(bw * bh)
+        val queue = IntArray(bw * bh)
+        for (start in off.indices) {
+            if (!off[start] || seen[start]) continue
+            var head = 0
+            var tail = 0
+            seen[start] = true
+            queue[tail++] = start
+            var touchesEdge = false
+            while (head < tail) {
+                val i = queue[head++]
+                val x = i % bw
+                val y = i / bw
+                if (x == 0 || y == 0 || x == bw - 1 || y == bh - 1) touchesEdge = true
+                for (dy in -1..1) for (dx in -1..1) {
+                    val xx = x + dx
+                    val yy = y + dy
+                    if (xx !in 0 until bw || yy !in 0 until bh) continue
+                    val j = yy * bw + xx
+                    if (off[j] && !seen[j]) { seen[j] = true; queue[tail++] = j }
+                }
+            }
+            if (touchesEdge) continue
+            for (k in 0 until tail) {
+                val i = queue[k]
+                kill[(y0 + i / bw) * w + x0 + i % bw] = true
+            }
+        }
+    }
+
+    /** Most common opaque color in a box (4-bit buckets, averaged), i.e. the fabric. */
+    private fun dominantColor(px: IntArray, w: Int, x0: Int, x1: Int, y0: Int, y1: Int): Int? {
+        val count = IntArray(4096)
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val c = px[y * w + x]
+            if (c ushr 24 < 200) continue
+            count[bucket(c)]++
+        }
+        var best = -1
+        for (k in count.indices) if (count[k] > 0 && (best < 0 || count[k] > count[best])) best = k
+        if (best < 0) return null
+        var r = 0
+        var g = 0
+        var b = 0
+        var n = 0
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val c = px[y * w + x]
+            if (c ushr 24 < 200 || bucket(c) != best) continue
+            r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+        }
+        return 0xFF000000.toInt() or ((r / n) shl 16) or ((g / n) shl 8) or (b / n)
+    }
+
+    private fun bucket(c: Int): Int =
+        (((c shr 20) and 0xF) shl 8) or (((c shr 12) and 0xF) shl 4) or ((c shr 4) and 0xF)
+
+    /** Average mid-tone fabric color in the rows just under a box (reference for tinted digits). */
+    private fun fabricBelow(px: IntArray, w: Int, h: Int, x0: Int, x1: Int, y1: Int): Int? {
+        var sr = 0
+        var sg = 0
+        var sb = 0
+        var sn = 0
+        for (y in y1.coerceAtMost(h - 1) until (y1 + 28).coerceAtMost(h)) {
+            for (x in x0 until x1) {
+                val c = px[y * w + x]
+                if (c ushr 24 < 200) continue
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                if (r + g + b in 101..649) { sr += r; sg += g; sb += b; sn++ }
+            }
+        }
+        if (sn == 0) return null
+        return 0xFF000000.toInt() or ((sr / sn) shl 16) or ((sg / sn) shl 8) or (sb / sn)
+    }
+
+    /**
+     * Repaints [kill] pixels from the surrounding fabric, one ring at a time from the edge
+     * inward, so the patch takes the local shade instead of one flat color.
+     */
+    private fun inpaint(px: IntArray, w: Int, h: Int, kill: BooleanArray, fabric: Int?) {
+        // First grow only from plain fabric so lettering and trim don't smear into the patch, then
+        // let anything that is left fill from whatever opaque neighbor it has.
+        if (fabric != null) {
+            val plain = BooleanArray(w * h) {
+                !kill[it] && px[it] ushr 24 >= 200 && colorDistance(px[it], fabric) <= FABRIC_DISTANCE
+            }
+            fillRings(px, w, h, kill, plain)
+        }
+        val known = BooleanArray(w * h) { !kill[it] && px[it] ushr 24 >= 200 && !isGlyphTone(px[it]) }
+        fillRings(px, w, h, kill, known)
+    }
+
+    private fun fillRings(px: IntArray, w: Int, h: Int, kill: BooleanArray, known: BooleanArray) {
+        var pending = 0
+        var bx0 = w
+        var by0 = h
+        var bx1 = -1
+        var by1 = -1
+        for (i in 0 until w * h) {
+            if (!kill[i]) continue
+            pending++
+            val x = i % w
+            val y = i / w
+            if (x < bx0) bx0 = x
+            if (x > bx1) bx1 = x
+            if (y < by0) by0 = y
+            if (y > by1) by1 = y
+        }
+        var pass = 0
+        val ring = ArrayList<Int>()
+        val colors = ArrayList<Int>()
+        while (pending > 0 && pass < 200) {
+            pass++
+            ring.clear()
+            colors.clear()
+            for (y in by0..by1) for (x in bx0..bx1) {
+                val i = y * w + x
+                if (!kill[i] || known[i]) continue
+                var r = 0
+                var g = 0
+                var b = 0
+                var n = 0
+                for (dy in -1..1) for (dx in -1..1) {
+                    if (dx == 0 && dy == 0) continue
+                    val xx = x + dx
+                    val yy = y + dy
+                    if (xx !in 0 until w || yy !in 0 until h) continue
+                    val j = yy * w + xx
+                    if (!known[j]) continue
+                    val c = px[j]
+                    r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+                }
+                if (n == 0) continue
+                ring.add(i)
+                colors.add(0xFF000000.toInt() or ((r / n) shl 16) or ((g / n) shl 8) or (b / n))
+            }
+            if (ring.isEmpty()) break
+            for (k in ring.indices) { px[ring[k]] = colors[k]; known[ring[k]] = true; kill[ring[k]] = false }
+            pending -= ring.size
+        }
     }
 
     private fun applyChestNumber(canvas: Bitmap, number: Int) {
@@ -106,59 +423,6 @@ object SpriteCompose {
             (CHEST_NUM_CX - chest.width / 2f).roundToInt(),
             (CHEST_NUM_CY - chest.height / 2f).roundToInt(),
         )
-    }
-
-    /** Replace bright glyph / dark outline pixels in a box with nearby jersey fabric color. */
-    private fun eraseGlyphs(bmp: Bitmap, cx: Float, cy: Float, halfW: Int, halfH: Int) {
-        val w = bmp.width
-        val h = bmp.height
-        val x0 = (cx - halfW).roundToInt().coerceIn(0, w - 1)
-        val x1 = (cx + halfW).roundToInt().coerceIn(0, w)
-        val y0 = (cy - halfH).roundToInt().coerceIn(0, h - 1)
-        val y1 = (cy + halfH).roundToInt().coerceIn(0, h)
-        val px = IntArray(w * h)
-        bmp.getPixels(px, 0, w, 0, 0, w, h)
-        var sr = 0
-        var sg = 0
-        var sb = 0
-        var sn = 0
-        val sampleY0 = y1.coerceAtMost(h - 1)
-        val sampleY1 = (y1 + 28).coerceAtMost(h)
-        for (y in sampleY0 until sampleY1) {
-            for (x in x0 until x1) {
-                val c = px[y * w + x]
-                if (c ushr 24 < 200) continue
-                val r = (c shr 16) and 0xFF
-                val g = (c shr 8) and 0xFF
-                val b = c and 0xFF
-                val sum = r + g + b
-                if (sum in 101..649) {
-                    sr += r; sg += g; sb += b; sn++
-                }
-            }
-        }
-        val fill = if (sn == 0) 0xFF404040.toInt() else {
-            0xFF000000.toInt() or ((sr / sn) shl 16) or ((sg / sn) shl 8) or (sb / sn)
-        }
-        val fr = (fill shr 16) and 0xFF
-        val fg = (fill shr 8) and 0xFF
-        val fb = fill and 0xFF
-        for (y in y0 until y1) {
-            for (x in x0 until x1) {
-                val i = y * w + x
-                val c = px[i]
-                if (c ushr 24 < 32) continue
-                val r = (c shr 16) and 0xFF
-                val g = (c shr 8) and 0xFF
-                val b = c and 0xFF
-                val sum = r + g + b
-                val brightOrDark = sum > 580 || sum < 110
-                val tintedDigit = abs(r - fr) + abs(g - fg) + abs(b - fb) > 160 &&
-                    (abs(r - g) > 45 || abs(g - b) > 45) && sum in 80..700
-                if (brightOrDark || tintedDigit) px[i] = fill
-            }
-        }
-        bmp.setPixels(px, 0, w, 0, 0, w, h)
     }
 
     /**
@@ -217,6 +481,20 @@ object SpriteCompose {
             SpriteSheets.bitmap("character/hairstyles/bleached_blonde_crop.png")?.let { return it }
         }
         return SpriteSheets.hair(f.hair)
+    }
+
+    /** Jerseys with their baked numbers removed, cached since cleaning walks the whole sprite. */
+    private val cleanJerseys = ConcurrentHashMap<String, Bitmap>()
+
+    private fun cleanJersey(key: String?, primary: Int, secondary: Int): Bitmap? {
+        val cacheKey = if (key != null && SpriteSheets.jersey(key) != null) key else "blank|$primary|$secondary"
+        cleanJerseys[cacheKey]?.let { return it }
+        val jersey = resolveJersey(key, primary, secondary) ?: return null
+        val clean = jersey.copy(Bitmap.Config.ARGB_8888, true)
+        cleanNumberAreas(clean)
+        if (cleanJerseys.size >= 48) cleanJerseys.clear()
+        cleanJerseys[cacheKey] = clean
+        return clean
     }
 
     private fun resolveJersey(key: String?, primary: Int, secondary: Int): Bitmap? {

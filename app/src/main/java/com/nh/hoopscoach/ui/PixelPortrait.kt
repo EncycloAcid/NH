@@ -47,7 +47,7 @@ object Pixels {
     private val cache = android.util.LruCache<String, ImageBitmap>(120)
 
     fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear(), jersey: String? = null) =
-        "v13|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
+        "v14|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
 
