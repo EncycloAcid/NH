@@ -34,7 +34,7 @@ object SpriteSheets {
     }
 
     fun hair(style: Int): Bitmap? {
-        val file = HAIR_FILES[style] ?: return null
+        val file = HAIR_FILES.getOrNull(style) ?: return null
         return bitmap("character/hairstyles/$file.png")
     }
 
@@ -45,6 +45,16 @@ object SpriteSheets {
         return null
     }
 
+    fun jerseyPath(key: String?): String {
+        if (key != null) {
+            val nba = "character/nba_jerseys/$key.png"
+            if (bitmap(nba) != null) return nba
+            val college = "character/college_jerseys/$key.png"
+            if (bitmap(college) != null) return college
+        }
+        return "character/college_jerseys/01_duke.png"
+    }
+
     /** Chest number 0–99 (and `00` via [zeroZero]). */
     fun chestNumber(number: Int, zeroZero: Boolean = false): Bitmap? {
         val name = when {
@@ -52,11 +62,8 @@ object SpriteSheets {
             number in 0..99 -> number.toString()
             else -> number.coerceIn(0, 99).toString()
         }
-        return bitmap("character/numbers/chest/$name.png")
+        return bitmap("character/numbers/$name.png")
     }
-
-    fun shoulderDigit(digit: Int): Bitmap? =
-        bitmap("character/numbers/shoulder/${digit.coerceIn(0, 9)}.png")
 
     /** Isolated eyes (+ brows). Index 0 = keep the body's baked eyes. */
     fun eyes(style: Int): Bitmap? {
@@ -87,7 +94,7 @@ object SpriteSheets {
     /**
      * Jersey file stem for a team.
      * - NBA: [slot] (franchise id) → `lakers`, `celtics`, …
-     * - College: [abbr] → numbered college art (`01_duke`, …); else null (blank recolor).
+     * - College: [abbr] → numbered college art (`01_duke`, …); else null (default jersey).
      */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
@@ -165,9 +172,9 @@ object SpriteSheets {
     private val BEARD_FILES = arrayOf(
         null,
         "03_stubble_shadow", // Stubble
-        "02_goatee",         // Mustache → closest
-        "02_goatee",         // Goatee
-        "02_goatee",         // Chin strap → closest
+        "02_trimmed_goatee", // Mustache → closest
+        "02_trimmed_goatee", // Goatee
+        "02_trimmed_goatee", // Chin strap → closest
         "01_full_beard",     // Full beard
     )
 

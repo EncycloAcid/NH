@@ -39,14 +39,14 @@ data class PlayerLook(
         fun fromInt(look: Int): PlayerLook {
             if (look == 0) return PlayerLook() // Default
             return PlayerLook(
-                skinToneIndex = (look shr 0) and 0xF,
-                hairIndex = (look shr 4) and 0xF,
+                skinToneIndex = ((look shr 0) and 0xF).coerceAtMost(skinTones.lastIndex),
+                hairIndex = ((look shr 4) and 0xF).coerceAtMost(hairstyles.lastIndex),
                 hairColorIndex = (look shr 8) and 0x7,
-                beardIndex = (look shr 11) and 0x7,
-                eyewearIndex = (look shr 14) and 0x7,
-                headbandIndex = (look shr 17) and 0x7,
-                mouthIndex = (look shr 20) and 0x7,
-                eyeIndex = (look shr 23) and 0x7
+                beardIndex = ((look shr 11) and 0x7).coerceAtMost(beards.lastIndex),
+                eyewearIndex = ((look shr 14) and 0x7).coerceAtMost(eyewear.lastIndex),
+                headbandIndex = ((look shr 17) and 0x7).coerceAtMost(headbands.lastIndex),
+                mouthIndex = ((look shr 20) and 0x7).coerceAtMost(mouths.lastIndex),
+                eyeIndex = ((look shr 23) and 0x7).coerceAtMost(eyes.lastIndex)
             )
         }
 

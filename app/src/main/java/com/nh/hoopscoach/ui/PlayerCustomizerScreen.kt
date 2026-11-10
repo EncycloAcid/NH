@@ -37,7 +37,8 @@ fun PlayerCustomizerScreen(
     player: Player,
     teamAbbr: String,
     onBack: () -> Unit,
-    onSave: (PlayerLook) -> Unit
+    onSave: (PlayerLook) -> Unit,
+    teamSlot: String? = null,
 ) {
     val initialLook = remember(player.id) { PlayerLook.fromInt(player.look) }
     var currentLook by remember(player.id) { mutableStateOf(initialLook) }
@@ -81,6 +82,8 @@ fun PlayerCustomizerScreen(
                 PlayerAvatar(
                     look = currentLook,
                     teamAbbr = teamAbbr,
+                    teamSlot = teamSlot,
+                    number = player.number,
                     size = 280.dp,
                     cornerRadius = 20.dp,
                     modifier = Modifier.border(2.dp, P.line, RoundedCornerShape(20.dp))
