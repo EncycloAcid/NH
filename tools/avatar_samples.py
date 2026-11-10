@@ -285,7 +285,50 @@ def mask_accessory_samples(out, files):
     print("PASS: both masks preserve pupils in all 96 eye/skin combinations; wrote 720 mask/headband/hair/body fits")
 
 
+def mask_ear_samples(out, before):
+    names = ("02_protective_clear_mask", "03_carbon_black_mask")
+    hairs = ("buzz_cut", "cornrows", "dreadlocks", "headband_with_curls")
+    bodies = sorted((ROOT / "bodies").glob("*.png"))
+    width, height = 752, 220
+    sheet = Image.new("RGB", (width * 4, height * len(bodies) * len(hairs)), "#404955")
+    draw = ImageDraw.Draw(sheet)
+    for skin, body_path in enumerate(bodies):
+        body = Image.open(body_path)
+        for mask_index, name in enumerate(names):
+            mask = Image.open(ROOT / f"eyewear/{name}.png")
+            old = Image.open(before / f"eyewear/{name}.png")
+            changes = [(i % 512, i // 512) for i, (a, b) in enumerate(zip(old.get_flattened_data(), mask.get_flattened_data())) if a != b]
+            assert len(changes) == 32
+            assert all(138 <= y <= 145 and x in (170, 171, 340, 341) for x, y in changes)
+            for y in range(138, 146):
+                left = min(x for x in range(140, 194) if body.getpixel((x, y))[3])
+                right = max(x for x in range(319, 370) if body.getpixel((x, y))[3])
+                assert all(mask.getpixel((x, y))[3] == 255 for x in list(range(left, 194)) + list(range(319, right + 1)))
+                assert mask.getpixel((left - 1, y))[3] == mask.getpixel((right + 1, y))[3] == 0
+            for row, hair in enumerate(hairs):
+                paths = [str(body_path.relative_to(ROOT)), "eyes/01_intense_focused.png",
+                         f"hairstyles/{hair}.png", "headbands/01_classic_white.png", f"eyewear/{name}.png"]
+                bare = composite(paths[:-1])
+                for version in range(2):
+                    avatar = Image.alpha_composite(bare, mask if version else old)
+                    if version:
+                        assert all(avatar.getpixel((x, y)) == mask.getpixel((x, y)) for y in range(138, 146)
+                                   for x in (170, 171, 180, 192, 319, 330, 340, 341))
+                    tile = avatar.crop((162, 125, 350, 174)).resize((width, height - 24), Image.Resampling.NEAREST)
+                    x, y = (mask_index * 2 + version) * width, (skin * len(hairs) + row) * height
+                    sheet.paste(tile, (x, y), tile)
+                    draw.text((x + 4, y + height - 20), f"{'AFTER .132' if version else 'BEFORE .131'} {body_path.stem} {name[:2]} {hair}", fill="white")
+            x, y = mask_index * 2 * width, skin * len(hairs) * height
+            sheet.crop((x, y, x + 2 * width, y + len(hairs) * height)).save(out / f"mask-ears-4x-{skin + 1}-{mask_index + 1}.png")
+    sheet.save(out / "mask-before-after-4x.png")
+    print("PASS: both straps reach ear rims x=170,341 at y=138..145 on all 8 bodies; only 32 strap pixels changed per mask")
+    print("PASS: 64 mask/body/hair/headband fits preserve visible ear straps; wrote mask-before-after-4x.png and 16 ear-detail pages")
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[2] == "--mask-ears":
+        mask_ear_samples(Path(sys.argv[1]), Path(sys.argv[3]))
+        return
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "avatar_samples"
     out.mkdir(parents=True, exist_ok=True)
     files = {folder: sorted((ROOT / folder).glob("*.png")) for folder in

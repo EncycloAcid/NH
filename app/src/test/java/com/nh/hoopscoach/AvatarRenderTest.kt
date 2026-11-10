@@ -386,6 +386,32 @@ class AvatarRenderTest {
         }
     }
 
+    @Test fun maskStrapsReachEarRimsOverEveryHairOnEveryBody() {
+        for (slot in 2..3) {
+            val mask = SpriteSheets.bitmap("character/eyewear/${PlayerLook.eyewear[slot]}.png")!!
+            for (skin in PlayerLook.skinTones.indices) {
+                val body = SpriteSheets.bitmap("character/bodies/${PlayerLook.skinTones[skin]}.png")!!
+                for (y in 138..145) {
+                    val left = (140..193).first { body.getPixel(it, y) ushr 24 != 0 }
+                    val right = (319..369).last { body.getPixel(it, y) ushr 24 != 0 }
+                    for (x in left..193) assertEquals(255, mask.getPixel(x, y) ushr 24)
+                    for (x in 319..right) assertEquals(255, mask.getPixel(x, y) ushr 24)
+                    assertEquals(0, mask.getPixel(left - 1, y) ushr 24)
+                    assertEquals(0, mask.getPixel(right + 1, y) ushr 24)
+                }
+                for (hair in PlayerLook.hairstyles.indices) {
+                    val packed = SpriteCompose.renderLook(PlayerLook(skinToneIndex = skin, hairIndex = hair,
+                        eyewearIndex = slot, headbandIndex = 1), null, 23)
+                    val legacy = SpriteCompose.render(Face(skin, 0, hair, 0, 0, 0, 0, 0, slot + 3), 0, 0, 23)
+                    for (y in 138..145) for (x in listOf(170, 171, 180, 192, 319, 330, 340, 341)) {
+                        assertEquals(mask.getPixel(x, y), packed[y * 512 + x])
+                        assertEquals(mask.getPixel(x, y), legacy[y * 512 + x])
+                    }
+                }
+            }
+        }
+    }
+
     @Test fun carbonMaskAppendsSlotsWithoutChangingExistingSavedChoices() {
         for (index in 0..3) {
             val look = PlayerLook(eyewearIndex = index)
