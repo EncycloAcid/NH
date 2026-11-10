@@ -230,7 +230,7 @@ fun PlayerCustomizerScreen(
                         Text("Eyewear", style = T.label, color = P.sub)
                         Spacer(Modifier.height(8.dp))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            val ewNames = listOf("None", "Sports Rec Specs", "Clear Face Mask")
+                            val ewNames = listOf("None", "Sports Rec Specs", "Clear Face Mask", "Carbon Black Mask")
                             itemsIndexed(ewNames) { idx, ewName ->
                                 val isSel = currentLook.eyewearIndex == idx
                                 Box(

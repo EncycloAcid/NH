@@ -7,7 +7,7 @@ package com.nh.hoopscoach.ui
  * - Bits 4..7   (0xF): Hairstyle index (0..15)
  * - Bits 8..10  (0x7): Hair color index (0..3)
  * - Bits 11..13 (0x7): Beard style index (0..3, 0 = none)
- * - Bits 14..16 (0x7): Eyewear style index (0..2, 0 = none)
+ * - Bits 14..16 (0x7): Eyewear style index (0..3, 0 = none)
  * - Bits 17..19 (0x7): Headband index (0..3, 0 = none)
  * - Bits 20..22 (0x7): Mouth expression index (0..3)
  * - Bits 23..25 (0x7): Eye expression index (0..5)
@@ -17,7 +17,7 @@ data class PlayerLook(
     val hairIndex: Int = 0,         // 0 = Buzz cut, 1 = Afro, 2 = Dreads, 3 = Cornrows, etc.
     val hairColorIndex: Int = 0,    // 0 = Black, 1 = Dark Brown, 2 = Brown, 3 = Auburn
     val beardIndex: Int = 0,        // 0 = None, 1 = Full Beard, 2 = Goatee, 3 = Stubble
-    val eyewearIndex: Int = 0,      // 0 = None, 1 = Rec Specs, 2 = Clear Mask
+    val eyewearIndex: Int = 0,      // 0 = None, 1 = Rec Specs, 2 = Clear Mask, 3 = Carbon Mask
     val headbandIndex: Int = 0,     // 0 = None, 1 = White, 2 = Red, 3 = Black
     val mouthIndex: Int = 0,        // 0 = Neutral, 1 = Grin, 2 = Shout, 3 = Mouthguard
     val eyeIndex: Int = 0           // 0 = Focused, 1 = Clutch, 2 = Swagger, 3 = Alert, 4 = Blue, 5 = Green
@@ -74,7 +74,7 @@ data class PlayerLook(
 
         val eyewear = listOf(
             null, // None
-            "01_sports_rec_specs", "02_protective_clear_mask"
+            "01_sports_rec_specs", "02_protective_clear_mask", "03_carbon_black_mask"
         )
 
         val mouths = listOf(

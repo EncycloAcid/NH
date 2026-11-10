@@ -7,6 +7,7 @@ import com.nh.hoopscoach.game.Gear
 /** Full-canvas source-over composition with jersey-specific number clearance. */
 object SpriteCompose {
     const val N = 512
+    private val EMBEDDED_BAND_COLORS = setOf(0xFFAE1C24.toInt(), 0xFFCE3137.toInt(), 0xFF71121A.toInt(), 0xFF301217.toInt())
 
     fun lookLayers(look: PlayerLook, jerseyKey: String?, number: Int): List<String> {
         fun path(folder: String, file: String?) = file?.let { "character/$folder/$it.png" }
@@ -32,9 +33,11 @@ object SpriteCompose {
         jerseyKey: String? = null,
     ): IntArray {
         val beard = SpriteSheets.beard(f.beard)
-        val hair = if (f.hair == 1 && f.hairColor >= 4)
+        val rawHair = if (f.hair == 1 && f.hairColor >= 4)
             SpriteSheets.bitmap("character/hairstyles/bleached_blonde_crop.png") else SpriteSheets.hair(f.hair)
-        val body = SpriteSheets.body(f.skin)
+        val headband = SpriteSheets.headband(if (f.hair == 7 && f.acc == 0) 3 else f.acc)
+        val hair = if (f.hair == 7 && rawHair != null) occludeEmbeddedBand(rawHair, headband) else rawHair
+        val body = SpriteSheets.body(f.skin)?.let { softenCheekHighlights(it) }
         val jerseyPath = SpriteSheets.jerseyPath(jerseyKey)
         val mouth = SpriteSheets.mouth(f.mouth)?.let { if (body != null) tintMouth(body, it) else it }
         return composite(listOfNotNull(
@@ -43,9 +46,9 @@ object SpriteCompose {
             SpriteSheets.chestNumber(number)?.let { positionNumber(it, jerseyPath) },
             beard,
             mouth,
-            SpriteSheets.eyes(f.eyes),
+            SpriteSheets.eyes(f.eyes)?.let { if (body != null) tintEyes(body, it) else it },
             hair,
-            SpriteSheets.headband(if (f.hair == 7 && f.acc == 0) 3 else f.acc)?.let { occludeHeadband(it, hair) },
+            headband?.let { occludeHeadband(it, rawHair, body) },
             SpriteSheets.eyewear(f.acc),
         ), f.hairColor, setOfNotNull(beard, hair))
     }
@@ -54,33 +57,147 @@ object SpriteCompose {
         val layers = lookLayers(look, jerseyKey, number).mapNotNull { path ->
             SpriteSheets.bitmap(path)?.let { path to it }
         }
+        val body = layers.firstOrNull { it.first.startsWith("character/bodies/") }?.second?.let { softenCheekHighlights(it) }
+        val rawHair = layers.firstOrNull { it.first.startsWith("character/hairstyles/") }?.second
+        val headband = layers.firstOrNull { it.first.startsWith("character/headbands/") }?.second
+        val hair = if (look.hairIndex == PlayerLook.hairstyles.indexOf("headband_with_curls") && rawHair != null)
+            occludeEmbeddedBand(rawHair, headband) else rawHair
         val colored = layers.filter { it.first.startsWith("character/hairstyles/") || it.first.startsWith("character/beards/") }
-            .map { it.second }.toSet()
-        val body = layers.firstOrNull { it.first.startsWith("character/bodies/") }?.second
-        val hair = layers.firstOrNull { it.first.startsWith("character/hairstyles/") }?.second
+            .map { it.second }.toSet() + listOfNotNull(hair)
         val jerseyPath = SpriteSheets.jerseyPath(jerseyKey)
         return composite(layers.map { (path, bitmap) ->
             when {
+                body != null && path.startsWith("character/bodies/") -> body
                 body != null && path.startsWith("character/mouths/") -> tintMouth(body, bitmap)
+                body != null && path.startsWith("character/eyes/") -> tintEyes(body, bitmap)
                 path.startsWith("character/numbers/") -> positionNumber(bitmap, jerseyPath)
-                path.startsWith("character/headbands/") -> occludeHeadband(bitmap, hair)
+                path.startsWith("character/hairstyles/") -> hair ?: bitmap
+                path.startsWith("character/headbands/") -> occludeHeadband(bitmap, rawHair, body)
                 else -> bitmap
             }
         }, look.hairColorIndex, colored)
     }
 
-    internal fun occludeHeadband(band: Bitmap, hair: Bitmap?): Bitmap {
-        require(band.width == N && band.height == N && (hair == null || hair.width == N && hair.height == N)) {
+    internal fun softenCheekHighlights(body: Bitmap): Bitmap {
+        require(body.width == N && body.height == N) { "Avatar layers must be ${N}x$N" }
+        val highlight = body.getPixel(212, 160)
+        if (highlight ushr 24 == 0) return body
+        val pixels = IntArray(N * N)
+        body.getPixels(pixels, 0, N, 0, 0, N, N)
+        val mask = IntArray(N * N)
+        for (y in 155..165) for (x in (201..223) + (288..310)) {
+            if (pixels[y * N + x] == highlight) mask[y * N + x] = -1
+        }
+        for (y in 155..165) for (x in (201..223) + (288..310)) {
+            if (mask[y * N + x] == 0) continue
+            val skin = surroundingSkin(body, mask, x, y)
+            fun channel(shift: Int) = (((highlight ushr shift) and 255) + ((skin ushr shift) and 255) * 7) / 8
+            pixels[y * N + x] = (highlight and 0xFF000000.toInt()) or
+                (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+        }
+        return Bitmap.createBitmap(pixels, N, N, Bitmap.Config.ARGB_8888)
+    }
+
+    internal fun tintEyes(body: Bitmap, eyes: Bitmap): Bitmap {
+        require(body.width == N && body.height == N && eyes.width == N && eyes.height == N) {
             "Avatar layers must be ${N}x$N"
         }
-        if (hair == null) return band
+        val pixels = IntArray(N * N)
+        eyes.getPixels(pixels, 0, N, 0, 0, N, N)
+        val result = pixels.copyOf()
+        val skinPixels = eyeSkin(body)
+        for (i in pixels.indices) {
+            val value = pixels[i]
+            val shade = (value ushr 16) and 255
+            if (value ushr 24 == 0 || (value and 0xFFFF) != shade) continue
+            val skin = skinPixels[i]
+            fun channel(shift: Int) = (((skin ushr shift) and 255) * shade / 224).coerceAtMost(255)
+            result[i] = (value and 0xFF000000.toInt()) or
+                (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+        }
+        return Bitmap.createBitmap(result, N, N, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun eyeSkin(body: Bitmap): IntArray {
+        val result = IntArray(N * N)
+        for (left in listOf(197, 262)) {
+            val channels = Array(3) { IntArray(53 * 42) }
+            for (y in 0..41) for (x in 0..52) {
+                val value = body.getPixel(left + x, 114 + y)
+                for (c in 0..2) channels[c][y * 53 + x] = ((value ushr (16 - c * 8)) and 255) * 256
+            }
+            for (channel in channels) {
+                for (y in 1..40) for (x in 1..51) {
+                    channel[y * 53 + x] = (channel[x] * (41 - y) + channel[41 * 53 + x] * y) / 41
+                }
+                repeat(96) {
+                    for (y in 1..40) for (x in 1..51) {
+                        val i = y * 53 + x
+                        channel[i] = (channel[i - 1] + channel[i + 1] + channel[i - 53] + channel[i + 53]) / 4
+                    }
+                }
+            }
+            for (y in 1..40) for (x in 1..51) {
+                val i = y * 53 + x
+                result[(114 + y) * N + left + x] = 0xFF000000.toInt() or
+                    ((channels[0][i] / 256) shl 16) or ((channels[1][i] / 256) shl 8) or (channels[2][i] / 256)
+            }
+        }
+        return result
+    }
+
+    private fun surroundingSkin(body: Bitmap, mask: IntArray, x: Int, y: Int): Int {
+        val left = if (x < 256) 198 else 261
+        val right = if (x < 256) 250 else 313
+        var red = 0
+        var green = 0
+        var blue = 0
+        var total = 0
+        for ((dx, dy) in listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) {
+            for (distance in 1..56) {
+                val xx = x + dx * distance
+                val yy = y + dy * distance
+                if (xx !in left..right || yy !in 112..167) break
+                if (mask[yy * N + xx] ushr 24 != 0) continue
+                val sample = body.getPixel(xx, yy)
+                if (sample ushr 24 == 0) continue
+                val weight = maxOf(1, 1024 / (distance * distance))
+                red += ((sample ushr 16) and 255) * weight
+                green += ((sample ushr 8) and 255) * weight
+                blue += (sample and 255) * weight
+                total += weight
+                break
+            }
+        }
+        return if (total == 0) body.getPixel(x, y) else
+            0xFF000000.toInt() or ((red / total) shl 16) or ((green / total) shl 8) or (blue / total)
+    }
+
+    internal fun occludeEmbeddedBand(hair: Bitmap, band: Bitmap?): Bitmap {
+        require(hair.width == N && hair.height == N && (band == null || band.width == N && band.height == N)) {
+            "Avatar layers must be ${N}x$N"
+        }
+        if (band == null) return hair
+        val pixels = IntArray(N * N)
+        hair.getPixels(pixels, 0, N, 0, 0, N, N)
+        for (i in pixels.indices) if (pixels[i] in EMBEDDED_BAND_COLORS) pixels[i] = 0
+        return Bitmap.createBitmap(pixels, N, N, Bitmap.Config.ARGB_8888)
+    }
+
+    internal fun occludeHeadband(band: Bitmap, hair: Bitmap?, body: Bitmap? = null): Bitmap {
+        require(band.width == N && band.height == N && (hair == null || hair.width == N && hair.height == N) &&
+            (body == null || body.width == N && body.height == N)) {
+            "Avatar layers must be ${N}x$N"
+        }
+        if (hair == null && body == null) return band
         val pixels = IntArray(N * N)
         val hairPixels = IntArray(N * N)
         band.getPixels(pixels, 0, N, 0, 0, N, N)
-        hair.getPixels(hairPixels, 0, N, 0, 0, N, N)
-        val embeddedBand = setOf(0xFFAE1C24.toInt(), 0xFFCE3137.toInt(), 0xFF71121A.toInt(), 0xFF301217.toInt())
+        hair?.getPixels(hairPixels, 0, N, 0, 0, N, N)
+        val bodyPixels = body?.let { IntArray(N * N).also { pixels -> it.getPixels(pixels, 0, N, 0, 0, N, N) } }
         for (i in pixels.indices) {
-            if (hairPixels[i] ushr 24 == 255 && hairPixels[i] !in embeddedBand) pixels[i] = 0
+            if (bodyPixels != null && bodyPixels[i] ushr 24 == 0 ||
+                hairPixels[i] ushr 24 == 255 && hairPixels[i] !in EMBEDDED_BAND_COLORS) pixels[i] = 0
         }
         return Bitmap.createBitmap(pixels, N, N, Bitmap.Config.ARGB_8888)
     }
@@ -92,6 +209,10 @@ object SpriteCompose {
             "nba_jerseys/jazz.png" -> 24
             "nba_jerseys/supersonics.png" -> 40
             "nba_jerseys/wizards.png" -> 16
+            "nba_jerseys/bulls.png" -> 12
+            "nba_jerseys/hawks.png" -> 16
+            "nba_jerseys/warriors.png" -> 16
+            "college_jerseys/23_ohio_state.png" -> 12
             else -> return number
         }
         val pixels = IntArray(N * (N - offset))

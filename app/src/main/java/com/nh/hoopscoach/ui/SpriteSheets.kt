@@ -186,12 +186,14 @@ object SpriteSheets {
         "03_stealth_black",
         null, // goggles
         null, // mask
+        null, // carbon mask
     )
 
     private val EYEWEAR_FILES = arrayOf(
         null, null, null, null,
         "01_sports_rec_specs",
         "02_protective_clear_mask",
+        "03_carbon_black_mask",
     )
 
     private val JERSEY_BY_ABBR = mapOf(

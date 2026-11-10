@@ -24,7 +24,7 @@ class Face(
             listOf("Default", "Intense", "Clutch", "Swagger", "Alert", "Blue", "Green"),
             listOf("Normal", "Thick", "Fierce"),
             listOf("Neutral", "Grin", "Shout", "Mouthguard"),
-            listOf("None", "White headband", "Red headband", "Black headband", "Goggles", "Clear mask"),
+            listOf("None", "White headband", "Red headband", "Black headband", "Goggles", "Clear mask", "Carbon mask"),
         )
 
         private fun from(a: IntArray) = Face(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8])

@@ -1,11 +1,13 @@
 """Host check mirroring SpriteCompose's z-order. Requires Pillow.
 
-Run: python tools/avatar_samples.py [output directory] [before face assets] [before hair assets]
+Run: python -B tools/avatar_samples.py [output directory] [before face assets] [before hair assets] [before eye assets]
 """
 import sys
 from pathlib import Path
+from functools import lru_cache
 from PIL import Image, ImageDraw, ImageFilter
 from fit_avatar_accessories import EMBEDDED_BAND_COLORS
+from redraw_eyes import eye_region
 
 ROOT = Path(__file__).resolve().parents[1] / "app/src/main/assets/character"
 ORDER = ("bodies", "jersey", "numbers", "beards", "mouths", "eyes",
@@ -13,7 +15,79 @@ ORDER = ("bodies", "jersey", "numbers", "beards", "mouths", "eyes",
 HAIR_COLORS = (0x2E2A2A, 0x4A2E1E, 0x6E4628, 0xA2562A,
                0xDAB458, 0xECE6D4, 0x8E9096, 0xC22E2E)
 NUMBER_OFFSETS = {"nba_jerseys/grizzlies_retro.png": 48, "nba_jerseys/jazz.png": 24,
-                  "nba_jerseys/supersonics.png": 40, "nba_jerseys/wizards.png": 16}
+                  "nba_jerseys/supersonics.png": 40, "nba_jerseys/wizards.png": 16,
+                  "nba_jerseys/bulls.png": 12, "nba_jerseys/hawks.png": 16,
+                  "nba_jerseys/warriors.png": 16, "college_jerseys/23_ohio_state.png": 12}
+
+
+def surrounding_skin(body, mask, x, y):
+    left, right = (198, 250) if x < 256 else (261, 313)
+    channels, total = [0, 0, 0], 0
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        for distance in range(1, 57):
+            xx, yy = x + dx * distance, y + dy * distance
+            if not left <= xx <= right or not 112 <= yy <= 167:
+                break
+            if mask.getpixel((xx, yy)):
+                continue
+            sample = body.getpixel((xx, yy))
+            if not sample[3]:
+                continue
+            weight = max(1, 1024 // (distance * distance))
+            channels = [channels[c] + sample[c] * weight for c in range(3)]
+            total += weight
+            break
+    return tuple(c // total for c in channels) + (255,) if total else body.getpixel((x, y))
+
+
+def soften_cheeks(body):
+    out = body.copy()
+    highlight = body.getpixel((212, 160))
+    if not highlight[3]:
+        return out
+    points = [(x, y) for y in range(155, 166) for x in list(range(201, 224)) + list(range(288, 311))
+              if body.getpixel((x, y)) == highlight]
+    mask = Image.new("L", (512, 512))
+    for point in points:
+        mask.putpixel(point, 255)
+    for x, y in points:
+        skin = surrounding_skin(body, mask, x, y)
+        out.putpixel((x, y), tuple((highlight[c] + skin[c] * 7) // 8 for c in range(3)) + (highlight[3],))
+    return out
+
+
+@lru_cache(maxsize=8)
+def eye_skin(crop_bytes):
+    crop = Image.frombytes("RGBA", (118, 42), crop_bytes)
+    out = list(crop.get_flattened_data())
+    for left in (0, 65):
+        channels = [[crop.getpixel((left + x, y))[c] * 256 for y in range(42) for x in range(53)] for c in range(3)]
+        for values in channels:
+            for y in range(1, 41):
+                for x in range(1, 52):
+                    values[y * 53 + x] = (values[x] * (41 - y) + values[41 * 53 + x] * y) // 41
+            for _ in range(96):
+                for y in range(1, 41):
+                    for x in range(1, 52):
+                        i = y * 53 + x
+                        values[i] = (values[i - 1] + values[i + 1] + values[i - 53] + values[i + 53]) // 4
+        for y in range(1, 41):
+            for x in range(1, 52):
+                out[y * 118 + left + x] = tuple(v[y * 53 + x] // 256 for v in channels) + (255,)
+    return out
+
+
+def tint_eyes(body, eyes):
+    assert body.size == eyes.size == (512, 512)
+    out = eyes.copy()
+    skin_pixels = eye_skin(body.crop((197, 114, 315, 156)).tobytes())
+    for y in range(115, 155):
+        for x in list(range(198, 249)) + list(range(263, 314)):
+            r, g, b, a = eyes.getpixel((x, y))
+            if a and r == b and g == 0:
+                skin = skin_pixels[(y - 114) * 118 + x - 197]
+                out.putpixel((x, y), tuple(min(c * r // 224, 255) for c in skin[:3]) + (a,))
+    return out
 
 
 def tint_mouth(body, mouth):
@@ -29,22 +103,38 @@ def tint_mouth(body, mouth):
     return mouth
 
 
-def composite(paths, hair_color=0, root=ROOT, replace_mouth=True, legacy_order=False):
+def composite(paths, hair_color=0, root=ROOT, replace_mouth=True, legacy_order=False, old_headband_occlusion=False):
     result = Image.new("RGBA", (512, 512))
     if not legacy_order:
         priorities = {name: i for i, name in enumerate(ORDER)}
         paths = sorted(paths, key=lambda p: priorities.get("jersey" if Path(p).parts[0].endswith("_jerseys") else Path(p).parts[0], len(ORDER)))
     body = next((Image.open(root / p) for p in paths if Path(p).parts[0] == "bodies"), None)
+    new_face = root == ROOT and not legacy_order
+    if new_face and body is not None:
+        body = soften_cheeks(body)
     hair = next((Image.open(root / p) for p in paths if Path(p).parts[0] == "hairstyles"), None)
     offset = next((NUMBER_OFFSETS.get(Path(p).as_posix(), 0) for p in paths
                    if Path(p).parts[0].endswith("_jerseys")), 0)
     for path in paths:
         layer = Image.open(root / path)
         assert layer.mode == "RGBA" and layer.size == (512, 512), path
-        if not legacy_order and hair is not None and Path(path).parts[0] == "headbands":
+        if new_face and Path(path).as_posix() == "hairstyles/headband_with_curls.png" and any(
+                Path(p).parts[0] == "headbands" for p in paths):
             layer = layer.copy()
-            layer.putdata([(0, 0, 0, 0) if hp[3] == 255 and hp not in EMBEDDED_BAND_COLORS else bp
-                           for bp, hp in zip(layer.get_flattened_data(), hair.get_flattened_data())])
+            layer.putdata([(0, 0, 0, 0) if p in EMBEDDED_BAND_COLORS else p for p in layer.get_flattened_data()])
+        if new_face and body is not None:
+            if Path(path).parts[0] == "bodies":
+                layer = body
+            elif Path(path).parts[0] == "eyes":
+                layer = tint_eyes(body, layer)
+        if Path(path).parts[0] == "headbands" and (not legacy_order or old_headband_occlusion):
+            layer = layer.copy()
+            if new_face and body is not None:
+                layer.putdata([bp if sp[3] else (0, 0, 0, 0)
+                               for bp, sp in zip(layer.get_flattened_data(), body.get_flattened_data())])
+            if hair is not None:
+                layer.putdata([(0, 0, 0, 0) if hp[3] == 255 and hp not in EMBEDDED_BAND_COLORS else bp
+                               for bp, hp in zip(layer.get_flattened_data(), hair.get_flattened_data())])
         if offset and Path(path).parts[0] == "numbers":
             positioned = Image.new("RGBA", (512, 512))
             positioned.paste(layer, (0, offset))
@@ -110,7 +200,8 @@ def accessory_samples(out, files, before):
         for row, (label, old, new) in enumerate(recipes):
             for col, body in enumerate(skins):
                 for version, (root, paths) in enumerate(((before, old), (ROOT, new))):
-                    avatar = composite([str(body.relative_to(ROOT))] + paths, root=root, legacy_order=not version)
+                    avatar = composite([str(body.relative_to(ROOT))] + paths, root=root, legacy_order=not version,
+                                       old_headband_occlusion=not version)
                     detail = avatar.crop(crop).resize((width, height - 24), Image.Resampling.NEAREST)
                     x, y = (col * 2 + version) * width, row * height
                     sheet.paste(detail, (x, y), detail)
@@ -123,7 +214,7 @@ def accessory_samples(out, files, before):
                 sheet.crop((col * 2 * width, row * height, (col + 1) * 2 * width,
                             min(len(recipes), row + rows_per_page) * height)).save(out / f"{prefix}-{page}.png")
     eyes = str(files["eyes"][0].relative_to(ROOT))
-    bands = ["01_classic_white", "02_bulls_red", "03_stealth_black"]
+    bands = [p.stem for p in files["headbands"]]
     recipes = []
     for hair in files["hairstyles"]:
         for band in bands:
@@ -141,11 +232,57 @@ def accessory_samples(out, files, before):
     paths = [eyes, "hairstyles/afro.png"]
     grid("afro-before-after-4x", [("afro", paths, paths)], (125, 0, 390, 178), files["bodies"])
     recipes = []
-    for eye in files["eyes"]:
-        paths = [str(eye.relative_to(ROOT)), "hairstyles/buzz_cut.png", "eyewear/02_protective_clear_mask.png"]
-        recipes.append((eye.stem, paths, paths))
-    grid("mask-before-after-4x", recipes, (170, 110, 343, 193), files["bodies"])
-    print("Wrote 4x before/after headbands x 15 hairstyles, 4 beards x 8 skins, afro x 8 skins, mask x every eyes layer x 8 skins")
+    for mask in ("02_protective_clear_mask", "03_carbon_black_mask"):
+        for eye in files["eyes"]:
+            common = [str(eye.relative_to(ROOT)), "hairstyles/buzz_cut.png"]
+            old = common + ([f"eyewear/{mask}.png"] if (before / f"eyewear/{mask}.png").exists() else [])
+            recipes.append((f"{mask} {eye.stem}", old, common + [f"eyewear/{mask}.png"]))
+    grid("mask-before-after-4x", recipes, (170, 110, 343, 193), files["bodies"], rows_per_page=6)
+    print("Wrote 4x before/after 6 headbands x 15 hairstyles, 4 beards x 8 skins, afro x 8 skins, 2 masks x every eyes layer x 8 skins")
+
+
+def eyes_samples(out, files, before):
+    width, height = 520, 248
+    sheet = Image.new("RGB", (16 * width, 6 * height), "#404955")
+    draw = ImageDraw.Draw(sheet)
+    for row, eye in enumerate(files["eyes"]):
+        for skin, body in enumerate(files["bodies"]):
+            paths = [str(body.relative_to(ROOT)), str(eye.relative_to(ROOT))]
+            for version, root in enumerate((before, ROOT)):
+                avatar = composite(paths, root=root, legacy_order=not version)
+                detail = avatar.crop((191, 109, 321, 165)).resize((520, 224), Image.Resampling.NEAREST)
+                x, y = (skin * 2 + version) * width, row * height
+                sheet.paste(detail, (x, y), detail)
+                draw.text((x + 4, y + 228), f"{'AFTER .131' if version else 'BEFORE .130'} {body.stem} {eye.stem}", fill="white")
+    sheet.save(out / "eyes-before-after-4x.png")
+    for skin in range(8):
+        sheet.crop((skin * 2 * width, 0, (skin + 1) * 2 * width, sheet.height)).save(out / f"eyes-before-after-4x-{skin + 1}.png")
+    print("Wrote eyes-before-after-4x.png: all 6 styles x 8 skins, before .130 / after .131")
+
+
+def mask_accessory_samples(out, files):
+    masks = ["02_protective_clear_mask", "03_carbon_black_mask"]
+    bands = ["01_classic_white", "02_bulls_red", "03_stealth_black"]
+    for skin, body in enumerate(files["bodies"]):
+        body_path = str(body.relative_to(ROOT))
+        for eye in files["eyes"]:
+            bare = composite([body_path, str(eye.relative_to(ROOT))])
+            for mask in masks:
+                guarded = Image.alpha_composite(bare, Image.open(ROOT / f"eyewear/{mask}.png"))
+                assert all(guarded.getpixel((x, 143)) == bare.getpixel((x, 143)) for x in (224, 287))
+        sheet = Image.new("RGB", (6 * 346, 15 * 212), "#404955")
+        draw = ImageDraw.Draw(sheet)
+        for row, hair in enumerate(files["hairstyles"]):
+            for mask_index, mask in enumerate(masks):
+                for band_index, band in enumerate(bands):
+                    avatar = composite([body_path, "eyes/01_intense_focused.png", str(hair.relative_to(ROOT)),
+                                        f"headbands/{band}.png", f"eyewear/{mask}.png"])
+                    tile = avatar.crop((170, 72, 343, 166)).resize((346, 188), Image.Resampling.NEAREST)
+                    x, y = (mask_index * 3 + band_index) * 346, row * 212
+                    sheet.paste(tile, (x, y), tile)
+                    draw.text((x + 3, y + 192), f"{hair.stem} {band[:2]} {mask[:2]}", fill="white")
+        sheet.save(out / f"mask-headband-hair-fits-{skin + 1}.png")
+    print("PASS: both masks preserve pupils in all 96 eye/skin combinations; wrote 720 mask/headband/hair/body fits")
 
 
 def main():
@@ -161,6 +298,18 @@ def main():
     assert all((ROOT / f"numbers/{n}.png").is_file() for n in range(100))
     assert composite([]).getbbox() is None
     assert len({Image.open(p).getchannel("A").tobytes() for p in files["bodies"]}) == 1
+    assert len(files["eyes"]) == 6
+    for path in files["eyes"]:
+        assert all(not p[3] or eye_region(i % 512, i // 512)
+                   for i, p in enumerate(Image.open(path).get_flattened_data())), path
+    for path in files["bodies"]:
+        original = Image.open(path)
+        softened = soften_cheeks(original)
+        changed = [(i % 512, i // 512) for i, (a, b) in enumerate(zip(original.get_flattened_data(), softened.get_flattened_data())) if a != b]
+        assert len(changed) == 150, path
+        assert all(155 <= y <= 165 and (201 <= x <= 223 or 288 <= x <= 310) for x, y in changed)
+    assert tint_eyes(Image.new("RGBA", (512, 512)), Image.new("RGBA", (512, 512))).getbbox() is None
+    print("PASS: 6 fitted eye layers stay inside native eye/brow regions; exactly 150 cheek-highlight pixels softened per skin")
     for path in files["mouths"]:
         mouth = Image.open(path)
         assert mouth.getbbox()[2] - mouth.getbbox()[0] == 54, path
@@ -262,17 +411,17 @@ def main():
                     face = avatar.crop((125, 0, 390, 175)).resize((530, 350), Image.Resampling.NEAREST)
                     x, y = (skin_col * 2 + col) * 530, i * 378
                     comparison.paste(face, (x, y), face)
-                    comparison_draw.text((x + 4, y + 354), f"{'CORRECTED .130' if col else 'SUPPLIED'} {path.stem}", fill="white")
+                    comparison_draw.text((x + 4, y + 354), f"{'AFTER .131' if col else 'BEFORE .130'} {path.stem}", fill="white")
                     detail = avatar.crop((170, 72, 343, 166)).resize((692, 376), Image.Resampling.NEAREST)
                     sx, sy = (skin_col * 2 + col) * 692, i * 400
                     seams.paste(detail, (sx, sy), detail)
-                    seams_draw.text((sx + 4, sy + 380), f"{'SHIPPED' if col else 'HAIR3'} {path.stem}", fill="white")
+                    seams_draw.text((sx + 4, sy + 380), f"{'AFTER .131' if col else 'BEFORE .130'} {path.stem}", fill="white")
         comparison.save(out / "hairline-sheet.png")
         seams.save(out / "hairline-temples-4x.png")
         for page in range(3):
             comparison.crop((0, page * 5 * 378, comparison.width, (page + 1) * 5 * 378)).save(out / f"hairline-before-after-{page + 1}.png")
             seams.crop((0, page * 2000, seams.width, (page + 1) * 2000)).save(out / f"hairline-temples-4x-{page + 1}.png")
-        print("Wrote zoomed hairline-sheet.png: supplied / corrected .130")
+        print("Wrote zoomed hairline-sheet.png: before .130 / after .131")
     else:
         hair_sheet.save(out / "hairline-sheet.png")
 
@@ -355,12 +504,15 @@ def main():
                     x, y = (skin_col * 2 + col) * 530, row * 520
                     zoom.paste("#111722" if skin_col == 0 else "#eeeeee", (x, y, x + 530, y + 490))
                     zoom.paste(face, (x, y), face)
-                    zoom_draw.text((x + 6, y + 496), f"{'AFTER .130' if col else 'BEFORE .127'} {body.stem} {mouth.stem}", fill="white")
+                    zoom_draw.text((x + 6, y + 496), f"{'AFTER .131' if col else 'BEFORE .127'} {body.stem} {mouth.stem}", fill="white")
         zoom.save(out / "faces-before-after.png")
         print(f"Wrote zoomed faces-before-after.png using {before}")
     print(f"PASS: {len(assets)} RGBA 512x512 layers; numbers 0-99; empty/error cases")
     if len(sys.argv) > 3:
         accessory_samples(out, files, Path(sys.argv[3]))
+    if len(sys.argv) > 4:
+        eyes_samples(out, files, Path(sys.argv[4]))
+    mask_accessory_samples(out, files)
     print("PASS: all eight body silhouettes match; full-width mouths cover baked lip seams; all 15 hairstyles cover cranium top")
     print(f"Wrote 12 avatars + 32 all-skin mouth/puff samples + contact-sheet.png + edge-sheet.png to {out}")
 
