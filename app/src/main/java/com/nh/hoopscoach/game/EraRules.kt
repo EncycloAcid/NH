@@ -56,19 +56,21 @@ enum class CollegeEra(
     ),
     THIRTY(
         2015, "2015–18", "30-second clock",
-        "Shot clock drops to 30. Pace up, threes keep climbing.",
-        30, 0.80, 0.005, 1.01, 1.02, 7, 10,
+        "Shot clock drops to 30. The one-and-one is gone: two free throws from the seventh team foul. Pace up, threes keep climbing.",
+        30, 0.80, 0.005, 1.01, 1.02, 99, 7,
     ),
     MODERN(
         2019, "Today", "Modern game",
-        "International three-point line, 30-second clock, threes everywhere.",
-        30, 1.0, 0.0, 1.0, 1.0, 7, 10,
+        "International three-point line, 30-second clock, threes everywhere. Two free throws from the seventh team foul — no one-and-one.",
+        30, 1.0, 0.0, 1.0, 1.0, 99, 7,
     );
 
     val hasThrees get() = threes > 0.0
     val hasShotClock get() = shotClock > 0
     /** Soft max possession length when there is no shot clock. */
     val maxPossLen get() = if (hasShotClock) shotClock.toDouble() else 55.0
+    /** True when the one-and-one bonus is still in the rulebook (pre-2015). */
+    val hasOneAndOne get() = oneAndOneFrom < doubleBonusFrom
 
     fun rulesSummary(): String = buildList {
         add(if (hasShotClock) "$shotClock-second shot clock" else "No shot clock")
@@ -78,7 +80,10 @@ enum class CollegeEra(
             this@CollegeEra == MID || this@CollegeEra == THIRTY -> "20'9\" three-point line"
             else -> "International three-point line"
         })
-        add("One-and-one at $oneAndOneFrom · two shots at $doubleBonusFrom")
+        add(
+            if (hasOneAndOne) "One-and-one at $oneAndOneFrom · two shots at $doubleBonusFrom"
+            else "Two free throws from the ${doubleBonusFrom}th team foul (no one-and-one)",
+        )
         add("Five fouls to foul out")
     }.joinToString(" · ")
 }

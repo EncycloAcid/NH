@@ -102,11 +102,20 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                 Section("Era")
                 val eras = com.nh.hoopscoach.game.Era.entries.sortedBy { if (it.year == 0) 9999 else it.year }.reversed()
                 Segmented(eras.map { it.label }, eras.indexOf(era), { era = eras[it] }, scroll = true)
+                val collegeYear = if (era == com.nh.hoopscoach.game.Era.TODAY) 2026 else era.year
+                val collegeRules = com.nh.hoopscoach.game.EraRules.ofSeason(collegeYear)
                 Text(
                     if (era == com.nh.hoopscoach.game.Era.TODAY) "Today's college game, then today's NBA."
                     else "College starts in ${era.year - 1}-${(era.year % 100).toString().padStart(2, '0')}, with the real future pros at their schools (${eraCollegeNames(era)}). You turn pro into that era's NBA: its teams that year, its stars, and a real draft class every summer.",
                     style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
                 )
+                Panel(Modifier.padding(top = 6.dp)) {
+                    Text("College rules · ${collegeRules.title}", style = T.bodyB, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    Text(collegeRules.blurb, style = T.small, color = P.sub)
+                    Spacer(Modifier.height(6.dp))
+                    Text(collegeRules.rulesSummary(), style = T.small, color = P.ink)
+                }
                 Section("Your player")
                 Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(first, { first = it.take(16) }, placeholder = { Text("First name", color = P.faint) }, singleLine = true, modifier = Modifier.weight(1f),

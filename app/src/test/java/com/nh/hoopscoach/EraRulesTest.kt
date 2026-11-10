@@ -34,7 +34,7 @@ class EraRulesTest {
     }
 
     @Test
-    fun modernGamesUseOneAndOneAndDoubleBonus() {
+    fun modernGamesUseTwoShotBonusWithoutOneAndOne() {
         Rng.r = Random(21)
         val lg = Offseason.claimTeam(LeagueGen.newLeague(2026), 0, "Test", "Coach")
         Schedule.build(lg)
@@ -45,16 +45,35 @@ class EraRulesTest {
             val e = GameEngine(lg, g, true)
             e.simToEnd()
             assertEquals(CollegeEra.MODERN, e.era)
+            assertFalse(e.era.hasOneAndOne)
+            assertEquals(7, e.era.doubleBonusFrom)
             tallies += e.events.map { it.text }
             val pfs = e.lines.flatMap { it.values }.map { it.pf }
             maxPf = maxOf(maxPf, pfs.maxOrNull() ?: 0)
             fouledOut += pfs.count { it >= 5 }
         }
         assertEquals("five fouls and you're out", 5, maxPf)
-        assertTrue("one-and-ones from the seventh foul", tallies.any { it.contains("one-and-one for") })
-        assertTrue("missed front ends", tallies.any { it.contains("misses the front end") })
-        assertTrue("double bonus from the tenth", tallies.any { it.contains(", two shots for") })
+        assertFalse("modern college dropped the one-and-one", tallies.any { it.contains("one-and-one for") })
+        assertFalse("no front-end misses without one-and-one", tallies.any { it.contains("misses the front end") })
+        assertTrue("two shots from the seventh team foul", tallies.any { it.contains(", two shots for") })
         assertTrue(fouledOut >= 0)
+    }
+
+    @Test
+    fun classicEraStillUsesOneAndOne() {
+        Rng.r = Random(22)
+        val lg = Offseason.claimTeam(LeagueGen.newLeague(2000), 0, "Test", "Coach")
+        Schedule.build(lg)
+        val tallies = mutableListOf<String>()
+        for (g in lg.games.filter { !it.played }.take(200)) {
+            val e = GameEngine(lg, g, true)
+            e.simToEnd()
+            assertEquals(CollegeEra.CLASSIC, e.era)
+            assertTrue(e.era.hasOneAndOne)
+            tallies += e.events.map { it.text }
+        }
+        assertTrue("classic era keeps the one-and-one", tallies.any { it.contains("one-and-one for") })
+        assertTrue(tallies.any { it.contains("misses the front end") })
     }
 
     @Test

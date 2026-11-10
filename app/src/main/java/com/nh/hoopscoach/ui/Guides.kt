@@ -154,6 +154,17 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "Minutes and mood",
             "Players compare their minutes with what their talent expects: your top five expect starter minutes, the next three a real role. Big gaps make players unhappy.",
         ),
+        sec(
+            "Era rules",
+            "College careers pick an era on New Career. That sets the shot clock, three-point line and bonus free throws to that year's NCAA rules.",
+            "• Pre-clock: no shot clock, no three-point line — long jumpers still happen, they count as twos.",
+            "• 1986: 45-second clock arrives.",
+            "• 1987–93: short 19'9\" three with the 45-second clock.",
+            "• 1994–07: 35-second clock, short three, one-and-one at 7 / two shots at 10.",
+            "• 2008–14: three-point line moves to 20'9\".",
+            "• 2015 on: 30-second clock; the one-and-one is gone — two free throws from the seventh team foul.",
+            "• Today: international three-point line. Rules advance automatically as seasons pass. Settings shows the active era.",
+        ),
     ),
     "Training" to listOf(
         sec(
