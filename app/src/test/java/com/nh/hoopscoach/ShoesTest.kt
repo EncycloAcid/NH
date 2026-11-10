@@ -22,7 +22,27 @@ class ShoesTest {
         val lg = LeagueGen.newLeague()
         assertTrue(lg.teams.all { it.apparel.isNotEmpty() && Shoes.of(it) != null })
         assertTrue(lg.teams.any { Shoes.of(it) == ShoeCo.NIKE || Shoes.of(it) == ShoeCo.JORDAN })
-        assertTrue(lg.teams.any { Shoes.of(it) in listOf(ShoeCo.PUMA, ShoeCo.NEW_BALANCE, ShoeCo.CONVERSE, ShoeCo.REEBOK, ShoeCo.UNDER_ARMOUR) })
+        assertTrue(lg.teams.any {
+            Shoes.of(it) in listOf(
+                ShoeCo.PUMA, ShoeCo.NEW_BALANCE, ShoeCo.CONVERSE, ShoeCo.REEBOK, ShoeCo.UNDER_ARMOUR,
+                ShoeCo.FILA, ShoeCo.AND1, ShoeCo.CHAMPION, ShoeCo.ASICS, ShoeCo.PEAK, ShoeCo.SKECHERS,
+                ShoeCo.LI_NING, ShoeCo.ANTA,
+            )
+        })
+        assertTrue(ShoeCo.entries.size >= 14)
+        assertTrue(Shoes.SIGNATURE_BRANDS.all { it.signature })
+        assertTrue(Shoes.BRANDS.none { it in listOf("Apex", "Vanta", "Strive", "Kinetic", "Rally") })
+    }
+
+    @Test
+    fun signatureBiddersAreRealCompanies() {
+        Rng.r = Random(28)
+        val lg = LeagueGen.newLeague()
+        val star = lg.players.maxBy { it.ovr }
+        val bidders = Shoes.pickSignatureBidders(star, allStars = 3)
+        assertEquals(3, bidders.size)
+        assertEquals(3, bidders.map { it.label }.toSet().size)
+        assertTrue(bidders.all { it.signature && it.label !in listOf("Apex", "Vanta", "Strive") })
     }
 
     @Test

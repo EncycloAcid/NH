@@ -20,8 +20,8 @@ class ShoeDeal(
 }
 
 /**
- * Real footwear / apparel companies for school kit deals and personal star endorsements.
- * Names are flavor only — no logos or licensed likenesses.
+ * Real footwear / apparel companies for school kit deals, personal endorsements,
+ * and pro signature lines. Names are flavor only — no logos or licensed likenesses.
  */
 enum class ShoeCo(
     val label: String,
@@ -34,18 +34,93 @@ enum class ShoeCo(
     val pullBonus: Int,
     /** How selective the brand is when picking schools (higher = bigger programs). */
     val prestigeNeed: Int,
-    /** Multiplier on personal endorsement offers. */
+    /** Multiplier on personal endorsement / signature offers. */
     val dealMult: Double,
+    /** True when the brand bids on pro signature shoes. */
+    val signature: Boolean,
+    val pitch: String,
     val blurb: String,
 ) {
-    NIKE("Nike", "NKE", 0.085, 90, 3, 58, 1.15, "The biggest college apparel deal in the game"),
-    JORDAN("Jordan Brand", "JOR", 0.095, 110, 4, 72, 1.25, "Exclusive Jumpman programs and star signature energy"),
-    ADIDAS("adidas", "ADI", 0.075, 70, 2, 48, 1.05, "Three stripes on campus and in the portal"),
-    UNDER_ARMOUR("Under Armour", "UA", 0.065, 55, 2, 40, 1.0, "Performance kit with a hungry mid-major footprint"),
-    PUMA("Puma", "PMA", 0.045, 35, 1, 28, 0.9, "Growing college presence and flashy colorways"),
-    NEW_BALANCE("New Balance", "NB", 0.05, 40, 1, 32, 0.95, "Freshman-class energy and made-in-USA flex"),
-    CONVERSE("Converse", "CNV", 0.035, 25, 1, 22, 0.85, "Classic Chuck heritage for the mid-majors"),
-    REEBOK("Reebok", "RBK", 0.04, 28, 1, 24, 0.88, "Comeback brand hunting hungry programs"),
+    NIKE(
+        "Nike", "NKE", 0.085, 90, 3, 58, 1.18, true,
+        "Swoosh worldwide. Your silhouette on the biggest launch calendar in the game.",
+        "The biggest college apparel deal in the game",
+    ),
+    JORDAN(
+        "Jordan Brand", "JOR", 0.095, 110, 4, 72, 1.28, true,
+        "Jumpman only signs a few. We want your name next to the 23 legacy.",
+        "Exclusive Jumpman programs and star signature energy",
+    ),
+    ADIDAS(
+        "adidas", "ADI", 0.075, 70, 2, 48, 1.08, true,
+        "Three stripes, global football crossover, and a signature built for your footwork.",
+        "Three stripes on campus and in the portal",
+    ),
+    UNDER_ARMOUR(
+        "Under Armour", "UA", 0.065, 55, 2, 40, 1.02, true,
+        "Performance first. We'll put your game on every court that wears UA.",
+        "Performance kit with a hungry mid-major footprint",
+    ),
+    PUMA(
+        "Puma", "PMA", 0.05, 38, 1, 30, 0.98, true,
+        "Flashy colorways and a rising hoop roster. Your model drops loud.",
+        "Growing college presence and flashy colorways",
+    ),
+    NEW_BALANCE(
+        "New Balance", "NB", 0.055, 42, 1, 34, 1.0, true,
+        "Made-for-hoops energy and a cult following. We build around how you move.",
+        "Freshman-class energy and made-in-USA flex",
+    ),
+    CONVERSE(
+        "Converse", "CNV", 0.035, 25, 1, 22, 0.88, true,
+        "Chuck heritage meets modern court tech. Classic silhouette, your story.",
+        "Classic Chuck heritage for the mid-majors",
+    ),
+    REEBOK(
+        "Reebok", "RBK", 0.04, 28, 1, 24, 0.9, true,
+        "The comeback brand. Shaq energy, Answer vibes — your chapter next.",
+        "Comeback brand hunting hungry programs",
+    ),
+    LI_NING(
+        "Li-Ning", "LN", 0.045, 32, 1, 36, 1.05, true,
+        "Global stage, Way of Wade DNA. We want your signature in every market.",
+        "China's flagship hoop brand with worldwide reach",
+    ),
+    ANTA(
+        "Anta", "ANT", 0.04, 30, 1, 34, 0.97, true,
+        "KT line heat and a massive Asia footprint. Your shoe, their factories.",
+        "Rising global apparel power with KT-line energy",
+    ),
+    PEAK(
+        "Peak", "PK", 0.035, 24, 1, 26, 0.92, true,
+        "Dwight Howard / Tony Parker DNA. Big overseas push with your name on it.",
+        "Overseas hoop staple building U.S. name recognition",
+    ),
+    SKECHERS(
+        "Skechers", "SKX", 0.038, 28, 1, 28, 0.94, true,
+        "Comfort tech that sells. We'll put your face in every big-box aisle.",
+        "Mass-market comfort brand expanding hard into hoops",
+    ),
+    FILA(
+        "Fila", "FIL", 0.032, 22, 1, 20, 0.86, false,
+        "Heritage stripes and street heat for campus kit.",
+        "Retro brand energy for mid-majors and fashion-forward programs",
+    ),
+    AND1(
+        "AND1", "AND", 0.03, 20, 1, 18, 0.84, true,
+        "Streetball roots. Mixtape culture. Your model belongs on the blacktop.",
+        "Streetball legend brand still chasing mixtape kids",
+    ),
+    ASICS(
+        "ASICS", "ASI", 0.034, 26, 1, 27, 0.91, false,
+        "Court stability from a running pedigree — quiet quality on campus.",
+        "Performance footwear expanding into college basketball kit",
+    ),
+    CHAMPION(
+        "Champion", "CHP", 0.03, 22, 1, 18, 0.82, false,
+        "Practice gear and campus lifestyle — the C logo everywhere.",
+        "Campus lifestyle apparel more than signature sneakers",
+    ),
 }
 
 /**
@@ -53,17 +128,28 @@ enum class ShoeCo(
  * your own signature shoe once brands come calling.
  */
 object Shoes {
-    // --- Pro player-career signature shoe brands (Road / hero path) ---
-    val BRANDS = listOf("Apex", "Vanta", "Strive", "Kinetic", "Rally")
-    private val PITCH = mapOf(
-        "Apex" to "We build legends. You're next.",
-        "Vanta" to "The darkest, fastest shoe in the league, with your name on it.",
-        "Strive" to "We sign people, not stats. We want your story on every pair.",
-        "Kinetic" to "Our lab, your game. We'll design it around how you move.",
-        "Rally" to "The biggest marketing push we've ever done. Billboards in every city.",
-    )
+    /** Brands that bid on pro signature lines (real companies only). */
+    val SIGNATURE_BRANDS: List<ShoeCo> = ShoeCo.entries.filter { it.signature }
 
-    fun shoeName(lg: League, d: ShoeDeal): String = "${d.brand} ${lg.hero?.last ?: ""} ${d.model}".trim()
+    /** @deprecated Prefer [SIGNATURE_BRANDS]; kept for older call sites / tests. */
+    val BRANDS: List<String> = SIGNATURE_BRANDS.map { it.label }
+
+    fun byLabel(label: String): ShoeCo? =
+        ShoeCo.entries.firstOrNull { it.label.equals(label, ignoreCase = true) || it.name.equals(label, ignoreCase = true) }
+
+    fun shoeName(lg: League, d: ShoeDeal): String {
+        val last = lg.hero?.last?.ifBlank { null } ?: "Sig"
+        val co = byLabel(d.brand)
+        val line = when (co) {
+            ShoeCo.JORDAN -> "Jumpman $last"
+            ShoeCo.NIKE -> "Nike $last"
+            ShoeCo.ADIDAS -> "adidas $last"
+            ShoeCo.LI_NING -> "Li-Ning $last"
+            ShoeCo.AND1 -> "AND1 $last"
+            else -> "${d.brand} $last"
+        }
+        return "$line ${d.model}".trim()
+    }
 
     /** How hot he is with buyers: 0.4 a quiet year to 2.5 a superstar's. */
     private fun heat(lg: League, h: Player): Double {
@@ -110,26 +196,65 @@ object Shoes {
         val f = (r.followers / 1_000_000.0).coerceAtMost(20.0)
         val stars = h.awards.count { it.endsWith("All-Star") }
         val base = 1_500 + f * 600 + stars * 900 + h.stats.ppg * 60
-        val brands = BRANDS.shuffled(Rng.r).take(3)
+        // Three competing real brands; stars pull Nike / Jordan / adidas more often.
+        val brands = pickSignatureBidders(h, stars).take(3)
         r.shoeOffers.clear()
-        for (b in brands) {
-            val years = Rng.range(3, 5)
-            val per = ((base * (0.8 + Rng.d() * 0.4)) / 10).roundToInt() * 10
-            val roy = (3 + Rng.int(0, 4)) / 100.0
-            r.shoeOffers += ShoeDeal(b, lg.season + 1, years, per, roy)
+        for (co in brands) {
+            val years = when {
+                co == ShoeCo.JORDAN || co == ShoeCo.NIKE -> Rng.range(4, 6)
+                co.dealMult >= 1.05 -> Rng.range(3, 5)
+                else -> Rng.range(2, 4)
+            }
+            val per = ((base * co.dealMult * (0.82 + Rng.d() * 0.36)) / 10).roundToInt() * 10
+            val roy = ((3 + Rng.int(0, 3) + if (co.dealMult >= 1.15) 1 else 0) / 100.0).coerceIn(0.03, 0.08)
+            r.shoeOffers += ShoeDeal(co.label, lg.season + 1, years, per, roy)
         }
         fun line(d: ShoeDeal) = "${d.brand}: ${d.years} years, ${Road.dollars(d.perYear)} a year, ${(d.royalty * 100).roundToInt()}% royalty"
         Farewell.show(lg, Ceremony(
-            kind = "shoes", kicker = "SIGNATURE SHOE", title = "Your own shoe", sub = "${r.shoeOffers.size} brands want ${h.name} on a signature line, starting next season.",
+            kind = "shoes", kicker = "SIGNATURE SHOE", title = "Your own shoe",
+            sub = "${r.shoeOffers.size} real brands want ${h.name} on a signature line, starting next season.",
             teamId = h.teamId, number = h.number,
-            statLabels = r.shoeOffers.map { it.brand }, statValues = r.shoeOffers.map { Road.dollars(it.perYear) + "/yr" },
+            statLabels = r.shoeOffers.map { it.brand },
+            statValues = r.shoeOffers.map { Road.dollars(it.perYear) + "/yr" },
             choices = r.shoeOffers.map { line(it) },
-            choiceQuotes = r.shoeOffers.map { "${it.brand}: \"${PITCH[it.brand] ?: "We want you."}\"" },
-            choiceReactions = r.shoeOffers.map { d -> listOf(Tribute("Sneaker Insider", "Sneakers", "The ${d.brand} ${h.last} 1 is going to fly off the shelves.")) },
-            choiceTitle = "Pick your brand", choicePrompt = "The guarantee is paid every season; the royalty is your cut of every pair sold.",
+            choiceQuotes = r.shoeOffers.map { d ->
+                val co = byLabel(d.brand)
+                "${d.brand}: \"${co?.pitch ?: "We want you on a signature line."}\""
+            },
+            choiceReactions = r.shoeOffers.map { d ->
+                val firstDrop = ShoeDeal(d.brand, d.start, d.years, d.perYear, d.royalty, model = 1)
+                listOf(Tribute("Sneaker Insider", "Sneakers", "The ${shoeName(lg, firstDrop)} is going to fly off the shelves."))
+            },
+            choiceTitle = "Pick your brand",
+            choicePrompt = "The guarantee is paid every season; the royalty is your cut of every pair sold.",
             effects = r.shoeOffers.map { "${it.years} years · ${Road.dollars(it.perYear * it.years)} guaranteed · ${(it.royalty * 100).roundToInt()}% of sales" },
             badge = "${lg.season} offseason",
         ))
+    }
+
+    /** Weighted shortlist of signature bidders based on star power. */
+    fun pickSignatureBidders(h: Player, allStars: Int = 0): List<ShoeCo> {
+        val elite = allStars >= 2 || h.stats.ppg >= 24 || h.ovr >= 90
+        val weights = SIGNATURE_BRANDS.associateWith { co ->
+            var w = co.dealMult
+            when (co) {
+                ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS -> w *= if (elite) 2.4 else 1.5
+                ShoeCo.LI_NING, ShoeCo.NEW_BALANCE, ShoeCo.UNDER_ARMOUR, ShoeCo.PUMA -> w *= if (elite) 1.1 else 1.35
+                ShoeCo.ANTA, ShoeCo.PEAK, ShoeCo.SKECHERS -> w *= if (elite) 0.7 else 1.2
+                ShoeCo.AND1, ShoeCo.REEBOK, ShoeCo.CONVERSE -> w *= if (elite) 0.45 else 1.0
+                else -> Unit
+            }
+            if (co == ShoeCo.JORDAN && !elite && h.ovr < 86) w *= 0.4
+            max(0.08, w)
+        }
+        val picked = mutableListOf<ShoeCo>()
+        val pool = SIGNATURE_BRANDS.toMutableList()
+        repeat(minOf(3, pool.size)) {
+            val next = Rng.weighted(pool) { weights.getValue(it) }
+            picked += next
+            pool.remove(next)
+        }
+        return picked
     }
 
     /** He picks a brand (pro signature ceremony). */
@@ -172,16 +297,26 @@ object Shoes {
         for (t in lg.teams) if (t.apparel.isEmpty() || byId(t.apparel) == null) assignApparel(t, force = true)
     }
 
+    private val POWER_KIT = setOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS)
+    private val MID_KIT = setOf(ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.UNDER_ARMOUR, ShoeCo.JORDAN, ShoeCo.NEW_BALANCE, ShoeCo.PUMA)
+    private val HUNGRY_KIT = setOf(
+        ShoeCo.PUMA, ShoeCo.NEW_BALANCE, ShoeCo.CONVERSE, ShoeCo.REEBOK, ShoeCo.UNDER_ARMOUR,
+        ShoeCo.FILA, ShoeCo.AND1, ShoeCo.CHAMPION, ShoeCo.ASICS, ShoeCo.PEAK, ShoeCo.SKECHERS,
+    )
+
     fun pickSchoolBrand(prestige: Int): ShoeCo {
         val weights = ShoeCo.entries.associateWith { co ->
             val fit = 1.0 - kotlin.math.abs(prestige - co.prestigeNeed) / 55.0
             val tier = when {
-                prestige >= 80 && co in listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS) -> 1.6
-                prestige >= 65 && co in listOf(ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.UNDER_ARMOUR, ShoeCo.JORDAN) -> 1.35
-                prestige < 40 && co in listOf(ShoeCo.PUMA, ShoeCo.NEW_BALANCE, ShoeCo.CONVERSE, ShoeCo.REEBOK, ShoeCo.UNDER_ARMOUR) -> 1.4
+                prestige >= 80 && co in POWER_KIT -> 1.7
+                prestige >= 65 && co in MID_KIT -> 1.4
+                prestige < 40 && co in HUNGRY_KIT -> 1.45
+                prestige in 40..64 && co in listOf(ShoeCo.LI_NING, ShoeCo.ANTA, ShoeCo.UNDER_ARMOUR, ShoeCo.PUMA) -> 1.25
                 else -> 1.0
             }
-            max(0.08, fit.coerceIn(0.05, 1.2) * tier)
+            // Champion / Fila / ASICS are apparel-leaning — fine for schools, rare for stars.
+            val apparelLean = if (!co.signature) 1.15 else 1.0
+            max(0.06, fit.coerceIn(0.05, 1.2) * tier * apparelLean)
         }
         return Rng.weighted(ShoeCo.entries.toList()) { weights.getValue(it) }
     }
@@ -197,20 +332,25 @@ object Shoes {
         var v = base * co.dealMult
         if (p.has(Trait.BAG_CHASER)) v *= 1.12
         if (p.awards.any { it.contains("AA") || it.contains("MVP") }) v *= 1.2
+        // Overseas brands pay up for stars who can sell abroad.
+        if (co in listOf(ShoeCo.LI_NING, ShoeCo.ANTA, ShoeCo.PEAK) && p.ovr >= 84) v *= 1.18
         return (v / 5).roundToInt().coerceAtLeast(5) * 5
     }
 
     fun pickPlayerBrand(p: Player, school: Team?): ShoeCo {
         val schoolCo = school?.let { of(it) }
-        val pool = ShoeCo.entries.toList()
+        // Personal deals prefer signature-capable brands.
+        val pool = SIGNATURE_BRANDS
         return Rng.weighted(pool) { co ->
             var w = when {
-                p.ovr >= 88 && co in listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS) -> 3.0
+                p.ovr >= 88 && co in POWER_KIT -> 3.2
+                p.ovr >= 84 && co in listOf(ShoeCo.LI_NING, ShoeCo.NEW_BALANCE, ShoeCo.UNDER_ARMOUR) -> 2.0
                 p.ovr >= 80 -> 1.0 + co.dealMult
-                else -> 1.2 - (co.prestigeNeed / 120.0)
+                else -> 1.25 - (co.prestigeNeed / 120.0)
             }
-            if (schoolCo != null && co == schoolCo) w *= 2.4
-            if (co == ShoeCo.JORDAN && p.ovr < 82) w *= 0.35
+            if (schoolCo != null && co == schoolCo) w *= 2.5
+            if (co == ShoeCo.JORDAN && p.ovr < 82) w *= 0.32
+            if (co == ShoeCo.AND1 && p.ovr >= 86) w *= 0.5
             max(0.05, w)
         }
     }
@@ -283,7 +423,6 @@ object Shoes {
                 }
             }
         }
-        // Seed a few deals on opening rosters so year one isn't empty for AI/user stars.
     }
 
     /** Stamp deals onto a freshly generated roster (league start). */
@@ -310,17 +449,37 @@ object Shoes {
         return "${co.label} · ${moneyK(p.shoeOfferPay)}/yr · ${p.shoeOfferYears} yr"
     }
 
+    fun blurb(p: Player): String = ofPlayer(p)?.blurb ?: byId(p.shoeOffer)?.blurb ?: ""
+
     /** NBA rookie shoe deal: lottery gets signature-tier money; second round stays modest. */
     fun nbaDeal(pick: Int, p: Player): Pair<ShoeCo, Int> {
         val co = when {
-            pick <= 5 -> Rng.weighted(listOf(ShoeCo.JORDAN, ShoeCo.NIKE, ShoeCo.ADIDAS)) {
-                when (it) { ShoeCo.JORDAN -> 1.4; ShoeCo.NIKE -> 1.3; else -> 0.7 }
+            pick <= 5 -> Rng.weighted(listOf(ShoeCo.JORDAN, ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.LI_NING)) {
+                when (it) {
+                    ShoeCo.JORDAN -> 1.5
+                    ShoeCo.NIKE -> 1.35
+                    ShoeCo.ADIDAS -> 0.85
+                    else -> 0.55
+                }
             }
-            pick <= 14 -> Rng.weighted(listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS, ShoeCo.PUMA)) {
-                when (it) { ShoeCo.NIKE -> 1.4; ShoeCo.JORDAN -> 1.0; ShoeCo.ADIDAS -> 1.1; else -> 0.6 }
+            pick <= 14 -> Rng.weighted(
+                listOf(ShoeCo.NIKE, ShoeCo.JORDAN, ShoeCo.ADIDAS, ShoeCo.PUMA, ShoeCo.NEW_BALANCE, ShoeCo.UNDER_ARMOUR, ShoeCo.LI_NING),
+            ) {
+                when (it) {
+                    ShoeCo.NIKE -> 1.4
+                    ShoeCo.JORDAN -> 1.05
+                    ShoeCo.ADIDAS -> 1.1
+                    ShoeCo.LI_NING -> 0.75
+                    else -> 0.7
+                }
             }
-            pick <= 30 -> Rng.weighted(listOf(ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.UNDER_ARMOUR, ShoeCo.PUMA, ShoeCo.NEW_BALANCE)) { 1.0 + it.dealMult }
-            else -> Rng.weighted(ShoeCo.entries.toList()) { 1.4 - it.prestigeNeed / 100.0 }
+            pick <= 30 -> Rng.weighted(
+                listOf(
+                    ShoeCo.NIKE, ShoeCo.ADIDAS, ShoeCo.UNDER_ARMOUR, ShoeCo.PUMA, ShoeCo.NEW_BALANCE,
+                    ShoeCo.ANTA, ShoeCo.SKECHERS, ShoeCo.REEBOK,
+                ),
+            ) { 1.0 + it.dealMult }
+            else -> Rng.weighted(SIGNATURE_BRANDS) { 1.45 - it.prestigeNeed / 100.0 }
         }
         val tier = when {
             pick <= 3 -> 2200.0

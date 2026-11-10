@@ -184,12 +184,16 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     if (p.shoePay > 0) {
                         Text("Shoe deal", style = T.label, color = P.sub)
                         Text(com.nh.hoopscoach.game.Shoes.label(p), style = T.bodyB, color = P.ink)
+                        val shoeBlurb = com.nh.hoopscoach.game.Shoes.blurb(p)
+                        if (shoeBlurb.isNotEmpty()) Text(shoeBlurb, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
                         Text("${p.shoeLeft} season${if (p.shoeLeft == 1) "" else "s"} left · paid by the brand", style = T.small, color = P.sub)
                     }
                     if (mine && p.shoeOffer.isNotEmpty()) {
                         if (p.shoePay > 0) Spacer(Modifier.height(8.dp))
                         Text("New offer", style = T.label, color = P.accent)
                         Text(com.nh.hoopscoach.game.Shoes.offerLabel(p), style = T.bodyB, color = P.accent)
+                        val offerBlurb = com.nh.hoopscoach.game.Shoes.byId(p.shoeOffer)?.blurb.orEmpty()
+                        if (offerBlurb.isNotEmpty()) Text(offerBlurb, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SmallButton("Decline") { vm.act { com.nh.hoopscoach.game.Shoes.declineOffer(p) } }
