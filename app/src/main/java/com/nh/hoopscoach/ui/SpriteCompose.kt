@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
 
-/** Full-canvas source-over composition; assets are never cropped or moved. */
+/** Full-canvas source-over composition with jersey-specific number clearance. */
 object SpriteCompose {
     const val N = 512
 
@@ -14,9 +14,9 @@ object SpriteCompose {
             path("bodies", PlayerLook.skinTones.getOrElse(look.skinToneIndex) { "04_medium_brown" }),
             SpriteSheets.jerseyPath(jerseyKey),
             "character/numbers/${number.coerceIn(0, 99)}.png",
+            path("beards", PlayerLook.beards.getOrNull(look.beardIndex)),
             path("mouths", PlayerLook.mouths.getOrNull(look.mouthIndex)),
             path("eyes", PlayerLook.eyes.getOrNull(look.eyeIndex)),
-            path("beards", PlayerLook.beards.getOrNull(look.beardIndex)),
             path("hairstyles", PlayerLook.hairstyles.getOrNull(look.hairIndex)),
             path("headbands", PlayerLook.headbands.getOrNull(look.headbandIndex)),
             path("eyewear", PlayerLook.eyewear.getOrNull(look.eyewearIndex)),
@@ -35,16 +35,17 @@ object SpriteCompose {
         val hair = if (f.hair == 1 && f.hairColor >= 4)
             SpriteSheets.bitmap("character/hairstyles/bleached_blonde_crop.png") else SpriteSheets.hair(f.hair)
         val body = SpriteSheets.body(f.skin)
+        val jerseyPath = SpriteSheets.jerseyPath(jerseyKey)
         val mouth = SpriteSheets.mouth(f.mouth)?.let { if (body != null) tintMouth(body, it) else it }
         return composite(listOfNotNull(
             body,
-            SpriteSheets.bitmap(SpriteSheets.jerseyPath(jerseyKey)),
-            SpriteSheets.chestNumber(number),
+            SpriteSheets.bitmap(jerseyPath),
+            SpriteSheets.chestNumber(number)?.let { positionNumber(it, jerseyPath) },
+            beard,
             mouth,
             SpriteSheets.eyes(f.eyes),
-            beard,
             hair,
-            SpriteSheets.headband(if (f.hair == 7 && f.acc == 0) 3 else f.acc),
+            SpriteSheets.headband(if (f.hair == 7 && f.acc == 0) 3 else f.acc)?.let { occludeHeadband(it, hair) },
             SpriteSheets.eyewear(f.acc),
         ), f.hairColor, setOfNotNull(beard, hair))
     }
@@ -56,9 +57,48 @@ object SpriteCompose {
         val colored = layers.filter { it.first.startsWith("character/hairstyles/") || it.first.startsWith("character/beards/") }
             .map { it.second }.toSet()
         val body = layers.firstOrNull { it.first.startsWith("character/bodies/") }?.second
+        val hair = layers.firstOrNull { it.first.startsWith("character/hairstyles/") }?.second
+        val jerseyPath = SpriteSheets.jerseyPath(jerseyKey)
         return composite(layers.map { (path, bitmap) ->
-            if (body != null && path.startsWith("character/mouths/")) tintMouth(body, bitmap) else bitmap
+            when {
+                body != null && path.startsWith("character/mouths/") -> tintMouth(body, bitmap)
+                path.startsWith("character/numbers/") -> positionNumber(bitmap, jerseyPath)
+                path.startsWith("character/headbands/") -> occludeHeadband(bitmap, hair)
+                else -> bitmap
+            }
         }, look.hairColorIndex, colored)
+    }
+
+    internal fun occludeHeadband(band: Bitmap, hair: Bitmap?): Bitmap {
+        require(band.width == N && band.height == N && (hair == null || hair.width == N && hair.height == N)) {
+            "Avatar layers must be ${N}x$N"
+        }
+        if (hair == null) return band
+        val pixels = IntArray(N * N)
+        val hairPixels = IntArray(N * N)
+        band.getPixels(pixels, 0, N, 0, 0, N, N)
+        hair.getPixels(hairPixels, 0, N, 0, 0, N, N)
+        val embeddedBand = setOf(0xFFAE1C24.toInt(), 0xFFCE3137.toInt(), 0xFF71121A.toInt(), 0xFF301217.toInt())
+        for (i in pixels.indices) {
+            if (hairPixels[i] ushr 24 == 255 && hairPixels[i] !in embeddedBand) pixels[i] = 0
+        }
+        return Bitmap.createBitmap(pixels, N, N, Bitmap.Config.ARGB_8888)
+    }
+
+    internal fun positionNumber(number: Bitmap, jerseyPath: String): Bitmap {
+        require(number.width == N && number.height == N) { "Avatar layers must be ${N}x$N" }
+        val offset = when (jerseyPath.removePrefix("character/")) {
+            "nba_jerseys/grizzlies_retro.png" -> 48
+            "nba_jerseys/jazz.png" -> 24
+            "nba_jerseys/supersonics.png" -> 40
+            "nba_jerseys/wizards.png" -> 16
+            else -> return number
+        }
+        val pixels = IntArray(N * (N - offset))
+        number.getPixels(pixels, 0, N, 0, 0, N, N - offset)
+        return Bitmap.createBitmap(N, N, Bitmap.Config.ARGB_8888).apply {
+            setPixels(pixels, 0, N, 0, offset, N, N - offset)
+        }
     }
 
     internal fun tintMouth(body: Bitmap, mouth: Bitmap): Bitmap {
@@ -96,6 +136,28 @@ object SpriteCompose {
             require(layer.width == N && layer.height == N) { "Avatar layers must be ${N}x$N" }
             layer.getPixels(src, 0, N, 0, 0, N, N)
             val colorHair = hairColor in 1..hairColors.lastIndex && layer in coloredLayers
+            var hairReference = 80f
+            if (colorHair) {
+                val histogram = IntArray(256)
+                var count = 0
+                for (pixel in src) {
+                    if (pixel ushr 24 == 0) continue
+                    val r = (pixel ushr 16) and 255
+                    val g = (pixel ushr 8) and 255
+                    val b = pixel and 255
+                    if (r + g + b < 40) continue
+                    histogram[(r * 35 + g * 45 + b * 20) / 100]++
+                    count++
+                }
+                var accumulated = 0
+                for (value in histogram.indices) {
+                    accumulated += histogram[value]
+                    if (count > 0 && accumulated * 10 >= count * 9) {
+                        hairReference = maxOf(80f, value.toFloat())
+                        break
+                    }
+                }
+            }
             for (i in src.indices) {
                 var s = src[i]
                 if (s ushr 24 == 0) continue
@@ -104,7 +166,7 @@ object SpriteCompose {
                     val g = (s ushr 8) and 255
                     val b = s and 255
                     if (r + g + b >= 40) {
-                        val shade = ((r * 0.35f + g * 0.45f + b * 0.2f) / 80f).coerceAtMost(1.5f)
+                        val shade = ((r * 0.35f + g * 0.45f + b * 0.2f) / hairReference).coerceAtMost(1.5f)
                         val color = hairColors[hairColor]
                         fun tinted(shift: Int) = (((color ushr shift) and 255) * shade).toInt().coerceIn(0, 255)
                         s = (s and 0xFF000000.toInt()) or (tinted(16) shl 16) or (tinted(8) shl 8) or tinted(0)

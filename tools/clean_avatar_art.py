@@ -1,4 +1,6 @@
-"""Rebuild avatar art from the original .127 aligned asset directory.
+"""Rebuild mouth and accessory art from the original .127 aligned assets.
+
+Supplied hairstyle files are left untouched.
 
 Usage: python tools/clean_avatar_art.py SOURCE_CHARACTER_DIR DEST_CHARACTER_DIR
 Requires Pillow. All coordinates remain on the original 512px canvas.
@@ -105,14 +107,12 @@ def clean_puffs(image, curls):
 
 def main():
     source, destination = map(Path, sys.argv[1:])
-    for folder in ("mouths", "hairstyles", "beards", "headbands", "eyewear"):
+    for folder in ("mouths", "beards", "headbands", "eyewear"):
         for path in sorted((source / folder).glob("*.png")):
             image = Image.open(path).convert("RGBA")
             original = image.copy()
             if folder == "mouths":
                 image = clean_mouth(image, path.stem)
-            if path.stem == "double_afro_puffs":
-                image = clean_puffs(image, Image.open(source / "hairstyles/curly_top_fade.png").convert("RGBA"))
             if folder == "mouths":
                 count = 0
             else:
