@@ -22,7 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,7 +101,9 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
     Column(Modifier.fillMaxSize()) {
-        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() })
+        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() }, actions = {
+            SmallButton("Skip") { vm.back() }
+        })
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             list.indices.forEach { i ->
                 // The progress bar fills page by page, the current page's segment taller.
@@ -123,7 +128,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
                     val (kicker, title) = list[page]
                     if (page > 0) item { PageHead(kicker, title, page + 1) }
                     when (val id = ids[page]) {
-                        "cover" -> nbaCover(lg, pv, list.size) { go(1) }
+                        "cover" -> nbaCover(lg, pv, list.size, onRead = { go(1) }, onSkip = { vm.back() })
                         "inside" -> nbaContents(lg, pv, list, go)
                         "stories" -> nbaStories(vm, lg, pv)
                         "you" -> heroSpotlight(vm, lg, pv)
@@ -151,7 +156,8 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
             }
         }
         Row(Modifier.fillMaxWidth().background(P.bg).padding(horizontal = Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
+            if (pager.currentPage == 0) SmallButton("Skip") { vm.back() }
+            else SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
             Text("${pager.currentPage + 1} / ${list.size}", style = T.numSm, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             if (pager.currentPage < list.lastIndex) SmallButton("Next ›", primary = true) { go(pager.currentPage + 1) }
             else SmallButton("Close", primary = true) { vm.back() }
@@ -275,7 +281,7 @@ private fun NbaUserBox(lg: League, pv: NbaPreview) {
     }
 }
 
-private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRead: () -> Unit) {
+private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRead: () -> Unit, onSkip: () -> Unit) {
     // This year's cover design: a feature on the biggest story, or the two-horse race, or the classic favorite cover.
     val ranked = NbaPreviews.ranked(lg, pv)
     val story = pv.cover
@@ -284,7 +290,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
         item {
             val lines = pv.stories.filter { it !== story && it.head != story.head && it.kicker != "Your team" }.take(3).map { it.kicker to it.head }
             FeatureCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
-                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead) { NbaUserBox(lg, pv) }
+                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead, onSkip) { NbaUserBox(lg, pv) }
         }
         return
     }
@@ -294,7 +300,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
             val b = ranked[1]
             val lines = pv.stories.filter { it.teamId != a.id && it.teamId != b.id && it.kicker != "Your team" }.take(3).map { it.kicker to it.head }
             VersusCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", pv.headline.ifEmpty { "Two teams, one title" }, a, b, proj(pv, a).title, proj(pv, b).title,
-                "Projected ${proj(pv, a).w}-${proj(pv, a).l}", "Projected ${proj(pv, b).w}-${proj(pv, b).l}", lines, count, onRead) { NbaUserBox(lg, pv) }
+                "Projected ${proj(pv, a).w}-${proj(pv, a).l}", "Projected ${proj(pv, b).w}-${proj(pv, b).l}", lines, count, onRead, onSkip) { NbaUserBox(lg, pv) }
         }
         return
     }
@@ -349,7 +355,10 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+                Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
+            }
         }
     }
 }
@@ -383,6 +392,36 @@ private fun LazyListScope.nbaContents(lg: League, pv: NbaPreview, list: List<Pai
 
 private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPreview) {
     item { Deck("The ${pv.stories.size} storylines that will decide the season.") }
+    if (lg.ollama.enabled) item {
+        Spacer(Modifier.height(10.dp))
+        var generating by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        Panel(color = P.accentSoft) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("OLLAMA AI STORYLINES · ${lg.ollama.model}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Have Ollama control and generate this season's NBA storylines.", style = T.small, color = P.ink)
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton(if (generating) "Writing..." else "Generate with Ollama", primary = true, enabled = !generating) {
+                    generating = true
+                    scope.launch {
+                        val top = NbaPreviews.ranked(lg, pv).firstOrNull()?.name ?: "Favorites"
+                        val context = "Contenders: " + NbaPreviews.ranked(lg, pv).take(4).joinToString { it.name }
+                        val res = Ollama.generateStorylines(lg.ollama, pv.season, top, lg.user.name, lg.userTeamId, context)
+                        generating = false
+                        res.onSuccess { newStories ->
+                            vm.act {
+                                pv.stories = newStories
+                            }
+                        }.onFailure { err ->
+                            vm.toast("Ollama: ${err.message ?: "Failed"}")
+                        }
+                    }
+                }
+            }
+        }
+    }
     pv.stories.forEachIndexed { i, s -> item { Spacer(Modifier.height(10.dp)); StoryCard(vm, lg, s, i, lead = i == 0) } }
 }
 

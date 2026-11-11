@@ -227,11 +227,34 @@ object Features {
 
     private fun colTiers(lg: League, pv: Preview): Feature {
         val top = colRanked(lg, pv).take(40)
-        fun tier(t: Team): String { val o = odds(pv, t); return when {
-            o.title >= 0.06 -> "Title contenders"; o.f4 >= 0.08 -> "Final Four sleepers"; o.s16 >= 0.2 -> "Second-weekend teams"; o.ncaa >= 0.5 -> "Tournament teams"; else -> "On the bubble" } }
+        fun tier(t: Team): String {
+            val o = odds(pv, t)
+            return when {
+                o.title >= 0.06 -> "Title contenders"
+                o.f4 >= 0.08 -> "Final Four sleepers"
+                o.s16 >= 0.2 -> "Second-weekend teams"
+                o.ncaa >= 0.5 -> "Tournament teams"
+                else -> "On the bubble"
+            }
+        }
+        fun summary(t: Team): String {
+            val o = odds(pv, t)
+            val star = lg.rosterOf(t).maxByOrNull { it.ovr }
+            val starText = if (star != null) "Led by ${star.name} (${star.posLabel}, ${Analysis.project(lg, star).short})." else ""
+            val scoutNote = Takes.college(lg, pv, t, 1, from = 1)
+            val oddsText = when {
+                o.title >= 0.06 -> "Title ${pct(o.title)} · Final Four ${pct(o.f4)} · Dance ${pct(o.ncaa)}."
+                o.f4 >= 0.08 -> "Final Four ${pct(o.f4)} · Dance ${pct(o.ncaa)} · ${o.lo}-${o.hi} wins."
+                o.s16 >= 0.2 -> "Sweet 16 ${pct(o.s16)} · Dance ${pct(o.ncaa)}."
+                else -> "Dance ${pct(o.ncaa)} · Win range ${o.lo}-${o.hi}."
+            }
+            return if (scoutNote.isNotEmpty()) "$oddsText $scoutNote" else "$oddsText $starText"
+        }
         return Feature("tiers", "The tiers", "Our top 40, sorted by how far they can go in March.",
-            top.map { t -> FeatureItem("${pv.proj.getValue(t.id).nat}. ${t.school} · ${pv.proj.getValue(t.id).w}-${pv.proj.getValue(t.id).l}",
-                Takes.college(lg, pv, t, 1, from = 1).ifEmpty { "NCAA ${pct(odds(pv, t).ncaa)}, Final Four ${pct(odds(pv, t).f4)}." }, tier(t), t.id) }, grouped = true)
+            top.map { t ->
+                val pr = pv.proj.getValue(t.id)
+                FeatureItem("${pr.nat}. ${t.school} · ${pr.w}-${pr.l}", summary(t), tier(t), t.id)
+            }, grouped = true)
     }
 
     private fun colSuperlatives(lg: League, pv: Preview): Feature {
