@@ -36,7 +36,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -228,6 +230,10 @@ fun fieldColors() = OutlinedTextFieldDefaults.colors(
 fun SettingsScreen(vm: GameViewModel, lg: League) {
     var confirm by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var testStatus by remember { mutableStateOf("") }
+    var testSuccess by remember { mutableStateOf(false) }
+    var testing by remember { mutableStateOf(false) }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) vm.exportSave(uri) }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importSave(uri) }
     LazyColumn(Modifier.fillMaxSize()) {
@@ -252,6 +258,70 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         Text("Draw real players as retro bit portraits too, instead of their headshots.", style = T.small, color = P.sub)
                     }
                     androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
+                }
+            }
+            Section("AI Stories · Ollama")
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Ollama controls stories", style = T.bodyB, color = P.ink)
+                        Text("Use a local Ollama instance to write game recaps, storylines and news articles.", style = T.small, color = P.sub)
+                    }
+                    androidx.compose.material3.Switch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
+                }
+                if (lg.ollama.enabled) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("SERVER ENDPOINT", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = lg.ollama.host,
+                        onValueChange = { h -> vm.act { it.ollama.host = h } },
+                        singleLine = true,
+                        placeholder = { Text("http://10.0.2.2:11434", color = P.faint) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors(),
+                    )
+                    Text("Use http://10.0.2.2:11434 for Android emulator, or http://localhost:11434 on-device.", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 2.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text("MODEL NAME", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = lg.ollama.model,
+                        onValueChange = { m -> vm.act { it.ollama.model = m } },
+                        singleLine = true,
+                        placeholder = { Text("llama3.2", color = P.faint) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors(),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
+                            Text("Automatically generate recaps for your games using Ollama.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    SecondaryButton(if (testing) "Testing..." else "Test connection", Modifier.fillMaxWidth(), enabled = !testing) {
+                        testing = true
+                        testStatus = "Testing connection..."
+                        scope.launch {
+                            val res = com.nh.hoopscoach.game.Ollama.testConnection(lg.ollama.host)
+                            testing = false
+                            res.onSuccess { models ->
+                                testSuccess = true
+                                testStatus = if (models.isNotEmpty()) "Connected! Available models: " + models.joinToString(", ")
+                                else "Connected! (No models downloaded yet in Ollama)"
+                            }.onFailure { err ->
+                                testSuccess = false
+                                testStatus = "Connection failed: ${err.message ?: "Could not reach Ollama"}"
+                            }
+                        }
+                    }
+                    if (testStatus.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(testStatus, style = T.small, color = if (testSuccess) P.good else P.bad)
+                    }
                 }
             }
             lg.road?.let { rd ->

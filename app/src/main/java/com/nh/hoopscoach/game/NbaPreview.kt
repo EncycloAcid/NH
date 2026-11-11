@@ -26,7 +26,7 @@ class NbaPreview(
     val dpoy: List<PoyOdds> = emptyList(),
     val sixth: List<PoyOdds> = emptyList(),
     val mip: List<PoyOdds> = emptyList(),
-    val stories: List<Story> = emptyList(),
+    var stories: List<Story> = emptyList(),
     val bold: List<String> = emptyList(),
     val headline: String = "",
     /** Last season by team: "52-30 · Lost in the second round". */

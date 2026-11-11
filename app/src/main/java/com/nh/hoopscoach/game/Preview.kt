@@ -13,7 +13,7 @@ class Odds(val conf: Double, val ncaa: Double, val s16: Double, val f4: Double, 
 
 /** One storyline: a kicker, a headline and a few sentences, about a team or a player. */
 @Serializable
-class Story(val kicker: String, val head: String, val body: String, val teamId: Int = -1, val pid: Int = -1)
+class Story(val kicker: String, val head: String, var body: String, val teamId: Int = -1, val pid: Int = -1)
 
 /**
  * A bold prediction, in a form the season can check: what kind of call it is, the team or player it's
@@ -57,7 +57,7 @@ class Preview(
     val odds: Map<Int, Odds> = emptyMap(),
     /** Each conference's average number of NCAA Tournament bids in the simulations. */
     val bids: Map<Int, Double> = emptyMap(),
-    val stories: List<Story> = emptyList(),
+    var stories: List<Story> = emptyList(),
     val poy: List<PoyOdds> = emptyList(),
     /** The cover headline. */
     val headline: String = "",
@@ -69,6 +69,7 @@ class Preview(
     val calls: List<Call> = emptyList(),
     var graded: List<Int> = emptyList(),
     var outcomes: List<String> = emptyList(),
+    val debates: List<TvSegment> = emptyList(),
 )
 
 object Previews {
@@ -169,11 +170,12 @@ object Previews {
         val stories = storylines(lg, base)
         val (cover, style) = Features.collegeCover(lg, base, stories)
         val calls = boldPredictions(lg, base)
+        val debates = PreviewDebates.buildCollege(lg, base)
         return Preview(
             base.season, base.proj, base.allAmerica, base.freshmen, base.transfers, base.breakouts, base.confPoy, base.finalFour, base.sleeper,
             3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, calls.first,
             calls = calls.second, odds = odds, bids = bids, stories = stories, poy = poy, headline = cover?.head ?: coverHeadline(lg, base),
-            features = Features.college(lg, base), cover = cover, coverStyle = style,
+            features = Features.college(lg, base), cover = cover, coverStyle = style, debates = debates,
         )
     }
 

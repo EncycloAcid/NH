@@ -198,7 +198,9 @@ object NewsDesk {
             add(if (won) Rng.pick(listOf("“I liked our energy,” coach ${coach.last} said. “We defended and shared it.”", "“Good win. Now we get ready for the next one,” coach ${coach.last} said."))
                 else Rng.pick(listOf("“We'll learn from it,” coach ${coach.last} said. “That one's on me.”", "“Not good enough,” coach ${coach.last} said. “We have to be sharper.”")))
         }.joinToString("\n\n")
-        lg.news += News(lg.season, lg.day, headline, true, g.id, "recap", body, outlet(), u.id, top?.pid ?: -1)
+        val recapNews = News(lg.season, lg.day, headline, true, g.id, "recap", body, outlet(), u.id, top?.pid ?: -1)
+        lg.news += recapNews
+        Ollama.maybeAutoGenerate(lg.ollama, lg, recapNews)
     }
 
     // ---------- the NBA's columns ----------

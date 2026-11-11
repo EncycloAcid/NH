@@ -199,10 +199,13 @@ object Scout {
         breakout?.let { b ->
             val last = lastLine(lg, b)
             val role = if (b in x.starters && (last == null || last.s.mpg < 24)) "and he moves into the starting five" else if (last != null && last.s.gp >= 10) "after ${f1(last.s.ppg)} a game last season" else "and the minutes are there"
-            breakoutWhy = "${ageWord(lg, b).replaceFirstChar { it.uppercase() }}, rated ${shown(lg, b.ovr)} with room to grow to ${shown(lg, b.pot)}, $role."
-            out += Insight("breakout", 3.0 + (b.pot - b.ovr) * 0.35, pick(
-                "Breakout watch: ${b.name}. ${breakoutWhy}",
-                "Keep an eye on ${b.name} (${ageWord(lg, b)}): rated ${shown(lg, b.ovr)} now, ${shown(lg, b.pot)} ceiling, $role.",
+            breakoutWhy = if (pro) "${ageWord(lg, b).replaceFirstChar { it.uppercase() }}, rated ${shown(lg, b.ovr)} with room to grow to ${shown(lg, b.pot)}, $role."
+            else if (b.year == 1 && b.stars >= 4) "${b.stars}★ signee with an All-America ceiling, $role."
+            else if (b.year == 1) "Freshman with big upside, $role."
+            else "${ageWord(lg, b).replaceFirstChar { it.uppercase() }} poised for a breakout year, $role."
+            out += Insight("breakout", 2.3 + (b.pot - b.ovr).coerceIn(0, 14) * 0.08, pick(
+                "Breakout watch: ${b.name}. $breakoutWhy",
+                "Keep an eye on ${b.name} (${ageWord(lg, b)}): $breakoutWhy",
             ), b.id)
         }
 
@@ -249,8 +252,8 @@ object Scout {
 
         // The schedule.
         val games = lg.games.filter { it.involves(t.id) && !it.played && (it.type == GameType.CONF || it.type == GameType.NONCONF || it.type == GameType.EVENT) }.sortedBy { it.day }
-        if (games.size >= 12) {
-            val win = 10
+        val win = if (pro) 10 else 4
+        if (games.size >= win + 2) {
             var bestI = 0; var bestV = -1.0
             for (i in 0..games.size - win) {
                 val v = games.subList(i, i + win).sumOf { lg.team(it.opp(t.id)).elo }
@@ -260,7 +263,7 @@ object Scout {
             val good = stretch.count { lg.team(it.opp(t.id)).elo >= playoffLine }
             if (sosRank <= 3) out += Insight("schedule", 3.2, "One of the toughest schedules in the league (${ord(sosRank)} hardest). Game ${stretch.first().day} to game ${stretch.last().day} is the gauntlet: $good of $win against ${if (pro) "playoff" else "tournament"} teams.")
             else if (sosRank >= n - 2) out += Insight("schedule", 2.6, "A friendly schedule (${ord(n - sosRank + 1)} easiest), which helps a team on the edge.")
-            else if (good >= 7) out += Insight("stretch", 2.4, "Circle game ${stretch.first().day} through ${stretch.last().day}: $good of $win against ${if (pro) "playoff" else "tournament"} teams.")
+            else if (good >= (if (pro) 7 else 3)) out += Insight("stretch", 2.7, "Circle game ${stretch.first().day} through ${stretch.last().day}: $good of $win against ${if (pro) "playoff" else "tournament"} teams.")
         }
 
         val sorted = out.sortedByDescending { it.score }
