@@ -184,19 +184,21 @@ object Ollama {
         }
     }
 
-    /** Low-level generate call using Ollama's /api/generate endpoint. */
+    /** Low-level generate call using Ollama's /api/generate endpoint with streaming to prevent socket timeouts. */
     suspend fun generate(
         config: OllamaConfig,
         prompt: String,
         system: String = "You are a professional basketball beat writer and columnist. Write engaging, realistic sports newspaper journalism in 2-4 clean paragraphs. Never include markdown headers, title prefixes, or conversational meta-commentary.",
         temperature: Double = 0.7,
+        numPredict: Int = 350,
+        onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL("${cleanHost(config.host)}/api/generate")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
-                connectTimeout = 6000
-                readTimeout = 30000
+                connectTimeout = 10000
+                readTimeout = 120000 // 2 minutes: allows on-device mobile models to load into RAM and output tokens
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
@@ -204,22 +206,33 @@ object Ollama {
 
             val payload = buildString {
                 append("{\"model\":")
-                append(jsonString(config.model.ifBlank { "llama3.2" }))
+                append(jsonString(config.model.ifBlank { "llama3.2:1b" }))
                 append(",\"prompt\":")
                 append(jsonString(prompt))
                 append(",\"system\":")
                 append(jsonString(system))
-                append(",\"stream\":false")
-                append(",\"options\":{\"temperature\":$temperature}}")
+                append(",\"stream\":true")
+                append(",\"options\":{\"temperature\":$temperature,\"num_predict\":$numPredict}}")
             }
 
             conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
 
             val code = conn.responseCode
             if (code in 200..299) {
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                val root = json.parseToJsonElement(body).jsonObject
-                val responseText = root["response"]?.jsonPrimitive?.content.orEmpty().trim()
+                val sb = StringBuilder()
+                conn.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                    for (line in lines) {
+                        if (line.isBlank()) continue
+                        val root = json.parseToJsonElement(line).jsonObject
+                        val token = root["response"]?.jsonPrimitive?.content.orEmpty()
+                        if (token.isNotEmpty()) {
+                            sb.append(token)
+                            onToken?.invoke(token)
+                        }
+                        if (root["done"]?.jsonPrimitive?.content == "true") break
+                    }
+                }
+                val responseText = sb.toString().trim()
                 if (responseText.isEmpty()) throw Exception("Empty response from Ollama")
                 responseText
             } else {
@@ -331,26 +344,47 @@ object Ollama {
             append("BODY: <2-3 sentences of preview commentary>\n---\n")
         }
 
-        return generate(config, prompt).map { raw ->
+        return generate(config, prompt, numPredict = 300).map { raw ->
             val stories = mutableListOf<Story>()
-            val blocks = raw.split("---")
-            for (b in blocks) {
-                var kicker = ""
-                var head = ""
-                val body = mutableListOf<String>()
-                for (line in b.lines()) {
-                    val trimmed = line.trim()
-                    when {
-                        trimmed.startsWith("KICKER:", ignoreCase = true) -> kicker = trimmed.substringAfter(":").trim()
-                        trimmed.startsWith("HEADLINE:", ignoreCase = true) -> head = trimmed.substringAfter(":").trim()
-                        trimmed.startsWith("BODY:", ignoreCase = true) -> body.add(trimmed.substringAfter(":").trim())
-                        kicker.isNotEmpty() && head.isNotEmpty() && trimmed.isNotBlank() -> body.add(trimmed)
+            var kicker = ""
+            var head = ""
+            val body = mutableListOf<String>()
+
+            fun flush() {
+                if (kicker.isNotEmpty() && head.isNotEmpty()) {
+                    val text = if (body.isNotEmpty()) body.joinToString(" ").trim() else "Key storyline to watch for the upcoming season."
+                    stories += Story(kicker, head, text, userTeamId)
+                }
+                kicker = ""
+                head = ""
+                body.clear()
+            }
+
+            for (line in raw.lines()) {
+                val trimmed = line.trim()
+                if (trimmed == "---") {
+                    flush()
+                    continue
+                }
+                when {
+                    trimmed.startsWith("KICKER:", ignoreCase = true) -> {
+                        if (kicker.isNotEmpty() && head.isNotEmpty()) flush()
+                        kicker = trimmed.substringAfter(":").trim()
+                    }
+                    trimmed.startsWith("HEADLINE:", ignoreCase = true) -> {
+                        head = trimmed.substringAfter(":").trim()
+                    }
+                    trimmed.startsWith("BODY:", ignoreCase = true) -> {
+                        val b = trimmed.substringAfter(":").trim()
+                        if (b.isNotEmpty()) body.add(b)
+                    }
+                    kicker.isNotEmpty() && head.isNotEmpty() && trimmed.isNotBlank() -> {
+                        body.add(trimmed)
                     }
                 }
-                if (kicker.isNotEmpty() && head.isNotEmpty()) {
-                    stories += Story(kicker, head, body.joinToString(" ").trim(), userTeamId)
-                }
             }
+            flush()
+
             if (stories.isEmpty()) {
                 listOf(Story("Ollama Spotlight", "A New Era Begins", raw.trim().take(300), userTeamId))
             } else stories

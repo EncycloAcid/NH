@@ -395,6 +395,7 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
     if (lg.ollama.enabled) item {
         Spacer(Modifier.height(10.dp))
         var generating by remember { mutableStateOf(false) }
+        var genStatus by remember { mutableStateOf("") }
         val scope = rememberCoroutineScope()
         Panel(color = P.accentSoft) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -405,20 +406,30 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
                 Spacer(Modifier.width(8.dp))
                 SmallButton(if (generating) "Writing..." else "Generate with Ollama", primary = true, enabled = !generating) {
                     generating = true
+                    genStatus = "Connecting to Ollama & generating storylines..."
                     scope.launch {
                         val top = NbaPreviews.ranked(lg, pv).firstOrNull()?.name ?: "Favorites"
                         val context = "Contenders: " + NbaPreviews.ranked(lg, pv).take(4).joinToString { it.name }
                         val res = Ollama.generateStorylines(lg.ollama, pv.season, top, lg.user.name, lg.userTeamId, context)
                         generating = false
                         res.onSuccess { newStories ->
+                            genStatus = ""
                             vm.act {
                                 pv.stories = newStories
                             }
                         }.onFailure { err ->
-                            vm.toast("Ollama: ${err.message ?: "Failed"}")
+                            val msg = if (err.message?.contains("timeout", ignoreCase = true) == true) {
+                                "Timed out. Your phone may need a lighter model (like qwen2.5:0.5b or smollm2) or more time to load."
+                            } else err.message ?: "Failed"
+                            genStatus = "Error: $msg"
+                            vm.toast("Ollama: $msg")
                         }
                     }
                 }
+            }
+            if (genStatus.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(genStatus, style = T.small.copy(fontSize = 11.sp), color = if (generating) P.accent else P.bad)
             }
         }
     } else item {
