@@ -503,12 +503,59 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         colors = fieldColors(),
                     )
                     Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
                             Text("Automatically generate recaps for your games using Ollama.", style = T.small, color = P.sub)
                         }
                         androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+                    Text("FINE NARRATIVE CONTROLS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    Text("The AI controls fine narrative details, quotes, and reactions. Game simulation stats, box scores, records, and ratings are strictly computed by the engine and never modified by AI.", style = T.small, color = P.good)
+                    Spacer(Modifier.height(10.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Postgame press conferences", style = T.bodyB, color = P.ink)
+                            Text("AI writes contextual podium questions & player quotes.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.pressConference, { on -> vm.act { it.ollama.pressConference = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Social media hot takes", style = T.bodyB, color = P.ink)
+                            Text("AI generates analyst, fan, and hater takes on your feed.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.socialFeed, { on -> vm.act { it.ollama.socialFeed = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Beat writer recaps & coach quotes", style = T.bodyB, color = P.ink)
+                            Text("AI writes newspaper reports and postgame locker room quotes.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.gameRecaps, { on -> vm.act { it.ollama.gameRecaps = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
+                            Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.tradeRumors, { on -> vm.act { it.ollama.tradeRumors = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Tactical pregame scouting keys", style = T.bodyB, color = P.ink)
+                            Text("AI writes keys to victory based on opponent matchups.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
                     }
                     Spacer(Modifier.height(12.dp))
                     SecondaryButton(if (testing) "Testing..." else "Test connection", Modifier.fillMaxWidth(), enabled = !testing && !configuring) {

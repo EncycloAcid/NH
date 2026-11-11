@@ -20,8 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -146,6 +150,70 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         Compare("Overall", Gameplan.teamRating(lg, u), Gameplan.teamRating(lg, opp), mine, theirs)
         Compare("Offense", Gameplan.teamRating(lg, u) { Ratings.offense(it) }, Gameplan.teamRating(lg, opp) { Ratings.offense(it) }, mine, theirs)
         Compare("Defense", Gameplan.teamRating(lg, u) { Ratings.defense(it) }, Gameplan.teamRating(lg, opp) { Ratings.defense(it) }, mine, theirs)
+        if (lg.ollama.enabled && lg.ollama.scoutingKeys) {
+            AiScoutingCard(vm, lg, g)
+        }
+    }
+}
+
+/** Tactical pregame scouting keys generated with Ollama from team ratings and simulated stats. */
+@Composable
+fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
+    var keys by remember(g.id) { mutableStateOf<List<Ollama.ScoutingKey>?>(null) }
+    var loading by remember(g.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val u = lg.user
+    val opp = lg.team(g.opp(u.id))
+
+    Spacer(Modifier.height(10.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(P.surface2)
+            .padding(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("AI SCOUTING KEYS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            if (keys == null && !loading) {
+                Text(
+                    "Generate with Ollama ✍️",
+                    style = T.small.copy(fontSize = 11.sp),
+                    color = P.accent,
+                    modifier = Modifier.clickable {
+                        loading = true
+                        scope.launch {
+                            val res = Ollama.generateScoutingKeys(lg.ollama, lg, u, opp)
+                            loading = false
+                            res.onSuccess { list ->
+                                keys = list
+                            }.onFailure { err ->
+                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        if (loading) {
+            Spacer(Modifier.height(6.dp))
+            Text("Ollama is analyzing matchups & scouting ${opp.school}...", style = T.small, color = P.accent)
+        } else if (keys != null) {
+            Spacer(Modifier.height(6.dp))
+            for (key in keys!!) {
+                Column(Modifier.padding(vertical = 3.dp)) {
+                    Text("• ${key.title}", style = T.bodyB.copy(fontSize = 13.sp), color = P.ink)
+                    Text(key.detail, style = T.small, color = P.sub)
+                }
+            }
+        } else {
+            Spacer(Modifier.height(4.dp))
+            Text("Have Ollama analyze matchups and write 3 tactical keys to victory against ${opp.school}.", style = T.small, color = P.faint)
+        }
     }
 }
 

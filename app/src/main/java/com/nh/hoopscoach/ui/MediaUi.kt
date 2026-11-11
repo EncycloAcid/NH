@@ -214,6 +214,7 @@ private fun storyClick(vm: GameViewModel, lg: League, p: Post): (() -> Unit)? {
 fun SocialScreen(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     var kind by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize()) {
         BackBar("Social", "${Road.count(r.followers)} followers", onBack = { vm.back() })
         LazyColumn(Modifier.weight(1f)) {
@@ -223,6 +224,40 @@ fun SocialScreen(vm: GameViewModel, lg: League) {
             }
             if (vm.socialTab == 0) {
                 item { ProfileCard(vm, lg) }
+                if (lg.ollama.enabled && lg.ollama.socialFeed) item {
+                    var generatingTakes by remember { mutableStateOf(false) }
+                    Spacer(Modifier.height(8.dp))
+                    Panel {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("AI Hot Takes Generator", style = T.bodyB, color = P.ink)
+                                Text("Generate fresh fan, analyst, and hater takes reacting to your latest game.", style = T.small, color = P.sub)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            SmallButton(if (generatingTakes) "Generating..." else "Generate takes 💬", primary = true, enabled = !generatingTakes) {
+                                val h = lg.hero ?: return@SmallButton
+                                val line = h.log.lastOrNull() ?: return@SmallButton
+                                val g = lg.games.lastOrNull { it.played && it.involves(h.teamId) } ?: return@SmallButton
+                                val won = g.winner() == h.teamId
+                                generatingTakes = true
+                                scope.launch {
+                                    val res = Ollama.generateSocialTakes(lg.ollama, lg, g, h, line, won)
+                                    generatingTakes = false
+                                    res.onSuccess { newPosts ->
+                                        vm.act { it.road?.feed?.addAll(newPosts) }
+                                        vm.toast("Added ${newPosts.size} new AI reactions to your feed!")
+                                    }.onFailure { err ->
+                                        vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 val posts = r.feed.reversed()
                 if (posts.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("Nothing yet. Play a game and the internet will have opinions.", style = T.body, color = P.sub) } }
                 else item {

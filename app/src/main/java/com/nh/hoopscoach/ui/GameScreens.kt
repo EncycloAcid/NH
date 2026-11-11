@@ -31,8 +31,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -338,6 +342,10 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
             CrowdLine(lg, g)
             if (g.played && lg.rivalry(g) != null) { Spacer(Modifier.height(10.dp)); NewspaperBanner(vm, lg, g, onClick = null) }
             if (g.played) PlayerOfTheGame(vm, lg, g)
+            if (g.played && lg.ollama.enabled && lg.ollama.gameRecaps) {
+                Spacer(Modifier.height(10.dp))
+                OllamaGameReportCard(vm, lg, g)
+            }
             val b = g.box
             if (b != null) {
                 Spacer(Modifier.height(10.dp))
@@ -537,3 +545,110 @@ private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.Mome
     ) { Text(if (drive) "FINISH" else "RELEASE", style = T.head, color = P.ink) }
     Text("Stop the marker in the green. The middle is perfect.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
 }
+
+/** Beat writer postgame report and quotes generated from simulated stats. */
+@Composable
+fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
+    if (!g.played) return
+    var report by remember(g.id) { mutableStateOf<Ollama.PostgameReport?>(null) }
+    var writing by remember(g.id) { mutableStateOf(false) }
+    var errorMsg by remember(g.id) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+
+    Section(
+        "Beat report & quotes",
+        action = if (report == null && !writing) "Ollama Report ✍️" else if (writing) "Writing..." else "Rewrite",
+        onAction = {
+            writing = true
+            errorMsg = ""
+            scope.launch {
+                val res = Ollama.generatePostgameReport(lg.ollama, lg, g)
+                writing = false
+                res.onSuccess { rep ->
+                    report = rep
+                }.onFailure { err ->
+                    errorMsg = err.message ?: "Generation failed"
+                    vm.toast("Ollama: $errorMsg")
+                }
+            }
+        },
+    )
+
+    Panel {
+        if (writing) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = P.accent,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Ollama is writing the beat report & quotes...", style = T.small, color = P.accent)
+            }
+        } else if (report != null) {
+            val rep = report!!
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(rep.outlet.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.weight(1f))
+                Text("AI REPORT", style = T.label.copy(fontSize = 10.sp), color = P.good)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(rep.headline, style = T.head, color = P.ink)
+            Spacer(Modifier.height(8.dp))
+            Text(rep.story, style = T.body, color = P.ink)
+            Spacer(Modifier.height(12.dp))
+            // Coach's quote
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(P.surface2, RoundedCornerShape(10.dp))
+                    .padding(10.dp),
+            ) {
+                Text("COACH'S PODIUM", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+                Spacer(Modifier.height(2.dp))
+                Text("\u201c${rep.coachQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
+            }
+            Spacer(Modifier.height(8.dp))
+            // Star player's quote
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(P.surface2, RoundedCornerShape(10.dp))
+                    .padding(10.dp),
+            ) {
+                Text("LOCKER ROOM REACTION", style = T.label.copy(fontSize = 9.sp), color = P.gold)
+                Spacer(Modifier.height(2.dp))
+                Text("\u201c${rep.starQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Ollama Beat Report", style = T.bodyB, color = P.ink)
+                    Text("Generate a postgame story with coach and locker room quotes using ${lg.ollama.model}.", style = T.small, color = P.sub)
+                    if (errorMsg.isNotEmpty()) {
+                        Text(errorMsg, style = T.small, color = P.bad)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton("Generate", primary = true) {
+                    writing = true
+                    errorMsg = ""
+                    scope.launch {
+                        val res = Ollama.generatePostgameReport(lg.ollama, lg, g)
+                        writing = false
+                        res.onSuccess { rep ->
+                            report = rep
+                        }.onFailure { err ->
+                            errorMsg = err.message ?: "Generation failed"
+                            vm.toast("Ollama: $errorMsg")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

@@ -30,7 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -196,6 +198,9 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
                             Spacer(Modifier.width(8.dp))
                             Text("${rv.name} is on the other side.", style = T.small, color = P.ink)
                         }
+                    }
+                    if (lg.ollama.enabled && lg.ollama.scoutingKeys) {
+                        AiScoutingCard(vm, lg, g)
                     }
                 }
             }
@@ -1178,13 +1183,46 @@ private fun LazyListScope.allTimeList(vm: GameViewModel, lg: League) {
 private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
     val a = lg.team(t.teamA)
     val b = lg.team(t.teamB)
+    var analysis by remember(t.teamA, t.teamB, t.season, t.day) { mutableStateOf<com.nh.hoopscoach.game.Ollama.TradeAnalysis?>(null) }
+    var grading by remember(t.teamA, t.teamB, t.season, t.day) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     Column(Modifier.fillMaxWidth().then(if (t.hero) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Text(if (t.offseason) "${t.season} OFFSEASON" else "${t.season} · DAY ${t.day}", style = T.label, color = if (t.hero) P.accent else P.sub)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (t.offseason) "${t.season} OFFSEASON" else "${t.season} · DAY ${t.day}", style = T.label, color = if (t.hero) P.accent else P.sub, modifier = Modifier.weight(1f))
+            if (lg.ollama.enabled && lg.ollama.tradeRumors && analysis == null) {
+                Text(
+                    if (grading) "Grading..." else "Grade with AI ✍️",
+                    style = T.small.copy(fontSize = 11.sp),
+                    color = P.accent,
+                    modifier = Modifier.clickable(enabled = !grading) {
+                        grading = true
+                        scope.launch {
+                            val res = com.nh.hoopscoach.game.Ollama.generateTradeAnalysis(lg.ollama, lg, t)
+                            grading = false
+                            res.onSuccess { analysis = it }
+                        }
+                    },
+                )
+            }
+        }
         for ((team, gets) in listOf(b to t.toB, a to t.toA)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                 TeamBadge(team, 24.dp)
                 Spacer(Modifier.width(8.dp))
                 Text("${team.mascot} get ${gets.joinToString(", ")}", style = T.small, color = P.ink, maxLines = 2)
+            }
+        }
+        if (analysis != null) {
+            val an = analysis!!
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(P.surface2).padding(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("AI TRADE GRADES: ", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("${a.abbr} ${an.gradeA}  ·  ${b.abbr} ${an.gradeB}", style = T.bodyB.copy(fontSize = 12.sp), color = P.ink)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(an.analysis, style = T.small, color = P.ink)
             }
         }
     }

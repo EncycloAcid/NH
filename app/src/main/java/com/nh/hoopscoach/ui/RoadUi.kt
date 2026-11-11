@@ -31,7 +31,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -492,9 +495,43 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
 fun PressCard(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val q = r.press ?: return
-    Section("Postgame press · ${q.topic}")
+    val scope = rememberCoroutineScope()
+    var aiGenerating by remember { mutableStateOf(false) }
+
+    Section(
+        "Postgame press · ${q.topic}",
+        action = if (lg.ollama.enabled && lg.ollama.pressConference) (if (aiGenerating) "Writing..." else "Ollama Q&A ✍️") else null,
+        onAction = {
+            val h = lg.hero ?: return@Section
+            val line = h.log.lastOrNull() ?: return@Section
+            val g = lg.games.firstOrNull { it.id == q.gameId } ?: lg.games.lastOrNull { it.played && it.involves(h.teamId) } ?: return@Section
+            val won = g.winner() == h.teamId
+            val rivalry = lg.rivalry(g) != null
+            aiGenerating = true
+            scope.launch {
+                val res = Ollama.generatePressConference(lg.ollama, lg, g, h, line, won, rivalry)
+                aiGenerating = false
+                res.onSuccess { newQ ->
+                    vm.act { it.road?.press = newQ }
+                    vm.toast("Generated postgame questions with Ollama!")
+                }.onFailure { err ->
+                    vm.toast("Ollama: ${err.message ?: "Failed"}")
+                }
+            }
+        },
+    )
     Panel {
-        if (q.reporter.isNotEmpty()) Text(q.reporter.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(bottom = 6.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (q.reporter.isNotEmpty()) {
+                Text(q.reporter.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.weight(1f))
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            if (q.reporter.contains("Ollama", ignoreCase = true)) {
+                Text("AI PODIUM", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Top) {
             Box(Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(P.accentSoft), contentAlignment = Alignment.Center) {
                 Text("?", style = T.head, color = P.accent)
@@ -514,14 +551,41 @@ fun PressCard(vm: GameViewModel, lg: League) {
             ) {
                 Text(a.text, style = T.body, color = P.ink)
                 val tags = listOfNotNull(
-                    if (a.persona < 0) "Humble" else if (a.persona > 0) "Brash" else "Even",
+                    if (a.persona < 0) "Humble" else if (a.persona > 0) "Brash" else "Analytical",
                     if (a.fans > 0) "fans like it" else if (a.fans < 0) "fans won't" else null,
                     if (a.teammates > 0) "teammates like it" else if (a.teammates < 0) "teammates won't" else null,
                 )
                 Text(tags.joinToString(" · "), style = T.small, color = if (a.persona > 0) P.warn else if (a.persona < 0) P.good else P.sub)
             }
         }
-        Text("Skip it and the next game brings new questions.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Skip it and the next game brings new questions.", style = T.small, color = P.faint, modifier = Modifier.weight(1f))
+            if (lg.ollama.enabled && lg.ollama.pressConference && !aiGenerating) {
+                Text(
+                    "Regenerate with AI",
+                    style = T.small.copy(fontSize = 11.sp),
+                    color = P.accent,
+                    modifier = Modifier.clickable {
+                        val h = lg.hero ?: return@clickable
+                        val line = h.log.lastOrNull() ?: return@clickable
+                        val g = lg.games.firstOrNull { it.id == q.gameId } ?: lg.games.lastOrNull { it.played && it.involves(h.teamId) } ?: return@clickable
+                        val won = g.winner() == h.teamId
+                        val rivalry = lg.rivalry(g) != null
+                        aiGenerating = true
+                        scope.launch {
+                            val res = Ollama.generatePressConference(lg.ollama, lg, g, h, line, won, rivalry)
+                            aiGenerating = false
+                            res.onSuccess { newQ ->
+                                vm.act { it.road?.press = newQ }
+                                vm.toast("Generated with Ollama!")
+                            }.onFailure { err ->
+                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                            }
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 

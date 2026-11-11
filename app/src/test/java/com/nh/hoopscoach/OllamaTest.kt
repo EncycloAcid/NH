@@ -1,10 +1,13 @@
 package com.nh.hoopscoach
 
+import com.nh.hoopscoach.game.Game
+import com.nh.hoopscoach.game.GameType
 import com.nh.hoopscoach.game.LeagueGen
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.OllamaConfig
 import com.nh.hoopscoach.game.SaveIO
+import com.nh.hoopscoach.game.Trade
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,6 +36,11 @@ class OllamaTest {
         lg.ollama.host = "http://localhost:11434"
         lg.ollama.model = "mistral"
         lg.ollama.autoGenerate = true
+        lg.ollama.pressConference = false
+        lg.ollama.socialFeed = true
+        lg.ollama.gameRecaps = true
+        lg.ollama.tradeRumors = false
+        lg.ollama.scoutingKeys = true
 
         val encoded = SaveIO.encode(lg)
         val decoded = SaveIO.decode(encoded)
@@ -41,6 +49,40 @@ class OllamaTest {
         assertEquals("http://localhost:11434", decoded.ollama.host)
         assertEquals("mistral", decoded.ollama.model)
         assertTrue(decoded.ollama.autoGenerate)
+        assertFalse(decoded.ollama.pressConference)
+        assertTrue(decoded.ollama.socialFeed)
+        assertTrue(decoded.ollama.gameRecaps)
+        assertFalse(decoded.ollama.tradeRumors)
+        assertTrue(decoded.ollama.scoutingKeys)
+    }
+
+    @Test
+    fun testFineNarrativeGeneratorsGracefulFailure() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(enabled = true, host = "http://127.0.0.1:54321", model = "test")
+        val g = Game(id = 1, day = 1, home = 0, away = 1, neutral = false, type = GameType.NONCONF, hs = 88, aws = 82)
+        lg.games.add(g)
+        val h = lg.players.first()
+        val line = com.nh.hoopscoach.game.GameLogEntry(g.id, 1, "H", true, "88-82", 24, 7, 5, 2, 1, 3, 34)
+
+        val pressRes = Ollama.generatePressConference(config, lg, g, h, line, won = true)
+        assertTrue(pressRes.isFailure)
+
+        val socialRes = Ollama.generateSocialTakes(config, lg, g, h, line, won = true)
+        assertTrue(socialRes.isFailure)
+
+        val recapRes = Ollama.generatePostgameReport(config, lg, g)
+        assertTrue(recapRes.isFailure)
+
+        val scoutRes = Ollama.generateScoutingKeys(config, lg, lg.teams[0], lg.teams[1])
+        assertTrue(scoutRes.isFailure)
+
+        val trade = Trade(season = 2026, day = 10, offseason = false, teamA = 0, teamB = 1, toB = listOf("Player A"), toA = listOf("Player B"))
+        val tradeRes = Ollama.generateTradeAnalysis(config, lg, trade)
+        assertTrue(tradeRes.isFailure)
+
+        val rumorRes = Ollama.generateTradeRumors(config, lg)
+        assertTrue(rumorRes.isFailure)
     }
 
     @Test

@@ -635,6 +635,11 @@ class OllamaConfig(
     var host: String = "http://localhost:11434",
     var model: String = "llama3.2:1b",
     var autoGenerate: Boolean = false,
+    var pressConference: Boolean = true,
+    var socialFeed: Boolean = true,
+    var gameRecaps: Boolean = true,
+    var tradeRumors: Boolean = true,
+    var scoutingKeys: Boolean = true,
 )
 
 enum class MomentKind(val tag: String) {
