@@ -15,7 +15,7 @@ class OllamaTest {
 
     @Test
     fun testHostCleaning() {
-        assertEquals("http://10.0.2.2:11434", Ollama.cleanHost(""))
+        assertEquals("http://localhost:11434", Ollama.cleanHost(""))
         assertEquals("http://localhost:11434", Ollama.cleanHost("localhost:11434"))
         assertEquals("http://10.0.2.2:11434", Ollama.cleanHost("http://10.0.2.2:11434/"))
         assertEquals("https://remote.ollama.ai:11434", Ollama.cleanHost("https://remote.ollama.ai:11434/"))
@@ -25,8 +25,8 @@ class OllamaTest {
     fun testLeagueSaveAndRestoreOllamaConfig() {
         val lg = LeagueGen.newLeague()
         assertFalse("Ollama should be disabled by default", lg.ollama.enabled)
-        assertEquals("http://10.0.2.2:11434", lg.ollama.host)
-        assertEquals("llama3.2", lg.ollama.model)
+        assertEquals("http://localhost:11434", lg.ollama.host)
+        assertEquals("llama3.2:1b", lg.ollama.model)
 
         // Turn on and configure
         lg.ollama.enabled = true
@@ -41,6 +41,29 @@ class OllamaTest {
         assertEquals("http://localhost:11434", decoded.ollama.host)
         assertEquals("mistral", decoded.ollama.model)
         assertTrue(decoded.ollama.autoGenerate)
+    }
+
+    @Test
+    fun testRecommendedModelsList() {
+        assertTrue("Recommended models should not be empty", Ollama.RECOMMENDED_MODELS.isNotEmpty())
+        val llama1b = Ollama.RECOMMENDED_MODELS.firstOrNull { it.id == "llama3.2:1b" }
+        assertTrue("Llama 3.2 1B preset exists", llama1b != null)
+        assertTrue("Has recommended tag", llama1b!!.tag.contains("Recommended"))
+        assertTrue("Has phone friendly sizes", Ollama.RECOMMENDED_MODELS.all { it.size.isNotEmpty() && it.description.isNotEmpty() })
+    }
+
+    @Test
+    fun testAutoConfigureGracefulFailure() = runBlocking {
+        // Without an active server, autoConfigure should fail gracefully with Result.failure
+        val res = Ollama.autoConfigure("http://127.0.0.1:54321")
+        assertTrue(res.isFailure)
+        assertTrue(res.exceptionOrNull()?.message?.contains("Could not find an active Ollama instance") == true)
+    }
+
+    @Test
+    fun testPullModelGracefulFailure() = runBlocking {
+        val res = Ollama.pullModel("http://127.0.0.1:54321", "llama3.2:1b") { _, _, _ -> }
+        assertTrue(res.isFailure)
     }
 
     @Test

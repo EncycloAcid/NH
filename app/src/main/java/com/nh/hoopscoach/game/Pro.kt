@@ -508,7 +508,7 @@ object ProLeague {
                     peak > p.ovr && l.age <= 27 -> peak.coerceAtMost(99)
                     else -> (p.ovr + (25 - l.age).coerceAtLeast(0) * 1.2).roundToInt().coerceIn(p.ovr, 99)
                 }
-                (photos[l.id] ?: NbaData.PLAYERS.firstOrNull { it.name == l.name }?.photo)?.let { p.photo = it }
+                (photos[l.id] ?: EraData.pickOf(l.id)?.photo?.takeIf { it.isNotEmpty() } ?: NbaData.PLAYERS.firstOrNull { it.name == l.name }?.photo)?.let { p.photo = it }
                 val past = RealSeasons.careerBefore(l.id, season)
                 p.proYears = past.size
                 RealSeasons.addCareer(p, past)
@@ -634,9 +634,14 @@ object ProLeague {
         return p
     }
 
-    /** A roster over the limit cuts its weakest players (never the user's player or his rival). */
+    /** A roster over the limit cuts its weakest players (never the user's player, his rival, or current first-round picks). */
     fun trim(lg: League, t: Team, protect: Set<Int> = emptySet()) {
-        val keep = setOf(lg.heroId, lg.road?.rivalId ?: -1) + protect
+        val firstRound = lg.players.filter { p ->
+            p.awards.any { a ->
+                a.startsWith("${lg.season} Draft #") && (a.substringAfter("#").toIntOrNull() ?: 99) <= lg.teams.size
+            }
+        }.map { it.id }
+        val keep = setOf(lg.heroId, lg.road?.rivalId ?: -1) + firstRound + protect
         while (t.roster.size > MAX_ROSTER) {
             val cut = lg.rosterOf(t).filter { it.id !in keep }.minByOrNull { it.ovr - (30 - it.age).coerceAtLeast(0) * 0.3 } ?: break
             t.roster.remove(cut.id)
@@ -1533,8 +1538,11 @@ object ProCareer {
         }
         ps.draftedByUser.clear()
         // Past eras draft the real class of that year (1986 to 2026): names, colleges, ceilings and photos.
-        val names = lg.players.map { it.name }.toSet()
-        val real = if (Eras.of(lg) != Era.TODAY || lg.season <= ProLeague.DATA_SEASON) EraData.draft(lg.season).filter { it.name !in names }.associateBy { it.pick } else emptyMap()
+        val names = lg.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
+        val realQueue = if (Eras.of(lg) != Era.TODAY || lg.season <= ProLeague.DATA_SEASON)
+            EraData.draft(lg.season).filter { it.name !in names }.toMutableList()
+        else mutableListOf()
+        if (rival != null && realQueue.isNotEmpty() && rivalSlot == 0) rivalSlot = 1
         for (i in 0 until picks) {
             // A traded first-round pick goes to the team that owns it (unless protected and lands inside protection).
             val t = lg.team(if (i < order.size) Picks.resolveDraftOwner(lg, lg.season, order[i], i + 1) else order[i % order.size])
@@ -1543,12 +1551,13 @@ object ProCareer {
                 r?.rivalPick = i + 1
                 r?.rivalDraft = lg.season
                 r?.rivalLeft = "went No. ${i + 1} in the ${lg.season} draft"
+                rival.awards += "${lg.season} Draft #${i + 1}"
                 ps.pendingRival = null
                 lg.news += News(lg.season, 0, "Your rival ${rival.name} goes No. ${i + 1} to the ${t.name}. He's coming for you.", true)
                 rival
             } else {
                 val (pos, target) = rookies[i]
-                val pick = real[i + 1]
+                val pick = realQueue.removeFirstOrNull()
                 ProLeague.makePro(lg, pick?.pos ?: pos, target, pick?.age ?: Rng.range(19, 22), t).also {
                     it.proYears = 0
                     Payroll.rookie(lg, it, i + 1)

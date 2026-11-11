@@ -24,7 +24,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.Alignment
@@ -530,7 +534,34 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             title = { Text("Generate story with Ollama", style = T.head, color = P.ink) },
             text = {
                 Column {
-                    Text("Ollama (${lg.ollama.model}) will write a breaking article for today's news.", style = T.small, color = P.sub)
+                    if (!lg.ollama.enabled) {
+                        var configuring by remember { mutableStateOf(false) }
+                        Panel(color = P.surface2) {
+                            Text("Ollama is not yet active. Auto-detect local instance on phone or PC:", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(6.dp))
+                            SmallButton(if (configuring) "Checking..." else "Auto-Configure", primary = true, enabled = !configuring) {
+                                configuring = true
+                                scope.launch {
+                                    val res = Ollama.autoConfigure(lg.ollama.host)
+                                    configuring = false
+                                    res.onSuccess { cfg ->
+                                        vm.act {
+                                            it.ollama.enabled = true
+                                            it.ollama.host = cfg.host
+                                            it.ollama.model = cfg.selectedModel
+                                        }
+                                        vm.toast("Connected to ${cfg.selectedModel}!")
+                                    }.onFailure {
+                                        showOllamaDialog = false
+                                        vm.push(Route.Settings)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    } else {
+                        Text("Ollama (${lg.ollama.model}) will write a breaking article for today's news.", style = T.small, color = P.sub)
+                    }
                     Spacer(Modifier.height(10.dp))
                     Text("SUGGESTED BEATS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                     Spacer(Modifier.height(4.dp))

@@ -18,24 +18,70 @@ import java.net.URL
 object Ollama {
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Normalizes a host string to a valid HTTP URL. */
+    data class ModelPreset(
+        val id: String,
+        val name: String,
+        val size: String,
+        val tag: String,
+        val description: String,
+    )
+
+    val RECOMMENDED_MODELS = listOf(
+        ModelPreset(
+            id = "llama3.2:1b",
+            name = "Llama 3.2 1B",
+            size = "1.3 GB",
+            tag = "Recommended · Phone",
+            description = "Meta's lightweight mobile model. Fast, witty game recaps and realistic player quotes with low RAM usage.",
+        ),
+        ModelPreset(
+            id = "qwen2.5:0.5b",
+            name = "Qwen 2.5 0.5B",
+            size = "398 MB",
+            tag = "Ultra-Lightweight",
+            description = "Extremely lightweight (~400MB). Runs smoothly on all Android phones with minimal battery and memory impact.",
+        ),
+        ModelPreset(
+            id = "smollm2:135m",
+            name = "SmolLM2 135M",
+            size = "270 MB",
+            tag = "Nano · Instant",
+            description = "Smallest footprint (~270MB). Instant headline and recap generation with near-zero memory footprint.",
+        ),
+        ModelPreset(
+            id = "llama3.2:3b",
+            name = "Llama 3.2 3B",
+            size = "2.0 GB",
+            tag = "Pro Quality",
+            description = "Full-length sports journalism, colorful columns, and rich storylines for mid-to-high end phones.",
+        ),
+    )
+
+    data class AutoConfigResult(
+        val host: String,
+        val models: List<String>,
+        val selectedModel: String,
+        val message: String,
+    )
+
+    /** Normalizes a host string to a valid HTTP URL, defaulting to local phone host localhost:11434. */
     fun cleanHost(raw: String): String {
         val trimmed = raw.trim().removeSuffix("/")
         return when {
-            trimmed.isEmpty() -> "http://10.0.2.2:11434"
+            trimmed.isEmpty() -> "http://localhost:11434"
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
             else -> "http://$trimmed"
         }
     }
 
     /** Test connection to Ollama server at [host] and return available model names. */
-    suspend fun testConnection(host: String): Result<List<String>> = withContext(Dispatchers.IO) {
+    suspend fun testConnection(host: String, timeoutMs: Int = 4000): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL("${cleanHost(host)}/api/tags")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 4000
-                readTimeout = 4000
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
                 setRequestProperty("Accept", "application/json")
             }
             val code = conn.responseCode
@@ -46,6 +92,91 @@ object Ollama {
                     it.jsonObject["name"]?.jsonPrimitive?.content
                 } ?: emptyList()
                 models
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                throw Exception("HTTP $code: $err")
+            }
+        }
+    }
+
+    /**
+     * Automatically probes localhost:11434 (on phone), 127.0.0.1:11434, 10.0.2.2:11434 (emulator),
+     * and custom host, detects the active server, and selects the best installed model.
+     */
+    suspend fun autoConfigure(currentHost: String = ""): Result<AutoConfigResult> = withContext(Dispatchers.IO) {
+        val candidates = listOf(
+            currentHost.trim(),
+            "http://localhost:11434",
+            "http://127.0.0.1:11434",
+            "http://10.0.2.2:11434",
+        ).filter { it.isNotBlank() }.distinct()
+
+        for (candidate in candidates) {
+            val testRes = testConnection(candidate, timeoutMs = 2500)
+            if (testRes.isSuccess) {
+                val models = testRes.getOrDefault(emptyList())
+                val chosen = when {
+                    models.contains("llama3.2:1b") -> "llama3.2:1b"
+                    models.contains("llama3.2") -> "llama3.2"
+                    models.contains("qwen2.5:0.5b") -> "qwen2.5:0.5b"
+                    models.contains("smollm2:135m") -> "smollm2:135m"
+                    models.any { it.startsWith("llama") } -> models.first { it.startsWith("llama") }
+                    models.isNotEmpty() -> models.first()
+                    else -> "llama3.2:1b"
+                }
+                val clean = cleanHost(candidate)
+                val msg = if (models.isNotEmpty()) {
+                    "Connected to $clean! Using '$chosen' (${models.size} models installed)."
+                } else {
+                    "Connected to $clean! No models downloaded yet on your device. Choose a model below to download."
+                }
+                return@withContext Result.success(AutoConfigResult(clean, models, chosen, msg))
+            }
+        }
+        Result.failure(Exception("Could not find an active Ollama instance on localhost:11434, 127.0.0.1:11434, or 10.0.2.2:11434. Start Ollama in Termux or on your computer."))
+    }
+
+    /**
+     * Pulls / downloads a model via Ollama's /api/pull endpoint with streaming progress.
+     */
+    suspend fun pullModel(
+        host: String,
+        modelName: String,
+        onProgress: (status: String, progress: Float, details: String) -> Unit,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = URL("${cleanHost(host)}/api/pull")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10000
+                readTimeout = 0 // Stream download over time
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Accept", "application/json")
+            }
+
+            val payload = "{\"name\":${jsonString(modelName)},\"stream\":true}"
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                conn.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                    for (line in lines) {
+                        if (line.isBlank()) continue
+                        val root = json.parseToJsonElement(line).jsonObject
+                        val status = root["status"]?.jsonPrimitive?.content.orEmpty()
+                        val total = root["total"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                        val completed = root["completed"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                        val progress = if (total > 0L) (completed.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+                        val details = if (total > 0L) {
+                            val completedMb = completed / (1024 * 1024)
+                            val totalMb = total / (1024 * 1024)
+                            "$completedMb MB / $totalMb MB (${(progress * 100).toInt()}%)"
+                        } else status
+                        onProgress(status, progress, details)
+                        if (status.equals("success", ignoreCase = true)) break
+                    }
+                }
             } else {
                 val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
                 throw Exception("HTTP $code: $err")

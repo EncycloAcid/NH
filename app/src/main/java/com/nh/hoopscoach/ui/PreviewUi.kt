@@ -620,6 +620,36 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
                 }
             }
         }
+    } else item {
+        Spacer(Modifier.height(10.dp))
+        var configuring by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        Panel(color = P.surface2) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("OLLAMA AI STORYLINES", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Run Ollama on your phone or PC to generate dynamic season storylines.", style = T.small, color = P.sub)
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton(if (configuring) "Checking..." else "Auto-Configure", primary = false, enabled = !configuring) {
+                    configuring = true
+                    scope.launch {
+                        val res = Ollama.autoConfigure(lg.ollama.host)
+                        configuring = false
+                        res.onSuccess { cfg ->
+                            vm.act {
+                                it.ollama.enabled = true
+                                it.ollama.host = cfg.host
+                                it.ollama.model = cfg.selectedModel
+                            }
+                            vm.toast("Ollama auto-configured with ${cfg.selectedModel}!")
+                        }.onFailure {
+                            vm.push(Route.Settings)
+                        }
+                    }
+                }
+            }
+        }
     }
     pv.stories.forEachIndexed { i, s ->
         item {

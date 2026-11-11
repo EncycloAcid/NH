@@ -133,8 +133,8 @@ object EraData {
         val parts = pick.name.split(" ", limit = 2)
         p.first = parts[0]
         p.last = parts.getOrElse(1) { "" }
-        p.country = null
-        if (pick.photo.isNotEmpty()) p.photo = pick.photo
+        val photo = pick.photo.ifEmpty { NbaData.PLAYERS.firstOrNull { it.name.equals(pick.name, ignoreCase = true) }?.photo.orEmpty() }
+        if (photo.isNotEmpty()) p.photo = photo
         if (pick.college.isNotEmpty()) p.highSchool = pick.college
         // Players who became stars get the ceiling they reached; the rest keep a raw rookie's.
         if (pick.peak > 0) p.pot = maxOf(p.ovr, pick.peak + Rng.int(-1, 1)).coerceAtMost(99)

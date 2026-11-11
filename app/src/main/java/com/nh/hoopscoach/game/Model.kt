@@ -632,8 +632,8 @@ class News(
 @Serializable
 class OllamaConfig(
     var enabled: Boolean = false,
-    var host: String = "http://10.0.2.2:11434",
-    var model: String = "llama3.2",
+    var host: String = "http://localhost:11434",
+    var model: String = "llama3.2:1b",
     var autoGenerate: Boolean = false,
 )
 
