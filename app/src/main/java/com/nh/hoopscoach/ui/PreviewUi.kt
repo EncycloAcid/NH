@@ -1,7 +1,10 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,11 +19,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,29 +52,44 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.nh.hoopscoach.game.Analysis
+import com.nh.hoopscoach.game.CollegeHistory
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Odds
+import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Pos
 import com.nh.hoopscoach.game.Preview
 import com.nh.hoopscoach.game.Previews
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.Story
-import com.nh.hoopscoach.game.CollegeHistory
 import com.nh.hoopscoach.game.Team
+import com.nh.hoopscoach.game.TvSegment
+import com.nh.hoopscoach.game.TvShow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** Player mode: the user's player has a page of his own. */
+private fun heroPage(lg: League) = lg.playerMode && lg.hero?.teamId?.let { it >= 0 } == true
+
 /** The pages of the issue: section kicker and headline. */
-private fun pageIds(pv: Preview) = listOf("cover", "inside", "stories") + pv.features.indices.map { "f$it" } +
+private fun pageIds(lg: League, pv: Preview) = listOf("cover", "inside") +
+    (if (heroPage(lg)) listOf("you") else emptyList()) +
+    listOf("stories") +
+    (if (pv.debates.isNotEmpty()) listOf("debate") else emptyList()) +
+    pv.features.indices.map { "f$it" } +
     listOf("title", "top5", "top25", "aa", "positions", "freshmen", "transfers", "breakouts", "confdepth", "power", "midmajors", "report", "coaches", "games", "picks")
 
 private fun pages(lg: League, pv: Preview) = listOf(
     "Cover" to "Preseason Preview",
     "Inside" to "In this issue",
+) + (if (heroPage(lg)) listOf("Your player" to (lg.hero?.name ?: "")) else emptyList()) +
+listOf(
     "Storylines" to "What to watch",
-) + pv.features.map { "Feature" to it.title } + listOf(
+) + (if (pv.debates.isNotEmpty()) listOf("The debate" to "${TvShow.showName(lg)} picks a side") else emptyList()) +
+pv.features.map { "Feature" to it.title } + listOf(
     "The title race" to "Who can win it all",
     "The rankings" to "Top 25: Nos. 1-5",
     "The rankings" to "Top 25: Nos. 6-25",
@@ -107,13 +127,16 @@ private fun letter(p: Double): String = when {
 }
 
 private fun lastLine(p: Player): String {
-    val l = p.career.lastOrNull() ?: return ""
-    return " · %.1f ppg last season".format(l.s.ppg)
+    val l = p.career.lastOrNull()
+    if (l != null) return " · %.1f ppg last season".format(l.s.ppg)
+    return if (p.year == 1) " · Freshman" else " · ${p.cls}"
 }
 
 private fun lastStats(p: Player): String {
-    val l = p.career.lastOrNull() ?: return "First college season"
-    return "%.1f pts · %.1f reb · %.1f ast last season".format(l.s.ppg, l.s.rpg, l.s.apg)
+    val l = p.career.lastOrNull()
+    if (l != null) return "%.1f pts · %.1f reb · %.1f ast last season".format(l.s.ppg, l.s.rpg, l.s.apg)
+    if (p.year == 1) return if (p.recruitRank > 0) "${p.stars}★ freshman · No. ${p.recruitRank}" else "Freshman · ${p.style.label}"
+    return "${p.cls} · ${p.style.label}"
 }
 
 /** Where a team finished last season in the final poll (0 = unranked, -1 = no season). */
@@ -123,18 +146,65 @@ private fun lastAp(lg: League, t: Team): Int = t.history.lastOrNull()?.takeIf { 
 fun PreviewScreen(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { Previews.current(lg) }
     val list = pages(lg, pv)
-    val ids = pageIds(pv)
+    val ids = pageIds(lg, pv)
     val pager = rememberPagerState { list.size }
     val scope = rememberCoroutineScope()
+    var showIndex by remember { mutableStateOf(false) }
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
+    val reportIndex = ids.indexOf("report").coerceAtLeast(0)
+
+    if (showIndex) {
+        Dialog(onDismissRequest = { showIndex = false }) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(RoundedCornerShape(20.dp)).background(P.surface).padding(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("TABLE OF CONTENTS", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
+                    SmallButton("Skip to end") {
+                        showIndex = false
+                        go(list.lastIndex)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    SmallButton("Close") { showIndex = false }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.weight(1f, fill = false)) {
+                    itemsIndexed(list) { idx, (kicker, title) ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    showIndex = false
+                                    go(idx)
+                                }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${idx + 1}", style = T.numSm, color = if (idx == pager.currentPage) P.accent else P.sub, modifier = Modifier.width(32.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(title, style = T.bodyB, color = if (idx == pager.currentPage) P.accent else P.ink, maxLines = 1)
+                                Text(kicker, style = T.small, color = P.sub)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
-        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() })
-        // Thumb index: one tick per page.
+        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() }, actions = {
+            SmallButton("Contents") { showIndex = true }
+            Spacer(Modifier.width(6.dp))
+            SmallButton("Skip") { vm.back() }
+        })
+        // Thumb index: one tick per page with spring height and smooth color transition.
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             list.indices.forEach { i ->
+                val h by animateDpAsState(if (i == pager.currentPage) 6.dp else 4.dp, spring(dampingRatio = 0.6f, stiffness = 500f), label = "seg")
+                val c by animateColorAsState(if (i <= pager.currentPage) P.accent else P.line, tween(260), label = "segc")
                 Box(
-                    Modifier.weight(1f).height(if (i == pager.currentPage) 6.dp else 4.dp).clip(RoundedCornerShape(2.dp))
-                        .background(if (i <= pager.currentPage) P.accent else P.line).clickable { go(i) },
+                    Modifier.weight(1f).height(h).clip(RoundedCornerShape(2.dp))
+                        .background(c).clickable { go(i) },
                 )
             }
         }
@@ -150,13 +220,15 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
                     alpha = 1f - abs(o) * 0.35f
                 },
             ) {
-                LazyColumn(Modifier.fillMaxSize().background(P.bg)) {
+                LazyColumn(Modifier.fillMaxSize().background(P.bg).then(if (page == 0) Modifier.popIn(pv.season).sheen() else Modifier)) {
                     val (kicker, title) = list[page]
                     if (page > 0) item { PageHead(kicker, title, page + 1) }
                     when (val id = ids[page]) {
-                        "cover" -> cover(lg, pv, list.size) { go(1) }
+                        "cover" -> cover(lg, pv, list.size, onRead = { go(1) }, onGoReport = { go(reportIndex) }, onSkip = { vm.back() })
                         "inside" -> contents(lg, pv, list, go)
+                        "you" -> heroSpotlight(vm, lg, pv)
                         "stories" -> storylines(vm, lg, pv)
+                        "debate" -> debates(lg, pv)
                         "title" -> titleRace(vm, lg, pv)
                         "top5" -> topFive(vm, lg, pv)
                         "top25" -> restOfTop25(vm, lg, pv)
@@ -185,7 +257,8 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
             }
         }
         Row(Modifier.fillMaxWidth().background(P.bg).padding(horizontal = Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
+            if (pager.currentPage == 0) SmallButton("Skip") { vm.back() }
+            else SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
             Text("${pager.currentPage + 1} / ${list.size}", style = T.numSm, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             if (pager.currentPage < list.lastIndex) SmallButton("Next ›", primary = true) { go(pager.currentPage + 1) }
             else SmallButton("Close", primary = true) { vm.back() }
@@ -275,25 +348,30 @@ internal fun Movement(now: Int, last: Int) {
 
 /** The user's team in the cover's corner. */
 @Composable
-private fun CollegeUserBox(lg: League, pv: Preview) {
+private fun CollegeUserBox(lg: League, pv: Preview, onClick: (() -> Unit)? = null) {
     val u = lg.user
     val mine = pv.proj.getValue(u.id)
     val uo = odds(pv, u)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TeamBadge(u, 40.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
+                if (onClick != null) Text("Team report →", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+            }
             Text("${u.school}: No. ${mine.nat}, ${Previews.ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}", style = T.bodyB, color = Color.White, maxLines = 2)
             Text("NCAA ${odd(uo.ncaa)} · ${lg.conf(u.confId).abbr} title ${odd(uo.conf)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
         }
     }
 }
 
-private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () -> Unit) {
+private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () -> Unit, onGoReport: () -> Unit, onSkip: () -> Unit) {
     // This year's cover design: a feature on the biggest story, the two-horse race, or the classic No. 1 cover.
     val story = pv.cover
     val subject = story?.let { lg.teams.getOrNull(it.teamId) }
@@ -301,7 +379,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
         item {
             val lines = pv.stories.filter { it.head != story.head && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
             FeatureCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
-                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead) { CollegeUserBox(lg, pv) }
+                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead, onSkip) { CollegeUserBox(lg, pv, onGoReport) }
         }
         return
     }
@@ -312,7 +390,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
             val b = rk[1]
             val lines = pv.stories.filter { it.teamId != a.id && it.teamId != b.id && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
             VersusCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", pv.headline.ifEmpty { "Two teams, one title" }, a, b, odds(pv, a).title, odds(pv, b).title,
-                "No. 1 · ${pv.proj.getValue(a.id).w}-${pv.proj.getValue(a.id).l}", "No. 2 · ${pv.proj.getValue(b.id).w}-${pv.proj.getValue(b.id).l}", lines, count, onRead) { CollegeUserBox(lg, pv) }
+                "No. 1 · ${pv.proj.getValue(a.id).w}-${pv.proj.getValue(a.id).l}", "No. 2 · ${pv.proj.getValue(b.id).w}-${pv.proj.getValue(b.id).l}", lines, count, onRead, onSkip) { CollegeUserBox(lg, pv, onGoReport) }
         }
         return
     }
@@ -323,9 +401,6 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
         val secondary = Color(top.secondary)
         val fg = onColor(primary)
         val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
-        val u = lg.user
-        val mine = pv.proj.getValue(u.id)
-        val uo = odds(pv, u)
         val to = odds(pv, top)
         val lines = pv.stories.filter { it.kicker != "Your team" && it.kicker != "Your program" && it.kicker != "Spotlight" && it.teamId != top.id }.take(3)
         Spacer(Modifier.height(6.dp))
@@ -344,7 +419,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
             Text(pv.headline.ifEmpty { "The team to beat" }.uppercase(), style = T.title.copy(fontSize = 38.sp, lineHeight = 38.sp), color = accent)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (star != null) Jersey(star.number, secondary, primary, 104.dp)
+                if (star != null) PlayerJersey(star, top, 104.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("NO. 1 · ${odd(to.title)} TO WIN IT ALL", style = T.label, color = accent)
@@ -358,20 +433,113 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
             lines.forEach { CoverLine(it.kicker, it.head, fg, accent) }
             Spacer(Modifier.height(12.dp))
             // The user's team, on the cover's corner.
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TeamBadge(u, 40.dp)
-                Spacer(Modifier.width(10.dp))
+            CollegeUserBox(lg, pv, onGoReport)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+                Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
+            }
+        }
+    }
+}
+
+// ---------- the user's player and the TV page ----------
+
+/** College player mode: the user's player has a page of his own. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+private fun LazyListScope.heroSpotlight(vm: GameViewModel, lg: League, pv: Preview) {
+    val h = lg.hero ?: return
+    val t = lg.teams.getOrNull(h.teamId) ?: return
+    item {
+        Spacer(Modifier.height(6.dp))
+        Panel(color = P.hero, onClick = { vm.openPlayer(h.id) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PlayerJersey(h, t, 96.dp)
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
-                    Text("${u.school}: No. ${mine.nat}, ${Previews.ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}", style = T.bodyB, color = Color.White, maxLines = 2)
-                    Text("NCAA ${odd(uo.ncaa)} · ${lg.conf(u.confId).abbr} title ${odd(uo.conf)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+                    Text("${h.cls.uppercase()} · ${t.school.uppercase()}", style = T.label, color = heroKicker)
+                    Text(h.last.uppercase(), style = T.hero.copy(fontSize = 38.sp, lineHeight = 38.sp), color = P.onHero, maxLines = 1)
+                    Text("${h.posLabel} · ${h.style.label} · age ${h.age}", style = T.small, color = P.onHero.copy(alpha = 0.85f))
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+            val tags = listOfNotNull(
+                if (h.year == 1 && h.recruitRank > 0) "${h.stars}★ RECRUIT · NO. ${h.recruitRank}" else null,
+                if (h.year == 1 && h.recruitRank == 0) "FRESHMAN" else null,
+                if (h.year == 4) "SENIOR YEAR" else null,
+                if (h in t.plan.slots.mapNotNull { s -> lg.playerOrNull(s.starter) }) "STARTER" else "ROTATION",
+            )
+            if (tags.isNotEmpty()) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                tags.forEachIndexed { i, tag -> Tag(tag, if (i == 0) P.gold else P.onHero, filled = i == 0) }
+            }
+            val l = h.career.lastOrNull()
+            Spacer(Modifier.height(14.dp))
+            if (l != null) Row(Modifier.fillMaxWidth()) {
+                for ((label, v) in listOf("PTS" to l.s.ppg, "REB" to l.s.rpg, "AST" to l.s.apg)) Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("%.1f".format(v), style = T.num, color = P.onHero)
+                    Text("$label LAST SEASON", style = T.label.copy(fontSize = 9.sp), color = P.onHero.copy(alpha = 0.75f))
+                }
+            } else Text("Our projection: ${Analysis.project(lg, h)}.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+        }
+    }
+    item {
+        val poyAt = pv.poy.indexOfFirst { it.pid == h.id }
+        val aaAt = pv.allAmerica.indexOf(h.id)
+        val posRank = lg.players.filter { it.teamId >= 0 && it.pos == h.pos }.sortedByDescending { Previews.value(it) }.indexOf(h) + 1
+        val confRank = lg.players.filter { it.teamId >= 0 && lg.team(it.teamId).confId == t.confId && it.pos == h.pos }.sortedByDescending { Previews.value(it) }.indexOf(h) + 1
+        val to = odds(pv, t)
+        val tp = pv.proj.getValue(t.id)
+        Section("National outlook")
+        Panel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Position ranking", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                Text("No. $posRank nationally (${Previews.ordinal(confRank)} in ${lg.conf(t.confId).abbr})", style = T.small, color = P.sub)
+            }
+            if (aaAt in 0..14) {
+                val teamNum = (aaAt / 5) + 1
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Preseason All-America", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                    Tag("${Previews.ordinal(teamNum)} team", P.gold, filled = true)
+                }
+            }
+            if (poyAt >= 0) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Player of the Year board", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                    Text("No. ${poyAt + 1} · ${odd(pv.poy[poyAt].p)}", style = T.small, color = P.sub)
+                }
+                GrowBar((pv.poy[poyAt].p / 0.5).toFloat(), Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), P.gold, 5.dp)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text("THE ${t.school.uppercase()}", style = T.label, color = P.accent)
+            Text("${tp.w}-${tp.l} projected (${tp.cw}-${tp.cl} ${lg.conf(t.confId).abbr}) · Tourney ${odd(to.ncaa)} · Final Four ${odd(to.f4)}", style = T.small, color = P.ink)
+            GrowBar(to.ncaa.toFloat(), Modifier.fillMaxWidth().padding(top = 6.dp), P.accent, 5.dp)
+        }
+    }
+    val mine = pv.stories.filter { it.pid == h.id }
+    if (mine.isNotEmpty()) item {
+        Section("His stories")
+        GroupList(mine) { st ->
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Text(st.kicker.uppercase(), style = T.label, color = P.accent)
+                Text(st.head, style = T.head, color = P.ink)
+                Text(st.body, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+    }
+}
+
+/** The preseason TV page: the season's biggest questions, argued. */
+private fun LazyListScope.debates(lg: League, pv: Preview) {
+    item { Deck("Before a game is played, ${TvShow.showName(lg)} picks a side. One voice argues our projections; the other argues the other side.") }
+    pv.debates.forEachIndexed { i, seg ->
+        item {
+            Spacer(Modifier.height(10.dp))
+            Panel(color = P.hero) {
+                Text("QUESTION ${i + 1} OF ${pv.debates.size}", style = T.label, color = heroKicker)
+                Text(seg.topic, style = T.title.copy(fontSize = 22.sp, lineHeight = 25.sp), color = P.onHero)
+                DebateTakes(seg)
+            }
         }
     }
 }
@@ -423,6 +591,36 @@ private fun LazyListScope.contents(lg: League, pv: Preview, list: List<Pair<Stri
 
 private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview) {
     item { Deck("The questions that will decide the season, from our ${pv.stories.size} biggest storylines.") }
+    if (lg.ollama.enabled) item {
+        Spacer(Modifier.height(10.dp))
+        var generating by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        Panel(color = P.accentSoft) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("OLLAMA AI STORYLINES · ${lg.ollama.model}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Have Ollama control and generate this season's magazine storylines.", style = T.small, color = P.ink)
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton(if (generating) "Writing..." else "Generate with Ollama", primary = true, enabled = !generating) {
+                    generating = true
+                    scope.launch {
+                        val top = lg.teams.getOrNull(pv.proj.entries.minByOrNull { it.value.nat }?.key ?: 0)?.school ?: "Favorites"
+                        val context = "Final Four picks: " + pv.finalFour.joinToString { lg.teams.getOrNull(it)?.school ?: "" }
+                        val res = Ollama.generateStorylines(lg.ollama, pv.season, top, lg.user.school, lg.userTeamId, context)
+                        generating = false
+                        res.onSuccess { newStories ->
+                            vm.act {
+                                pv.stories = newStories
+                            }
+                        }.onFailure { err ->
+                            vm.toast("Ollama: ${err.message ?: "Failed"}")
+                        }
+                    }
+                }
+            }
+        }
+    }
     pv.stories.forEachIndexed { i, s ->
         item {
             Spacer(Modifier.height(10.dp))
@@ -650,12 +848,13 @@ private fun LazyListScope.restOfTop25(vm: GameViewModel, lg: League, pv: Preview
 
 @Composable
 private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
+    var expanded by remember { mutableStateOf(false) }
     val pr = pv.proj.getValue(t.id)
     val o = odds(pv, t)
     val mine = t.id == lg.userTeamId
     Column(
         Modifier.fillMaxWidth().then(if (mine) Modifier.background(P.accentSoft) else Modifier)
-            .clickable { vm.push(Route.TeamPage(t.id)) }.padding(horizontal = 14.dp, vertical = 11.dp),
+            .clickable { expanded = !expanded }.padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${pr.nat}", style = T.num.copy(fontSize = 24.sp), color = if (mine) P.accent else P.ink, modifier = Modifier.width(40.dp))
@@ -676,6 +875,30 @@ private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
         Column(Modifier.padding(start = 74.dp, top = 6.dp)) {
             if (last != null) Text("Last season: ${last.w}-${last.l}, ${last.result.ifEmpty { "no postseason" }}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(take, style = T.small, color = P.ink, modifier = Modifier.padding(top = 2.dp))
+            if (expanded) {
+                Spacer(Modifier.height(8.dp))
+                val star = lg.rosterOf(t).maxByOrNull { it.ovr }
+                val newcomer = lg.rosterOf(t).filter { Previews.isNewcomer(it) }.maxByOrNull { it.ovr }
+                if (star != null) {
+                    Text("STAR · ${star.name} (${star.posLabel}, ${star.cls})", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Projected ${Analysis.project(lg, star).short}.", style = T.small, color = P.ink)
+                }
+                if (newcomer != null) {
+                    Spacer(Modifier.height(4.dp))
+                    val source = if (newcomer.year == 1) "${newcomer.stars}★ recruit" else "Transfer"
+                    Text("NEWCOMER · ${newcomer.name} ($source)", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("MARCH ODDS · Dance ${odd(o.ncaa)} · Final 4 ${odd(o.f4)} · Title ${odd(o.title)} · Range ${o.lo}-${o.hi} W", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(P.surface).clickable { vm.push(Route.TeamPage(t.id)) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Full ${t.school} team page", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = P.accent, modifier = Modifier.weight(1f))
+                    Chevron()
+                }
+            }
         }
     }
 }
@@ -694,7 +917,7 @@ private fun LazyListScope.allAmerica(vm: GameViewModel, lg: League, pv: Preview)
                     Text("PRESEASON PLAYER OF THE YEAR", style = T.label, color = accent)
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Jersey(p.number, Color(t.secondary), Color(t.primary), 84.dp)
+                        PlayerJersey(p, t, 84.dp)
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text(p.name.uppercase(), style = T.title.copy(fontSize = 28.sp, lineHeight = 29.sp), color = fg)
@@ -1318,6 +1541,32 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
             }
         }
         Text("Under each team: its chance to reach the Final Four.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+        val rk = ranked(lg, pv)
+        if (rk.size >= 4) {
+            Section("Regional No. 1 seeds")
+            Panel(padding = PaddingValues(12.dp)) {
+                val regions = listOf("East", "South", "Midwest", "West")
+                regions.forEachIndexed { i, reg ->
+                    val t = rk[i]
+                    val o = odds(pv, t)
+                    val pr = pv.proj.getValue(t.id)
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { vm.push(Route.TeamPage(t.id)) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(reg.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.width(66.dp))
+                        TeamBadge(t, 26.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("${t.school} (No. 1 seed)", style = T.bodyB, color = P.ink)
+                            Text("Proj. ${pr.w}-${pr.l} · Title ${odd(o.title)} · Final Four ${odd(o.f4)}", style = T.small, color = P.sub)
+                        }
+                        Chevron()
+                    }
+                    if (i < 3) Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
         Section("Long shots")
         GroupList(listOf("Cinderella" to lg.team(pv.cinderella), "Sleeper" to lg.team(pv.sleeper))) { (label, t) ->
             ListRow(onClick = { vm.push(Route.TeamPage(t.id)) }) {
@@ -1332,6 +1581,44 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
                         style = T.small, color = P.sub,
                     )
                 }
+            }
+        }
+        val bubblePool = lg.teams.filter { odds(pv, it).ncaa in 0.28..0.68 }.sortedByDescending { odds(pv, it).ncaa }
+        val last4In = bubblePool.filter { odds(pv, it).ncaa >= 0.50 }.takeLast(4).ifEmpty { bubblePool.take(4) }
+        val first4Out = bubblePool.filter { odds(pv, it).ncaa < 0.50 }.take(4)
+        if (last4In.isNotEmpty() || first4Out.isNotEmpty()) {
+            Section("Bubble watch")
+            Panel {
+                if (last4In.isNotEmpty()) {
+                    Text("LAST FOUR IN", style = T.label, color = P.good)
+                    Spacer(Modifier.height(4.dp))
+                    last4In.forEach { t ->
+                        val o = odds(pv, t)
+                        val pr = pv.proj.getValue(t.id)
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { vm.push(Route.TeamPage(t.id)) }, verticalAlignment = Alignment.CenterVertically) {
+                            TeamBadge(t, 22.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(t.school, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                            Text("${pr.w}-${pr.l} · ${odd(o.ncaa)} bid", style = T.small, color = P.sub)
+                        }
+                    }
+                }
+                if (first4Out.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("FIRST FOUR OUT", style = T.label, color = P.warn)
+                    Spacer(Modifier.height(4.dp))
+                    first4Out.forEach { t ->
+                        val o = odds(pv, t)
+                        val pr = pv.proj.getValue(t.id)
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { vm.push(Route.TeamPage(t.id)) }, verticalAlignment = Alignment.CenterVertically) {
+                            TeamBadge(t, 22.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(t.school, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                            Text("${pr.w}-${pr.l} · ${odd(o.ncaa)} bid", style = T.small, color = P.sub)
+                        }
+                    }
+                }
+                Text("Teams on the cut line in our 400 season simulations.", style = T.small.copy(fontSize = 11.sp), color = P.sub, modifier = Modifier.padding(top = 8.dp))
             }
         }
         Section("Conference champions")
@@ -1350,6 +1637,23 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
                         }
                     }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        if (pv.bids.isNotEmpty()) {
+            Section("Projected tournament bids")
+            Panel(padding = PaddingValues(12.dp)) {
+                val confBids = lg.confs.map { it to (pv.bids[it.id] ?: 0.0) }.filter { it.second >= 1.0 }.sortedByDescending { it.second }.take(8)
+                confBids.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                        pair.forEach { (c, bids) ->
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Text(c.abbr, style = T.bodyB, color = P.ink, modifier = Modifier.width(60.dp))
+                                Text("%.1f bids".format(bids), style = T.small, color = P.sub)
+                            }
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }

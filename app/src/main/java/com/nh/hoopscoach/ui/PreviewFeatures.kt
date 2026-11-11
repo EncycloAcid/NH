@@ -83,7 +83,7 @@ private fun FeatureRow(vm: GameViewModel, lg: League, it: FeatureItem, showTag: 
 @Composable
 internal fun FeatureCover(
     masthead: String, season: String, team: Team, player: Player?, kicker: String, headline: String, deck: String,
-    lines: List<Pair<String, String>>, count: Int, onRead: () -> Unit, userBox: @Composable () -> Unit,
+    lines: List<Pair<String, String>>, count: Int, onRead: () -> Unit, onSkip: (() -> Unit)? = null, userBox: @Composable () -> Unit,
 ) {
     val primary = Color(team.primary)
     val secondary = Color(team.secondary)
@@ -115,7 +115,10 @@ internal fun FeatureCover(
         Spacer(Modifier.height(12.dp))
         userBox()
         Spacer(Modifier.height(12.dp))
-        Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+            if (onSkip != null) Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
+        }
     }
 }
 
@@ -123,7 +126,7 @@ internal fun FeatureCover(
 @Composable
 internal fun VersusCover(
     masthead: String, season: String, headline: String, a: Team, b: Team, aOdds: Double, bOdds: Double, aLine: String, bLine: String,
-    lines: List<Pair<String, String>>, count: Int, onRead: () -> Unit, userBox: @Composable () -> Unit,
+    lines: List<Pair<String, String>>, count: Int, onRead: () -> Unit, onSkip: (() -> Unit)? = null, userBox: @Composable () -> Unit,
 ) {
     Spacer(Modifier.height(6.dp))
     Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xFF101318)).padding(20.dp)) {
@@ -162,7 +165,10 @@ internal fun VersusCover(
         Spacer(Modifier.height(12.dp))
         userBox()
         Spacer(Modifier.height(12.dp))
-        Text("$count pages · swipe to open →", style = T.bodyB, color = P.gold, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("$count pages · swipe to open →", style = T.bodyB, color = P.gold, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
+            if (onSkip != null) Text("Skip preview →", style = T.small, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
+        }
     }
 }
 

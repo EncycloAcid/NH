@@ -616,9 +616,9 @@ class RoundReport(
 
 @Serializable
 class News(
-    val season: Int, val day: Int, val text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "",
+    val season: Int, val day: Int, var text: String, val mine: Boolean = false, val gameId: Int = -1, val kind: String = "",
     /** A short article behind the headline, and the outlet that ran it. */
-    val body: String = "", val source: String = "",
+    var body: String = "", var source: String = "",
     /** The team and player the story is about, for its picture and links. */
     val teamId: Int = -1, val pid: Int = -1,
     /** What people said about it: players, coaches, analysts, insiders and fans. */
@@ -627,6 +627,15 @@ class News(
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
 }
+
+/** Settings for local Ollama LLM integration to control and generate stories. */
+@Serializable
+class OllamaConfig(
+    var enabled: Boolean = false,
+    var host: String = "http://10.0.2.2:11434",
+    var model: String = "llama3.2",
+    var autoGenerate: Boolean = false,
+)
 
 enum class MomentKind(val tag: String) {
     BUZZER("Buzzer-beater"), FORCED_OT("Forces overtime"), UPSET("Upset alert"), CLASSIC("Instant classic"),
@@ -1466,6 +1475,7 @@ class League(
     var topSeason: Int = 0,
     val myPlays: MutableList<Highlight> = mutableListOf(),
     var usaGolds: Int = 0,
+    var ollama: OllamaConfig = OllamaConfig(),
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

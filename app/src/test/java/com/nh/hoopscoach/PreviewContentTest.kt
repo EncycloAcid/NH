@@ -38,5 +38,7 @@ class PreviewContentTest {
         assertEquals("first team should cover five positions", Pos.entries.toSet(), aa.toSet())
         assertEquals(4, pv.finalFour.size)
         assertEquals(pv.finalFour.distinct().size, 4)
+        assertEquals(3, pv.debates.size)
+        assertTrue(pv.debates.all { it.topic.isNotBlank() && it.takes.isNotEmpty() })
     }
 }

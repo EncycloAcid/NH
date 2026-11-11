@@ -98,6 +98,214 @@ object PreviewDebates {
         return picked.map { q -> segment(lg, q, show) }
     }
 
+    fun buildCollege(lg: League, pv: Preview): List<TvSegment> {
+        val ranked = pv.proj.entries.sortedBy { it.value.nat }.map { lg.team(it.key) }
+        if (ranked.size < 4) return emptyList()
+        fun pr(t: Team) = pv.proj.getValue(t.id)
+        fun od(t: Team) = pv.odds[t.id] ?: Odds(0.0, 0.0, 0.0, 0.0, 0.0, 0, 0)
+        val qs = mutableListOf<Q>()
+        val top = ranked[0]
+        val second = ranked[1]
+        val topOdds = od(top)
+        val secOdds = od(second)
+        // 1. The favorite.
+        qs += Q(
+            "favorite",
+            "Can ${top.school} cut down the nets in April?",
+            ((topOdds.title - 0.12) * 4).coerceIn(-0.85, 0.85),
+            7.0,
+            listOf(
+                "They win the national title in ${pct(topOdds.title)} of our season sims and reach the Final Four in ${pct(topOdds.f4)}.",
+                "Projected ${pr(top).w}-${pr(top).l} with the No. 1 overall ranking.",
+            ),
+            listOf(
+                "Single-elimination March means ${pct(1 - topOdds.title)} of the field is picking someone else.",
+                "No. 2 ${second.school} has a ${pct(secOdds.title)} chance in our simulations.",
+            ),
+            listOf(
+                "Best roster in America, top to bottom. They have all the pieces.",
+                "Championship pedigree wins in March.",
+            ),
+            listOf(
+                "Nobody breezes through six tournament rounds unscathed.",
+                "One cold shooting night in March and the season is over.",
+            ),
+        )
+
+        // 2. Defending champion (if any in history).
+        val champ = CollegeHistory.lastChampion(lg)
+        if (champ != null) {
+            val co = od(champ)
+            val cp = pr(champ)
+            qs += Q(
+                "repeat",
+                "Can ${champ.school} repeat as national champions?",
+                ((co.title - 0.10) * 4).coerceIn(-0.85, 0.75),
+                6.5,
+                listOf(
+                    "Our model gives them a ${pct(co.title)} chance to run it back.",
+                    "Projected ${cp.w}-${cp.l} with a Final Four probability of ${pct(co.f4)}.",
+                ),
+                listOf(
+                    "Sims give them only ${pct(co.title)} to repeat.",
+                    "Repeating in modern college basketball with roster turnover is nearly impossible.",
+                ),
+                listOf(
+                    "They have the championship DNA and culture. Don't count them out.",
+                    "Winning when everyone has you circled is what true programs do.",
+                ),
+                listOf(
+                    "Target on their backs every night in hostile gymnasiums.",
+                    "The portal reshuffles the deck every spring; nobody repeats easily.",
+                ),
+            )
+        }
+
+        // 3. Hero or User's team.
+        val hero = lg.hero?.takeIf { lg.playerMode && it.teamId >= 0 }
+        if (hero != null) {
+            val ht = lg.team(hero.teamId)
+            val ho = od(ht)
+            val poyAt = pv.poy.indexOfFirst { it.pid == hero.id }
+            if (poyAt in 0..5) {
+                val p = pv.poy[poyAt].p
+                qs += Q(
+                    "poy",
+                    "Is ${hero.name} the National Player of the Year?",
+                    ((p - 0.15) * 4).coerceIn(-0.85, 0.8),
+                    8.5,
+                    listOf(
+                        "He sits at No. ${poyAt + 1} on our National Player of the Year board (${pct(p)}).",
+                        "${ht.school} projects as a tournament lock at ${pr(ht).w}-${pr(ht).l}.",
+                    ),
+                    listOf(
+                        "${pct(1 - p)} of our simulations see another star take the trophy.",
+                        "POY voters demand tournament No. 1 seeds.",
+                    ),
+                    listOf(
+                        "Must-watch basketball every time he touches the rock.",
+                        "He's the most electric player in the country.",
+                    ),
+                    listOf(
+                        "Too early to crown him before conference play starts.",
+                        "Wait until he faces road defenses loaded up to stop him.",
+                    ),
+                    hero.id,
+                )
+            } else {
+                qs += Q(
+                    "hero_tourney",
+                    "Can ${hero.name} lead ${ht.school} on a deep March run?",
+                    ((ho.s16 - 0.3) * 2.5).coerceIn(-0.85, 0.8),
+                    7.5,
+                    listOf(
+                        "${ht.school} has a ${pct(ho.ncaa)} chance at the Big Dance and ${pct(ho.s16)} to reach the Sweet 16.",
+                        "With ${hero.name} leading the way, their ceiling is unmatched.",
+                    ),
+                    listOf(
+                        "Sims project only ${pct(ho.f4)} to make the Final Four.",
+                        "One star alone cannot carry a squad through March.",
+                    ),
+                    listOf(
+                        "He's the kind of alpha who can take over a 40-minute tournament game.",
+                        "Tournament legends are born in March, and he has that look.",
+                    ),
+                    listOf(
+                        "Tournament defenses will double him and force teammates to beat them.",
+                        "March requires a full eight-man rotation, not just one guy.",
+                    ),
+                    hero.id,
+                )
+            }
+        } else {
+            // User coach team
+            val ut = lg.user
+            val uo = od(ut)
+            val up = pr(ut)
+            if (uo.ncaa in 0.2..0.85) {
+                qs += Q(
+                    "dance",
+                    "Will ${ut.school} hear their name called on Selection Sunday?",
+                    ((uo.ncaa - 0.5) * 2.5).coerceIn(-0.85, 0.85),
+                    6.5,
+                    listOf(
+                        "Simulations punch their ticket in ${pct(uo.ncaa)} of runs.",
+                        "Projected ${up.w}-${up.l} (${up.cw}-${up.cl} in conference).",
+                    ),
+                    listOf(
+                        "Miss the tournament in ${pct(1 - uo.ncaa)} of simulations.",
+                        "A brutal bubble battle awaits them in February.",
+                    ),
+                    listOf(
+                        "The resume will be strong enough; quality wins will get them in.",
+                        "They have the veteran poise needed to win key games down the stretch.",
+                    ),
+                    listOf(
+                        "One bad road loss in conference play drops them straight to the NIT.",
+                        "The bubble is unforgiving when committee members debate Quadrant 1 records.",
+                    ),
+                )
+            } else if (uo.f4 >= 0.12) {
+                qs += Q(
+                    "finalfour",
+                    "Are the ${ut.school} a legitimate Final Four contender?",
+                    ((uo.f4 - 0.22) * 3.0).coerceIn(-0.85, 0.85),
+                    6.5,
+                    listOf(
+                        "Reach the Final Four in ${pct(uo.f4)} of our season simulations.",
+                        "Ranked No. ${up.nat} nationally with a projected ${up.w}-${up.l} record.",
+                    ),
+                    listOf(
+                        "${pct(1 - uo.f4)} of our tournament simulations fall short of Glendale.",
+                        "The bracket draw determines everything.",
+                    ),
+                    listOf(
+                        "They have the guard play and rim protection needed for April.",
+                        "Built specifically for tournament basketball.",
+                    ),
+                    listOf(
+                        "Too many landmines in the regional rounds.",
+                        "Tough matchups against athletic mid-majors could trip them up early.",
+                    ),
+                )
+            }
+        }
+
+        // 4. Cinderella
+        if (pv.cinderella >= 0 && pv.cinderella != top.id) {
+            val cin = lg.team(pv.cinderella)
+            val co = od(cin)
+            val cp = pr(cin)
+            qs += Q(
+                "cinderella",
+                "Is ${cin.school} this year's Cinderella story?",
+                ((co.s16 - 0.18) * 3.5).coerceIn(-0.85, 0.8),
+                6.0,
+                listOf(
+                    "Projected at ${cp.w}-${cp.l} with a ${pct(co.s16)} chance to reach the Sweet 16.",
+                    "Dominant mid-major profile with top-tier efficiency metrics.",
+                ),
+                listOf(
+                    "Underdogs only reach the second weekend ${pct(co.s16)} of the time.",
+                    "Facing a high-major 2 or 3 seed in the Round of 32 is a monumental hill.",
+                ),
+                listOf(
+                    "They have the fearless veteran guards who shock power conference teams in March.",
+                    "Every bracket needs a darling, and this is the one.",
+                ),
+                listOf(
+                    "Size and athletic disparity always show up by the second round.",
+                    "Fun early story, but power conference depth wears them down.",
+                ),
+            )
+        }
+
+        val ranked3 = qs.filter { abs(it.lean) <= 0.85 }.sortedByDescending { it.interest * (1 + abs(it.lean)) }
+        val picked = ranked3.take(3)
+        val show = TvShow.showName(lg)
+        return picked.map { q -> segment(lg, q, show) }
+    }
+
     private fun segment(lg: League, q: Q, show: String): TvSegment {
         val numbersYes = q.lean >= 0
         val a = Media.pundit(lg)

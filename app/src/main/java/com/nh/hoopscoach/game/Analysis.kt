@@ -86,7 +86,14 @@ object Analysis {
             return Line(l.s.pts / mins * m * grow, l.s.reb / mins * m * (0.6 + grow * 0.4), l.s.ast / mins * m * (0.6 + grow * 0.4), m)
         }
         // No line to go on (a rookie, a freshman): his rating and position.
-        val k = ((p.ovr - (if (lg.pro) 72 else 60)) / 20.0).coerceIn(0.1, 1.6)
+        if (!lg.pro) {
+            val colK = ((p.ovr - 58) / 28.0).coerceIn(0.1, 1.45)
+            val ppg = (6.0 + 8.5 * colK) * (min / 30.0).coerceIn(0.35, 1.15)
+            val rpg = when (p.pos) { Pos.C -> 8.0; Pos.PF -> 6.6; Pos.SF -> 4.8; Pos.SG -> 3.4; Pos.PG -> 2.6 } * (0.75 + colK * 0.3) * (min / 30.0)
+            val apg = when (p.pos) { Pos.PG -> 5.0; Pos.SG -> 2.8; Pos.SF -> 2.2; Pos.PF -> 1.5; Pos.C -> 1.1 } * (0.75 + colK * 0.3) * (min / 30.0)
+            return Line(ppg, rpg, apg, min)
+        }
+        val k = ((p.ovr - 72) / 20.0).coerceIn(0.1, 1.6)
         val per36 = Line(10 + 12 * k, when (p.pos) { Pos.C -> 9.5; Pos.PF -> 8.0; Pos.SF -> 5.5; Pos.SG -> 4.0; Pos.PG -> 3.5 } * (0.8 + k * 0.3),
             when (p.pos) { Pos.PG -> 6.5; Pos.SG -> 3.5; Pos.SF -> 2.8; Pos.PF -> 2.0; Pos.C -> 1.6 } * (0.8 + k * 0.3), 36.0)
         return Line(per36.ppg * min / 36, per36.rpg * min / 36, per36.apg * min / 36, min)
