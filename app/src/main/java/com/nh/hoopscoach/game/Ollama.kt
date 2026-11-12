@@ -414,49 +414,73 @@ object Ollama {
         }
         val apiKey = config.googleApiKey.trim()
         if (apiKey.isNotEmpty()) {
-            runCatching {
+            val remoteResult = runCatching {
                 val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
-                val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 10000
-                    readTimeout = 30000
-                    doOutput = true
-                    if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
-                        setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
+                val candidates = listOf(model, "$model-latest", "gemini-2.0-flash", "gemini-1.5-flash").distinct()
+                var lastErr: Exception? = null
+                var text: String? = null
+
+                for (cand in candidates) {
+                    for (apiVersion in listOf("v1beta", "v1")) {
+                        try {
+                            val url = URL("https://generativelanguage.googleapis.com/$apiVersion/models/$cand:generateContent?key=$apiKey")
+                            val conn = (url.openConnection() as HttpURLConnection).apply {
+                                requestMethod = "POST"
+                                connectTimeout = 8000
+                                readTimeout = 20000
+                                doOutput = true
+                                if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
+                                    setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
+                                }
+                                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                                setRequestProperty("Accept", "application/json")
+                            }
+
+                            val payload = buildString {
+                                append("{\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}]")
+                                if (system.isNotBlank()) {
+                                    append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
+                                }
+                                append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict}}")
+                            }
+
+                            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+
+                            val code = conn.responseCode
+                            if (code in 200..299) {
+                                val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                                val root = json.parseToJsonElement(body).jsonObject
+                                val content = root["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
+                                    ?.get("content")?.jsonObject
+                                    ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
+                                    ?.get("text")?.jsonPrimitive?.content.orEmpty().trim()
+                                if (content.isNotEmpty()) {
+                                    onToken?.invoke(content)
+                                    text = content
+                                    break
+                                }
+                            } else {
+                                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                                val errMsg = runCatching {
+                                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                                }.getOrNull() ?: err
+                                lastErr = Exception("Google AI Error ($code): $errMsg")
+                            }
+                        } catch (e: Exception) {
+                            lastErr = e
+                        }
                     }
-                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                    setRequestProperty("Accept", "application/json")
+                    if (text != null) break
                 }
+                text ?: throw (lastErr ?: Exception("Google AI request failed"))
+            }
 
-                val payload = buildString {
-                    append("{\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]},")
-                    append("{\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}],")
-                    append("{\"generationConfig\":{")
-                    append("{\"temperature\":$temperature,")
-                    append("{\"maxOutputTokens\":$numPredict")
-                    append("}}")
-                }
-
-                conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
-
-                val code = conn.responseCode
-                if (code in 200..299) {
-                    val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val root = json.parseToJsonElement(body).jsonObject
-                    val text = root["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
-                        ?.get("content")?.jsonObject
-                        ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
-                        ?.get("text")?.jsonPrimitive?.content.orEmpty().trim()
-                    if (text.isEmpty()) throw Exception("Empty response from Google Gemini")
-                    onToken?.invoke(text)
-                    text
-                } else {
-                    val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                    val errMsg = runCatching {
-                        json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull() ?: err
-                    throw Exception("Google AI Error ($code): $errMsg")
+            if (remoteResult.isSuccess) {
+                remoteResult
+            } else {
+                // Graceful fallback to Account Narrative on API error (e.g. 404, rate limit, quota exceeded)
+                runCatching {
+                    generateAccountNarrative("Google Gemini", config.googleAccountEmail, prompt, onToken)
                 }
             }
         } else {
@@ -480,7 +504,7 @@ object Ollama {
         }
         val apiKey = config.openAiApiKey.trim()
         if (apiKey.isNotEmpty()) {
-            runCatching {
+            val remoteResult = runCatching {
                 val model = config.openAiModel.ifBlank { "gpt-4o-mini" }
                 val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
                 val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
@@ -521,6 +545,15 @@ object Ollama {
                         json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                     }.getOrNull() ?: err
                     throw Exception("ChatGPT Error ($code): $errMsg")
+                }
+            }
+
+            if (remoteResult.isSuccess) {
+                remoteResult
+            } else {
+                // Graceful fallback to Account Narrative on API error (e.g. rate limit, quota exceeded)
+                runCatching {
+                    generateAccountNarrative("ChatGPT", config.openAiAccountEmail, prompt, onToken)
                 }
             }
         } else {
