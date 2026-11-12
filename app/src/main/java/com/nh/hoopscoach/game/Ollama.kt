@@ -358,7 +358,7 @@ object Ollama {
                 }
 
                 // Press Conference
-                prompt.contains("QUESTION:") && (prompt.contains("HUMBLE:") || prompt.contains("ANSWER:")) -> {
+                (prompt.contains("QUESTION:") && (prompt.contains("HUMBLE:") || prompt.contains("ANSWER:"))) || prompt.contains("press conference", ignoreCase = true) -> {
                     appendLine("TOPIC: Postgame Focus")
                     appendLine("REPORTER: Courtside Beat · $provider")
                     appendLine("QUESTION: Coach, what was your message to the team during that pivotal fourth-quarter timeout?")
@@ -450,12 +450,201 @@ object Ollama {
                     append("SEASON_OUTLOOK: The coaching staff enters the upcoming season with upgraded depth, versatile lineup configurations, and renewed defensive energy.")
                 }
 
-                // Article / Column
-                else -> {
-                    appendLine("[$provider Feature]")
-                    appendLine("Basketball analysts around the country are taking notice as recent developments shift the landscape. Strong tactical coaching, disciplined shot selection, and roster chemistry continue to define this group's identity on the national stage.")
+                // Custom breaking story or feature article
+                prompt.contains("HEADLINE:") && prompt.contains("OUTLET:") && prompt.contains("BODY:") -> {
+                    val topic = prompt.lines().firstOrNull { it.startsWith("Topic:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Season Outlook" }
+                    val league = prompt.lines().firstOrNull { it.startsWith("League:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Basketball" }
+                    val userTeamLine = prompt.lines().firstOrNull { it.startsWith("User team:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val uTeam = if (userTeamLine.contains("(")) userTeamLine.substringBefore("(").trim() else userTeamLine.ifEmpty { "The squad" }
+                    val uCoach = if (userTeamLine.contains("Coach:")) userTeamLine.substringAfter("Coach:").trim() else userHandle
+                    val topTeamLine = prompt.lines().firstOrNull { it.startsWith("Top team:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val topTeam = if (topTeamLine.contains("(")) topTeamLine.substringBefore("(").trim() else topTeamLine.ifEmpty { "the league leaders" }
+
+                    appendLine("HEADLINE: Inside $uTeam: $topic Sparks Intrigue Across $league")
+                    appendLine("OUTLET: Courtside Chronicle")
+                    appendLine("BODY:")
+                    appendLine("As the $league season unfolds, conversations across the basketball landscape have centered on $topic. Inside the $uTeam facility, Coach $uCoach has emphasized disciplined preparation and mental toughness to keep the group locked in amidst escalating external expectations.")
                     appendLine()
-                    append("With conference competition heating up, every possession carries heightened weight. The program appears primed to make a deep statement as the season trajectory accelerates toward postseason contention.")
+                    appendLine("\"We cannot get distracted by noise or projections,\" noted Coach $uCoach during a recent press availability. \"Every team in this league presents unique tactical challenges. Our focus remains squarely on our day-to-day development, executing our principles, and holding each other to a championship standard.\"")
+                    appendLine()
+                    append("With formidable opponents like $topTeam setting the pace at the top of the standings, the upcoming schedule will serve as a defining litmus test. How $uTeam navigates this critical stretch will determine their standing when postseason positioning comes into sharp focus.")
+                }
+
+                // Complete newspaper article for news item
+                prompt.contains("Headline:") || prompt.contains("Write a complete sports newspaper article") || prompt.contains("game recap", ignoreCase = true) -> {
+                    val headline = prompt.lines().firstOrNull { it.startsWith("Headline:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val teamRaw = prompt.lines().firstOrNull { it.startsWith("Team:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val teamName = if (teamRaw.contains("(")) teamRaw.substringBefore("(").trim() else teamRaw
+                    val teamRecord = if (teamRaw.contains("(") && teamRaw.contains(")")) teamRaw.substringAfter("(").substringBefore(")").trim() else ""
+
+                    val oppRaw = prompt.lines().firstOrNull { it.startsWith("Opponent:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val oppName = if (oppRaw.contains("(")) oppRaw.substringBefore("(").trim() else oppRaw
+                    val oppRecord = if (oppRaw.contains("(") && oppRaw.contains(")")) oppRaw.substringAfter("(").substringBefore(")").trim() else ""
+
+                    val scoreRaw = prompt.lines().firstOrNull { it.startsWith("Game Score:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val score = if (scoreRaw.isNotBlank() && scoreRaw != "Upcoming") scoreRaw else {
+                        Regex("""\b(\d{2,3}-\d{2,3})\b""").find(headline)?.value.orEmpty()
+                    }
+
+                    val playerRaw = prompt.lines().firstOrNull { it.startsWith("Featured Player:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+                    val playerName = when {
+                        playerRaw.isNotBlank() -> if (playerRaw.contains("(")) playerRaw.substringBefore("(").trim() else playerRaw
+                        headline.contains(" hands out ", ignoreCase = true) -> headline.substringBefore(" hands out ").trim()
+                        headline.contains(" drops ", ignoreCase = true) -> headline.substringBefore(" drops ").trim()
+                        headline.contains(" pours in ", ignoreCase = true) -> headline.substringBefore(" pours in ").trim()
+                        headline.contains(" grabs ", ignoreCase = true) -> headline.substringBefore(" grabs ").trim()
+                        headline.contains(" blocks ", ignoreCase = true) -> headline.substringBefore(" blocks ").trim()
+                        headline.contains(" posts ", ignoreCase = true) -> headline.substringBefore(" posts ").trim()
+                        headline.contains(" scores ", ignoreCase = true) -> headline.substringBefore(" scores ").trim()
+                        headline.contains(" goes for ", ignoreCase = true) -> headline.substringBefore(" goes for ").trim()
+                        else -> ""
+                    }
+                    val playerLast = if (playerName.isNotBlank()) playerName.substringAfterLast(" ") else "The star"
+                    val notes = prompt.lines().firstOrNull { it.startsWith("Background notes:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty()
+
+                    val vsMatch = Regex("""\b([A-Za-z0-9 ]+)\s+vs\.?\s+([A-Za-z0-9 ]+)\b""", RegexOption.IGNORE_CASE).find(prompt)
+                    val derivedTeam = if (teamName.isNotEmpty()) teamName else {
+                        when {
+                            headline.contains(" as ", ignoreCase = true) -> {
+                                val afterAs = headline.substringAfter(" as ")
+                                when {
+                                    afterAs.contains(" beat ", ignoreCase = true) -> afterAs.substringBefore(" beat ").trim()
+                                    afterAs.contains(" fall to ", ignoreCase = true) -> afterAs.substringBefore(" fall to ").trim()
+                                    afterAs.contains(" lose to ", ignoreCase = true) -> afterAs.substringBefore(" lose to ").trim()
+                                    afterAs.contains(" defeat ", ignoreCase = true) -> afterAs.substringBefore(" defeat ").trim()
+                                    else -> ""
+                                }
+                            }
+                            headline.contains(" lose ", ignoreCase = true) -> headline.substringBefore(" lose ").trim()
+                            headline.contains(" loses ", ignoreCase = true) -> headline.substringBefore(" loses ").trim()
+                            headline.contains(" win ", ignoreCase = true) -> headline.substringBefore(" win ").trim()
+                            headline.contains(" wins ", ignoreCase = true) -> headline.substringBefore(" wins ").trim()
+                            headline.contains(" beat ", ignoreCase = true) -> headline.substringBefore(" beat ").trim()
+                            headline.contains(" rout ", ignoreCase = true) -> headline.substringBefore(" rout ").trim()
+                            headline.contains(" edge ", ignoreCase = true) -> headline.substringBefore(" edge ").trim()
+                            vsMatch != null -> vsMatch.groupValues[1].substringAfterLast("for ").substringAfterLast("recap ").trim()
+                            else -> ""
+                        }
+                    }.ifEmpty { "The team" }
+
+                    val derivedOpp = if (oppName.isNotEmpty()) oppName else {
+                        when {
+                            headline.contains(" beat ", ignoreCase = true) -> headline.substringAfter(" beat ").substringBefore(" ").trim()
+                            headline.contains(" fall to ", ignoreCase = true) -> headline.substringAfter(" fall to ").substringBefore(" ").trim()
+                            headline.contains(" lost to ", ignoreCase = true) -> headline.substringAfter(" lost to ").substringBefore(" ").trim()
+                            headline.contains(" defeat ", ignoreCase = true) -> headline.substringAfter(" defeat ").substringBefore(" ").trim()
+                            headline.contains(" rout ", ignoreCase = true) -> headline.substringAfter(" rout ").substringBefore(" ").trim()
+                            headline.contains(" edge ", ignoreCase = true) -> headline.substringAfter(" edge ").substringBefore(" ").trim()
+                            vsMatch != null -> vsMatch.groupValues[2].trim()
+                            else -> ""
+                        }
+                    }.ifEmpty { "the opposition" }
+
+                    val combined = "$headline $notes"
+                    val assistMatch = Regex("""(\d+)\s+assists?""", RegexOption.IGNORE_CASE).find(combined)
+                    val assists = assistMatch?.groupValues?.get(1)?.toIntOrNull()
+
+                    val loseStreakMatch = Regex("""(?:lose|loses|lost|dropped)\s+(\d+)\s+(?:in a row|straight)""", RegexOption.IGNORE_CASE).find(combined)
+                    val loseStreakCount = loseStreakMatch?.groupValues?.get(1)?.toIntOrNull()
+                        ?: if (headline.contains("lose", ignoreCase = true) && (headline.contains("in a row", ignoreCase = true) || headline.contains("straight", ignoreCase = true))) {
+                            Regex("""(\d+)""").find(headline)?.value?.toIntOrNull()
+                        } else null
+
+                    val winStreakMatch = Regex("""(?:win|wins|won)\s+(\d+)\s+(?:in a row|straight)""", RegexOption.IGNORE_CASE).find(combined)
+                    val winStreakCount = winStreakMatch?.groupValues?.get(1)?.toIntOrNull()
+                        ?: if (headline.contains("win", ignoreCase = true) && (headline.contains("in a row", ignoreCase = true) || headline.contains("straight", ignoreCase = true))) {
+                            Regex("""(\d+)""").find(headline)?.value?.toIntOrNull()
+                        } else null
+
+                    val ptsMatch = Regex("""(?:drops|pours in|scores|goes for|behind .*'s)\s+(\d+)""", RegexOption.IGNORE_CASE).find(combined)
+                    val points = ptsMatch?.groupValues?.get(1)?.toIntOrNull()
+
+                    val rebMatch = Regex("""(\d+)\s+rebounds?""", RegexOption.IGNORE_CASE).find(combined)
+                    val rebounds = rebMatch?.groupValues?.get(1)?.toIntOrNull()
+
+                    val blkMatch = Regex("""(\d+)\s+blocks?""", RegexOption.IGNORE_CASE).find(combined)
+                    val blocks = blkMatch?.groupValues?.get(1)?.toIntOrNull()
+
+                    val isTripleDouble = headline.contains("triple-double", ignoreCase = true) || notes.contains("triple-double", ignoreCase = true)
+
+                    when {
+                        // Assist clinic (e.g. Larkin 18 assists, Carter-Williams 24 assists)
+                        assists != null || headline.contains("assists", ignoreCase = true) -> {
+                            val countStr = assists?.let { "$it assists" } ?: "a flurry of assists"
+                            appendLine("It was a masterclass in floor vision and offensive orchestration as $playerName delivered a dazzling performance, dishing out $countStr to propel $derivedTeam past $derivedOpp${if (score.isNotEmpty()) " by a final score of $score" else ""}. From the opening tip, $playerLast dictated the tempo of the contest, picking apart defensive traps and finding cutters with laser-guided bounce passes and pinpoint cross-court skips.")
+                            appendLine()
+                            appendLine("\"When our ball movement is flowing like that, the entire floor opens up,\" said $playerLast after the game. \"My teammates did a tremendous job knocking down shots and making hard cuts to the rim. It's easy to create when everyone trusts the offense and stays unselfish.\"")
+                            appendLine()
+                            append("${if (teamRecord.isNotEmpty()) "Now standing at $teamRecord, " else ""}$derivedTeam demonstrated the poise and tactical discipline required to contend at the highest level. If $playerLast continues to direct traffic with this level of precision, opposing scouting reports will have their hands full trying to contain this high-powered offensive machine.")
+                        }
+
+                        // Losing streak (e.g. Portland Trail Blazers lose 8 in a row)
+                        loseStreakCount != null || (headline.contains("lose", ignoreCase = true) && (headline.contains("in a row", ignoreCase = true) || headline.contains("straight", ignoreCase = true))) -> {
+                            appendLine("The searching continues for $derivedTeam as their downward slide deepened, dropping their ${loseStreakCount ?: "recent run of"} straight game in a grueling stretch that has tested the resolve of the locker room. Costly turnovers, untimely defensive lapses, and cold shooting stretches down the stretch once again proved fatal against opportunistic competition.")
+                            appendLine()
+                            appendLine("\"There are no shortcuts out of a hole like this,\" acknowledged the coaching staff during the postgame media session. \"Nobody is going to feel sorry for us. Every player in this locker room has to look in the mirror, take accountability for the little details, and compete for a full 48 minutes. It starts on the defensive glass and taking care of the basketball.\"")
+                            appendLine()
+                            append("With the schedule offering little respite${if (teamRecord.isNotEmpty()) " at $teamRecord" else ""}, $derivedTeam faces a critical juncture in their season. Finding consistent leadership and rediscovering defensive urgency will be paramount if they hope to stop the bleeding and reverse course before the postseason picture slips away.")
+                        }
+
+                        // Winning streak
+                        winStreakCount != null || (headline.contains("win", ignoreCase = true) && (headline.contains("in a row", ignoreCase = true) || headline.contains("straight", ignoreCase = true))) -> {
+                            val countStr = winStreakCount?.let { "$it" } ?: "another"
+                            appendLine("$derivedTeam is playing some of the most cohesive basketball in the league right now, extending their scorching winning streak to $countStr consecutive victories. Operating with supreme confidence and relentless defensive grit, the squad executed down the wire to preserve momentum and overwhelm their opponents.")
+                            appendLine()
+                            appendLine("\"We have developed real trust in our system and each other,\" remarked team leaders following the buzzer. \"When you play disciplined team basketball and communicate on every rotation, good things happen. We celebrate the progress, but our focus immediately shifts to the next challenge.\"")
+                            appendLine()
+                            append("Sitting comfortably${if (teamRecord.isNotEmpty()) " at $teamRecord" else ""}, $derivedTeam has firmly established themselves as a formidable contender. If they maintain this level of defensive communication and unselfish execution, their ceiling in the upcoming postseason looks higher with every passing game.")
+                        }
+
+                        // Scoring outburst
+                        points != null && points >= 30 -> {
+                            appendLine("It was a breathtaking scoring clinic as $playerName put on an unforgettable offensive showcase, erupting for $points points to lift $derivedTeam against $derivedOpp${if (score.isNotEmpty()) " in a $score battle" else ""}. Scoring from beyond the arc, slicing through double-teams, and getting to the charity stripe at will, $playerLast proved virtually unstoppable all night.")
+                            appendLine()
+                            appendLine("\"When a scorer gets into a rhythm like that, you just try to space the floor and let him work,\" noted the coaching staff. \"He attacked the rim with purpose and hit timely, contested buckets whenever the opposing defense attempted to make a run.\"")
+                            appendLine()
+                            append("The commanding performance underscored $playerLast's status as a premier offensive weapon${if (teamRecord.isNotEmpty()) " as $derivedTeam moves to $teamRecord" else ""}. When their primary star plays with this degree of swagger and efficiency, $derivedTeam possesses the firepower to challenge any heavyweight in the league.")
+                        }
+
+                        // Triple-double
+                        isTripleDouble -> {
+                            appendLine("$playerName stuffed the stat sheet with an exceptional all-around masterpiece, recording a triple-double to guide $derivedTeam past $derivedOpp${if (score.isNotEmpty()) " ($score)" else ""}. Impacting every phase of the game, $playerLast dominated the glass, anchored defensive stops, and orchestrated the transition break with veteran savvy.")
+                            appendLine()
+                            appendLine("\"Winning basketball isn't just about scoring; it's about doing whatever the game demands on every single possession,\" said $playerLast. \"Securing the defensive rebound, making the hockey assist, and diving for loose balls—that's how championships are built.\"")
+                            appendLine()
+                            append("${if (teamRecord.isNotEmpty()) "Now $teamRecord on the year, " else ""}$derivedTeam continues to thrive when their floor general impacts all 94 feet of hardwood with versatile, high-IQ basketball.")
+                        }
+
+                        // Rebounds or Blocks
+                        rebounds != null || blocks != null || headline.contains("rebounds", ignoreCase = true) || headline.contains("blocks", ignoreCase = true) -> {
+                            val feat = when {
+                                rebounds != null -> "$rebounds rebounds"
+                                blocks != null -> "$blocks blocks"
+                                else -> "commanding defensive presence"
+                            }
+                            appendLine("A dominant physical presence inside the paint powered $derivedTeam, anchored by $playerName's stellar effort ($feat) against $derivedOpp${if (score.isNotEmpty()) " ($score)" else ""}. Protecting the rim and securing second-chance opportunities, $playerLast set an uncompromising tone in the trenches.")
+                            appendLine()
+                            appendLine("\"We challenged our bigs to control the painted area, and they responded with toughness and grit,\" said the coaching staff. \"Controlling the backboards and altering shots without fouling changes everything for our transition game.\"")
+                            appendLine()
+                            append("With $derivedTeam${if (teamRecord.isNotEmpty()) " improving to $teamRecord" else ""}, this physical interior identity provides a dependable anchor against explosive perimeter opponents.")
+                        }
+
+                        // General game recap / matchup
+                        else -> {
+                            appendLine("In an intense contest that kept fans on the edge of their seats${if (score.isNotEmpty()) " to the final $score buzzer" else ""}, $derivedTeam clashed with $derivedOpp in a high-stakes showdown. Early momentum swings and physical half-court battles set the stage for a tense stretch decided by clutch execution.")
+                            appendLine()
+                            appendLine("${if (playerName.isNotBlank()) "$playerName led the charge with steady composure, while " else ""}$derivedTeam capitalized on timely defensive stops and clutch free-throw shooting to seize control during the game's decisive moments.")
+                            appendLine()
+                            append("${if (teamRecord.isNotEmpty()) "Moving forward at $teamRecord, " else ""}$derivedTeam looks to build on this performance as conference competition tightens down the stretch.")
+                        }
+                    }
+                }
+
+                // Dynamic Fallback Narrative
+                else -> {
+                    appendLine("Behind the scenes, preparation and relentless player development continue to shape the trajectory for the program. The coaching staff has instilled an unselfish culture rooted in defensive accountability, crisp ball movement, and competitive resilience.")
+                    appendLine()
+                    append("With the schedule intensifying and every possession magnified down the stretch, the team's commitment to fundamentals and roster chemistry positions them to make a lasting statement on the national stage.")
                 }
             }
         }.trim()
@@ -487,7 +676,7 @@ object Ollama {
         if (apiKey.isNotEmpty()) {
             val remoteResult = runCatching {
                 val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
-                val candidates = listOf(model, "$model-latest", "gemini-2.0-flash", "gemini-1.5-flash").distinct()
+                val candidates = listOf(model, "$model-latest", "gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro-latest", "gemini-1.5-pro", "gemini-pro").distinct()
                 var lastErr: Exception? = null
                 var text: String? = null
 
@@ -500,6 +689,7 @@ object Ollama {
                                 connectTimeout = 8000
                                 readTimeout = 20000
                                 doOutput = true
+                                setRequestProperty("x-goog-api-key", apiKey)
                                 if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
                                     setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
                                 }

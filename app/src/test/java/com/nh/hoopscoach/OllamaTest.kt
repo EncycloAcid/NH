@@ -369,7 +369,7 @@ class OllamaTest {
         val googleText = googleRes.getOrThrow()
         assertTrue(googleText.isNotEmpty())
         assertTrue("Streamed tokens were emitted", streamedTokens > 0)
-        assertTrue("Credits Google Gemini", googleText.contains("Google Gemini") || googleText.contains("Gemini"))
+        assertTrue("Generates realistic narrative content", googleText.length > 50)
 
         // Signed in with OpenAI account (email & password, NO raw API key)
         val openAiCfg = OllamaConfig(
@@ -388,7 +388,7 @@ class OllamaTest {
         assertTrue(openAiRes.isSuccess)
         val openAiText = openAiRes.getOrThrow()
         assertTrue(openAiText.isNotEmpty())
-        assertTrue("Credits ChatGPT", openAiText.contains("ChatGPT"))
+        assertTrue("Generates realistic narrative content", openAiText.length > 50)
     }
 
     @Test
@@ -551,4 +551,93 @@ class OllamaTest {
         assertTrue("Storylines parsed", stories.isNotEmpty())
         assertTrue("Storylines have kicker and headline", stories.all { it.kicker.isNotEmpty() && it.head.isNotEmpty() })
     }
+
+    @Test
+    fun testDynamicArticleGenerationForDifferentStorylines() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "user@gmail.com",
+            googleSignedIn = true,
+        )
+
+        // 1. Assist clinic news item
+        val larkinNews = News(
+            season = 2026,
+            day = 12,
+            text = "Shane Larkin hands out 18 assists as 76ers beat Warriors 143-138",
+            mine = false,
+            gameId = -1,
+            kind = "game",
+            body = "Philadelphia — Shane Larkin orchestrated the offense with 18 assists.",
+            source = "The Daily Dribble",
+        )
+        val larkinRes = Ollama.generateArticle(config, lg, larkinNews)
+        assertTrue("Larkin article succeeds", larkinRes.isSuccess)
+        val larkinBody = larkinRes.getOrThrow()
+        assertFalse("Must not contain static fallback", larkinBody.contains("Basketball analysts around the country are taking notice"))
+        assertFalse("Must not contain artificial provider header", larkinBody.contains("[Google Gemini Feature]"))
+        assertTrue("Must mention assists or floor vision", larkinBody.contains("assist", ignoreCase = true) || larkinBody.contains("orchestration", ignoreCase = true))
+
+        // 2. Losing streak news item
+        val blazersNews = News(
+            season = 2026,
+            day = 12,
+            text = "Portland Trail Blazers lose 8 in a row",
+            mine = false,
+            gameId = -1,
+            kind = "team",
+            body = "The Portland Trail Blazers have dropped 8 straight games.",
+            source = "Hoops Wire",
+        )
+        val blazersRes = Ollama.generateArticle(config, lg, blazersNews)
+        assertTrue("Blazers article succeeds", blazersRes.isSuccess)
+        val blazersBody = blazersRes.getOrThrow()
+        assertFalse("Must not contain static fallback", blazersBody.contains("Basketball analysts around the country are taking notice"))
+        assertFalse("Must not contain artificial provider header", blazersBody.contains("[Google Gemini Feature]"))
+        assertTrue("Must mention losing slide or adversity", blazersBody.contains("slide", ignoreCase = true) || blazersBody.contains("hole", ignoreCase = true) || blazersBody.contains("straight", ignoreCase = true))
+
+        // 3. Scoring outburst news item
+        val scoringNews = News(
+            season = 2026,
+            day = 12,
+            text = "Marcus Smart pours in 44 points as Celtics beat Heat 112-108",
+            mine = false,
+            gameId = -1,
+            kind = "game",
+            body = "Marcus Smart erupted for 44 points on 14-of-22 shooting.",
+            source = "Courtside Post",
+        )
+        val scoringRes = Ollama.generateArticle(config, lg, scoringNews)
+        assertTrue("Scoring article succeeds", scoringRes.isSuccess)
+        val scoringBody = scoringRes.getOrThrow()
+        assertFalse("Must not contain static fallback", scoringBody.contains("Basketball analysts around the country are taking notice"))
+        assertTrue("Must mention points or scoring clinic", scoringBody.contains("44", ignoreCase = true) || scoringBody.contains("scoring", ignoreCase = true))
+
+        // 4. All three articles must be completely distinct from each other
+        assertFalse("Larkin and Blazers articles must differ", larkinBody == blazersBody)
+        assertFalse("Larkin and Scoring articles must differ", larkinBody == scoringBody)
+        assertFalse("Blazers and Scoring articles must differ", blazersBody == scoringBody)
+    }
+
+    @Test
+    fun testCustomStoryAccountFallback() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "coach@gmail.com",
+            googleSignedIn = true,
+        )
+
+        val storyRes = Ollama.generateCustomStory(config, lg, "Rivalry Week Showdowns")
+        assertTrue("Custom story succeeds with account fallback", storyRes.isSuccess)
+        val news = storyRes.getOrThrow()
+        assertTrue("Headline is generated", news.text.isNotEmpty())
+        assertTrue("Body is generated", news.body.isNotEmpty())
+        assertFalse("Body must not contain static fallback", news.body.contains("Basketball analysts around the country are taking notice"))
+        assertTrue("Headline or body references topic", news.text.contains("Rivalry Week Showdowns", ignoreCase = true) || news.body.contains("Rivalry Week Showdowns", ignoreCase = true))
+    }
 }
+
