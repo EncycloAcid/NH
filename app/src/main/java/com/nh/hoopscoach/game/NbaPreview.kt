@@ -14,6 +14,7 @@ class NbaProj(
     /** Odds: the No. 1 seed, a top-six seed, the play-in, the playoffs, each round won, the title. */
     val top: Double, val six: Double, val playIn: Double, val playoffs: Double,
     val second: Double, val confFinals: Double, val finals: Double, val title: Double,
+    val median: Int? = null,
 )
 
 /** The NBA's preseason magazine. */
@@ -45,6 +46,8 @@ class NbaPreview(
     var outcomes: List<String> = emptyList(),
     /** The preseason TV page: the season's biggest questions, argued (see [PreviewDebates]). Filled in once if an older issue has none. */
     var debates: List<TvSegment> = emptyList(),
+    val reports: Map<Int, TeamPreview> = emptyMap(),
+    var regularActual: Map<Int, Int> = emptyMap(),
 )
 
 object NbaPreviews {
@@ -83,8 +86,7 @@ object NbaPreviews {
         val ps = lg.proState!!
         val last = lastSeasons(lg)
         val games = ProLeague.seasonGames(lg).coerceAtLeast(1)
-        // The magazine projects what its writers see, not the truth (see Receipts.bias), so it can be wrong.
-        val proj = simulate(lg, Receipts.bias(lg))
+        val proj = simulate(lg)
         val active = lg.teams.flatMap { lg.rosterOf(it) }
         fun projW(p: Player) = proj[p.teamId]?.w ?: 41
         fun odds(cands: List<Pair<Player, Double>>, temp: Double, n: Int): List<PoyOdds> {
@@ -110,15 +112,20 @@ object NbaPreviews {
         val lastWins = lg.teams.associate { t ->
             t.id to (hist[t]?.let { y -> (y.w.toDouble() / (y.w + y.l).coerceAtLeast(1) * games).roundToInt() } ?: last[t.id]?.w ?: ps.lastWins[t.id] ?: -1)
         }
-        val base = NbaPreview(lg.season, proj, mvp, roy, dpoy, sixth, mip, last = lastText, lastWins = lastWins)
-        val stories = storylines(lg, base)
-        val (cover, style) = Features.nbaCover(lg, base, stories)
+        val base = NbaPreview(lg.season, proj, mvp, roy, dpoy, sixth, mip, last = lastText, lastWins = lastWins,
+            reports = PreviewWriting.pro(lg, proj))
+        val editor = PreviewEditor(lg.season, base.reports)
+        val topics = PreviewTopics.stories(lg, PreviewTopics.select(lg, pro = base))
+        val stories = (topics + storylines(lg, base).filter { s -> topics.none { it.teamId == s.teamId && it.pid == s.pid } }).map { editor.story(it) }
+        val (rawCover, style) = Features.nbaCover(lg, base, stories)
+        val cover = rawCover?.let { editor.story(it, "the cover: ${it.head}") }
         val calls = bold(lg, base)
         return NbaPreview(
             lg.season, proj, mvp, roy, dpoy, sixth, mip,
-            stories = stories, bold = calls.first, calls = calls.second, headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
-            features = Features.nba(lg, base), cover = cover, coverStyle = style,
+            stories = stories, bold = calls.first.map { editor.text(it, "the bold picks") }, calls = calls.second, headline = cover?.head ?: headline(lg, base), last = lastText, lastWins = lastWins,
+            features = Features.nba(lg, base).map { editor.feature(it) }, cover = cover, coverStyle = style,
             debates = runCatching { PreviewDebates.build(lg, base) }.getOrDefault(emptyList()),
+            reports = base.reports,
         )
     }
 
@@ -137,7 +144,8 @@ object NbaPreviews {
         val n = lg.teams.size
         val rnd = kotlin.random.Random(lg.season * 6271L + n * 17L)
         val era = Eras.of(lg)
-        fun lean(t: Int) = bias?.getOrNull(t) ?: 0.0
+        val availability = lg.teams.associate { it.id to PreviewAvailability.loss(lg, it) }
+        fun lean(t: Int) = (bias?.getOrNull(t) ?: 0.0) - availability.getValue(t)
         val elo = DoubleArray(n) { lg.team(it).elo + lean(it) }
         val reg = lg.games.filter { it.type == GameType.CONF || it.type == GameType.NONCONF }
         val home = IntArray(reg.size) { reg[it].home }
@@ -145,7 +153,7 @@ object NbaPreviews {
         val pHome = DoubleArray(reg.size) { i -> val g = reg[i]; if (g.played) (if (g.hs > g.aws) 1.0 else 0.0) else Rankings.shift(Rankings.winProbFor(lg, g, g.home), lean(g.home) - lean(g.away)) }
         val played = IntArray(n)
         for (g in reg) { played[g.home]++; played[g.away]++ }
-        val maxW = 100
+        val maxW = (played.maxOrNull() ?: 0) + 1
         val hist = Array(n) { IntArray(maxW) }
         val seedSum = DoubleArray(n)
         val top = IntArray(n); val six = IntArray(n); val pin = IntArray(n); val po = IntArray(n)
@@ -223,7 +231,7 @@ object NbaPreviews {
             val mean = (0 until maxW).sumOf { it * hist[t][it] } / sims
             val w = mean.roundToInt().coerceIn(0, played[t])
             NbaProj(w, played[t] - w, pct(t, 0.1), pct(t, 0.9), seedSum[t] / sims,
-                top[t] / sims, six[t] / sims, pin[t] / sims, po[t] / sims, r2[t] / sims, cf[t] / sims, fin[t] / sims, title[t] / sims)
+                top[t] / sims, six[t] / sims, pin[t] / sims, po[t] / sims, r2[t] / sims, cf[t] / sims, fin[t] / sims, title[t] / sims, pct(t, 0.5))
         }
     }
 
@@ -322,14 +330,14 @@ object NbaPreviews {
             "The favorite",
             pick(lg, 10, "The ${top.name} are the team to beat", "Everyone is chasing the ${top.name}", "The title is the ${possessive(top.name)} to lose"),
             (if (champId == top.id) "The defending champions start where they finished. " else "") +
-                "The ${top.name} win the title in ${pct(to.title)} of our $SIMS simulations and reach the Finals in ${pct(to.finals)}" +
-                (ranked.getOrNull(1)?.let { "; nobody else wins it more than ${pct(pr(it).title)} (the ${it.name})." } ?: ".") +
+                "The ${top.name} have a ${pct(to.title)} title chance and a ${pct(to.finals)} chance of reaching the Finals" +
+                (ranked.getOrNull(1)?.let { "; nobody else's title chance is higher than ${pct(pr(it).title)} (the ${it.name})." } ?: ".") +
                 " " + Takes.nba(lg, pv, top, 2, from = 1),
             top.id, topStar?.id ?: -1,
         ) else Story(
             "Wide open",
             pick(lg, 11, "No team stands above the rest", "It's anyone's title", "A season without a favorite"),
-            "Our favorite, the ${top.name}, win it all in only ${pct(to.title)} of our simulations, and $contenders teams have at least a 5% shot. The ${ranked[1].name} and ${ranked[2].name} are right there.",
+            "Our favorite, the ${top.name}, have only a ${pct(to.title)} title chance, and $contenders teams have at least a 5% shot. The ${ranked[1].name} and ${ranked[2].name} are right there.",
             top.id,
         )
         reportCard(lg, pv)?.let { out += it }
@@ -519,7 +527,7 @@ object NbaPreviews {
                         t.id)
                 }
                 rematch -> out += Story("History", pick(lg, 191, "A Finals rematch?", "${lastChamp!!.name.substringAfterLast(' ')}-${lastRunner!!.name.substringAfterLast(' ')}, part two?"),
-                    "Last June the ${lastChamp!!.name} beat the ${lastRunner!!.name} for the title. Both are back in the Finals in our simulations " +
+                    "Last June the ${lastChamp!!.name} beat the ${lastRunner!!.name} for the title. Both have a chance to return to the Finals " +
                         "(${pct(pr(lastChamp).finals)} and ${pct(pr(lastRunner).finals)}), and they meet again ${often(pr(lastChamp).finals * pr(lastRunner).finals * 1.6)}.",
                     lastChamp.id)
                 waiting != null -> {
@@ -527,7 +535,7 @@ object NbaPreviews {
                     out += Story("History",
                         if (ts.isEmpty()) pick(lg, 192, "The ${t.name} have never won it all", "Still chasing a first title") else pick(lg, 193, "${lg.season - ts.last()} years and counting", "The ${t.name} want to end the wait"),
                         (if (ts.isEmpty()) "The franchise has never won a championship. " else "The ${t.name}' last title came in ${ts.last()}, ${NbaHistory.titleWords(ts.size)} in all. ") +
-                            "This team has a real chance to change that: a title ${often(pr(t).title)} in our simulations" +
+                            "This team has a real chance to change that: a title ${often(pr(t).title)}" +
                             (NbaHistory.playoffStreak(lg, t).takeIf { it >= 3 }?.let { ", and it's made the playoffs $it years in a row." } ?: "."),
                         t.id)
                 }
@@ -578,7 +586,7 @@ object NbaPreviews {
             val kid = lg.rosterOf(t).filter { it.age <= 23 }.maxByOrNull { it.pot }
             if (age <= 25.5) scored(Story("Youth movement", pick(lg, 303, "The kids are in charge in ${t.school}", "The youngest team in the league", "Growing up in public"),
                 "The ${possessive(t.name)} top eight average ${f1(age)} years old, the youngest in the league. " +
-                    (kid?.let { "${it.name} (${it.age}) has the highest ceiling on the roster, ${Ratings.shownPro(it.pot)} on our board. " } ?: "") +
+                    (kid?.let { "${it.name} (${it.age}) has the team's highest ceiling, ${Ratings.shownPro(it.pot)} on our board. " } ?: "") +
                     "We project ${pr(t).w}-${pr(t).l}. The wins matter less than how fast they grow.",
                 t.id, kid?.id ?: -1), (26 - age) * 2.5)
         }
@@ -786,8 +794,8 @@ object NbaPreviews {
         val (fc, fr) = NbaHistory.finalists(lg, lg.season - 1)
         out += pick(lg, 200, "Welcome to the ${lg.season} season. ", "The ${lg.season} season tips off. ", "Basketball is back. ") +
             (if (fc != null) "Last June the ${fc.name} won it all" + (fr?.let { " over the ${it.name}" } ?: "") + (NbaHistory.lastMvp(lg)?.let { ", and $it was the MVP. " } ?: ". ") else "") +
-            "We simulated it $SIMS times, through the playoffs. The ${top.name} won the title in ${pct(to.title)} of them, the most of any team. " +
-            ((champ ?: fc)?.let { if (it.id == top.id) "The defending champions are the team to catch." else "The defending champion ${it.name} won it in ${pct(pv.proj.getValue(it.id).title)}." } ?: "")
+            "The ${top.name} lead the title race at ${pct(to.title)}. " +
+            ((champ ?: fc)?.let { if (it.id == top.id) "The defending champions are the team to catch." else "The defending champion ${it.name} have a ${pct(pv.proj.getValue(it.id).title)} title chance." } ?: "")
         val east = lg.teams.filter { it.confId == 0 }.maxByOrNull { pv.proj.getValue(it.id).finals }
         val west = lg.teams.filter { it.confId == 1 }.maxByOrNull { pv.proj.getValue(it.id).finals }
         if (east != null && west != null) out += "Our Finals: the ${east.name} against the ${west.name}. " +

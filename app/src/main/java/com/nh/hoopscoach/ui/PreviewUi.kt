@@ -571,7 +571,7 @@ private fun LazyListScope.contents(lg: League, pv: Preview, list: List<Pair<Stri
         Panel {
             Text("Every team gets a strength rating from its roster (its best players, weighted) and its coach. We play the season 400 times from those ratings and the real schedule: conference tournaments, a 68-team field and the bracket. Projected records are the average; the win range covers 8 seasons in 10.", style = T.small, color = P.ink)
             Spacer(Modifier.height(6.dp))
-            Text("Tuned against how seasons really play out in the game, the projections miss by about 2 to 3 wins on average. During the season every result moves a team's strength, and your Program panel shows where your season is heading.", style = T.small, color = P.sub)
+            Text("Odds are observed frequencies in 400 simulated seasons, not guarantees or measured real-world accuracy. Known absences reduce strength for their expected missed games. The live tracker compares this frozen issue with current results.", style = T.small, color = P.sub)
         }
         Section("Contents")
         GroupList(list.withIndex().drop(2).toList()) { (i, pg) ->
@@ -599,8 +599,8 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
         Panel(color = P.accentSoft) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("${lg.ollama.providerDisplayName.uppercase()} AI STORYLINES · ${lg.ollama.activeModelName}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Text("Have ${lg.ollama.providerDisplayName} control and generate this season's magazine storylines.", style = T.small, color = P.ink)
+                    Text("THE STORY DESK", style = T.label, color = P.accent)
+                    Text("Draft from the issue's simulated odds, roster changes, injuries and scheduled rivalries.", style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
                 SmallButton(if (generating) "Writing..." else "Generate with ${lg.ollama.shortActionName}", primary = true, enabled = !generating) {
@@ -609,7 +609,7 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
                     scope.launch {
                         val top = lg.teams.getOrNull(pv.proj.entries.minByOrNull { it.value.nat }?.key ?: 0)?.school ?: "Favorites"
                         val context = "Final Four picks: " + pv.finalFour.joinToString { lg.teams.getOrNull(it)?.school ?: "" }
-                        val res = Ollama.generateStorylines(lg.ollama, pv.season, top, lg.user.school, lg.userTeamId, context)
+                        val res = Ollama.generateStorylines(lg.ollama, lg, pv.season, top, lg.user.school, lg.userTeamId, context)
                         generating = false
                         res.onSuccess { newStories ->
                             genStatus = ""
@@ -638,7 +638,7 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
         Panel(color = P.surface2) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("OLLAMA AI STORYLINES", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("THE STORY DESK", style = T.label, color = P.accent)
                     Text("Run Ollama on your phone or PC to generate dynamic season storylines.", style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
@@ -686,6 +686,8 @@ internal fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Bo
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("%02d · %s".format(i + 1, s.kicker.uppercase()), style = T.label, color = accent, modifier = Modifier.weight(1f))
                     TeamBadge(t, 36.dp)
+                    Spacer(Modifier.width(8.dp))
+                    AiBadge(s.isAiGenerated, s.aiProvider)
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(s.head, style = T.title.copy(fontSize = 30.sp, lineHeight = 31.sp), color = fg)
@@ -708,6 +710,8 @@ internal fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Bo
                 Tag(s.kicker.uppercase(), if (mine) P.accent else stripe)
                 Spacer(Modifier.weight(1f))
                 if (t != null) TeamBadge(t, 28.dp)
+                Spacer(Modifier.width(8.dp))
+                AiBadge(s.isAiGenerated, s.aiProvider)
             }
             Spacer(Modifier.height(6.dp))
             Text(s.head, style = T.h2, color = P.ink)
@@ -789,7 +793,8 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
     val star = Previews.star(lg, t)
     val nc = Previews.newcomer(lg, t)
     val (st, ppg) = Previews.returning(lg, t)
-    val (forIt, against) = Previews.case(lg, pv, t)
+    val report = pv.reports[t.id]
+    val (forIt, against) = report?.let { it.strength to it.concern } ?: Previews.case(lg, pv, t)
     val (strength, concern) = Previews.scoutingProse(lg, t)
     val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
     val ink = teamInk(t)
@@ -802,14 +807,14 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.school.uppercase(), style = T.title.copy(fontSize = 26.sp, lineHeight = 27.sp), color = fg, maxLines = 2)
-                        Text("${t.mascot} · ${lg.conf(t.confId).abbr} · ${Previews.expectation(pr.nat)}", style = T.small, color = fg.copy(alpha = 0.85f), maxLines = 2)
+                        Text("${t.mascot} · ${lg.conf(t.confId).abbr} · ${Previews.expectation(pv.odds[t.id])}", style = T.small, color = fg.copy(alpha = 0.85f), maxLines = 2)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row {
                     listOf(
                         "PROJECTED" to "${pr.w}-${pr.l}",
-                        "WIN RANGE" to "${o.lo}-${o.hi}",
+                        "WIN RANGE" to (if (pv.odds.containsKey(t.id)) "${o.lo}-${o.hi}" else "—"),
                         "LAST SEASON" to (last?.let { "${it.w}-${it.l}" } ?: "—"),
                     ).forEach { (k, v) ->
                         Column(Modifier.weight(1f)) {
@@ -821,6 +826,8 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             }
         }
         Column(Modifier.padding(16.dp)) {
+            Text(com.nh.hoopscoach.game.PreviewWriting.range(o.lo, o.median, o.hi, pr.w + pr.l), style = T.small, color = P.sub)
+            pv.reports[t.id]?.let { Text(it.overview, style = T.body, color = P.ink, modifier = Modifier.padding(vertical = 8.dp)) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OddsCell(lg.conf(t.confId).abbr + " title", o.conf, ink, Modifier.weight(1f))
                 OddsCell("Final Four", o.f4, ink, Modifier.weight(1f))
@@ -865,8 +872,10 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             Text("WHY THEY WON'T", style = T.label, color = P.warn)
             Text(against, style = T.body, color = P.ink)
             Spacer(Modifier.height(10.dp))
-            Text(strength, style = T.small, color = P.good)
-            Text(concern, style = T.small, color = P.warn)
+            if (report == null) {
+                Text(strength, style = T.small, color = P.good)
+                Text(concern, style = T.small, color = P.warn)
+            }
         }
     }
 }
@@ -912,10 +921,11 @@ private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             }
         }
         val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
-        val take = remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, t, 3) }
+        val take = pv.reports[t.id]?.overview ?: remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, t, 3) }
         Column(Modifier.padding(start = 74.dp, top = 6.dp)) {
             if (last != null) Text("Last season: ${last.w}-${last.l}, ${last.result.ifEmpty { "no postseason" }}", style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(take, style = T.small, color = P.ink, modifier = Modifier.padding(top = 2.dp))
+            Text(com.nh.hoopscoach.game.PreviewWriting.range(o.lo, o.median, o.hi, pr.w + pr.l), style = T.small, color = P.sub)
             if (expanded) {
                 Spacer(Modifier.height(8.dp))
                 val star = lg.rosterOf(t).maxByOrNull { it.ovr }
@@ -1272,7 +1282,7 @@ private fun LazyListScope.midMajors(vm: GameViewModel, lg: League, pv: Preview) 
                 Column(Modifier.weight(1f)) {
                     Text(pick.school, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (poy != null) Text("POY: ${poy.name}, ${lg.team(poy.teamId).abbr}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(remember(pick.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, pick, 1) }, style = T.small.copy(fontSize = 12.sp), color = P.ink)
+                    Text(pv.reports[pick.id]?.conference ?: remember(pick.id, lg.season) { com.nh.hoopscoach.game.Takes.college(lg, pv, pick, 1) }, style = T.small.copy(fontSize = 12.sp), color = P.ink)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(odd(odds(pv, pick).ncaa), style = T.numSm.copy(fontSize = 15.sp), color = P.ink)
@@ -1303,14 +1313,14 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
                     TeamBadge(u, 52.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(Previews.expectation(pr.nat).uppercase(), style = T.label, color = accent)
+                        Text(Previews.expectation(pv.odds[u.id]).uppercase(), style = T.label, color = accent)
                         Text("${u.school} ${u.mascot}".uppercase(), style = T.title.copy(fontSize = 24.sp, lineHeight = 25.sp), color = fg)
                         Text("Coach ${lg.userCoach.name}", style = T.small, color = fg.copy(alpha = 0.85f))
                     }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row {
-                    listOf("NATIONAL" to "No. ${pr.nat}", lg.conf(u.confId).abbr to Previews.ordinal(pr.confRank), "PROJECTED" to "${pr.w}-${pr.l}", "RANGE" to "${o.lo}-${o.hi} W").forEach { (k, v) ->
+                    listOf("NATIONAL" to "No. ${pr.nat}", lg.conf(u.confId).abbr to Previews.ordinal(pr.confRank), "PROJECTED" to "${pr.w}-${pr.l}", "RANGE" to (if (pv.odds.containsKey(u.id)) "${o.lo}-${o.hi} W" else "—")).forEach { (k, v) ->
                         Column(Modifier.weight(1f)) {
                             Text(k, style = T.label.copy(fontSize = 9.sp), color = fg.copy(alpha = 0.75f), maxLines = 1)
                             Text(v, style = T.numSm.copy(fontSize = 17.sp), color = fg, maxLines = 1)
@@ -1343,6 +1353,9 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
                         }
                     }
                 }
+                Text(com.nh.hoopscoach.game.PreviewWriting.range(o.lo, o.median, o.hi, pr.w + pr.l), style = T.small, color = P.sub, modifier = Modifier.padding(top = 10.dp))
+                Text(com.nh.hoopscoach.game.PreviewWriting.chance(o.ncaa, "an NCAA bid"), style = T.small, color = P.ink)
+                Text("Odds are frequencies from 400 simulated seasons, not guarantees.", style = T.small, color = P.sub)
                 Text(if (Previews.hasLastSeason(lg)) "${f1(ppg)} points a game return from last season." else CollegeHistory.line(lg, u), style = T.small, color = P.sub, modifier = Modifier.padding(top = 10.dp))
                 if (u.gp > 0) {
                     val confPart = if (u.cw + u.cl > 0) ", ${Previews.ordinal(Season.standings(lg, u.confId).indexOf(u) + 1)} in the ${lg.conf(u.confId).abbr}" else ""
@@ -1404,9 +1417,12 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
             }
             Text("Right column: our chance to win each game.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
         }
-        pv.odds[u.id]?.let { od -> ScoutingReport(vm, lg, u, od.lo, od.hi) }
-        Section("The bottom line")
-        Panel { Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.collegeBottom(lg, pv, u) }, style = T.body, color = P.ink) }
+        if (pv.reports.containsKey(u.id)) PreviewTeamCopy(pv.reports[u.id], showScouting = pr.nat > 5)
+        else pv.odds[u.id]?.let { od -> ScoutingReport(vm, lg, u, od.lo, od.hi) }
+        if (!pv.reports.containsKey(u.id)) {
+            Section("The bottom line")
+            Panel { Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.collegeBottom(lg, pv, u) }, style = T.body, color = P.ink) }
+        }
     }
 }
 
@@ -1534,38 +1550,8 @@ private fun LazyListScope.gamesToWatch(vm: GameViewModel, lg: League, pv: Previe
 // ---------- 18: predictions ----------
 
 private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview) {
+    previewTracker(lg, com.nh.hoopscoach.game.PreviewTracker.college(lg, pv))
     item {
-        if (lg.user.gp > 0) {
-            Section("Scorecard so far")
-            val top25 = ranked(lg, pv).take(25)
-            val onPace = top25.count { t ->
-                t.w + t.l >= 5 && t.w.toDouble() / t.gp >=
-                    pv.proj.getValue(t.id).w / (pv.proj.getValue(t.id).w + pv.proj.getValue(t.id).l).toDouble() - 0.08
-            }
-            val f4Alive = pv.finalFour.count { id ->
-                val t = lg.team(id)
-                t.l <= (t.w + t.l) / 2 + 2
-            }
-            val u = lg.user
-            val mine = pv.proj.getValue(u.id)
-            Panel {
-                Text(
-                    "Of our preseason Top 25, $onPace are roughly on their projected win pace. $f4Alive of our Final Four picks still look like tournament teams.",
-                    style = T.body, color = P.ink,
-                )
-                Spacer(Modifier.height(8.dp))
-                val delta = u.w - (mine.w * u.gp / (mine.w + mine.l).coerceAtLeast(1).toDouble()).roundToInt()
-                Text(
-                    when {
-                        u.gp < 5 -> "${u.school} is ${u.record} — too early to grade the projection."
-                        delta >= 2 -> "${u.school} is beating the projection (${u.record} vs a ${mine.w}-${mine.l} pace)."
-                        delta <= -2 -> "${u.school} is behind the projection (${u.record}; we had them at ${mine.w}-${mine.l})."
-                        else -> "${u.school} is right about where we picked them (${u.record}, projected ${mine.w}-${mine.l})."
-                    },
-                    style = T.small, color = P.sub,
-                )
-            }
-        }
         Section("Final Four")
         Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {

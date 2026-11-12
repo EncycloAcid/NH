@@ -82,6 +82,20 @@ import com.nh.hoopscoach.game.Team
 val Gutter = 16.dp
 private val CardShape = RoundedCornerShape(20.dp)
 
+@Composable
+fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier) {
+    if (!isAi) return
+    var details by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF228B50)).clickable { details = true }, contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Check, contentDescription = "AI-generated", tint = Color.White, modifier = Modifier.size(16.dp))
+        }
+        DropdownMenu(expanded = details, onDismissRequest = { details = false }) {
+            Text(if (provider.isBlank()) "AI-assisted content" else "Generated with $provider", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+        }
+    }
+}
+
 // ---------- layout ----------
 
 @Composable

@@ -242,7 +242,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
     val cycle = Recruiting.inCycle(lg)
     val ctx = remember(vm.rev, lg) { Recruiting.Ctx(lg) }
     val proj = if (cycle && !committed) Recruiting.project(lg, r, ctx) else r.interest
-    var pitchLetter by remember { mutableStateOf<String?>(null) }
+    var pitchLetter by remember { mutableStateOf<com.nh.hoopscoach.game.AiText?>(null) }
     var draftingPitch by remember { mutableStateOf(false) }
     var pitchSent by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -304,8 +304,8 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("✉️ COACH'S RECRUITING PITCH", style = T.label.copy(fontSize = 11.sp), color = P.good)
-                                    Tag("✨ AI PITCH", P.accent)
+                                    Text("COACH'S RECRUITING PITCH", style = T.label, color = P.good, modifier = Modifier.weight(1f))
+                                    AiBadge(pitchLetter?.isAi == true, pitchLetter?.provider.orEmpty())
                                 }
                                 Text("Personalized pitch letter targeting ${r.pref.label}.", style = T.small, color = P.sub)
                             }
@@ -332,7 +332,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                                     .background(if (P.dark) Color(0xFF181F22) else Color(0xFFFFFFFF))
                                     .padding(12.dp)
                             ) {
-                                for (pPara in pitchLetter!!.split("\n\n")) {
+                                for (pPara in pitchLetter!!.text.split("\n\n")) {
                                     Text(pPara.trim(), style = T.body, color = P.ink)
                                     Spacer(Modifier.height(6.dp))
                                 }

@@ -73,10 +73,8 @@ fun AiInjuryAnalysisCard(lg: League, player: Player, team: Team) {
             .padding(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("MEDICAL OUTLOOK", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-            Spacer(Modifier.width(6.dp))
-            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
-            Spacer(Modifier.weight(1f))
+            Text("MEDICAL OUTLOOK", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
+            AiBadge(analysis?.isAi == true, lg.ollama.providerDisplayName)
             if (analysis == null && !loading) {
                 SmallButton("Generate Breakdown", primary = true) {
                     loading = true
@@ -100,7 +98,7 @@ fun AiInjuryAnalysisCard(lg: League, player: Player, team: Team) {
             Spacer(Modifier.height(2.dp))
             Text("• Next Man Up: ${a.nextManUpStrategy}", style = T.small, color = P.sub)
             Spacer(Modifier.height(4.dp))
-            Text("\u201c${a.quote}\u201d", style = T.small.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.faint)
+            if (a.quote.isNotBlank()) Text("\u201c${a.quote}\u201d", style = T.small.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.faint)
         }
     }
 }

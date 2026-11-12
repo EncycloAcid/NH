@@ -1227,10 +1227,8 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
             Spacer(Modifier.height(8.dp))
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(P.surface2).padding(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("AI TRADE GRADES: ", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Text("${a.abbr} ${an.gradeA}  ·  ${b.abbr} ${an.gradeB}", style = T.bodyB.copy(fontSize = 12.sp), color = P.ink)
-                    Spacer(Modifier.weight(1f))
-                    Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+                    Text("${a.abbr} ${an.gradeA}  ·  ${b.abbr} ${an.gradeB}", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                    AiBadge(an.isAi, lg.ollama.providerDisplayName)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(an.analysis, style = T.small, color = P.ink)

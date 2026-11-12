@@ -9,11 +9,13 @@ class Proj(val nat: Int, val confRank: Int, val w: Int, val l: Int, val cw: Int,
 
 /** A team's odds from simulating the season: its conference title, an NCAA bid, the Sweet 16, the Final Four and the title, plus a likely win range. */
 @Serializable
-class Odds(val conf: Double, val ncaa: Double, val s16: Double, val f4: Double, val title: Double, val lo: Int, val hi: Int)
+class Odds(val conf: Double, val ncaa: Double, val s16: Double, val f4: Double, val title: Double, val lo: Int, val hi: Int, val median: Int? = null)
 
 /** One storyline: a kicker, a headline and a few sentences, about a team or a player. */
 @Serializable
-class Story(val kicker: String, val head: String, var body: String, val teamId: Int = -1, val pid: Int = -1)
+class Story(val kicker: String, val head: String, var body: String, val teamId: Int = -1, val pid: Int = -1, val aiProvider: String = "") {
+    val isAiGenerated get() = aiProvider.isNotBlank()
+}
 
 /**
  * A bold prediction, in a form the season can check: what kind of call it is, the team or player it's
@@ -70,6 +72,9 @@ class Preview(
     var graded: List<Int> = emptyList(),
     var outcomes: List<String> = emptyList(),
     val debates: List<TvSegment> = emptyList(),
+    val reports: Map<Int, TeamPreview> = emptyMap(),
+    var regularActual: Map<Int, Int> = emptyMap(),
+    val letter: List<String> = emptyList(),
 )
 
 object Previews {
@@ -79,9 +84,9 @@ object Previews {
     /** Built once per season, when the schedule is set. */
     fun build(lg: League): Preview {
         val n = lg.teams.size
-        // The magazine projects what its writers see, not the truth (see Receipts.bias), so it can be wrong.
-        val lean = Receipts.bias(lg)
-        fun seen(t: Team) = t.elo + lean[t.id]
+        val perception = Receipts.bias(lg)
+        val lean = DoubleArray(n) { -PreviewAvailability.loss(lg, lg.team(it)) }
+        fun seen(t: Team) = t.elo + perception[t.id] + lean[t.id]
         val games = IntArray(n)
         val confGames = IntArray(n)
         val confWins = DoubleArray(n)
@@ -130,8 +135,7 @@ object Previews {
         for (c in lg.confs) {
             c.teamIds.flatMap { lg.team(it).roster }.map { lg.player(it) }.maxByOrNull { value(it) }?.let { confPoy[c.id] = it.id }
         }
-        // Champion favorite, two other blue bloods, and one darkhorse from outside the top 8.
-        val finalFour = finalFourPicks(byElo)
+        val finalFour = finalFourPicks(lg.season, odds)
         val sleeper = byElo.drop(20).take(40).firstOrNull { lg.conf(it.confId).tier <= 1 && it.id !in finalFour }?.id
             ?: byElo.drop(25).firstOrNull { it.id !in finalFour }?.id ?: byElo[25].id
         val cinderella = lg.teams.filter { lg.conf(it.confId).tier >= 2 && it.id !in finalFour && it.id != sleeper }
@@ -166,16 +170,22 @@ object Previews {
             lg.season, proj, allAmerica, freshmen, transfers, breakouts, confPoy, finalFour, sleeper,
             version = 3, underRadar = underRadar, dpoy = dpoy, cinderella = cinderella, cotyTeam = coty,
             marquee = marquee, hotSeat = hotSeat, odds = odds, bids = bids, poy = poy,
+            reports = PreviewWriting.college(lg, proj, odds),
         )
-        val stories = storylines(lg, base)
-        val (cover, style) = Features.collegeCover(lg, base, stories)
+        val editor = PreviewEditor(lg.season, base.reports)
+        val topics = PreviewTopics.stories(lg, PreviewTopics.select(lg, college = base))
+        val stories = (topics + storylines(lg, base).filter { s -> topics.none { it.teamId == s.teamId && it.pid == s.pid } }).map { editor.story(it) }
+        val (rawCover, style) = Features.collegeCover(lg, base, stories)
+        val cover = rawCover?.let { editor.story(it, "the cover: ${it.head}") }
         val calls = boldPredictions(lg, base)
         val debates = PreviewDebates.buildCollege(lg, base)
         return Preview(
             base.season, base.proj, base.allAmerica, base.freshmen, base.transfers, base.breakouts, base.confPoy, base.finalFour, base.sleeper,
-            3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, calls.first,
+            3, base.underRadar, base.dpoy, base.cinderella, base.cotyTeam, base.marquee, base.hotSeat, calls.first.map { editor.text(it, "the bold picks") },
             calls = calls.second, odds = odds, bids = bids, stories = stories, poy = poy, headline = cover?.head ?: coverHeadline(lg, base),
-            features = Features.college(lg, base), cover = cover, coverStyle = style, debates = debates,
+            features = Features.college(lg, base).map { editor.feature(it) }, cover = cover, coverStyle = style, debates = debates,
+            reports = base.reports,
+            letter = editorsLetter(lg, base).map { editor.text(it, "the editor's letter") },
         )
     }
 
@@ -198,12 +208,14 @@ object Previews {
         return (first + rest).map { it.id }
     }
 
-    /** Favorite, two contenders from the top 8, and one darkhorse from 9–20 so the page isn't just the Top 4. */
-    private fun finalFourPicks(byElo: List<Team>): List<Int> {
-        val champ = byElo.first().id
-        val contenders = byElo.drop(1).take(7).shuffled(Rng.r).take(2).map { it.id }
-        val dark = byElo.drop(8).take(12).shuffled(Rng.r).first().id
-        return listOf(champ) + contenders + dark
+    internal fun finalFourPicks(season: Int, odds: Map<Int, Odds>): List<Int> {
+        val rnd = kotlin.random.Random(season * 7919L + 113)
+        val tie = odds.keys.sorted().associateWith { rnd.nextDouble() }
+        val favorite = odds.keys.maxWithOrNull(compareBy<Int> { odds.getValue(it).title }
+            .thenBy { odds.getValue(it).f4 }.thenBy { tie.getValue(it) }) ?: return emptyList()
+        return listOf(favorite) + odds.keys.filter { it != favorite }
+            .sortedWith(compareByDescending<Int> { odds.getValue(it).f4 }
+                .thenByDescending { odds.getValue(it).title }.thenBy { tie.getValue(it) }).take(3)
     }
 
     // ---------- the simulations ----------
@@ -253,7 +265,7 @@ object Previews {
             while (round.size > 1) round = round.chunked(2).map { (a, b) -> play(a, b) }
             return round[0]
         }
-        val maxGames = 64
+        val maxGames = ((0 until n).maxOfOrNull { t -> reg.count { it.involves(t) } + extra[t] } ?: 0) + 1
         val hist = Array(n) { IntArray(maxGames) }
         val confC = IntArray(n); val ncaaC = IntArray(n); val s16C = IntArray(n); val f4C = IntArray(n); val titleC = IntArray(n)
         val bidC = DoubleArray(lg.confs.size)
@@ -329,7 +341,7 @@ object Previews {
         }
         val sims = SIMS.toDouble()
         val odds = (0 until n).associateWith { t ->
-            Odds(confC[t] / sims, ncaaC[t] / sims, s16C[t] / sims, f4C[t] / sims, titleC[t] / sims, percentile(t, 0.1), percentile(t, 0.9))
+            Odds(confC[t] / sims, ncaaC[t] / sims, s16C[t] / sims, f4C[t] / sims, titleC[t] / sims, percentile(t, 0.1), percentile(t, 0.9), percentile(t, 0.5))
         }
         val bids = lg.confs.associate { it.id to bidC[it.id] / sims }
         val avgWins = DoubleArray(n) { t -> (0 until maxGames).sumOf { it * hist[t][it] } / sims }
@@ -413,13 +425,13 @@ object Previews {
         out += if (to.title >= 0.12) Story(
             "The favorite",
             pick(lg, 10, "${top.school} is the team to beat", "Everyone is chasing ${top.school}", "${top.school}'s title to lose"),
-            repeat + "${top.school} wins the national title in ${pct(to.title)} of our simulations and reaches the Final Four in ${pct(to.f4)}; " +
+            repeat + "${top.school} has a ${pct(to.title)} national-title chance and a ${pct(to.f4)} chance of reaching the Final Four; " +
                 "${ranked[1].school} is next at ${pct(odds(pv, ranked[1]).title)}. We project ${proj(top).w}-${proj(top).l}. " + Takes.college(lg, pv, top, 2, from = 1),
             top.id,
         ) else Story(
             "Wide open",
             pick(lg, 11, "No team stands above the rest", "It's anyone's year", "A season without a favorite"),
-            repeat + "Our No. 1, ${top.school}, wins it all in only ${pct(to.title)} of our simulations, and $contenders teams have at least a 5% shot. ${ranked[1].school} and ${ranked[2].school} are right there.",
+            repeat + "Our No. 1, ${top.school}, has only a ${pct(to.title)} title chance, and $contenders teams have at least a 5% shot. ${ranked[1].school} and ${ranked[2].school} are right there.",
             top.id,
         )
 
@@ -503,7 +515,7 @@ object Previews {
                     val t = firsts.first()
                     out += Story("History", pick(lg, 161, "${t.school} chases its first title", "No banner yet at ${t.school}", "Is this ${t.school}'s year?"),
                         "${t.school} has never won a national title. This team is good enough to: No. ${proj(t).nat} in our poll, the Final Four ${NbaPreviews.often(odds(pv, t).f4)} " +
-                            "and a title ${NbaPreviews.often(odds(pv, t).title)} in our simulations." +
+                            "and a title ${NbaPreviews.often(odds(pv, t).title)}." +
                             (bluest?.takeIf { it.first.id != t.id }?.let { (b, ts) -> " The blue bloods are waiting: ${b.school} has ${CollegeHistory.count(ts.size)} and is No. ${proj(b).nat}." } ?: ""),
                         t.id)
                 }
@@ -531,7 +543,7 @@ object Previews {
             out += Story(
                 "Conference race",
                 pick(lg, 50, "The ${c.abbr} is a coin flip", "A two-team race in the ${c.abbr}", "${a.school} or ${b.school}?"),
-                "${a.school} wins the ${c.abbr} in ${pct(odds(pv, a).conf)} of our simulations, ${b.school} in ${pct(odds(pv, b).conf)}." +
+                "${a.school} has a ${pct(odds(pv, a).conf)} chance of winning the ${c.abbr}; ${b.school} has a ${pct(odds(pv, b).conf)} chance." +
                     (if (days.isNotEmpty()) " They meet ${days.joinToString(" and ")}." else "") +
                     " ${Takes.college(lg, pv, if (a.id == top.id) b else a, 1, from = 1)}",
                 a.id,
@@ -667,7 +679,7 @@ object Previews {
             out += Story(
                 "Bracket buster",
                 pick(lg, 140, "Don't sleep on ${t.school}", "${t.school} could bust brackets", "Remember the name: ${t.school}"),
-                "${t.school} of the ${lg.conf(t.confId).abbr} makes the NCAA Tournament in ${pct(odds(pv, t).ncaa)} of our simulations" +
+                "${t.school} of the ${lg.conf(t.confId).abbr} has a ${pct(odds(pv, t).ncaa)} chance of making the NCAA Tournament" +
                     (if (odds(pv, t).s16 >= 0.05) " and the Sweet 16 in ${pct(odds(pv, t).s16)}." else ". Nobody will want to see them in the first round.") +
                     (s?.let { " ${it.name} (${it.posLabel}, ${it.cls}) is the reason." } ?: ""),
                 t.id,
@@ -774,6 +786,7 @@ object Previews {
 
     /** The editor's letter at the front of the issue. */
     fun editorsLetter(lg: League, pv: Preview): List<String> {
+        if (pv.letter.isNotEmpty()) return pv.letter
         val ranked = ranked(lg, pv)
         val top = ranked[0]
         val champ = CollegeHistory.lastChampion(lg)
@@ -785,7 +798,7 @@ object Previews {
             append(pick(lg, 200, "Welcome to the ${pv.season} season. ", "The ${pv.season} season is here. ", "Basketball is back. "))
             append("${top.school} opens at No. 1")
             star(lg, top)?.let { append(pick(lg, 201, ", and ${it.name} is the reason", " behind ${it.name}", ", with ${it.name} leading the way")) }
-            append(". We simulated the season $SIMS times: ${top.school} won it all in ${pct(to.title)} of them. ")
+            append(". ${top.school} has a ${pct(to.title)} title chance. ")
             if (champ != null) append(if (champ.id == top.id) "The defending champions are the team to catch." else "Defending champion ${champ.school} starts at No. ${pv.proj.getValue(champ.id).nat}.")
         }
         val ff = pv.finalFour.map { lg.team(it).school }
@@ -799,23 +812,31 @@ object Previews {
 
     /** Every area of a team's game and where it ranks nationally (0 = last, 1 = first). */
     fun profile(lg: League, t: Team, peers: List<Team> = lg.teams): List<Pair<String, Double>> {
-        fun rotation(team: Team) = lg.rosterOf(team).sortedByDescending { it.ovr }.take(8)
-        val areas = listOf<Pair<String, (Team) -> Double>>(
-            "Perimeter shooting" to { tm -> rotation(tm).map { (it[Attr.OUT] + it[Attr.MID]) / 2.0 }.average() },
-            "Finishing inside" to { tm -> rotation(tm).map { it[Attr.INS].toDouble() }.average() },
-            "Ball handling" to { tm -> rotation(tm).map { (it[Attr.HND] + it[Attr.PAS]) / 2.0 }.average() },
-            "Rebounding" to { tm -> rotation(tm).map { it[Attr.REB].toDouble() }.average() },
-            "Perimeter defense" to { tm -> rotation(tm).map { (it[Attr.PER] + it[Attr.STL]) / 2.0 }.average() },
-            "Rim protection" to { tm -> rotation(tm).map { (it[Attr.IDF] + it[Attr.BLK]) / 2.0 }.average() },
-            "Depth" to { tm -> lg.rosterOf(tm).sortedByDescending { it.ovr }.drop(5).take(4).map { it.ovr.toDouble() }.average() },
-            "Experience" to { tm -> rotation(tm).map { it.year.toDouble() }.average() },
+        val mine = profileValues(lg, t)
+        val others = peers.filter { it.id != t.id }.map { profileValues(lg, it) }
+        return mine.mapIndexed { i, (name, value) -> name to others.count { it[i].second < value }.toDouble() / others.size.coerceAtLeast(1) }
+    }
+
+    internal fun profiles(lg: League): Map<Int, List<Pair<String, Double>>> {
+        val raw = lg.teams.associate { it.id to profileValues(lg, it) }
+        return raw.mapValues { (_, mine) -> mine.mapIndexed { i, (name, value) ->
+            name to raw.values.count { it[i].second < value }.toDouble() / (raw.size - 1).coerceAtLeast(1)
+        } }
+    }
+
+    private fun profileValues(lg: League, t: Team): List<Pair<String, Double>> {
+        val roster = lg.rosterOf(t).sortedByDescending { it.ovr }
+        val rotation = roster.take(8)
+        return listOf(
+            "Perimeter shooting" to rotation.map { (it[Attr.OUT] + it[Attr.MID]) / 2.0 }.average(),
+            "Finishing inside" to rotation.map { it[Attr.INS].toDouble() }.average(),
+            "Ball handling" to rotation.map { (it[Attr.HND] + it[Attr.PAS]) / 2.0 }.average(),
+            "Rebounding" to rotation.map { it[Attr.REB].toDouble() }.average(),
+            "Perimeter defense" to rotation.map { (it[Attr.PER] + it[Attr.STL]) / 2.0 }.average(),
+            "Rim protection" to rotation.map { (it[Attr.IDF] + it[Attr.BLK]) / 2.0 }.average(),
+            "Depth" to roster.drop(5).take(4).map { it.ovr.toDouble() }.average(),
+            "Experience" to rotation.map { it.year.toDouble() }.average(),
         )
-        val group = peers.filter { it.id != t.id }
-        return areas.map { (name, f) ->
-            val all = group.map { f(it) }
-            val mine = f(t)
-            name to all.count { it < mine }.toDouble() / all.size.coerceAtLeast(1)
-        }
     }
 
     /** Team strengths and concerns, by where the team ranks nationally in each area. */
@@ -826,39 +847,9 @@ object Previews {
 
     /** Magazine-style scouting sentences built from [scouting]. */
     fun scoutingProse(lg: League, t: Team): Pair<String, String> {
-        val (good, bad) = scouting(lg, t)
-        fun strengthOf(area: String) = when (area) {
-            "Perimeter shooting" -> "they can heat up from deep and punish soft closeouts"
-            "Finishing inside" -> "they live at the rim and get to the line"
-            "Ball handling" -> "they take care of the ball and create for each other"
-            "Rebounding" -> "they own the glass on both ends"
-            "Perimeter defense" -> "they can switch and pressure on the perimeter"
-            "Rim protection" -> "they erase mistakes at the rim"
-            "Depth" -> "they can go nine deep without falling off a cliff"
-            else -> "they have a veteran core that knows how to win"
-        }
-        fun concernOf(area: String) = when (area) {
-            "Perimeter shooting" -> "the jump shot has to travel"
-            "Finishing inside" -> "they need more punch inside"
-            "Ball handling" -> "turnovers could bury them on the road"
-            "Rebounding" -> "they can get pushed around on the glass"
-            "Perimeter defense" -> "guards will have to prove they can stay in front"
-            "Rim protection" -> "the paint is a soft spot"
-            "Depth" -> "a short bench leaves little margin for foul trouble"
-            else -> "youth will cost them some nights"
-        }
-        val strength = buildString {
-            append(strengthOf(good.first()).replaceFirstChar { it.uppercase() })
-            good.getOrNull(1)?.let { append(", and ${strengthOf(it)}") }
-            append(".")
-        }
-        val concern = buildString {
-            append("The worry: ")
-            append(concernOf(bad.first()))
-            bad.getOrNull(1)?.let { append(", and ${concernOf(it)}") }
-            append(".")
-        }
-        return strength to concern
+        val report = if (lg.pro) lg.proState?.preview?.takeIf { it.season == lg.season }?.reports?.get(t.id)
+            else lg.preview?.takeIf { it.season == lg.season }?.reports?.get(t.id)
+        return report?.let { it.strength to it.concern } ?: PreviewWriting.scouting(lg, t)
     }
 
     /** Why a team can win it all, and why it might not. */
@@ -875,7 +866,7 @@ object Previews {
         else "Can a veteran group take the next step? $st starters and ${"%.1f".format(ppg)} points a game return."
         out += "Can they fix their ${bad[0].lowercase()}? It's the weakest part of their game."
         if (nc != null) out += "Is ${nc.name} ready? He's the newcomer with the most to give."
-        else star(lg, t)?.let { out += "Can ${it.name} carry the load? He's the best player on the roster." }
+        else star(lg, t)?.let { out += "Can ${it.name} carry the load? He's the team's highest-rated player." }
         return out
     }
 
@@ -914,6 +905,7 @@ object Previews {
 
     /** A short write-up: how last season went and who to watch — no raw overalls. */
     fun blurb(lg: League, t: Team): String {
+        lg.preview?.takeIf { it.season == lg.season }?.reports?.get(t.id)?.let { return it.overview }
         val last = t.history.lastOrNull()
         val s = star(lg, t)
         val nc = newcomer(lg, t)
@@ -944,18 +936,9 @@ object Previews {
 
     /** One line for a conference predicted-finish row. */
     fun confLine(lg: League, t: Team, confRank: Int): String {
-        val s = star(lg, t) ?: return "A workmanlike group looking for its identity."
-        val nc = newcomer(lg, t)
-        return when {
-            confRank == 1 -> "Our pick to win it, built around ${s.name}."
-            confRank == 2 -> "The top challenger if ${s.name} stays healthy."
-            confRank <= 4 -> listOfNotNull(
-                "${s.name} gives them a chance on any night.",
-                nc?.let { "${it.last} is the X-factor." },
-            ).joinToString(" ")
-            confRank <= lg.conf(t.confId).teamIds.size / 2 -> "Dangerous when ${s.name} gets going; consistency is the question."
-            else -> "Rebuilding pieces, with ${s.name} as the bright spot."
-        }
+        lg.preview?.takeIf { it.season == lg.season }?.reports?.get(t.id)?.let { return it.conference }
+        val chance = lg.preview?.odds?.get(t.id)?.conf ?: return "${t.school}: picked ${ordinal(confRank)}; conference odds unavailable in this older issue."
+        return "${t.school}: picked ${ordinal(confRank)}, with ${PreviewWriting.chance(chance, "the conference title")}."
     }
 
     /** Why this player is on the breakouts page. */
@@ -991,13 +974,5 @@ object Previews {
 
     private fun possessive(s: String) = if (s.endsWith("s", ignoreCase = true)) "$s'" else "$s's"
 
-    /** What the program should expect from its preseason ranking. */
-    fun expectation(nat: Int) = when {
-        nat <= 4 -> "National title contender"
-        nat <= 12 -> "Final Four darkhorse"
-        nat <= 25 -> "Second-weekend team"
-        nat <= 45 -> "NCAA Tournament team"
-        nat <= 70 -> "On the bubble"
-        else -> "Building for the future"
-    }
+    fun expectation(odds: Odds?) = odds?.let { PreviewWriting.label(it.ncaa, it.title, it.f4) } ?: "Forecast unavailable"
 }

@@ -438,8 +438,8 @@ private fun CallCard(lg: League, lv: LiveGame, c: com.nh.hoopscoach.game.GameEng
                     .padding(10.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.gold)
-                    Spacer(Modifier.weight(1f))
+                    Text("LOCKER ROOM", style = T.label, color = P.onHero, modifier = Modifier.weight(1f))
+                    AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName)
                     if (speech == null && !loadingSpeech) {
                         SmallButton("Generate AI Speech", primary = true) {
                             loadingSpeech = true
@@ -665,7 +665,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
             val rep = report!!
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(rep.outlet.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.weight(1f))
-                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+                AiBadge(rep.isAi, lg.ollama.providerDisplayName)
             }
             Spacer(Modifier.height(4.dp))
             Text(rep.headline, style = T.head, color = P.ink)
@@ -673,30 +673,28 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
             Text(rep.story, style = T.body, color = P.ink)
             Spacer(Modifier.height(12.dp))
             // Coach's quote
-            Column(
+            if (rep.coachQuote.isNotBlank()) Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(P.surface2, RoundedCornerShape(10.dp))
                     .padding(10.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("COACH'S PODIUM", style = T.label.copy(fontSize = 9.sp), color = P.accent)
-                    Tag("✨ AI QUOTE", P.accent)
+                    Text("COACH'S PODIUM", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(2.dp))
                 Text("\u201c${rep.coachQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
             }
             Spacer(Modifier.height(8.dp))
             // Star player's quote
-            Column(
+            if (rep.starQuote.isNotBlank()) Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(P.surface2, RoundedCornerShape(10.dp))
                     .padding(10.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("LOCKER ROOM REACTION", style = T.label.copy(fontSize = 9.sp), color = P.gold)
-                    Tag("✨ AI QUOTE", P.gold)
+                    Text("LOCKER ROOM REACTION", style = T.label, color = P.gold, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(2.dp))
                 Text("\u201c${rep.starQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
@@ -736,4 +734,3 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
         }
     }
 }
-

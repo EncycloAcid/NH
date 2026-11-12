@@ -16,7 +16,7 @@ object PreviewDebates {
     private fun pct(v: Double) = "${(v * 100).roundToInt().coerceIn(0, 100)}%"
 
     fun build(lg: League, pv: NbaPreview): List<TvSegment> {
-        val ranked = NbaPreviews.ranked(lg, pv)
+        val ranked = NbaPreviews.ranked(lg, pv).sortedWith(compareByDescending<Team> { pv.proj.getValue(it.id).title }.thenByDescending { pv.proj.getValue(it.id).w }.thenBy { it.id })
         if (ranked.size < 3) return emptyList()
         fun pr(t: Team) = pv.proj.getValue(t.id)
         val qs = mutableListOf<Q>()
@@ -24,15 +24,15 @@ object PreviewDebates {
         val second = ranked[1]
         // The favorite.
         qs += Q("favorite", "Are the ${top.name} the team to beat?", ((pr(top).title - 0.2) * 4).coerceIn(-0.9, 0.8), 6.0,
-            listOf("They win the title in ${pct(pr(top).title)} of our sims and reach the Finals in ${pct(pr(top).finals)}.", "Projected ${pr(top).w}-${pr(top).l}, the best record in the league."),
-            listOf("That still leaves a ${pct(1 - pr(top).title)} chance somebody else wins it.", "The ${second.name} win it in ${pct(pr(second).title)} of our sims."),
-            listOf("Best roster, best odds. Everyone else is chasing.", "Look at who they put on the floor."),
+            listOf("They have a ${pct(pr(top).title)} title chance and a ${pct(pr(top).finals)} chance of reaching the Finals.", "Projected ${pr(top).w}-${pr(top).l}; the highest title probability in the league."),
+            listOf("That still leaves a ${pct(1 - pr(top).title)} chance somebody else wins it.", "The ${second.name} have a ${pct(pr(second).title)} title chance."),
+            listOf("Strongest group, best odds. Everyone else is chasing.", "Look at who they put on the floor."),
             listOf("Nobody wins a title in October.", "Favorites lose every June."))
         // The champs.
         val (champ, _) = NbaHistory.finalists(lg, lg.season - 1)
         if (champ != null) qs += Q("repeat", "Can the ${champ.name} repeat?", ((pr(champ).title - 0.18) * 4).coerceIn(-0.85, 0.75), 6.5,
             listOf("We give them ${pct(pr(champ).title)} to win it again.", "Projected ${pr(champ).w}-${pr(champ).l}."),
-            listOf("Only a ${pct(pr(champ).title)} chance in our sims.", "Repeats are rare: everybody's best night is against you."),
+            listOf("Only a ${pct(pr(champ).title)} title chance.", "Repeats are rare: everybody's best night is against you."),
             listOf("They know how to win in June. That doesn't go away.", "Champions don't give it back easily."),
             listOf("The hunted get tired.", "Running it back is harder than winning it once."))
         val hero = lg.hero?.takeIf { lg.playerMode && it.teamId >= 0 }
@@ -47,29 +47,29 @@ object PreviewDebates {
                 val lead = pv.mvp.firstOrNull()
                 qs += Q("mvp", "Can ${hero.name} win MVP?", ((p - 0.14) * 4).coerceIn(-0.85, 0.75), 8.0,
                     listOfNotNull("He's No. ${mvpAt + 1} on our MVP board at ${pct(p)}.", "The ${ht.name} project at ${ho.w}-${ho.l}, and MVPs come from winners."),
-                    listOfNotNull(lead?.takeIf { it.pid != hero.id }?.let { "${lg.playerOrNull(it.pid)?.name ?: "The favorite"} leads the board at ${pct(it.p)}." }, "${pct(1 - p)} of our sims, somebody else wins it."),
+                    listOfNotNull(lead?.takeIf { it.pid != hero.id }?.let { "${lg.playerOrNull(it.pid)?.name ?: "The favorite"} leads the board at ${pct(it.p)}." }, "There is a ${pct(1 - p)} chance somebody else wins it."),
                     listOf("Watch him for a week and tell me who's better.", "It's his league now."),
                     listOf("Name recognition wins this award, and he's not there yet.", "Ask me again at the All-Star break."), hero.id)
             } else if (royAt in 0..4 && hero.proYears == 0) {
                 val p = pv.roy[royAt].p
                 qs += Q("roy", "Is ${hero.name} the Rookie of the Year?", ((p - 0.25) * 3).coerceIn(-0.85, 0.75), 7.0,
                     listOf("He's No. ${royAt + 1} in our rookie odds at ${pct(p)}.", "He walks into a real role with the ${ht.name}."),
-                    listOf("${pct(1 - p)} of our sims, another rookie wins it.", "Rookies hit a wall in February."),
+                    listOf("There is a ${pct(1 - p)} chance another rookie wins it.", "Rookies hit a wall in February."),
                     listOf("He's ready. You can see it.", "The minutes are there."),
                     listOf("Every year a rookie nobody talked about wins this.", "Let him play a game first."), hero.id)
             }
             if (Hometown.active(lg)) {
                 val town = Hometown.city(lg)
                 qs += Q("hometown", "Can ${hero.name} bring a title home to $town?", ((ho.title - 0.12) * 4 + (ho.playoffs - 0.5) * 0.6).coerceIn(-0.85, 0.7), 9.0,
-                    listOf("The ${ht.name} win the title in ${pct(ho.title)} of our sims.", "They make the playoffs ${pct(ho.playoffs)} of the time."),
-                    listOf("A title in only ${pct(ho.title)} of our sims.", "Projected ${ho.w}-${ho.l}. That's not a champion's record."),
+                    listOf("The ${ht.name} have a ${pct(ho.title)} title chance.", "They make the playoffs ${pct(ho.playoffs)} of the time."),
+                    listOf("Only a ${pct(ho.title)} title chance.", "Projected ${ho.w}-${ho.l}. That's not a champion's record."),
                     listOf("The kid from $town, in front of $town. That's how titles happen.", "Nobody plays harder for a city than the one who grew up in it."),
                     listOf("A great story doesn't win a playoff series.", "Every bad night, the whole city hears about it."), hero.id)
             }
             if (r.farewellSeason == lg.season) {
                 qs += Q("lastride", "Does ${hero.name} go out with a ring?", ((ho.title - 0.12) * 4).coerceIn(-0.85, 0.75), 9.5,
-                    listOf("The ${ht.name} win it all in ${pct(ho.title)} of our sims.", "Reach the conference finals ${pct(ho.confFinals)}."),
-                    listOf("They win it all in only ${pct(ho.title)} of our sims.", "Projected ${ho.w}-${ho.l}."),
+                    listOf("The ${ht.name} have a ${pct(ho.title)} title chance.", "Reach the conference finals ${pct(ho.confFinals)}."),
+                    listOf("They have only a ${pct(ho.title)} title chance.", "Projected ${ho.w}-${ho.l}."),
                     listOf("Last rides bring out something extra.", "His teammates will play for him."),
                     listOf("Sentiment doesn't guard anybody.", "Most farewell tours end in the second round."), hero.id)
             }
@@ -86,8 +86,8 @@ object PreviewDebates {
         val u = lg.user
         val uo = pr(u)
         if (uo.playoffs in 0.2..0.85) qs += Q("playoffs", "Are the ${u.name} a playoff team?", ((uo.playoffs - 0.5) * 2.2).coerceIn(-0.85, 0.85), 6.5,
-            listOf("They make the playoffs in ${pct(uo.playoffs)} of our sims.", "Projected ${uo.w}-${uo.l}, around the ${Previews.ordinal(uo.seed.roundToInt())} seed."),
-            listOf("They miss in ${pct(1 - uo.playoffs)} of our sims.", "Projected range: ${uo.lo} to ${uo.hi} wins."),
+            listOf("They have a ${pct(uo.playoffs)} playoff chance.", "Projected ${uo.w}-${uo.l}, around the ${Previews.ordinal(uo.seed.roundToInt())} seed."),
+            listOf("They have a ${pct(1 - uo.playoffs)} chance of missing the playoffs.", "Projected range: ${uo.lo} to ${uo.hi} wins."),
             listOf("They've got the top-end talent. That matters in April.", "Healthy, they're in."),
             listOf("Too many teams in the middle, and they're one of them.", "One injury and it's the lottery."))
         // Pick the three biggest, favoring the user's own stories; nothing the numbers have settled.
@@ -99,7 +99,7 @@ object PreviewDebates {
     }
 
     fun buildCollege(lg: League, pv: Preview): List<TvSegment> {
-        val ranked = pv.proj.entries.sortedBy { it.value.nat }.map { lg.team(it.key) }
+        val ranked = pv.proj.entries.sortedWith(compareByDescending<Map.Entry<Int, Proj>> { pv.odds[it.key]?.title ?: 0.0 }.thenBy { it.value.nat }).map { lg.team(it.key) }
         if (ranked.size < 4) return emptyList()
         fun pr(t: Team) = pv.proj.getValue(t.id)
         fun od(t: Team) = pv.odds[t.id] ?: Odds(0.0, 0.0, 0.0, 0.0, 0.0, 0, 0)
@@ -115,15 +115,15 @@ object PreviewDebates {
             ((topOdds.title - 0.12) * 4).coerceIn(-0.85, 0.85),
             7.0,
             listOf(
-                "They win the national title in ${pct(topOdds.title)} of our season sims and reach the Final Four in ${pct(topOdds.f4)}.",
-                "Projected ${pr(top).w}-${pr(top).l} with the No. 1 overall ranking.",
+                "They have a ${pct(topOdds.title)} national-title chance and a ${pct(topOdds.f4)} Final Four chance.",
+                "Projected ${pr(top).w}-${pr(top).l} with the No. ${pr(top).nat} overall ranking.",
             ),
             listOf(
-                "Single-elimination March means ${pct(1 - topOdds.title)} of the field is picking someone else.",
-                "No. 2 ${second.school} has a ${pct(secOdds.title)} chance in our simulations.",
+                "Single-elimination March leaves a ${pct(1 - topOdds.title)} chance somebody else wins it.",
+                "No. ${pr(second).nat} ${second.school} has a ${pct(secOdds.title)} title chance.",
             ),
             listOf(
-                "Best roster in America, top to bottom. They have all the pieces.",
+                "Strongest group in America, top to bottom. They have all the pieces.",
                 "Championship pedigree wins in March.",
             ),
             listOf(
@@ -147,8 +147,8 @@ object PreviewDebates {
                     "Projected ${cp.w}-${cp.l} with a Final Four probability of ${pct(co.f4)}.",
                 ),
                 listOf(
-                    "Sims give them only ${pct(co.title)} to repeat.",
-                    "Repeating in modern college basketball with roster turnover is nearly impossible.",
+                    "Only a ${pct(co.title)} chance to repeat.",
+                    "Repeating in modern college basketball with a changing rotation is difficult.",
                 ),
                 listOf(
                     "They have the championship DNA and culture. Don't count them out.",
@@ -179,7 +179,7 @@ object PreviewDebates {
                         "${ht.school} projects as a tournament lock at ${pr(ht).w}-${pr(ht).l}.",
                     ),
                     listOf(
-                        "${pct(1 - p)} of our simulations see another star take the trophy.",
+                        "There is a ${pct(1 - p)} chance another star takes the trophy.",
                         "POY voters demand tournament No. 1 seeds.",
                     ),
                     listOf(
@@ -203,7 +203,7 @@ object PreviewDebates {
                         "With ${hero.name} leading the way, their ceiling is unmatched.",
                     ),
                     listOf(
-                        "Sims project only ${pct(ho.f4)} to make the Final Four.",
+                        "Only a ${pct(ho.f4)} chance of making the Final Four.",
                         "One star alone cannot carry a squad through March.",
                     ),
                     listOf(
@@ -229,11 +229,11 @@ object PreviewDebates {
                     ((uo.ncaa - 0.5) * 2.5).coerceIn(-0.85, 0.85),
                     6.5,
                     listOf(
-                        "Simulations punch their ticket in ${pct(uo.ncaa)} of runs.",
+                        "A ${pct(uo.ncaa)} chance of making the tournament.",
                         "Projected ${up.w}-${up.l} (${up.cw}-${up.cl} in conference).",
                     ),
                     listOf(
-                        "Miss the tournament in ${pct(1 - uo.ncaa)} of simulations.",
+                        "A ${pct(1 - uo.ncaa)} chance of missing the tournament.",
                         "A brutal bubble battle awaits them in February.",
                     ),
                     listOf(
@@ -252,11 +252,11 @@ object PreviewDebates {
                     ((uo.f4 - 0.22) * 3.0).coerceIn(-0.85, 0.85),
                     6.5,
                     listOf(
-                        "Reach the Final Four in ${pct(uo.f4)} of our season simulations.",
+                        "A ${pct(uo.f4)} chance of reaching the Final Four.",
                         "Ranked No. ${up.nat} nationally with a projected ${up.w}-${up.l} record.",
                     ),
                     listOf(
-                        "${pct(1 - uo.f4)} of our tournament simulations fall short of Glendale.",
+                        "A ${pct(1 - uo.f4)} chance of falling short of the Final Four.",
                         "The bracket draw determines everything.",
                     ),
                     listOf(
@@ -308,10 +308,11 @@ object PreviewDebates {
 
     private fun segment(lg: League, q: Q, show: String): TvSegment {
         val numbersYes = q.lean >= 0
-        val a = Media.pundit(lg)
-        var b = Media.pundit(lg)
+        val random = kotlin.random.Random(lg.season * 6271L + q.question.hashCode())
+        val a = Media.pundit(lg, random)
+        var b = Media.pundit(lg, random)
         var guard = 0
-        while (b.handle == a.handle && guard++ < 6) b = Media.pundit(lg)
+        while (b.handle == a.handle && guard++ < 6) b = Media.pundit(lg, random)
         // The numbers side cites the projections; the hot take argues the other side with talk only (the
         // numbers don't help it, so it never quotes one against itself).
         val dataLines = if (numbersYes) q.yes else q.no

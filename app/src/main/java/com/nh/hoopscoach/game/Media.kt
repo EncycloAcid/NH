@@ -76,10 +76,10 @@ object Media {
     fun hater() = Rng.pick(listOf("Hot Takes Only" to "hottakes_only", "Overrated Watch" to "overratedwatch", "Real Hoops Fan" to "realhoopsfan_", "Bench Mob" to "benchmob99"))
 
     /** An analyst with a first-person take: a real pack account in today's game, else a made-up regular. */
-    fun pundit(lg: League): Voice {
-        SocialAccounts.pick(lg, "person")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
-        SocialAccounts.pick(lg, "analyst")?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
-        val (n, h) = Rng.pick(ANALYSTS)
+    fun pundit(lg: League, random: kotlin.random.Random = Rng.r): Voice {
+        SocialAccounts.pick(lg, "person", random)?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
+        SocialAccounts.pick(lg, "analyst", random)?.let { return Voice(it.name, it.handle, it.avatar, it.verified) }
+        val (n, h) = ANALYSTS.random(random)
         return Voice(n, h)
     }
 

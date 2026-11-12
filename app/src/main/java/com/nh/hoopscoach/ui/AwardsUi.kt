@@ -250,10 +250,8 @@ fun AiAwardCeremonyCard(lg: League, honor: Honor) {
             .padding(14.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("AWARD CEREMONY PODIUM", style = T.label.copy(fontSize = 10.sp), color = P.gold)
-            Spacer(Modifier.width(6.dp))
-            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
-            Spacer(Modifier.weight(1f))
+            Text("AWARD CEREMONY PODIUM", style = T.label, color = P.gold, modifier = Modifier.weight(1f))
+            AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName)
             if (speech == null && !loading) {
                 SmallButton("Generate Ceremony", primary = true) {
                     loading = true

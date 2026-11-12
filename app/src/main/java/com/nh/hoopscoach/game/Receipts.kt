@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 /**
  * The magazine can be wrong. Its writers don't see true strength: they lean on last season's record,
  * on star names and (in college) on big programs, and they simply misjudge some teams. [bias] is that
- * lean, in Elo, and the previews project from it. When a season ends its bold predictions are graded
+ * lean, in Elo, used for the college poll; simulation odds use strength and known availability. When a season ends its bold predictions are graded
  * (right, wrong, and what really happened), for the season review, the old issue and next year's
  * report card.
  */
@@ -60,6 +60,7 @@ object Receipts {
     fun gradePro(lg: League) {
         val ps = lg.proState ?: return
         val pv = ps.preview?.takeIf { it.season == lg.season } ?: return
+        pv.regularActual = regularWins(lg)
         if (pv.calls.isEmpty()) return
         val res = pv.calls.map { runCatching { pro(lg, ps, it) }.getOrNull() ?: (-1 to "") }
         pv.graded = res.map { it.first }
@@ -69,6 +70,7 @@ object Receipts {
     /** Grades this season's college calls. Run when the season ends, before the review column. */
     fun gradeCollege(lg: League) {
         val pv = lg.preview?.takeIf { it.season == lg.season } ?: return
+        pv.regularActual = regularWins(lg)
         if (pv.calls.isEmpty()) return
         val res = pv.calls.map { runCatching { college(lg, it) }.getOrNull() ?: (-1 to "") }
         pv.graded = res.map { it.first }
@@ -76,6 +78,15 @@ object Receipts {
     }
 
     private fun hit(b: Boolean, text: String) = (if (b) 1 else 0) to text
+
+    private fun regularWins(lg: League): Map<Int, Int> {
+        val games = lg.games.filter { it.played && PreviewAvailability.regular(it) }
+        return lg.teams.associate { t -> t.id to games.count { it.involves(t.id) && (if (it.hs > it.aws) it.home else it.away) == t.id } }
+    }
+
+    fun check(lg: League, call: Call): Pair<Int, String> = runCatching {
+        if (lg.pro) pro(lg, lg.proState!!, call) else college(lg, call)
+    }.getOrDefault(-1 to "Result unavailable.")
 
     private fun pro(lg: League, ps: ProState, c: Call): Pair<Int, String> {
         val t = lg.teams.getOrNull(c.team)

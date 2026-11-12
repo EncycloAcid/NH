@@ -316,10 +316,8 @@ private fun AiProspectScoutingCard(lg: League, pr: Prospect, p: Player) {
             .padding(10.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("AI DRAFT SCOUTING", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-            Spacer(Modifier.width(6.dp))
-            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
-            Spacer(Modifier.weight(1f))
+            Text("DRAFT SCOUTING", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
+            AiBadge(report?.isAi == true, lg.ollama.providerDisplayName)
             if (report == null && !loading) {
                 SmallButton("Generate Intel", primary = true) {
                     loading = true

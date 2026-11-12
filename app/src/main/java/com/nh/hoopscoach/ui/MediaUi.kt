@@ -128,6 +128,8 @@ fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
                     Spacer(Modifier.width(6.dp))
                     Text("@${p.handle}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Text(" · ${whenAgo(lg, p)}", style = T.small, color = P.faint, maxLines = 1)
+                    Spacer(Modifier.width(6.dp))
+                    AiBadge(p.isAi, lg?.ollama?.providerDisplayName.orEmpty())
                 }
                 // A reply to a story says which one (the outlet's own post is the story).
                 if (p.re.isNotEmpty() && p.kind != "news") {
@@ -150,10 +152,6 @@ fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
                     Text("🔁 ${Road.count(reposts)}", style = T.small, color = P.sub)
                     Spacer(Modifier.width(10.dp))
                     Text(kindLabel(p.kind), style = T.small, color = kindColor(p.kind).copy(alpha = 0.85f))
-                    if (p.isAi) {
-                        Spacer(Modifier.width(8.dp))
-                        Tag("✨ AI LABELED", P.accent)
-                    }
                     if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
                 }
                 Text(vibe(p), style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
@@ -335,8 +333,9 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     val ink = if (P.dark) Color(0xFFEFE8D8) else Color(0xFF1B1915)
     val faded = ink.copy(alpha = 0.6f)
     val serif = androidx.compose.ui.text.font.FontFamily.Serif
-    val outlet = n.source.substringAfter(" · ", n.source).ifEmpty { "The Daily" }
-    val byline = n.source.substringBefore(" · ", "").takeIf { it.isNotEmpty() && n.source.contains(" · ") }
+    val articleSource = if (n.isAiGenerated) n.source.substringBeforeLast(" · ", n.source) else n.source
+    val outlet = articleSource.substringAfter(" · ", articleSource).ifEmpty { "The Daily" }
+    val byline = articleSource.substringBefore(" · ", "").takeIf { it.isNotEmpty() && articleSource.contains(" · ") }
     var showEditDialog by remember { mutableStateOf(false) }
     var showAngleDialog by remember { mutableStateOf(false) }
     var editHeadline by remember { mutableStateOf(n.text) }
@@ -348,8 +347,12 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
         LazyColumn(Modifier.weight(1f)) {
             item {
                 Column(Modifier.padding(horizontal = Gutter, vertical = 10.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(paper).padding(16.dp)) {
-                    Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
-                        color = ink, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
+                            color = ink, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.width(8.dp))
+                        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""))
+                    }
                     Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
                     Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade", "move" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; "upset", "buzzer", "moment" -> "MOMENTS"; "" -> "NEWS"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
@@ -357,7 +360,6 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                     if (n.isAiGenerated) {
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Tag("✨ LABELED BY AI · ${n.source.substringAfter(" · ", lg.ollama.providerDisplayName).uppercase()}", P.accent)
                             if (n.approved) Tag("✓ APPROVED", P.good)
                             else Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
                             if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
@@ -405,11 +407,11 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                 Column(Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
-                                            if (n.approved) "✓ APPROVED & PUBLISHED" else "EDITOR'S DESK · DRAFT PENDING REVIEW",
+                                            if (n.approved) "PUBLISHED" else "EDITOR'S DESK · DRAFT",
                                             style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp),
                                             color = if (n.approved) P.good else (if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309)),
+                                            modifier = Modifier.weight(1f),
                                         )
-                                        if (n.isAiGenerated) Tag("✨ AI LABELED", P.accent)
                                         if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
                                     }
                                     Text(
@@ -429,8 +431,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                             ) {
                                 if (!n.approved) {
                                     SmallButton(
-                                        "✓ Approve & Publish",
-                                        primary = true,
+                                        "Publish",
                                         enabled = !generating,
                                     ) {
                                         vm.act {
@@ -452,7 +453,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                     }
                                 }
                                 SmallButton(
-                                    "✏️ Edit",
+                                    "Edit",
                                     enabled = !generating,
                                 ) {
                                     editHeadline = n.text
@@ -460,7 +461,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                     showEditDialog = true
                                 }
                                 SmallButton(
-                                    "🎲 Re-roll Angle",
+                                    "Re-roll",
                                     enabled = !generating,
                                 ) {
                                     showAngleDialog = true
@@ -577,13 +578,9 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                             res.onSuccess { text ->
                                 vm.act {
                                     val target = it.news.getOrNull(index) ?: return@act
-                                    target.body = text
+                                    text.applyTo(target)
                                     target.angle = selectedAngle
-                                    target.aiLabeled = true
                                     target.approved = false
-                                    if (!target.source.contains("AI") && !target.source.contains("Ollama")) {
-                                        target.source = "${target.source} · ${lg.ollama.providerDisplayName}".trim(' ', '·')
-                                    }
                                 }
                                 vm.toast("Story re-written with $selectedAngle perspective!")
                             }.onFailure { err ->
@@ -613,7 +610,7 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                NewsTag(n)
+                NewsTag(n, Modifier.weight(1f))
                 if (n.needsApproval) Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
                 else if (n.approved) Tag("APPROVED", P.good)
             }

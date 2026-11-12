@@ -374,7 +374,7 @@ private fun LazyListScope.nbaContents(lg: League, pv: NbaPreview, list: List<Pai
         Panel {
             Text("Every team gets a strength rating from its roster: its eight best players, the best counting most. We play the whole season 400 times from those ratings and the real schedule, through the play-in, every playoff series and the Finals. A team's projected record is its average; the win range covers 8 seasons in 10.", style = T.small, color = P.ink)
             Spacer(Modifier.height(6.dp))
-            Text("It's tuned against how seasons really play out in the game: projections miss by about 7 wins on average, about what real preseason models miss by in the NBA. Once the season starts, every result moves a team's strength, trades change it, and the projection is re-run each week.", style = T.small, color = P.sub)
+            Text("Odds are observed frequencies in 400 simulated seasons, not guarantees or measured real-world accuracy. Known absences reduce strength for their expected missed games. Weekly live projections change; this preseason issue stays fixed for the tracker.", style = T.small, color = P.sub)
         }
         Section("Contents")
         GroupList(list.withIndex().drop(2).toList()) { (i, pg) ->
@@ -400,8 +400,8 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
         Panel(color = P.accentSoft) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("${lg.ollama.providerDisplayName.uppercase()} AI STORYLINES · ${lg.ollama.activeModelName}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Text("Have ${lg.ollama.providerDisplayName} control and generate this season's NBA storylines.", style = T.small, color = P.ink)
+                    Text("THE STORY DESK", style = T.label, color = P.accent)
+                    Text("Draft from the issue's simulated odds, roster changes, injuries and scheduled rivalries.", style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
                 SmallButton(if (generating) "Writing..." else "Generate with ${lg.ollama.shortActionName}", primary = true, enabled = !generating) {
@@ -410,7 +410,7 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
                     scope.launch {
                         val top = NbaPreviews.ranked(lg, pv).firstOrNull()?.name ?: "Favorites"
                         val context = "Contenders: " + NbaPreviews.ranked(lg, pv).take(4).joinToString { it.name }
-                        val res = Ollama.generateStorylines(lg.ollama, pv.season, top, lg.user.name, lg.userTeamId, context)
+                        val res = Ollama.generateStorylines(lg.ollama, lg, pv.season, top, lg.user.name, lg.userTeamId, context)
                         generating = false
                         res.onSuccess { newStories ->
                             genStatus = ""
@@ -439,7 +439,7 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
         Panel(color = P.surface2) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("OLLAMA AI STORYLINES", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("THE STORY DESK", style = T.label, color = P.accent)
                     Text("Run Ollama on your phone or PC to generate dynamic season storylines.", style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
@@ -492,7 +492,7 @@ private fun LazyListScope.powerRankings(vm: GameViewModel, lg: League, pv: NbaPr
                         Text("TITLE ${odd(o.title)}", style = T.label.copy(fontSize = 8.sp), color = P.faint)
                     }
                 }
-                Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 3) }, style = T.small, color = P.ink, modifier = Modifier.padding(start = 72.dp, top = 4.dp))
+                Text(pv.reports[t.id]?.overview ?: remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 3) }, style = T.small, color = P.ink, modifier = Modifier.padding(start = 72.dp, top = 4.dp))
             }
         }
     }
@@ -593,7 +593,7 @@ private fun LazyListScope.conference(vm: GameViewModel, lg: League, pv: NbaPrevi
                     }
                     Spacer(Modifier.height(5.dp))
                     GrowBar(o.playoffs.toFloat(), Modifier.fillMaxWidth().padding(start = 66.dp), teamInk(t), 4.dp)
-                    Text(remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 2, from = 1) }, style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
+                    Text(pv.reports[t.id]?.conference ?: remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 2, from = 1) }, style = T.small, color = P.sub, modifier = Modifier.padding(start = 66.dp, top = 4.dp))
                 }
             }
         }
@@ -734,7 +734,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
                     TeamBadge(u, 52.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(when { o.title >= 0.12 -> "TITLE CONTENDER"; o.six >= 0.6 -> "PLAYOFF TEAM"; o.playoffs >= 0.35 -> "ON THE BUBBLE"; else -> "REBUILDING" }, style = T.label, color = accent)
+                        Text(com.nh.hoopscoach.game.PreviewWriting.label(o.playoffs, o.title, o.confFinals).uppercase(), style = T.label, color = accent)
                         Text(u.name.uppercase(), style = T.title.copy(fontSize = 24.sp, lineHeight = 25.sp), color = fg)
                         Text("Coach ${lg.coachOf(u).name} · ${Payroll.status(lg, u)}", style = T.small, color = fg.copy(alpha = 0.85f), maxLines = 1)
                     }
@@ -806,10 +806,17 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
             }
             Text("Right column: our chance to win each game.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
         }
-        ScoutingReport(vm, lg, u, o.lo, o.hi)
-        Section("The bottom line")
         Panel {
-            Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = T.body, color = P.ink)
+            Text(com.nh.hoopscoach.game.PreviewWriting.range(o.lo, o.median, o.hi, o.w + o.l), style = T.small, color = P.sub)
+            Text(com.nh.hoopscoach.game.PreviewWriting.chance(o.playoffs, "the playoffs"), style = T.small, color = P.ink)
+            Text("Conference champion: ${odd(o.finals)} · Title: ${odd(o.title)} · 400 simulated seasons.", style = T.small, color = P.sub)
+        }
+        if (pv.reports.containsKey(u.id)) PreviewTeamCopy(pv.reports[u.id]) else ScoutingReport(vm, lg, u, o.lo, o.hi)
+        if (!pv.reports.containsKey(u.id)) {
+            Section("The bottom line")
+            Panel {
+                Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = T.body, color = P.ink)
+            }
         }
     }
 }
@@ -817,6 +824,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
 // ---------- predictions ----------
 
 private fun LazyListScope.nbaPredictions(vm: GameViewModel, lg: League, pv: NbaPreview) {
+    previewTracker(lg, com.nh.hoopscoach.game.PreviewTracker.pro(lg, pv))
     item {
         for (c in 0..1) {
             val seeds = lg.teams.filter { it.confId == c }.sortedBy { proj(pv, it).seed }.take(8)

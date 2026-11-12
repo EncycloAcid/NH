@@ -515,7 +515,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
                     vm.act { it.road?.press = newQ }
                     vm.toast("Generated postgame Q&A with ${lg.ollama.providerDisplayName}!")
                 }.onFailure {
-                    vm.toast("Generated with ${lg.ollama.providerDisplayName}!")
+                    vm.toast("Draft unavailable; the original game-written question was kept.")
                 }
             }
         },
@@ -527,10 +527,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            val isAi = q.isAi || q.reporter.contains("AI", ignoreCase = true) || q.reporter.contains("Ollama", ignoreCase = true) || q.reporter.contains("Gemini", ignoreCase = true) || q.reporter.contains("ChatGPT", ignoreCase = true) || lg.ollama.enabled
-            if (isAi) {
-                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.accent)
-            }
+            AiBadge(q.isAi, q.reporter.substringAfterLast(" · ", lg.ollama.providerDisplayName))
         }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Top) {

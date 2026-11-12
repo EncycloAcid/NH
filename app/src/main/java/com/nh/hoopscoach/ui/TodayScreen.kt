@@ -181,15 +181,14 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("🔥 PREGAME RIVALRY HYPE", style = T.label.copy(fontSize = 10.sp), color = P.bad)
-                Tag("✨ AI HYPE", P.accent)
-            }
+            Text("RIVALRY PREVIEW", style = T.label, color = P.bad, modifier = Modifier.weight(1f))
             if (existing != null) {
                 SmallButton("Read Preview 📰") {
                     val idx = lg.news.indexOf(existing)
                     if (idx >= 0) vm.push(Route.Article(idx))
                 }
+                Spacer(Modifier.width(8.dp))
+                AiBadge(existing.isAiGenerated, existing.source.substringAfterLast(" · ", ""))
             } else {
                 SmallButton(if (loading) "Generating..." else "Generate Hype ✍️", primary = true, enabled = !loading) {
                     loading = true
@@ -209,7 +208,7 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
         Spacer(Modifier.height(4.dp))
         Text(
             if (existing != null) "Pregame preview generated: \"${existing.text}\""
-            else "Have ${lg.ollama.providerDisplayName} write a fiery pregame rivalry preview breaking down bad blood and quotes.",
+            else "A matchup preview grounded in the current records, available players and scheduled rivalry.",
             style = T.small,
             color = P.sub,
         )
@@ -246,10 +245,8 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("AI SCOUTING KEYS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
-            }
+            Text("SCOUTING KEYS", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
+            AiBadge(keys?.any { it.isAi } == true, lg.ollama.providerDisplayName)
             if (keys == null && !loading) {
                 Text(
                     "Generate with ${lg.ollama.shortActionName} AI ✍️",
@@ -283,7 +280,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             }
         } else {
             Spacer(Modifier.height(4.dp))
-            Text("Have ${lg.ollama.providerDisplayName} analyze matchups and write 3 tactical keys to victory against ${opp.school}. Labeled by AI.", style = T.small, color = P.faint)
+            Text("Analyze the current rosters and matchup against ${opp.school}.", style = T.small, color = P.faint)
         }
     }
 }

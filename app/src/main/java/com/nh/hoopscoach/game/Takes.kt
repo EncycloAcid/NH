@@ -149,7 +149,7 @@ object Takes {
             last != null && lastAp <= 0 && pr.nat <= 15 -> pick(lg, t, 4,
                 "Unranked at the end of last season, ${t.school} opens at No. ${pr.nat}.",
                 "Nobody climbed more over the summer: from outside the poll to No. ${pr.nat}.",
-                "From unranked to No. ${pr.nat}. The roster changed, and so did the expectations.",
+                "From unranked to No. ${pr.nat}. The team changed, and so did the expectations.",
             )
             lastAp > 0 && lastAp - pr.nat >= 10 -> pick(lg, t, 5,
                 "Up from No. $lastAp in the final poll to No. ${pr.nat}.",
@@ -162,7 +162,7 @@ object Takes {
             st >= 4 && last != null -> pick(lg, t, 7,
                 "${cap(num(st))} starters and ${f1(ppg)} points a game return from a $lastLine team.",
                 "Continuity is the word: ${num(st)} starters back from last season's $lastLine group.",
-                "Few rosters are as settled. ${cap(num(st))} starters return, and ${f1(ppg)} points a game with them.",
+                "Few teams are as settled. ${cap(num(st))} starters return, and ${f1(ppg)} points a game with them.",
             )
             known && st <= 1 && nc != null -> pick(lg, t, 8,
                 "Almost everyone is new: ${if (st == 0) "no starters" else "one starter"} back, and a rebuilt rotation.",
@@ -174,7 +174,7 @@ object Takes {
             )
             drought >= 4 && o.ncaa >= 0.45 -> pick(lg, t, 10,
                 "$drought years without an NCAA bid. This could be the year that ends.",
-                "The drought is $drought seasons long; the roster says it's time.",
+                "The drought is $drought seasons long; this group says it's time.",
             )
             star != null && starLast != null && starLast.s.ppg >= 17 -> pick(lg, t, 11,
                 "It's ${poss(star.name)} team.",
@@ -182,7 +182,7 @@ object Takes {
                 "${t.school} goes as ${star.name} goes.",
             )
             pr.nat <= 8 && titles.isEmpty() -> pick(lg, t, 17,
-                "Still chasing a first national title, and this roster is good enough to win one.",
+                "Still chasing a first national title, and this team is good enough to win one.",
                 "No banner yet. This could be the team that hangs the first one.",
             )
             pr.nat <= 25 && titles.size >= 4 && lg.season - titles.last() >= 15 -> pick(lg, t, 18,
@@ -193,10 +193,10 @@ object Takes {
                 "Blue blood, ${num(titles.size)} banners deep (the last in ${titles.last()}), and a contender again.",
                 "${CollegeHistory.count(titles.size).replaceFirstChar { it.uppercase() }}, the last in ${titles.last()}. The standard is the standard.",
             )
-            pr.nat <= 5 -> pick(lg, t, 12, "A title contender from day one.", "Built to play in April.", "The ceiling is a championship.")
-            pr.nat <= 25 -> pick(lg, t, 13, "Ranked, and with reason.", "A second-weekend team on paper.", "Good enough to win any night.")
-            o.ncaa >= 0.4 -> pick(lg, t, 14, "A bubble team that could play its way off it.", "In the mix for a bid.", "One good month from the field.")
-            pr.confRank <= 2 -> pick(lg, t, 15, "A contender in the ${conf.abbr}.", "Picked near the top of the ${conf.abbr}.")
+            o.title >= 0.10 -> pick(lg, t, 12, "A title contender from day one.", "A chance to play in April.", "The ceiling is a championship.")
+            o.ncaa > 0.65 -> pick(lg, t, 13, "A likely tournament team.", "Favored to make the field, not guaranteed.", "A strong postseason case.")
+            o.ncaa in 0.35..0.65 -> pick(lg, t, 14, "A bubble team that could play its way off it.", "In the mix for a bid, with little certainty.", "The bid could go either way.")
+            o.conf >= 0.35 -> pick(lg, t, 15, "A contender in the ${conf.abbr}.", "A plausible winner of the ${conf.abbr}.")
             else -> pick(lg, t, 16, "A work in progress.", "Building, one season at a time.", "Looking for a breakthrough.")
         }
     }
@@ -207,7 +207,7 @@ object Takes {
         val who = "the ${classWord(s.cls)} ${posWord(s.pos)}"
         val starPart = when {
             starLast != null && starLast.s.ppg < 9 -> pick(lg, t, 23,
-                "${s.name}, $who, is the best player on the roster after a quiet ${f1(starLast.s.ppg)}-point season; his breakout is the key.",
+                "${s.name}, $who, is the best player on the team after a quiet ${f1(starLast.s.ppg)}-point season; his breakout is the key.",
                 "The most talented player is ${s.name}, $who, who scored only ${f1(starLast.s.ppg)} a game last season. That changes now.",
             )
             starLast != null && named -> pick(lg, t, 24,
@@ -219,8 +219,8 @@ object Takes {
                 "${s.name} is back after ${statLine(s, starLast)} a game.",
                 "The headliner is ${s.name}, $who who put up ${statLine(s, starLast)}.",
             )
-            Previews.isTransfer(s) -> "${s.name} arrives from ${Previews.cameFrom(lg, s)} as the best player on the roster."
-            s.year == 1 && s.recruitRank > 0 -> "Freshman ${s.name}, the No. ${s.recruitRank} recruit, is the best player on the roster from day one."
+            Previews.isTransfer(s) -> "${s.name} arrives from ${Previews.cameFrom(lg, s)} as the best player on the team."
+            s.year == 1 && s.recruitRank > 0 -> "Freshman ${s.name}, the No. ${s.recruitRank} recruit, is the best player on the team from day one."
             else -> "${s.name}, $who, leads the way."
         }
         val c = nc ?: return starPart
@@ -263,11 +263,11 @@ object Takes {
     private fun Col.outlook(): String {
         val wide = o.hi - o.lo >= 9
         return when {
-            pr.nat <= 5 -> pick(lg, t, 40,
+            o.title >= 0.10 -> pick(lg, t, 40,
                 "We have them ${pr.w}-${pr.l}: Final Four ${pct(o.f4)}, title ${pct(o.title)}.",
-                "In our ${NbaPreviews.SIMS} seasons they reached the Final Four ${pct(o.f4)} of the time and won it all ${pct(o.title)}.",
+                "Their Final Four chance is ${pct(o.f4)}, and their national-title chance is ${pct(o.title)}.",
             )
-            pr.nat <= 25 -> pick(lg, t, 41,
+            o.ncaa > 0.65 -> pick(lg, t, 41,
                 "Projection: ${pr.w}-${pr.l} (${o.lo} to ${o.hi} wins), ${ord(pr.confRank)} in the ${conf.abbr}, Sweet 16 ${pct(o.s16)}.",
                 "We see ${pr.w}-${pr.l} and a ${pct(o.s16)} shot at the second weekend.",
             )
@@ -340,7 +340,7 @@ object Takes {
                 c.known && c.st <= 2 -> append("Only ${num(c.st)} starters return; chemistry takes time.")
                 c.newCoach -> append("A new coach means a new system to learn.")
                 (r?.get(7) ?: 0) >= c.n * 2 / 3 -> append("It's a young rotation (${ord(r!![7])} in experience).")
-                c.o.title < 0.1 -> append("Even the favorites win it all only ${pct(c.o.title)} of the time in our sims.")
+                c.o.title < 0.1 -> append("Even the favorites have only a ${pct(c.o.title)} title chance.")
                 else -> append(pick(lg, t, 64,
                     "The single-elimination bracket doesn't care about the regular season.",
                     "One cold shooting night in March and it's over; that's the tournament.",
@@ -378,7 +378,7 @@ object Takes {
             if (flips.isNotEmpty()) append("The season swings on ${flips.size} coin-flip ${if (flips.size == 1) "game" else "games"}" + (biggest?.let { ", none closer than ${it.school}" } ?: "") + "; ")
             append(if (longShots > 0) "$longShots more ${if (longShots == 1) "is" else "are"} long shots that would make the résumé. " else "there's no game on the schedule they can't win. ")
             if (bw != null) append(if (bw.second.second <= c.n / 9) "There's no weak spot to fix; it's about winning the close ones. " else "Fix the ${AREAS[bw.second.first]} (${ord(bw.second.second)}) and the ceiling rises. ")
-            append(Previews.expectation(c.pr.nat) + ". ")
+            append(Previews.expectation(c.o) + ". ")
             append(CollegeHistory.line(lg, t))
             val r = Scout.report(lg, t)
             append(" The question: ${r.question} Best case, ${c.o.hi} wins if ${r.best}; worst case, ${c.o.lo} if ${r.worst}.")
@@ -455,7 +455,7 @@ object Takes {
                 "A Finals loss stings all summer. The ${t.name} are back to finish the job.",
             )
             titleRank in 1..5 && pr.title >= 0.07 && (titles.isEmpty() || lg.season - titles.last() >= 25) -> pick(lg, t, 116,
-                if (titles.isEmpty()) "Still chasing the franchise's first title, and this could be the roster." else "${lg.season - titles.last()} years since the last title (${titles.last()}); this roster could end the wait.",
+                if (titles.isEmpty()) "Still chasing the franchise's first title, and this could be the group." else "${lg.season - titles.last()} years since the last title (${titles.last()}); this team could end the wait.",
                 if (titles.isEmpty()) "No banner yet. This team has a real shot at the first one." else "The last parade was in ${titles.last()}. A contender again.",
             )
             titleRank == 1 -> pick(lg, t, 103,
@@ -476,7 +476,7 @@ object Takes {
                 "Down ${-delta} wins on last season, and ${poss(d.name)} exit is most of it.",
             )
             delta <= -9 -> pick(lg, t, 107,
-                "Down ${-delta} wins on last season: the roster got older and thinner.",
+                "Down ${-delta} wins on last season: the team got older and thinner.",
                 "The projection slides ${-delta} wins. Something has to break right.",
             )
             a != null -> pick(lg, t, 108,
@@ -523,7 +523,7 @@ object Takes {
                 "${s.name} (${s.posLabel}, ${s.age}) is the engine: ${f1(starLast.s.ppg)} a night last season.",
                 "It's ${poss(s.name)} team after ${f1(starLast.s.ppg)} points a game.",
             )
-            s.proYears == 0 -> "Rookie ${s.name} is already the best player on the roster."
+            s.proYears == 0 -> "Rookie ${s.name} is already the best player on the team."
             else -> "${s.name} (${s.posLabel}) leads the way."
         }
         val a = newPiece?.takeIf { it.first.id != s.id && !lead.contains(it.first.name) }
@@ -558,7 +558,7 @@ object Takes {
     private fun Nba.outlook(): String = when {
         pr.title >= 0.12 -> pick(lg, t, 140,
             "${pr.w}-${pr.l} projected, Finals ${pct(pr.finals)}, title ${pct(pr.title)}.",
-            "Our sims: ${pr.w} wins, the Finals ${pct(pr.finals)} of the time, the title ${pct(pr.title)}.",
+            "Projected ${pr.w} wins, with a ${pct(pr.finals)} Finals chance and a ${pct(pr.title)} title chance.",
         )
         pr.playoffs >= 0.75 -> pick(lg, t, 141,
             "${pr.w}-${pr.l} (${pr.lo} to ${pr.hi} wins), about the ${ord(pr.seed.roundToInt())} seed, playoffs ${pct(pr.playoffs)}.",

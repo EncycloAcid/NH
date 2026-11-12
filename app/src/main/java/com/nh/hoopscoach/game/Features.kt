@@ -47,11 +47,10 @@ object Features {
 
     private fun nbaTiers(lg: League, pv: NbaPreview): Feature {
         val order = lg.teams.sortedByDescending { pr(pv, it).title * 100 + pr(pv, it).playoffs * 10 + pr(pv, it).w / 100.0 }
-        fun tier(t: Team): String { val o = pr(pv, t); return when {
-            o.title >= 0.08 -> "Contenders"; o.title >= 0.02 -> "Dark horses"; o.playoffs >= 0.6 -> "Playoff teams"; o.playoffs >= 0.25 -> "The bubble"; else -> "The lottery" } }
+        fun tier(t: Team): String { val o = pr(pv, t); return PreviewWriting.label(o.playoffs, o.title, o.confFinals) }
         val items = order.map { t ->
             val o = pr(pv, t)
-            FeatureItem("${t.name} · ${o.w}-${o.l}", Takes.nba(lg, pv, t, 1, from = 1).ifEmpty { "Playoffs ${pct(o.playoffs)}, title ${pct(o.title)}." }, tier(t), t.id)
+            FeatureItem("${t.name} · ${o.w}-${o.l}", pv.reports[t.id]?.strength ?: "Playoffs ${pct(o.playoffs)}, title ${pct(o.title)}.", tier(t), t.id)
         }
         return Feature("tiers", "The tiers", "All ${lg.teams.size} teams, sorted into where they really stand.", items, grouped = true)
     }
@@ -73,8 +72,8 @@ object Features {
             val why = when {
                 tv != null && over && tv.arrivals.any { NbaPreviews.lastLine(lg, it) != null } -> "The newcomers (${tv.arrivals.filter { NbaPreviews.lastLine(lg, it) != null }.sortedByDescending { it.ovr }.take(2).joinToString(" and ") { it.last }}) are worth more than the line thinks."
                 tv != null && !over && tv.departures.isNotEmpty() -> "The line still counts ${tv.departures.first().first.last}, who's gone."
-                over -> "The roster is better than last season's record."
-                else -> "Last season's record flattered this roster."
+                over -> "This group is better than last season's record."
+                else -> "Last season's record flattered this group."
             }
             FeatureItem("${t.name}: ${if (over) "OVER" else "UNDER"} ${f1(l)}", "We project $w. $why", "${if (over) "OVER" else "UNDER"} · $conf", t.id)
         }
@@ -153,7 +152,7 @@ object Features {
         }.sortedByDescending { it.second }.take(6).map { (t, h) ->
             val c = lg.coachOf(t)
             FeatureItem("${c.name}, ${t.name}", "${c.history.count { it.teamId == t.id }} seasons in charge, ${c.w}-${c.l} overall. We project ${pr(pv, t).w} wins" +
-                (if (pr(pv, t).title >= 0.05) "; with a roster this good, anything short of a deep run is trouble." else "; another losing year could be his last."),
+                (if (pr(pv, t).title >= 0.05) "; with a team this good, anything short of a deep run is trouble." else "; another losing year could be his last."),
                 if (h >= 5) "HOT" else "WARM", t.id)
         }
         return Feature("hotseat", "The hot seat", "The coaches who need a good year, and why.", items)
@@ -229,13 +228,7 @@ object Features {
         val top = colRanked(lg, pv).take(40)
         fun tier(t: Team): String {
             val o = odds(pv, t)
-            return when {
-                o.title >= 0.06 -> "Title contenders"
-                o.f4 >= 0.08 -> "Final Four sleepers"
-                o.s16 >= 0.2 -> "Second-weekend teams"
-                o.ncaa >= 0.5 -> "Tournament teams"
-                else -> "On the bubble"
-            }
+            return PreviewWriting.label(o.ncaa, o.title, o.f4)
         }
         fun summary(t: Team): String {
             val o = odds(pv, t)
@@ -282,11 +275,11 @@ object Features {
         fun ask(q: String, a: String, t: Int = -1, p: Int = -1) { items += FeatureItem(q, a, "Q${items.size + 1}", t, p) }
         val fav = ranked[0]
         ask("Is ${fav.school} the team to beat?", "Yes, at ${pct(odds(pv, fav).title)} to win it all. It's still more likely somebody else cuts down the nets.", fav.id)
-        CollegeHistory.lastChampion(lg)?.let { c -> ask("Can ${c.school} repeat?", "${pct(odds(pv, c).title)} in our simulations. ${if (odds(pv, c).title >= 0.1) "It has the roster." else "Not with this roster."}", c.id) }
+        CollegeHistory.lastChampion(lg)?.let { c -> ask("Can ${c.school} repeat?", "A ${pct(odds(pv, c).title)} chance. ${if (odds(pv, c).title >= 0.1) "It has a credible case." else "A repeat is a long shot."}", c.id) }
         pv.poy.firstOrNull()?.let { o -> lg.playerOrNull(o.pid)?.let { ask("Who's the Player of the Year?", "${it.name}, ${lg.team(it.teamId).school} (${pct(o.p)}).", it.teamId, it.id) } }
         lg.teams.getOrNull(pv.sleeper)?.let { t -> ask("Who's the sleeper?", "${t.school}: No. ${pv.proj.getValue(t.id).nat} in our poll, and a second-weekend team ${NbaPreviews.often(odds(pv, t).s16)}.", t.id) }
         lg.teams.getOrNull(pv.cinderella)?.let { t -> ask("Who's this year's Cinderella?", "${t.school} out of the ${lg.conf(t.confId).abbr}: in the tournament ${NbaPreviews.often(odds(pv, t).ncaa)}, the Sweet 16 ${NbaPreviews.often(odds(pv, t).s16)}.", t.id) }
-        pv.bids.maxByOrNull { it.value }?.let { (c, n) -> ask("Which is the best conference?", "The ${lg.conf(c).name}, with ${f1(n)} NCAA bids in an average simulation.") }
+        pv.bids.maxByOrNull { it.value }?.let { (c, n) -> ask("Which is the best conference?", "The ${lg.conf(c).name}, with ${f1(n)} projected NCAA bids.") }
         val u = lg.user
         ask("Does ${u.school} go dancing?", "${if (odds(pv, u).ncaa >= 0.5) "Yes" else "Probably not"}: ${pct(odds(pv, u).ncaa)}.", u.id)
         lg.teams.getOrNull(pv.freshmen.firstOrNull()?.let { lg.playerOrNull(it)?.teamId } ?: -1)?.let { t ->
@@ -301,7 +294,7 @@ object Features {
 
     private fun colConferences(lg: League, pv: Preview): Feature {
         val rows = lg.confs.map { c -> c to (pv.bids[c.id] ?: 0.0) }.sortedByDescending { it.second }.take(12)
-        return Feature("conferences", "Conference rankings", "Every league's strength, by the NCAA bids it gets in our simulations.",
+        return Feature("conferences", "Conference rankings", "Every league's strength, by its projected NCAA bids.",
             rows.mapIndexed { i, (c, b) ->
                 val fav = c.teamIds.map { lg.team(it) }.minByOrNull { pv.proj[it.id]?.confRank ?: 99 }
                 FeatureItem("${i + 1}. ${c.name}", "${f1(b)} bids on average. The favorite: ${fav?.school ?: "?"}" + (fav?.let { " (No. ${pv.proj.getValue(it.id).nat})" } ?: "") + ".", "", fav?.id ?: -1)
@@ -340,7 +333,7 @@ object Features {
         val tvs = ranked.take(25).mapNotNull { t -> Analysis.turnover(lg, t)?.let { t to it } }
         tvs.minByOrNull { it.second.returning }?.let { (t, tv) -> items += FeatureItem(pct(tv.returning), "Of ${t.school}'s minutes are back, the fewest in our Top 25.", "", t.id) }
         tvs.maxByOrNull { it.second.returning }?.let { (t, tv) -> items += FeatureItem(pct(tv.returning), "Back at ${t.school}, the most in our Top 25.", "", t.id) }
-        pv.bids.maxByOrNull { it.value }?.let { (c, n) -> items += FeatureItem(f1(n), "NCAA bids for the ${lg.conf(c).name} in an average simulation, the most.") }
+        pv.bids.maxByOrNull { it.value }?.let { (c, n) -> items += FeatureItem(f1(n), "Projected NCAA bids for the ${lg.conf(c).name}, the most.") }
         lg.players.filter { it.teamId >= 0 }.maxByOrNull { Analysis.project(lg, it).ppg }?.let { p -> items += FeatureItem(f1(Analysis.project(lg, p).ppg), "Projected points a game for ${p.name}, the country's top scorer in our model.", "", p.teamId, p.id) }
         return Feature("numbers", "By the numbers", "The season in figures.", items)
     }

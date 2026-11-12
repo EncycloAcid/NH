@@ -71,7 +71,7 @@ object SocialAccounts {
      * the networks that air the games), "analyst" (outlets and people with takes), "person" (analysts who
      * are people, for first-person takes) and "insider" (the college game has its own).
      */
-    fun pick(lg: League, kind: String): Account? {
+    fun pick(lg: League, kind: String, random: kotlin.random.Random = Rng.r): Account? {
         if (!today(lg)) return null
         val wrongLevel = if (lg.pro) COLLEGE_ONLY else NBA_ONLY
         val pool = when (kind) {
@@ -82,7 +82,7 @@ object SocialAccounts {
             "insider" -> all.filter { it.type in (if (lg.pro) listOf("insider") else listOf("cbb insider", "recruiting")) }
             else -> return null
         }.filter { it.handle.isNotBlank() && it.handle != "wojespn" && it.name !in wrongLevel } // Woj retired in 2024; the rest are fair game.
-        return if (pool.isEmpty()) null else Rng.pick(pool)
+        return if (pool.isEmpty()) null else pool.random(random)
     }
 
     /** The league's own account: the NBA, or the NCAA. */
