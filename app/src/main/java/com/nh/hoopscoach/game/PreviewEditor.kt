@@ -9,15 +9,15 @@ internal class PreviewEditor(season: Int, reports: Map<Int, TeamPreview>) {
         }
     }
 
-    fun text(value: String, context: String): String = sentences(value).joinToString(" ") { sentence ->
+    fun text(value: String, context: String): String = value.split(Regex("\\n\\s*\\n")).joinToString("\n\n") { paragraph -> sentences(paragraph).joinToString(" ") { sentence ->
         if (picker.reserve(sentence)) return@joinToString sentence
         val body = sentence.replaceFirstChar { it.lowercase() }
         val label = context.replace(Regex("(?<=\\d)\\.(?=\\s)"), "")
         picker.pick(listOf("For $label, $body", "Our $label assessment: $body",
             "The $label angle is this: $body"), label)
-    }
+    } }
 
-    fun story(s: Story, context: String = s.head) = Story(s.kicker, s.head, text(s.body, context), s.teamId, s.pid, s.aiProvider)
+    fun story(s: Story, context: String = s.head) = Story(s.kicker, s.head, text(s.body, context), s.teamId, s.pid, s.aiProvider, s.fallbackReason)
 
     fun feature(f: Feature) = Feature(f.kind, f.title, text(f.deck, f.title), f.items.map {
         FeatureItem(it.head, text(it.body, it.head), it.tag, it.teamId, it.pid)

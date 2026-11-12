@@ -53,7 +53,7 @@ object PreviewTopics {
     }
 
     fun stories(lg: League, topics: List<PreviewTopic>) = topics.map {
-        Story(it.kind.replaceFirstChar { c -> c.uppercase() }, it.subject, it.facts, it.teamId, it.pid)
+        Story(it.kind.replaceFirstChar { c -> c.uppercase() }, it.subject, it.facts + "\n\n" + ArticleWriting.news(lg, News(lg.season, lg.day, it.subject, teamId = it.teamId, pid = it.pid), includeForecast = false), it.teamId, it.pid)
     }
 
     fun match(lg: League, topics: List<PreviewTopic>, text: String): PreviewTopic? =

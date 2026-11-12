@@ -39,6 +39,7 @@ object AiDiagnostics {
         else -> "Ollama must run separately. Localhost means this phone, not your computer. Use the computer's LAN IP and port 11434 on the same network; bind Ollama to that LAN address and allow the port through its firewall. 10.0.2.2 is emulator-only."
     }
     fun networkReason(error: Throwable?, config: OllamaConfig): String {
+        if (listOf("token limit", "Incomplete model stream", "incomplete or filtered").any { error?.message?.contains(it, true) == true }) return "Model response was cut off or blocked before completion. Used complete game-written coverage."
         if (error?.message?.contains("no compatible text models", true) == true) return "Provider lists no compatible text models. Check API access or enter a supported model ID manually."
         if (error?.message?.contains("fact sheet exceeds", true) == true) return "The report exceeds the local model context budget. Use a cloud model or a smaller report."
         if ((config.provider == "google" && config.googleApiKey.isBlank()) || (config.provider == "openai" && config.openAiApiKey.isBlank())) return setupHint(config)

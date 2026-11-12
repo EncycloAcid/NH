@@ -4,6 +4,7 @@ import com.nh.hoopscoach.game.LeagueGen
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.OllamaConfig
+import com.nh.hoopscoach.game.ArticleWriting
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,10 +23,9 @@ import kotlin.concurrent.thread
 
 class AiProviderGroundingTest {
     @Test fun actualProviderPathRetriesAndLeavesTemplateOnRepeatedInvalidDrafts() = runBlocking {
-        val lg = LeagueGen.newLeague()
-        lg.user.w = 7; lg.user.l = 3; lg.day = 10
+        val (lg, news) = ArticleFixture.league()
         val original = "Original game-written template."
-        val news = News(lg.season, lg.day, "${lg.user.school} outlook", teamId = lg.userTeamId, body = original)
+        news.body = original
         val calls = AtomicInteger()
         val requests = Collections.synchronizedList(mutableListOf<String>())
         var validSecond = true
@@ -48,7 +48,7 @@ class AiProviderGroundingTest {
                     while (offset < length) { val n = input.read(body, offset, length - offset); check(n > 0); offset += n }
                     requests += body.toString(Charsets.UTF_8)
                     val call = calls.incrementAndGet()
-                    val text = if (validSecond && call == 2) "${lg.user.school} is 7-3." else "Unknown Person scored 999 points."
+                    val text = if (validSecond && call == 2) ArticleWriting.news(lg, news) else "Unknown Person scored 999 points."
                     val payload = JsonObject(mapOf("response" to JsonPrimitive(text), "done" to JsonPrimitive(true))).toString().toByteArray()
                     socket.getOutputStream().apply {
                         write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n".toByteArray())
@@ -58,10 +58,10 @@ class AiProviderGroundingTest {
             } catch (e: Exception) { if (!server.isClosed) failure.set(e) }
         }
         try {
-            val config = OllamaConfig(enabled = true, host = "http://127.0.0.1:${server.localPort}", model = "test", cacheResponses = false)
+            val config = OllamaConfig(enabled = true, host = "http://127.0.0.1:${server.localPort}", model = "test-small", cacheResponses = false)
             val result = Ollama.generateArticle(config, lg, news)
-            assertEquals("${lg.user.school} is 7-3.", result.getOrThrow().text)
-            assertTrue(result.getOrThrow().isAi)
+            assertEquals(ArticleWriting.news(lg, news), result.getOrThrow().text)
+            assertTrue(result.getOrThrow().fallbackReason, result.getOrThrow().isAi)
             assertEquals(2, calls.get())
             assertTrue(requests.all { it.contains("FACT SHEET") && it.contains("current record 7-3") })
             assertTrue(requests.last().contains("previous draft was rejected"))

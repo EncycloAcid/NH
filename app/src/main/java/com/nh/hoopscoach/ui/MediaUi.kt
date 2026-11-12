@@ -1,6 +1,7 @@
 package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import com.nh.hoopscoach.game.Ollama
+import com.nh.hoopscoach.game.ArticleWriting
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -325,6 +327,11 @@ fun newsClick(vm: GameViewModel, lg: League, n: News): (() -> Unit)? {
 @Composable
 fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     val n = lg.news.getOrNull(index) ?: run { vm.back(); return }
+    val incomplete = !n.source.startsWith("Edited ·") && ArticleWriting.errors(n.body, lg.ollama).isNotEmpty()
+    val articleBody = if (incomplete) ArticleWriting.news(lg, n) else n.body
+    val verified = n.isAiGenerated && !incomplete
+    val fallbackReason = if (incomplete && n.isAiGenerated) "Incomplete saved draft replaced with game-written coverage." else n.aiFallbackReason
+    val articleGame = lg.games.firstOrNull { it.id == n.gameId && it.played }
     var generating by remember { androidx.compose.runtime.mutableStateOf(false) }
     var ollamaError by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -351,7 +358,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
                             color = ink, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.width(8.dp))
-                        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""), fallbackReason = n.aiFallbackReason)
+                        AiBadge(verified, n.source.substringAfterLast(" · ", ""))
                     }
                     Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
@@ -367,27 +374,38 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                     }
                     Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
                         color = ink, modifier = Modifier.padding(top = 6.dp))
-                    if (byline != null) Text("By $byline", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
+                    Text("By ${if (verified) byline ?: "Staff" else "Staff"} · ${n.season} season, day ${n.day}", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
                         color = faded, modifier = Modifier.padding(top = 6.dp))
+                    if (!verified && fallbackReason.isNotBlank()) Text("Game-written: $fallbackReason", style = T.small, color = faded, modifier = Modifier.padding(top = 4.dp))
                     // The picture: the player the story is about, or his team.
                     val pic = lg.playerOrNull(n.pid)
                     val team = lg.teams.getOrNull(n.teamId)
                     if (pic != null || team != null) {
                         Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(team?.let { Color(it.primary).copy(alpha = 0.18f) } ?: faded.copy(alpha = 0.1f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(ink.copy(alpha = 0.035f)).border(0.75.dp, faded.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 72.dp) else if (team != null) TeamBadge(team, 60.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(pic?.name ?: team?.name ?: "", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp), color = ink)
                                 Text(if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}" else team?.let { "${it.w}-${it.l}" } ?: "",
                                     style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 13.sp), color = faded)
+                                articleGame?.box?.let { b -> (b.home + b.away).firstOrNull { it.pid == pic?.id } }?.let { line ->
+                                    Text("${line.s.pts} PTS · ${line.s.reb} REB · ${line.s.ast} AST", style = T.small, color = ink, modifier = Modifier.padding(top = 4.dp))
+                                }
                             }
                         }
                     }
-                    if (n.body.isNotEmpty()) {
+                    articleGame?.let { g ->
+                        Column(Modifier.fillMaxWidth().padding(top = 12.dp).border(0.75.dp, faded.copy(alpha = 0.3f)).padding(12.dp)) {
+                            Text("FINAL${if (g.ot > 0) " · OT" else ""} · Current records", style = T.small, color = faded)
+                            Text("${lg.team(g.away).name} (${lg.team(g.away).record})  ${g.aws}", style = T.bodyB, color = ink)
+                            Text("${lg.team(g.home).name} (${lg.team(g.home).record})  ${g.hs}", style = T.bodyB, color = ink)
+                        }
+                    }
+                    if (articleBody.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
+                            for (para in articleBody.split(Regex("\\n\\s*\\n"))) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 24.sp), color = ink)
                         }
                     }
                     if (lg.ollama.enabled) {
@@ -436,6 +454,12 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                     ) {
                                         vm.act {
                                             val target = it.news.getOrNull(index) ?: return@act
+                                            if (target.isAiGenerated && ArticleWriting.errors(target.body, it.ollama).isNotEmpty()) {
+                                                target.body = ArticleWriting.news(it, target)
+                                                target.aiLabeled = false
+                                                target.source = "Game-written · $outlet"
+                                                target.aiFallbackReason = "Incomplete draft replaced with game-written coverage."
+                                            }
                                             target.approved = true
                                         }
                                         vm.toast("Story approved and published to front page! 📰")
@@ -524,6 +548,8 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         val target = it.news.getOrNull(index) ?: return@act
                         target.text = editHeadline.trim()
                         target.body = editBody.trim()
+                        target.aiLabeled = false
+                        target.source = "Edited · $outlet"
                     }
                     vm.toast("Story edits saved.")
                 }) { Text("Save Edits", color = P.accent) }

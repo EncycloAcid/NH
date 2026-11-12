@@ -108,11 +108,6 @@ object Media {
         val opp = lg.team(g.opp(t.id))
         val us = g.scoreFor(t.id)
         val them = g.scoreAgainst(t.id)
-        val box = boxLine(g, h.id)
-        val coach = lg.coachOf(t)
-        val home = g.home == t.id
-        val dateline = (if (home) t.school else opp.school).uppercase()
-        val day = DAYS[(g.day + lg.season) % 7]
         val headline = when {
             winner -> "${h.last}'s buzzer-beater lifts ${t.mascot} past ${opp.mascot}"
             stakes.isNotEmpty() && won -> "${stakes}: ${h.last} and the ${t.mascot} come through"
@@ -121,36 +116,8 @@ object Media {
             won -> "${h.last} scores ${line.pts}, ${t.mascot} top ${opp.mascot} $us-$them"
             else -> "${opp.mascot} hold off ${t.mascot} despite ${line.pts} from ${h.last}"
         }
-        val lede = "$dateline — ${h.name} scored ${line.pts} points" + (box?.let { " on ${it.fgm}-of-${it.fga} shooting" } ?: "") +
-            (if (line.reb >= 8 || line.ast >= 6) ", with ${line.reb} rebounds and ${line.ast} assists," else "") +
-            " and the ${t.name} ${if (won) "beat" else "lost to"} the ${opp.name} $us-$them on $day night" +
-            (if (winner) ", winning it at the horn." else ".")
-        val context = buildList {
-            if (g.type == GameType.PLAYOFF) lg.proState?.series?.firstOrNull { g.id in it.gameIds }?.let { add("${ProSeason.seriesStatus(lg, it)}.") }
-            else add("The ${t.mascot} are ${t.w}-${t.l}" + when {
-                t.streak >= 3 -> ", winners of ${t.streak} straight."
-                t.streak <= -3 -> " and have lost ${-t.streak} in a row."
-                else -> "."
-            })
-            if (lg.rivalry(g) != null) add("It was the latest chapter of the rivalry, and the crowd treated it that way.")
-            if (duel != null) Rival.player(lg)?.let { add("${it.last}, his rival since high school, had ${duel.him}.") }
-        }.joinToString(" ")
-        val quote = if (won) Rng.pick(listOf(
-            "“He was special tonight,” coach ${coach.last} said. “When he plays like that, we're hard to beat.”",
-            "“We rode him,” coach ${coach.last} said. “He made the right play almost every time down.”",
-        )) else Rng.pick(listOf(
-            "“We have to be better,” coach ${coach.last} said. “He gave us a chance. The rest of us didn't do enough.”",
-            "“Credit to them,” coach ${coach.last} said. “We'll look at the film and get back to work.”",
-        ))
-        val others = g.box?.let { b ->
-            val mine = if (home) b.home else b.away
-            val theirs = if (home) b.away else b.home
-            val mate = mine.filter { it.pid != h.id }.maxByOrNull { it.s.pts }
-            val top = theirs.maxByOrNull { it.s.pts }
-            listOfNotNull(mate?.let { "${it.name} added ${it.s.pts} for the ${t.mascot}." }, top?.let { "${it.name} led the ${opp.mascot} with ${it.s.pts}." }).joinToString(" ")
-        } ?: ""
-        val body = listOf(lede, context, quote, others).filter { it.isNotBlank() }.joinToString("\n\n")
-        val news = News(lg.season, lg.day, headline, true, g.id, "article", body, Rng.pick(OUTLETS))
+        val body = ArticleWriting.game(lg, g)
+        val news = News(lg.season, lg.day, headline, true, g.id, "article", body, Rng.pick(OUTLETS), teamId = t.id, pid = h.id)
         lg.news += news
         Ollama.maybeAutoGenerate(lg.ollama, lg, news)
     }

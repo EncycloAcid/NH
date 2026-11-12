@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.AiTemplates
+import com.nh.hoopscoach.game.ArticleWriting
 import com.nh.hoopscoach.game.SeasonLine
 import com.nh.hoopscoach.game.StatLine
 import com.nh.hoopscoach.game.Offseason
@@ -44,6 +45,26 @@ class AiUiScreenshotTest {
     }
 
     @Test fun gameWrittenFallbackHasNoCheck() = render("fallback-light", false)
+    @Test fun gameWrittenFallbackDark() {
+        RuntimeEnvironment.setQualifiers("+night")
+        render("fallback-dark", false)
+    }
+    @Test fun unfinishedSavedDraftCannotBePublishedWithACheck() {
+        val (lg, news) = ArticleFixture.league()
+        lg.ollama.enabled = true
+        news.body = "${lg.playerOrNull(news.pid)!!.name} delivered a standout performance, scoring 32 points to"
+        news.aiLabeled = true
+        news.source = "Baseline Sports · Google Gemini"
+        lg.news += news
+        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        vm.install(lg)
+        rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, 0) } }
+        rule.onAllNodesWithContentDescription("AI-generated").assertCountEquals(0)
+        rule.onNodeWithText("Publish").performScrollTo().performClick()
+        rule.waitUntil(30_000) { news.approved }
+        org.junit.Assert.assertFalse(news.isAiGenerated)
+        org.junit.Assert.assertEquals(ArticleWriting.news(lg, news), news.body)
+    }
     @Test fun diagnosticsFetchWithNoApiKeyShowsAnActionableFailure() {
         val config = com.nh.hoopscoach.game.OllamaConfig(provider = "google")
         rule.activity.setContent { HoopsTheme { com.nh.hoopscoach.ui.AiDiagnosticsPanel(config) {} } }
@@ -59,21 +80,26 @@ class AiUiScreenshotTest {
     private fun render(mode: String, isAi: Boolean = true) {
         GameViewModel.autoLoad = false
         Rng.r = Random(41)
-        val lg = Offseason.newGame(5, "Test", "Coach")
+        val (lg, article) = ArticleFixture.league()
         lg.ollama.enabled = true
-        val star = lg.rosterOf(lg.user).maxBy { it.ovr }
+        val star = lg.playerOrNull(article.pid)!!
         star.career.removeAll { it.season == lg.season - 1 }
         star.career += SeasonLine(lg.season - 1, lg.user.school, lg.conf(lg.user.confId).name, 3, star.ovr,
             StatLine(gp = 30, pts = 510, orb = 18, drb = 114, ast = 138), teamId = lg.userTeamId)
-        lg.news += News(lg.season, lg.day, "${lg.user.school} faces a changing rotation as ${star.name} anchors the preseason outlook",
-            source = if (isAi) "Courtside Report · Google Gemini" else "Game-written · Courtside Report", teamId = lg.userTeamId, pid = star.id, kind = "column", aiLabeled = isAi,
-            body = AiTemplates.previewCopy(lg, lg.user), aiFallbackReason = if (isAi) "" else "Gemini requires an API key. Configure it in AI settings.")
+        val fullStory = ArticleWriting.news(lg, article)
+        lg.news += News(lg.season, lg.day, article.text, gameId = article.gameId,
+            source = if (isAi) "Baseline Sports · Google Gemini" else "Game-written · Baseline Sports", teamId = lg.userTeamId, pid = star.id, kind = "article", aiLabeled = isAi,
+            body = fullStory, aiFallbackReason = if (isAi) "" else "Gemini requires an API key. Configure it in AI settings.")
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
         vm.install(lg)
         rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, lg.news.lastIndex) } }
         rule.onNodeWithText(lg.news.last().text).assertIsDisplayed()
         rule.onAllNodesWithContentDescription("AI-generated").assertCountEquals(if (isAi) 1 else 0)
         shot("article-$mode")
+        rule.onNodeWithText(fullStory.split("\n\n")[2]).performScrollTo().assertIsDisplayed()
+        shot("story-middle-$mode")
+        rule.onNodeWithText(fullStory.split("\n\n").last()).performScrollTo().assertIsDisplayed()
+        shot("story-end-$mode")
         rule.onNodeWithText("Review, edit quotes, or re-roll the reporter's angle before publishing.").performScrollTo().assertIsDisplayed()
         shot("editors-desk-$mode")
     }

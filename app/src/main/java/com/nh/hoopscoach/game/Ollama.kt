@@ -369,7 +369,7 @@ object Ollama {
                             val conn = (url.openConnection() as HttpURLConnection).apply {
                                 requestMethod = "POST"
                                 connectTimeout = 8000
-                                readTimeout = 20000
+                                readTimeout = 90000
                                 doOutput = true
                                 setRequestProperty("x-goog-api-key", apiKey)
                                 if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
@@ -392,11 +392,7 @@ object Ollama {
                             val code = conn.responseCode
                             if (code in 200..299) {
                                 val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                                val root = json.parseToJsonElement(body).jsonObject
-                                val content = root["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
-                                    ?.get("content")?.jsonObject
-                                    ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
-                                    ?.get("text")?.jsonPrimitive?.content.orEmpty().trim()
+                                val content = googleResponse(body)
                                 if (content.isNotEmpty()) {
                                     onToken?.invoke(content)
                                     text = content
@@ -446,7 +442,7 @@ object Ollama {
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 10000
-                    readTimeout = 30000
+                    readTimeout = 90000
                     doOutput = true
                     setRequestProperty("Authorization", "Bearer $apiKey")
                     setRequestProperty("Content-Type", "application/json; charset=UTF-8")
@@ -466,10 +462,7 @@ object Ollama {
                 val code = conn.responseCode
                 if (code in 200..299) {
                     val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val root = json.parseToJsonElement(body).jsonObject
-                    val text = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-                        ?.get("message")?.jsonObject
-                        ?.get("content")?.jsonPrimitive?.content.orEmpty().trim()
+                    val text = openAiResponse(body)
                     if (text.isEmpty()) throw Exception("Empty response from ChatGPT")
                     onToken?.invoke(text)
                     text
@@ -545,7 +538,6 @@ object Ollama {
                 append(",\"num_thread\":$threads")
                 append(",\"top_k\":40")
                 append(",\"top_p\":0.9")
-                append(",\"stop\":[\"\\n\\n\\n\",\"---\",\"<|eot_id|>\",\"<|im_end|>\",\"</s>\"]")
                 append("}}")
             }
 
@@ -554,6 +546,7 @@ object Ollama {
             val code = conn.responseCode
             if (code in 200..299) {
                 val sb = StringBuilder()
+                var completed = false
                 conn.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
                     for (line in lines) {
                         if (line.isBlank()) continue
@@ -563,10 +556,16 @@ object Ollama {
                             sb.append(token)
                             onToken?.invoke(token)
                         }
-                        if (root["done"]?.jsonPrimitive?.content == "true") break
+                        root["error"]?.jsonPrimitive?.content?.let { throw IllegalStateException("Ollama generation failed") }
+                        if (root["done"]?.jsonPrimitive?.content == "true") {
+                            check(root["done_reason"]?.jsonPrimitive?.content != "length") { "Model output reached its token limit" }
+                            completed = true
+                            break
+                        }
                     }
                 }
                 val responseText = sb.toString().trim()
+                check(completed) { "Incomplete model stream: missing completion marker" }
                 if (responseText.isEmpty()) throw Exception("Empty response from Ollama")
                 responseText
             } else {
@@ -583,6 +582,22 @@ object Ollama {
             .replace("\r", "\\r")
             .replace("\t", "\\t") + "\""
 
+    internal fun googleResponse(body: String): String {
+        val candidate = json.parseToJsonElement(body).jsonObject["candidates"]?.jsonArray?.firstOrNull()?.jsonObject ?: error("Empty response from Gemini")
+        val reason = candidate["finishReason"]?.jsonPrimitive?.content
+        check(reason == null || reason == "STOP") { "Model response was incomplete or filtered ($reason)" }
+        return candidate["content"]?.jsonObject?.get("parts")?.jsonArray?.mapNotNull { part ->
+            part.jsonObject.takeUnless { it["thought"]?.jsonPrimitive?.content == "true" }?.get("text")?.jsonPrimitive?.content
+        }?.joinToString("").orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from Gemini" } }
+    }
+
+    internal fun openAiResponse(body: String): String {
+        val choice = json.parseToJsonElement(body).jsonObject["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: error("Empty response from ChatGPT")
+        val reason = choice["finish_reason"]?.jsonPrimitive?.content
+        check(reason == null || reason == "stop") { "Model response was incomplete or filtered ($reason)" }
+        return choice["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content.orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from ChatGPT" } }
+    }
+
     /** Generate or rewrite a complete newspaper article for a [News] item. */
     private suspend fun groundedGenerate(
         config: OllamaConfig,
@@ -596,21 +611,27 @@ object Ollama {
         preview: Boolean = false,
         upcoming: Boolean = false,
         validateDraft: (String) -> List<String> = { emptyList() },
+        articleCopy: String = "",
+        eventGame: Game? = null,
     ): Result<AiText> {
-        val facts = AiFacts.build(lg, prompt, extraFacts, extraPlayers, preview, upcoming)
+        val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
+        val subject = lg.teams.filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
+        val fallbackCopy = articleCopy.ifBlank { if (wantsArticle) ArticleWriting.news(lg, News(lg.season, lg.day, "${subject.name}: the latest outlook", teamId = subject.id)) else "" }
+        val facts = AiFacts.build(lg, prompt, extraFacts + if (wantsArticle) "\nARTICLE CONTEXT:\n$fallbackCopy" else "", extraPlayers, preview, upcoming, eventGame)
         val requestId = AiDiagnostics.begin(config, if (prompt.contains("KEY 1:")) "Scouting report" else if (prompt.contains("KICKER:")) "Preview stories" else "Game report")
         var providerError: Throwable? = null
         var gotResponse = false
-        val result = AiGrounding.generate(facts, prompt, validateDraft) { grounded ->
-            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = numPredict).also {
+        val longForm = wantsArticle
+        val writingPrompt = prompt + if (longForm) "\n${ArticleWriting.instruction(config)}" else ""
+        val result = AiGrounding.generate(facts, writingPrompt, { raw -> validateDraft(raw) + if (longForm) ArticleWriting.errors(raw, config) else emptyList() }) { grounded ->
+            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config) * (if (prompt.contains("Format each storyline as:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")) 3 else 1) else numPredict, onToken = onToken).also {
                 gotResponse = it.isSuccess
                 if (it.isFailure) providerError = it.exceptionOrNull()
             }
         }
         val reason = if (gotResponse) "Fact check failed: " + result.exceptionOrNull()?.message.orEmpty().substringAfter('(').substringBefore(").") else AiDiagnostics.networkReason(providerError, config)
         AiDiagnostics.finish(requestId, if (result.isSuccess) "success" else if (gotResponse) "validation failure" else "network error", if (result.isFailure) reason else "Verified against game facts")
-        val draft = result.fold({ AiText(it, true, config.fullModelDisplayName) }, { return runCatching { AiTemplates.create(facts, prompt).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
-        onToken?.invoke(draft.text)
+        val draft = result.fold({ AiText(it, true, config.fullModelDisplayName) }, { return runCatching { AiTemplates.create(facts, prompt, fallbackCopy).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
         return Result.success(draft)
     }
 
@@ -641,7 +662,6 @@ object Ollama {
                 }
             }
             if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
-            if (news.body.isNotEmpty()) append("Background notes: ${news.body}\n")
             val angleInstruction = when (angle) {
                 "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
                 "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
@@ -649,10 +669,11 @@ object Ollama {
                 "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
                 else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
             }
-            append("\nWrite 2-4 compelling paragraphs of realistic basketball journalism. $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
+            append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
         }
 
-        return groundedGenerate(config, lg, prompt, extraFacts = "Event: ${if (news.isAiGenerated) news.kind else news.text}; season ${news.season}, day ${news.day}; ${game?.takeIf { it.played }?.let { "final ${lg.team(it.home).name} ${it.hs}-${it.aws} ${lg.team(it.away).name}" }.orEmpty()}")
+        val copy = ArticleWriting.news(lg, news)
+        return groundedGenerate(config, lg, prompt, articleCopy = copy, eventGame = game, extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(), extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}")
     }
 
     /** Generates an epic coronation newspaper feature for the National Champion or NBA Finals winner. */
@@ -828,17 +849,7 @@ object Ollama {
 
         return groundedGenerate(config, lg, prompt, system = "You analyze actual free-agent eligibility; possibilities are not reports or confirmed demands.", numPredict = 240, extraFacts = rebuilding.joinToString { "${it.name} cap room ${Payroll.room(lg, it)} thousand dollars" }).map { draft ->
             val raw = draft.text
-            val scoops = mutableListOf<Brief>()
-            for (lineStr in raw.lines()) {
-                val tr = lineStr.trim()
-                if (tr.startsWith("SCOOP", true) && tr.contains("|")) {
-                    val head = tr.substringAfter(":").substringBefore("|").trim()
-                    val body = tr.substringAfter("|").trim()
-                    if (head.isNotEmpty() && body.isNotEmpty()) {
-                        scoops.add(Brief(head, body, draft.isAi, draft.fallbackReason))
-                    }
-                }
-            }
+            val scoops = ArticleWriting.briefs(raw, "SCOOP").map { Brief(it.first, it.second, draft.isAi, draft.fallbackReason) }
             val finalScoops = scoops
             if (config.cacheResponses) Cache.put(cacheKey, finalScoops)
             finalScoops
@@ -917,7 +928,7 @@ object Ollama {
             append("Format each storyline as:\n")
             append("KICKER: <Short 1-3 word tag like 'The Favorite' or 'Hot Seat'>\n")
             append("HEADLINE: <Punchy storyline headline>\n")
-            append("BODY: <2-3 sentences of preview commentary>\n---\n")
+            append("BODY: <4-7 paragraphs of evidence-backed preview reporting>\n---\n")
         }
 
         return groundedGenerate(config, lg, prompt, numPredict = 300, preview = true, extraFacts = topics.joinToString("\n") { "${it.subject}: ${it.facts}" }, validateDraft = { raw ->
@@ -933,7 +944,7 @@ object Ollama {
 
             fun flush() {
                 if (kicker.isNotEmpty() && head.isNotEmpty()) {
-                    val text = if (body.isNotEmpty()) body.joinToString(" ").trim() else "Key storyline to watch for the upcoming season."
+                    val text = if (body.isNotEmpty()) body.joinToString("\n").trim() else "Key storyline to watch for the upcoming season."
                     val subject = PreviewTopics.match(lg, topics, "$head $text")
                     if (subject != null) stories += Story(kicker, head, text, subject.teamId, subject.pid, draft.provider)
                 }
@@ -960,7 +971,7 @@ object Ollama {
                         val b = trimmed.substringAfter(":").trim()
                         if (b.isNotEmpty()) body.add(b)
                     }
-                    kicker.isNotEmpty() && head.isNotEmpty() && trimmed.isNotBlank() -> {
+                    kicker.isNotEmpty() && head.isNotEmpty() -> {
                         body.add(trimmed)
                     }
                 }
@@ -1324,9 +1335,9 @@ object Ollama {
             append("Format your response EXACTLY as:\n")
             append("HEADLINE: <Catchy newspaper headline>\n")
             append("OUTLET: <Publication name e.g. Courtside Report or Daily Dribble>\n")
-            append("STORY:\n<${if (config.speedMode == "turbo") "1 punchy paragraph" else "2 paragraphs"} recapping the game's decisive run and key matchup>\n")
-            append("COACH_QUOTE: <Realistic postgame quote from Coach $coach>\n")
-            append("STAR_QUOTE: <Postgame locker room quote from $topPlayerName>\n")
+            append("STORY:\n<4-7 paragraphs using supplied game facts>\n")
+            append("COACH_QUOTE: <Use —; no recorded quote supplied>\n")
+            append("STAR_QUOTE: <Use —; no recorded quote supplied>\n")
         }
 
         return groundedGenerate(
@@ -1336,6 +1347,9 @@ object Ollama {
             system = "You are a professional basketball beat writer. Write engaging, realistic newspaper recaps using the exact provided statistics and final score.",
             numPredict = if (config.speedMode == "turbo") 200 else 320,
             onToken = onToken,
+            articleCopy = ArticleWriting.game(lg, g),
+            eventGame = g,
+            extraFacts = ArticleWriting.boxFacts(g) + "\n" + ArticleWriting.game(lg, g),
         ).map { draft ->
             val raw = draft.text
             var headline = "${winner.school} Defeats ${loser.school} $winScore-$loseScore"
@@ -1511,17 +1525,7 @@ object Ollama {
             numPredict = 220,
         ).map { draft ->
             val raw = draft.text
-            val rumors = mutableListOf<Brief>()
-            for (lineStr in raw.lines()) {
-                val tr = lineStr.trim()
-                if (tr.startsWith("RUMOR", true) && tr.contains("|")) {
-                    val head = tr.substringAfter(":").substringBefore("|").trim()
-                    val body = tr.substringAfter("|").trim()
-                    if (head.isNotEmpty() && body.isNotEmpty()) {
-                        rumors.add(Brief(head, body, draft.isAi, draft.fallbackReason))
-                    }
-                }
-            }
+            val rumors = ArticleWriting.briefs(raw, "RUMOR").map { Brief(it.first, it.second, draft.isAi, draft.fallbackReason) }
             val finalRumors = rumors
             if (config.cacheResponses) Cache.put(cacheKey, finalRumors)
             finalRumors

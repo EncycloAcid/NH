@@ -16,8 +16,8 @@ android {
         applicationId = "com.nh.hoopscoach.pro"
         minSdk = 26
         targetSdk = 35
-        versionCode = 169
-        versionName = "3.4-pro.148"
+        versionCode = 170
+        versionName = "3.4-pro.149"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from

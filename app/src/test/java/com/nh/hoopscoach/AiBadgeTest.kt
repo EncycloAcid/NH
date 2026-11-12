@@ -49,9 +49,17 @@ class AiBadgeTest {
     }
 
     @Test fun persistedAiFlagControlsNewsBadge() {
-        val n = News(2026, 1, "Story", source = "Courtside Report", aiLabeled = true)
+        val (lg, n) = ArticleFixture.league()
+        n.body = com.nh.hoopscoach.game.ArticleWriting.news(lg, n)
+        n.aiLabeled = true
         rule.activity.setContent { HoopsTheme { NewsTag(n) } }
         rule.onNodeWithContentDescription("AI-generated").assertIsDisplayed()
+    }
+
+    @Test fun unfinishedPersistedAiFlagDoesNotGiveACheck() {
+        val n = News(2026, 1, "Story", body = "A performance cut off to", source = "Courtside Report", aiLabeled = true)
+        rule.activity.setContent { HoopsTheme { NewsTag(n) } }
+        rule.onNodeWithContentDescription("AI-generated").assertDoesNotExist()
     }
 
     @Test fun previewStoryUsesItsOwnAiFlagNotEnabledProvider() {
@@ -61,7 +69,7 @@ class AiBadgeTest {
         lg.ollama.enabled = true
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
         vm.install(lg)
-        val story = Story("Forecast", "A verified subject", "A forecast is not a result.", lg.userTeamId, aiProvider = "Google Gemini")
+        val story = Story("Forecast", "A verified subject", com.nh.hoopscoach.game.ArticleWriting.news(lg, News(lg.season, lg.day, "${lg.user.name}: the outlook", teamId = lg.userTeamId)), lg.userTeamId, aiProvider = "Google Gemini")
         rule.activity.setContent { HoopsTheme { StoryCard(vm, lg, story, 0, false) } }
         rule.onNodeWithContentDescription("AI-generated").assertIsDisplayed()
     }

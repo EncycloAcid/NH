@@ -188,7 +188,7 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
                     if (idx >= 0) vm.push(Route.Article(idx))
                 }
                 Spacer(Modifier.width(8.dp))
-                AiBadge(existing.isAiGenerated, existing.source.substringAfterLast(" · ", ""), fallbackReason = existing.aiFallbackReason)
+                AiBadge(com.nh.hoopscoach.game.ArticleWriting.checked(existing), existing.source.substringAfterLast(" · ", ""), fallbackReason = existing.aiFallbackReason)
             } else {
                 SmallButton(if (loading) "Generating..." else "Generate Hype ✍️", primary = true, enabled = !loading) {
                     loading = true

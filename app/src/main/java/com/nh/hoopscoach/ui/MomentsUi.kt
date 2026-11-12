@@ -58,7 +58,7 @@ fun NewsTag(n: News, modifier: Modifier = Modifier) {
             Tag(regularTag.first, regularTag.second)
         }
         Spacer(Modifier.weight(1f))
-        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""), fallbackReason = n.aiFallbackReason)
+        AiBadge(com.nh.hoopscoach.game.ArticleWriting.checked(n), n.source.substringAfterLast(" · ", ""), fallbackReason = n.aiFallbackReason)
     }
     Spacer(Modifier.height(3.dp))
 }

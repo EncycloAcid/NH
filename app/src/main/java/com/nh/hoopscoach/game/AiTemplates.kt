@@ -63,7 +63,7 @@ object AiTemplates {
         }
     }.trim()
 
-    fun create(facts: AiFactSheet, request: String): AiText {
+    fun create(facts: AiFactSheet, request: String, articleCopy: String = ""): AiText {
         val lines = facts.text.lines()
         require(lines.any { it.startsWith("TEAM ") }) { "No factual team context is available." }
         fun field(key: String) = request.lineSequence().firstOrNull { it.startsWith("$key:", true) }?.substringAfter(':')?.trim().orEmpty()
@@ -91,8 +91,9 @@ object AiTemplates {
         }.orEmpty()
         val body = if (facts.preseason || facts.preview || facts.upcoming) editorial else listOf(gameCopy, production, editorial.takeIf { gameCopy.isEmpty() }.orEmpty()).filter { it.isNotBlank() }.joinToString("\n\n")
         val copy = when {
+            articleCopy.isNotBlank() -> articleCopy
             request.contains("CHAMPIONSHIP_CELEBRATION:") -> event.removePrefix("Champion ").replace("; runner-up ", " finished ahead of ").replace("; finals outcome ", ", ").replace("; Finals MVP ", ". Finals MVP: ") + "."
-            else -> body.ifBlank { lines.firstOrNull { it.startsWith("TEAM ") }?.substringBefore(';')?.removePrefix("TEAM ").orEmpty() }
+            else -> articleCopy.ifBlank { body.ifBlank { lines.firstOrNull { it.startsWith("TEAM ") }?.substringBefore(';')?.removePrefix("TEAM ").orEmpty() } }
         }
         if (request.contains("Format each storyline as:")) {
             val topics = request.substringBefore("Format each storyline as:").lines().drop(1).filter { it.contains(": ") }.take(3)
@@ -142,7 +143,7 @@ object AiTemplates {
                         val contracts = lines.filter { it.startsWith("CONTRACT ") }
                         val index = label.substringAfterLast(' ').toIntOrNull()?.minus(1) ?: 0
                         val contract = contracts.getOrNull(index)?.removePrefix("CONTRACT ")
-                        "Contract watch | ${contract ?: event.ifBlank { copy }.replace("\n", " ")}"
+                        "Contract watch | ${contract?.let { "${it.trimEnd('.')}.\n\n" }.orEmpty()}$copy"
                     }
                     label.startsWith("KEY") -> "The matchup ahead | ${copy.replace("\n", " ")}"
                     else -> copy.replace("\n", " ")

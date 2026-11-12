@@ -23,10 +23,11 @@ object AiFacts {
         Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(text)
     private fun stats(s: StatLine) = String.format(Locale.US, "%d GP; %.1f PPG; %.1f RPG; %.1f APG; %.1f MPG; %.1f%% FG; %.1f%% 3PT; %.1f%% FT", s.gp, s.ppg, s.rpg, s.apg, s.mpg, s.fgPct * 100, s.tpPct * 100, s.ftPct * 100)
 
-    fun build(lg: League, request: String, extra: String = "", players: List<Player> = emptyList(), preview: Boolean = false, upcoming: Boolean = false): AiFactSheet {
+    fun build(lg: League, request: String, extra: String = "", players: List<Player> = emptyList(), preview: Boolean = false, upcoming: Boolean = false, eventGame: Game? = null): AiFactSheet {
         val population = (lg.players + lg.alumni + lg.recruits.map { it.p } + players).distinctBy { it.id }
-        val namedPlayers = population.filter { mentioned(request, it.name) }
-        val teams = (lg.teams.filter { t -> aliases(t).any { mentioned(request, it) } } +
+        val context = request + "\n" + extra
+        val namedPlayers = population.filter { mentioned(context, it.name) }
+        val teams = (lg.teams.filter { t -> aliases(t).any { mentioned(context, it) } } +
             namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } } + lg.user).distinctBy { it.id }.take(8)
         val featured = (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
             teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } + teams.mapNotNull { AiTemplates.departure(lg, it) }).distinctBy { it.id }
@@ -60,7 +61,7 @@ object AiFacts {
                 aliases(t).forEach { records[it] = setOf(t.record) }
                 appendLine("EDITORIAL ${if (lg.pro) t.name else t.school}: ${AiTemplates.previewCopy(lg, t)}")
             }
-            val results = lg.games.filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
+            val results = (eventGame?.let { listOf(it) } ?: lg.games).filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
                 .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(6)
             results.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
@@ -152,7 +153,7 @@ object AiGrounding {
                 numbers.none { normalized(m.value) == normalized(it) || (rate && equivalent(m.value, it)) }
             }) errors += "unsupported number"
         Regex("(\\d+(?:\\.\\d+)?)\\s*(PPG|RPG|APG|PTS|REB|AST|STL|BLK|TOV|MIN|points|rebounds|assists)\\b", RegexOption.IGNORE_CASE).findAll(content).forEach { m ->
-            val prefix = content.substring((m.range.first - 100).coerceAtLeast(0), m.range.first)
+            val prefix = content.substring((m.range.first - 300).coerceAtLeast(0), m.range.first).split(Regex("(?<=[.!?;])\\s+(?=[A-Z])")).last()
             val player = facts.names.mapNotNull { name ->
                 Regex(Regex.escape(name), RegexOption.IGNORE_CASE).findAll(prefix).lastOrNull()?.let { name to it.range.first }
             }.filter { (name, _) -> facts.text.lines().any { it.startsWith("PLAYER $name;") } }.maxByOrNull { it.second }?.first
@@ -203,7 +204,7 @@ object AiGrounding {
         if (facts.phase == Phase.OFFSEASON && Regex("\\b(tonight's game|tonight's win|tonight's loss|tomorrow's game)\\b").containsMatchIn(lower)) errors += "wrong season phase"
         if (!facts.preseason && !facts.preview && Regex("\\b(before the season begins|season has yet to begin|no games have been played)\\b").containsMatchIn(lower) && facts.phase != Phase.OFFSEASON) errors += "wrong season phase"
         if (facts.phase == Phase.REGULAR && !facts.preview && Regex("\\b(won the championship|won the title|clinched the title|playoff victory|postseason victory)\\b").containsMatchIn(lower)) errors += "wrong season phase"
-        if (Regex("\\b(buzzer.beater|game.winning shot|late run|closing minutes|fourth.quarter run|second.chance points|locker.room champagne|parade|contract demand|demanded a trade|physicians confirmed|doctors confirmed|non.contact conditioning|medically cleared)\\b").containsMatchIn(lower)) errors += "unsupported event detail"
+        if (Regex("\\b(buzzer.beater|game.winning shot|late run|closing minutes|fourth.quarter run|second.chance points|locker.room champagne|parade|contract demand|demanded a trade|physicians confirmed|doctors confirmed|non.contact conditioning|medically cleared)\\b").findAll(lower).any { !facts.text.contains(it.value, true) }) errors += "unsupported event detail"
         return errors.distinct()
     }
 
