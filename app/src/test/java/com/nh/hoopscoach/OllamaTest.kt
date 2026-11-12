@@ -503,4 +503,52 @@ class OllamaTest {
         assertTrue(decoded.ollama.halftimeSpeeches)
         assertFalse(decoded.ollama.playerDevelopment)
     }
+
+    @Test
+    fun testPressSocialTradeAndStorylinesAccountFallback() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val p = lg.players.first()
+        val g = Game(id = 12, day = 1, home = 0, away = 1, neutral = false, type = GameType.NONCONF, hs = 92, aws = 88)
+        lg.games.add(g)
+        val line = com.nh.hoopscoach.game.GameLogEntry(g.id, 1, "H", true, "92-88", 26, 6, 8, 3, 1, 2, 36)
+
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "coach.test@gmail.com",
+            googleSignedIn = true,
+        )
+
+        // 1. Press Conference
+        val pressRes = Ollama.generatePressConference(config, lg, g, p, line, won = true)
+        assertTrue("Press conference succeeds with account fallback", pressRes.isSuccess)
+        val press = pressRes.getOrThrow()
+        assertTrue("Press question has content", press.prompt.isNotEmpty())
+        assertTrue("Press question has 3 answers", press.answers.size == 3)
+        assertTrue("Press question is AI flagged", press.isAi)
+
+        // 2. Social Takes
+        val socialRes = Ollama.generateSocialTakes(config, lg, g, p, line, won = true)
+        assertTrue("Social takes succeed with account fallback", socialRes.isSuccess)
+        val posts = socialRes.getOrThrow()
+        assertTrue("Social takes return posts", posts.isNotEmpty())
+        assertTrue("Social posts have content", posts.all { it.text.isNotEmpty() && it.handle.isNotEmpty() })
+        assertTrue("Social posts are AI flagged", posts.all { it.isAi })
+
+        // 3. Trade Analysis
+        val trade = Trade(season = 2026, day = 15, offseason = false, teamA = 0, teamB = 1, toB = listOf("Player A"), toA = listOf("Player B"))
+        val tradeRes = Ollama.generateTradeAnalysis(config, lg, trade)
+        assertTrue("Trade analysis succeeds with account fallback", tradeRes.isSuccess)
+        val tradeAnalysis = tradeRes.getOrThrow()
+        assertEquals("B+", tradeAnalysis.gradeA)
+        assertEquals("A-", tradeAnalysis.gradeB)
+        assertTrue("Trade analysis has narrative text", tradeAnalysis.analysis.isNotEmpty())
+
+        // 4. Storylines
+        val storyRes = Ollama.generateStorylines(config, season = 2026, topTeam = "Gonzaga", userTeam = "Duke", userTeamId = 0, context = "Preseason")
+        assertTrue("Storylines succeed with account fallback", storyRes.isSuccess)
+        val stories = storyRes.getOrThrow()
+        assertTrue("Storylines parsed", stories.isNotEmpty())
+        assertTrue("Storylines have kicker and headline", stories.all { it.kicker.isNotEmpty() && it.head.isNotEmpty() })
+    }
 }

@@ -1602,6 +1602,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                 it.ollama.googleSignedIn = true
                                 it.ollama.provider = "google"
                                 it.ollama.enabled = true
+                                it.ollama.autoGenerate = true
                             }
                             showGoogleLoginDialog = false
                             vm.toast("Signed in with Google ($email)!")
@@ -1747,6 +1748,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                 it.ollama.openAiSignedIn = true
                                 it.ollama.provider = "openai"
                                 it.ollama.enabled = true
+                                it.ollama.autoGenerate = true
                             }
                             showOpenAiLoginDialog = false
                             vm.toast("Signed in to ChatGPT ($email)!")

@@ -400,13 +400,13 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
         Panel(color = P.accentSoft) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("OLLAMA AI STORYLINES · ${lg.ollama.model}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Text("Have Ollama control and generate this season's NBA storylines.", style = T.small, color = P.ink)
+                    Text("${lg.ollama.providerDisplayName.uppercase()} AI STORYLINES · ${lg.ollama.activeModelName}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Have ${lg.ollama.providerDisplayName} control and generate this season's NBA storylines.", style = T.small, color = P.ink)
                 }
                 Spacer(Modifier.width(8.dp))
-                SmallButton(if (generating) "Writing..." else "Generate with Ollama", primary = true, enabled = !generating) {
+                SmallButton(if (generating) "Writing..." else "Generate with ${lg.ollama.shortActionName}", primary = true, enabled = !generating) {
                     generating = true
-                    genStatus = "Connecting to Ollama & generating storylines..."
+                    genStatus = "Connecting to ${lg.ollama.providerDisplayName} & generating storylines..."
                     scope.launch {
                         val top = NbaPreviews.ranked(lg, pv).firstOrNull()?.name ?: "Favorites"
                         val context = "Contenders: " + NbaPreviews.ranked(lg, pv).take(4).joinToString { it.name }
@@ -422,7 +422,7 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
                                 "Timed out. Your phone may need a lighter model (like qwen2.5:0.5b or smollm2) or more time to load."
                             } else err.message ?: "Failed"
                             genStatus = "Error: $msg"
-                            vm.toast("Ollama: $msg")
+                            vm.toast("${lg.ollama.providerDisplayName}: $msg")
                         }
                     }
                 }

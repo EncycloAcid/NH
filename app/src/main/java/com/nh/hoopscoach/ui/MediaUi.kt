@@ -150,6 +150,10 @@ fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
                     Text("🔁 ${Road.count(reposts)}", style = T.small, color = P.sub)
                     Spacer(Modifier.width(10.dp))
                     Text(kindLabel(p.kind), style = T.small, color = kindColor(p.kind).copy(alpha = 0.85f))
+                    if (p.isAi) {
+                        Spacer(Modifier.width(8.dp))
+                        Tag("✨ AI LABELED", P.accent)
+                    }
                     if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
                 }
                 Text(vibe(p), style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
@@ -251,7 +255,7 @@ fun SocialScreen(vm: GameViewModel, lg: League) {
                                         vm.act { it.road?.feed?.addAll(newPosts) }
                                         vm.toast("Added ${newPosts.size} new AI reactions to your feed!")
                                     }.onFailure { err ->
-                                        vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                        vm.toast("${lg.ollama.providerDisplayName}: ${err.message ?: "Failed"}")
                                     }
                                 }
                             }
@@ -540,7 +544,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
     Column(Modifier.fillMaxSize()) {
         BackBar("News", "${lg.season} season · ${all.size} stories", onBack = { vm.back() }, actions = {
             if (lg.ollama.enabled) {
-                SmallButton("Ollama story") { showOllamaDialog = true }
+                SmallButton("${lg.ollama.shortActionName} story") { showOllamaDialog = true }
             }
         })
         LazyColumn(Modifier.weight(1f)) {
@@ -576,7 +580,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
         AlertDialog(
             onDismissRequest = { if (!writingStory) showOllamaDialog = false },
             containerColor = P.surface,
-            title = { Text("Generate story with Ollama", style = T.head, color = P.ink) },
+            title = { Text("Generate story with ${lg.ollama.providerDisplayName}", style = T.head, color = P.ink) },
             text = {
                 Column {
                     if (!lg.ollama.enabled) {
@@ -605,7 +609,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                         }
                         Spacer(Modifier.height(8.dp))
                     } else {
-                        Text("Ollama (${lg.ollama.model}) will write a breaking article for today's news.", style = T.small, color = P.sub)
+                        Text("${lg.ollama.providerDisplayName} (${lg.ollama.activeModelName}) will write a breaking article for today's news.", style = T.small, color = P.sub)
                     }
                     Spacer(Modifier.height(10.dp))
                     Text("SUGGESTED BEATS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
@@ -631,7 +635,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                     )
                     if (writingStory) {
                         Spacer(Modifier.height(8.dp))
-                        Text("Writing article with Ollama... please wait.", style = T.small, color = P.accent)
+                        Text("Writing article with ${lg.ollama.providerDisplayName}... please wait.", style = T.small, color = P.accent)
                     }
                 }
             },
@@ -649,7 +653,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                                 vm.act { it.news.add(story) }
                                 vm.push(Route.Article(lg.news.lastIndex))
                             }.onFailure { err ->
-                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                vm.toast("${lg.ollama.providerDisplayName}: ${err.message ?: "Failed"}")
                             }
                         }
                     },

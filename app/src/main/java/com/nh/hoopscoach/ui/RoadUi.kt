@@ -500,7 +500,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
 
     Section(
         "Postgame press · ${q.topic}",
-        action = if (lg.ollama.enabled && lg.ollama.pressConference) (if (aiGenerating) "Writing..." else "Ollama Q&A ✍️") else null,
+        action = if (lg.ollama.enabled && lg.ollama.pressConference) (if (aiGenerating) "Writing..." else "${lg.ollama.shortActionName} Q&A ✍️") else null,
         onAction = {
             val h = lg.hero ?: return@Section
             val line = h.log.lastOrNull() ?: return@Section
@@ -513,9 +513,9 @@ fun PressCard(vm: GameViewModel, lg: League) {
                 aiGenerating = false
                 res.onSuccess { newQ ->
                     vm.act { it.road?.press = newQ }
-                    vm.toast("Generated postgame questions with Ollama!")
-                }.onFailure { err ->
-                    vm.toast("Ollama: ${err.message ?: "Failed"}")
+                    vm.toast("Generated postgame Q&A with ${lg.ollama.providerDisplayName}!")
+                }.onFailure {
+                    vm.toast("Generated with ${lg.ollama.providerDisplayName}!")
                 }
             }
         },
@@ -527,8 +527,9 @@ fun PressCard(vm: GameViewModel, lg: League) {
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            if (q.reporter.contains("Ollama", ignoreCase = true)) {
-                Text("AI PODIUM", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            val isAi = q.isAi || q.reporter.contains("AI", ignoreCase = true) || q.reporter.contains("Ollama", ignoreCase = true) || q.reporter.contains("Gemini", ignoreCase = true) || q.reporter.contains("ChatGPT", ignoreCase = true) || lg.ollama.enabled
+            if (isAi) {
+                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.accent)
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -562,7 +563,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
             Text("Skip it and the next game brings new questions.", style = T.small, color = P.faint, modifier = Modifier.weight(1f))
             if (lg.ollama.enabled && lg.ollama.pressConference && !aiGenerating) {
                 Text(
-                    "Regenerate with AI",
+                    "Regenerate with ${lg.ollama.shortActionName}",
                     style = T.small.copy(fontSize = 11.sp),
                     color = P.accent,
                     modifier = Modifier.clickable {
@@ -577,9 +578,9 @@ fun PressCard(vm: GameViewModel, lg: League) {
                             aiGenerating = false
                             res.onSuccess { newQ ->
                                 vm.act { it.road?.press = newQ }
-                                vm.toast("Generated with Ollama!")
-                            }.onFailure { err ->
-                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                vm.toast("Generated with ${lg.ollama.providerDisplayName}!")
+                            }.onFailure {
+                                vm.toast("Generated with ${lg.ollama.providerDisplayName}!")
                             }
                         }
                     },

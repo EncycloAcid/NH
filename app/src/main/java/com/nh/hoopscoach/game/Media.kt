@@ -97,6 +97,8 @@ object Media {
         Feed.game(lg, g, line, won, winner, stakes, duel)
         val big = line.pts >= 28 || listOf(line.pts, line.reb, line.ast).count { it >= 10 } >= 2 || winner
         if (big || winner || stakes.isNotEmpty() || lg.rivalry(g) != null) article(lg, g, line, won, winner, stakes, duel)
+        val h = lg.hero ?: return
+        Ollama.maybeAutoGenerateSocial(lg.ollama, lg, g, h, line, won)
     }
 
     /** A short game story: the lede, his line, the context, a quote from the coach and who else stood out. */
@@ -148,7 +150,9 @@ object Media {
             listOfNotNull(mate?.let { "${it.name} added ${it.s.pts} for the ${t.mascot}." }, top?.let { "${it.name} led the ${opp.mascot} with ${it.s.pts}." }).joinToString(" ")
         } ?: ""
         val body = listOf(lede, context, quote, others).filter { it.isNotBlank() }.joinToString("\n\n")
-        lg.news += News(lg.season, lg.day, headline, true, g.id, "article", body, Rng.pick(OUTLETS))
+        val news = News(lg.season, lg.day, headline, true, g.id, "article", body, Rng.pick(OUTLETS))
+        lg.news += news
+        Ollama.maybeAutoGenerate(lg.ollama, lg, news)
     }
 
     // ---------- the press ----------
@@ -169,7 +173,12 @@ object Media {
                     a.persona < 0 -> "Teammates and coaches have noticed the same thing: the attention hasn't changed how he carries himself."
                     else -> "He kept it short, and moved on to the next question."
                 }
-            lg.news += News(lg.season, lg.day, "${h.last} on ${q.topic.lowercase()}: “$short”", true, q.gameId, "quote", body, outlet)
+            val quoteNews = News(lg.season, lg.day, "${h.last} on ${q.topic.lowercase()}: “$short”", true, q.gameId, "quote", body, outlet)
+            if (q.isAi) {
+                quoteNews.aiLabeled = true
+                quoteNews.source = "$outlet · ${lg.ollama.shortActionName}"
+            }
+            lg.news += quoteNews
         }
         when {
             // A bold answer gets quoted back at him, by a fan or a doubter (not every time).

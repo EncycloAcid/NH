@@ -637,7 +637,7 @@ class OllamaConfig(
     var enabled: Boolean = false,
     var host: String = "http://localhost:11434",
     var model: String = "llama3.2:1b",
-    var autoGenerate: Boolean = false,
+    var autoGenerate: Boolean = true,
     var pressConference: Boolean = true,
     var socialFeed: Boolean = true,
     var gameRecaps: Boolean = true,
@@ -1392,7 +1392,7 @@ class PressAnswer(
 )
 
 @Serializable
-class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "")
+class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "", val isAi: Boolean = false)
 
 /** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
 /** One reaction to a story: who said it (and in what role), what they said, and how many liked it. */
@@ -1407,6 +1407,7 @@ class Post(
     val avatar: String = "",
     /** The story it's about (a headline in the news), for the league feed: tap to read it. */
     val re: String = "",
+    val isAi: Boolean = false,
 )
 
 @Serializable

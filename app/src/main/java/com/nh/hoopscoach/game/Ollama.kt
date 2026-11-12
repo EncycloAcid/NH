@@ -351,16 +351,20 @@ object Ollama {
 
                 // Social takes
                 prompt.contains("FAN:") && prompt.contains("HATER:") -> {
-                    appendLine("FAN: Massive win! The energy on the floor was unmatched tonight. Keep this momentum rolling!")
-                    appendLine("HATER: Don't get ahead of yourselves. Let's see how this team performs against top-10 competition on the road.")
-                    appendLine("ANALYST: The half-court defensive rotations and paint protection were the story of the night. Legitimate tournament pedigree on display.")
-                    appendLine("INSIDER: Locker room morale is at a season high. Multiple scouts in attendance came away impressed with the ball movement.")
-                    append("STUDENT: Campus is buzzing right now! Best atmosphere of the season by far.")
+                    appendLine("ANALYST: film_room_guru | The half-court defensive rotations and paint protection were the story of the night. Legitimate tournament pedigree on display.")
+                    appendLine("FAN: hoops_fanatic | Massive win! The energy on the floor was unmatched tonight. Keep this momentum rolling!")
+                    appendLine("HATER: cold_takes_daily | Don't get ahead of yourselves. Let's see how this team performs against top-10 competition on the road.")
+                    append("TEAMMATE: locker_room_hype | Proud of my brothers leaving everything on the floor tonight! Big time team basketball.")
                 }
 
                 // Press Conference
-                prompt.contains("QUESTION:") && prompt.contains("ANSWER:") -> {
+                prompt.contains("QUESTION:") && (prompt.contains("HUMBLE:") || prompt.contains("ANSWER:")) -> {
+                    appendLine("TOPIC: Postgame Focus")
+                    appendLine("REPORTER: Courtside Beat · $provider")
                     appendLine("QUESTION: Coach, what was your message to the team during that pivotal fourth-quarter timeout?")
+                    appendLine("HUMBLE: \"Credit to my teammates and coaching staff. We put the work in every day and just tried to execute the game plan.\"")
+                    appendLine("BRASH: \"When the ball is in my hands, I expect to make plays. Tonight was just a glimpse of what we can do.\"")
+                    appendLine("ANALYTICAL: \"We identified their defensive coverages early on and took what they gave us in transition and half-court sets.\"")
                     append("ANSWER: \"We just had to breathe and trust our fundamentals. We reminded the guys that games are won on the defensive glass and taking care of the ball. They responded with poise.\"")
                 }
 
@@ -373,10 +377,26 @@ object Ollama {
                 }
 
                 // Trade Analysis
-                prompt.contains("GRADE:") -> {
-                    appendLine("GRADE: B+")
+                prompt.contains("GRADE_A:") || prompt.contains("GRADE:") -> {
+                    appendLine("GRADE_A: B+")
+                    appendLine("GRADE_B: A-")
                     appendLine("ANALYSIS: A high-upside acquisition that addresses perimeter depth while maintaining financial flexibility. The roster balance immediately improves for playoff contention.")
                     append("WINNER: Balanced value with immediate rotational impact.")
+                }
+
+                // Season Preview Storylines
+                prompt.contains("KICKER:") -> {
+                    appendLine("KICKER: Contender")
+                    appendLine("HEADLINE: Title Hopes and Roster Depth Set the Stage")
+                    appendLine("BODY: With high-end talent across the roster and renewed commitment to perimeter defense, this squad enters the campaign with legitimate championship aspirations.")
+                    appendLine("---")
+                    appendLine("KICKER: Breakout")
+                    appendLine("HEADLINE: Rising Stars Primed for Leap Forward")
+                    appendLine("BODY: Player development through the offseason has elevated rotational depth, giving the coaching staff versatile lineups for crunch-time execution.")
+                    appendLine("---")
+                    appendLine("KICKER: Defense")
+                    appendLine("HEADLINE: Locking Down the Half Court")
+                    append("BODY: Rim protection and disruptive guard play will define the team's ceiling in a competitive conference landscape.")
                 }
 
                 // Draft Prospect Scouting
@@ -423,7 +443,7 @@ object Ollama {
                 }
 
                 // Training Camp Report
-                prompt.contains("CAMP_STANDOUT:") -> {
+                prompt.contains("CAMP_STANDOUT:") || prompt.contains("STANDOUT_ANALYSIS:") -> {
                     val topPlayer = prompt.lines().firstOrNull { it.startsWith("Top Standout:") }?.substringAfter(":")?.trim() ?: "Breakout Player"
                     appendLine("HEADLINE: Training Camp Report: $topPlayer Sparks New Dimension in Team Identity")
                     appendLine("STANDOUT_ANALYSIS: Entering camp in peak physical shape, $topPlayer displayed notable jumps in playmaking poise and spot-up efficiency, establishing strong chemistry with the starting unit.")
@@ -867,6 +887,44 @@ object Ollama {
         }
     }
 
+    /** Fire-and-forget postgame press question generation if auto-generate is enabled. */
+    fun maybeAutoGeneratePress(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+        player: Player,
+        line: GameLogEntry,
+        won: Boolean,
+        rivalry: Boolean = false,
+        winner: Boolean = false,
+    ) {
+        if (!config.enabled || !config.pressConference || !config.autoGenerate) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generatePressConference(config, lg, g, player, line, won, rivalry, winner).onSuccess { aiQ ->
+                if (lg.road?.press?.gameId == g.id) {
+                    lg.road?.press = aiQ
+                }
+            }
+        }
+    }
+
+    /** Fire-and-forget social feed reactions generation if auto-generate is enabled. */
+    fun maybeAutoGenerateSocial(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+        player: Player,
+        line: GameLogEntry,
+        won: Boolean,
+    ) {
+        if (!config.enabled || !config.socialFeed || !config.autoGenerate) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateSocialTakes(config, lg, g, player, line, won).onSuccess { posts ->
+                lg.road?.feed?.addAll(posts)
+            }
+        }
+    }
+
     data class PostgameReport(
         val headline: String,
         val outlet: String,
@@ -1008,7 +1066,8 @@ object Ollama {
                     PressAnswer(brash, followers = 0.04, fans = 0, teammates = -2, persona = 2),
                     PressAnswer(analytical, followers = 0.008, fans = 1, teammates = 1, persona = 0),
                 ),
-                reporter = reporter,
+                reporter = if (reporter.contains(config.shortActionName, ignoreCase = true)) reporter else "$reporter · ${config.shortActionName}",
+                isAi = true,
             )
             if (config.cacheResponses) Cache.put(cacheKey, questionObj)
             questionObj
@@ -1094,6 +1153,7 @@ object Ollama {
                             likes = likes,
                             verified = role == "analyst" || role == "teammate",
                             gameId = g.id,
+                            isAi = true,
                         ),
                     )
                 }
@@ -1103,7 +1163,7 @@ object Ollama {
                     Post(season, day, "${t.school} Faithful", "${t.abbr.lowercase()}nation", "fan",
                         if (won) "What a performance by ${player.last}! $statLineStr in the win over ${opp.school}."
                         else "Tough loss tonight against ${opp.school}, but ${player.last} gave everything with $statLineStr.",
-                        likes = 250, gameId = g.id),
+                        likes = 250, gameId = g.id, isAi = true),
                 )
             } else posts
             if (config.cacheResponses) Cache.put(cacheKey, finalPosts)

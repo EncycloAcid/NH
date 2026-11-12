@@ -129,7 +129,9 @@ object NewsDesk {
                 "“We needed every bit of it,” coach ${coach.last} said.",
             )))
         }.joinToString("\n\n")
-        lg.news += News(lg.season, lg.day, headline, t.id == lg.userTeamId, n.gameId, "game", body, outlet(), t.id, p.id)
+        val bigNews = News(lg.season, lg.day, headline, t.id == lg.userTeamId, n.gameId, "game", body, outlet(), t.id, p.id)
+        lg.news += bigNews
+        Ollama.maybeAutoGenerate(lg.ollama, lg, bigNews)
     }
 
     /**
@@ -162,7 +164,11 @@ object NewsDesk {
                 (star?.let { "\n\n${it.name} leads ${if (lg.pro) "them" else "the ${t.mascot}"} at ${"%.1f".format(it.stats.ppg)} points a game." } ?: "") +
                 (if (win) "\n\n“We're not thinking about the streak,” coach ${lg.coachOf(t).last} said. “Just the next one.”"
                 else "\n\n“Nobody's feeling sorry for us,” coach ${lg.coachOf(t).last} said. “We have to find a way.”")
-            lg.news += News(lg.season, lg.day, headline, t.id == lg.userTeamId, -1, "team", body, outlet(), t.id)
+            val streakNews = News(lg.season, lg.day, headline, t.id == lg.userTeamId, -1, "team", body, outlet(), t.id)
+            lg.news += streakNews
+            if (t.id == lg.userTeamId) {
+                Ollama.maybeAutoGenerate(lg.ollama, lg, streakNews)
+            }
         }
     }
 
@@ -282,7 +288,11 @@ object NewsDesk {
                 star?.let { (p, pts) -> add("${p.name} led the way with ${"%.1f".format(pts.toDouble() / games)} points a game in the series.") }
                 add(if (s.round == 4) "It's the end of a long road: ${w.w}-${w.l} in the regular season, and four series won." else "Next for the ${w.name}: the ${if (s.round == 3) "Finals" else ProLeague.ROUND_NAMES.getOrElse(s.round) { "next round" }}.")
             }.joinToString("\n\n")
-            lg.news += News(lg.season, lg.day, headline, s.involves(lg.userTeamId), last.id, "series", body, outlet(), w.id, star?.first?.id ?: -1)
+            val seriesNews = News(lg.season, lg.day, headline, s.involves(lg.userTeamId), last.id, "series", body, outlet(), w.id, star?.first?.id ?: -1)
+            lg.news += seriesNews
+            if (s.involves(lg.userTeamId) || s.round == 4) {
+                Ollama.maybeAutoGenerate(lg.ollama, lg, seriesNews)
+            }
         }
     }
 
@@ -330,8 +340,12 @@ object NewsDesk {
             add(why(a, fromB, fromA) + " " + why(b, fromA, fromB))
             add("Our grades: ${a.name} $gradeA, ${b.name} $gradeB.")
         }.joinToString("\n\n")
-        lg.news += News(lg.season, lg.day, headline, a.id == lg.userTeamId || b.id == lg.userTeamId, -1, "trade", body, outlet(),
+        val tradeNews = News(lg.season, lg.day, headline, a.id == lg.userTeamId || b.id == lg.userTeamId, -1, "trade", body, outlet(),
             if (star != null && star in fromA) b.id else a.id, star?.id ?: -1)
+        lg.news += tradeNews
+        if (a.id == lg.userTeamId || b.id == lg.userTeamId || big) {
+            Ollama.maybeAutoGenerate(lg.ollama, lg, tradeNews)
+        }
         @Suppress("UNUSED_VARIABLE") val unused = t
     }
 

@@ -458,6 +458,7 @@ object Road {
         if (won && r.persona <= -4) t.fans = (t.fans + 0.6).coerceAtMost(100.0)
         payMilestones(lg)
         r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner, duel)
+        Ollama.maybeAutoGeneratePress(lg.ollama, lg, g, h, line, won, rivalry, winner)
         if (lg.pro) BigNights.afterGame(lg, g, line, won, winner, stakes)
         Media.afterGame(lg, g, line, won, winner, stakes, duel)
         Media.raceColumn(lg)
