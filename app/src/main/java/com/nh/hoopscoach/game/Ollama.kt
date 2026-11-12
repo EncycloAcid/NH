@@ -324,7 +324,7 @@ object Ollama {
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val apiKey = config.googleApiKey.trim()
-            if (apiKey.isEmpty()) throw Exception("Google API key is missing. Please enter your Gemini API key in Settings.")
+            if (apiKey.isEmpty()) throw Exception("Google account is not signed in. Please tap 'Sign In with Google' in Settings.")
             val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
             val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -332,6 +332,9 @@ object Ollama {
                 connectTimeout = 10000
                 readTimeout = 30000
                 doOutput = true
+                if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
+                    setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
+                }
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
             }
@@ -379,7 +382,7 @@ object Ollama {
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val apiKey = config.openAiApiKey.trim()
-            if (apiKey.isEmpty()) throw Exception("OpenAI API key is missing. Please enter your ChatGPT API key in Settings.")
+            if (apiKey.isEmpty()) throw Exception("ChatGPT account is not signed in. Please tap 'Sign In with ChatGPT' in Settings.")
             val model = config.openAiModel.ifBlank { "gpt-4o-mini" }
             val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
             val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"

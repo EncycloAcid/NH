@@ -650,10 +650,28 @@ class OllamaConfig(
     var provider: String = "ollama", // "ollama", "google", "openai"
     var googleApiKey: String = "",
     var googleModel: String = "gemini-1.5-flash",
+    var googleAccountEmail: String = "",
+    var googleAccountName: String = "",
+    var googleSignedIn: Boolean = false,
     var openAiApiKey: String = "",
     var openAiModel: String = "gpt-4o-mini",
+    var openAiAccountEmail: String = "",
+    var openAiAccountName: String = "",
+    var openAiSignedIn: Boolean = false,
     var customEndpoint: String = "",
 ) {
+    val isGoogleSignedIn: Boolean
+        get() = googleSignedIn || googleApiKey.isNotBlank()
+
+    val isOpenAiSignedIn: Boolean
+        get() = openAiSignedIn || openAiApiKey.isNotBlank()
+
+    val googleDisplayEmail: String
+        get() = googleAccountEmail.ifBlank { if (googleApiKey.isNotBlank()) "Connected Google Account" else "Not Signed In" }
+
+    val openAiDisplayEmail: String
+        get() = openAiAccountEmail.ifBlank { if (openAiApiKey.isNotBlank()) "Connected ChatGPT Account" else "Not Signed In" }
+
     val activeModelName: String
         get() = when (provider.lowercase()) {
             "google" -> googleModel.ifBlank { "gemini-1.5-flash" }
@@ -663,8 +681,8 @@ class OllamaConfig(
 
     val providerDisplayName: String
         get() = when (provider.lowercase()) {
-            "google" -> "Google Gemini"
-            "openai" -> "ChatGPT (OpenAI)"
+            "google" -> if (isGoogleSignedIn && googleAccountEmail.isNotBlank()) "Google Gemini (${googleAccountEmail.substringBefore("@")})" else "Google Gemini"
+            "openai" -> if (isOpenAiSignedIn && openAiAccountEmail.isNotBlank()) "ChatGPT (${openAiAccountEmail.substringBefore("@")})" else "ChatGPT (OpenAI)"
             else -> "Local Ollama"
         }
 

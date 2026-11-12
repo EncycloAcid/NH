@@ -220,15 +220,23 @@ class OllamaTest {
         assertEquals("ollama", lg.ollama.provider)
         assertEquals("", lg.ollama.googleApiKey)
         assertEquals("gemini-1.5-flash", lg.ollama.googleModel)
+        assertEquals("", lg.ollama.googleAccountEmail)
+        assertFalse(lg.ollama.googleSignedIn)
         assertEquals("", lg.ollama.openAiApiKey)
         assertEquals("gpt-4o-mini", lg.ollama.openAiModel)
+        assertEquals("", lg.ollama.openAiAccountEmail)
+        assertFalse(lg.ollama.openAiSignedIn)
         assertEquals("", lg.ollama.customEndpoint)
 
         lg.ollama.provider = "google"
         lg.ollama.googleApiKey = "test_google_key_123"
         lg.ollama.googleModel = "gemini-2.0-flash"
+        lg.ollama.googleAccountEmail = "coach.dynasty@gmail.com"
+        lg.ollama.googleSignedIn = true
         lg.ollama.openAiApiKey = "test_openai_key_456"
         lg.ollama.openAiModel = "gpt-4o"
+        lg.ollama.openAiAccountEmail = "coach.alex@openai.com"
+        lg.ollama.openAiSignedIn = true
         lg.ollama.customEndpoint = "https://custom.openai.proxy/v1/chat/completions"
 
         val encoded = SaveIO.encode(lg)
@@ -237,8 +245,14 @@ class OllamaTest {
         assertEquals("google", decoded.ollama.provider)
         assertEquals("test_google_key_123", decoded.ollama.googleApiKey)
         assertEquals("gemini-2.0-flash", decoded.ollama.googleModel)
+        assertEquals("coach.dynasty@gmail.com", decoded.ollama.googleAccountEmail)
+        assertTrue(decoded.ollama.googleSignedIn)
+        assertTrue(decoded.ollama.isGoogleSignedIn)
         assertEquals("test_openai_key_456", decoded.ollama.openAiApiKey)
         assertEquals("gpt-4o", decoded.ollama.openAiModel)
+        assertEquals("coach.alex@openai.com", decoded.ollama.openAiAccountEmail)
+        assertTrue(decoded.ollama.openAiSignedIn)
+        assertTrue(decoded.ollama.isOpenAiSignedIn)
         assertEquals("https://custom.openai.proxy/v1/chat/completions", decoded.ollama.customEndpoint)
     }
 
@@ -252,12 +266,22 @@ class OllamaTest {
         assertEquals("Google gemini-1.5-flash", cfg.fullModelDisplayName)
         assertEquals("Gemini", cfg.shortActionName)
 
+        cfg.googleAccountEmail = "coach.hoops@gmail.com"
+        cfg.googleSignedIn = true
+        assertEquals("Google Gemini (coach.hoops)", cfg.providerDisplayName)
+
         cfg.provider = "openai"
         cfg.openAiModel = "gpt-4o-mini"
+        cfg.openAiAccountEmail = ""
+        cfg.openAiSignedIn = false
         assertEquals("ChatGPT (OpenAI)", cfg.providerDisplayName)
         assertEquals("gpt-4o-mini", cfg.activeModelName)
         assertEquals("ChatGPT (gpt-4o-mini)", cfg.fullModelDisplayName)
         assertEquals("ChatGPT", cfg.shortActionName)
+
+        cfg.openAiAccountEmail = "alex.ball@openai.com"
+        cfg.openAiSignedIn = true
+        assertEquals("ChatGPT (alex.ball)", cfg.providerDisplayName)
 
         cfg.provider = "ollama"
         cfg.model = "llama3.2:1b"
@@ -292,11 +316,11 @@ class OllamaTest {
         val googleCfg = OllamaConfig(provider = "google", googleApiKey = "")
         val googleRes = Ollama.generate(googleCfg, "Test prompt")
         assertTrue(googleRes.isFailure)
-        assertTrue(googleRes.exceptionOrNull()?.message?.contains("Google API key is missing") == true)
+        assertTrue(googleRes.exceptionOrNull()?.message?.contains("Google account is not signed in") == true)
 
         val openAiCfg = OllamaConfig(provider = "openai", openAiApiKey = "")
         val openAiRes = Ollama.generate(openAiCfg, "Test prompt")
         assertTrue(openAiRes.isFailure)
-        assertTrue(openAiRes.exceptionOrNull()?.message?.contains("OpenAI API key is missing") == true)
+        assertTrue(openAiRes.exceptionOrNull()?.message?.contains("ChatGPT account is not signed in") == true)
     }
 }
