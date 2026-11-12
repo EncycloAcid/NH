@@ -646,7 +646,42 @@ class OllamaConfig(
     var contextSize: Int = 512, // 512 tokens for rapid mobile prefill & low KV cache memory
     var keepAliveMinutes: Int = 30, // keep warm in RAM to avoid cold reload delays
     var cacheResponses: Boolean = true, // instant 0ms load for identical queries
-)
+    // Multi-Provider AI (Google Gemini, OpenAI ChatGPT, Local Ollama)
+    var provider: String = "ollama", // "ollama", "google", "openai"
+    var googleApiKey: String = "",
+    var googleModel: String = "gemini-1.5-flash",
+    var openAiApiKey: String = "",
+    var openAiModel: String = "gpt-4o-mini",
+    var customEndpoint: String = "",
+) {
+    val activeModelName: String
+        get() = when (provider.lowercase()) {
+            "google" -> googleModel.ifBlank { "gemini-1.5-flash" }
+            "openai" -> openAiModel.ifBlank { "gpt-4o-mini" }
+            else -> model.ifBlank { "llama3.2:1b" }
+        }
+
+    val providerDisplayName: String
+        get() = when (provider.lowercase()) {
+            "google" -> "Google Gemini"
+            "openai" -> "ChatGPT (OpenAI)"
+            else -> "Local Ollama"
+        }
+
+    val fullModelDisplayName: String
+        get() = when (provider.lowercase()) {
+            "google" -> "Google $activeModelName"
+            "openai" -> "ChatGPT ($activeModelName)"
+            else -> "Ollama $activeModelName"
+        }
+
+    val shortActionName: String
+        get() = when (provider.lowercase()) {
+            "google" -> "Gemini"
+            "openai" -> "ChatGPT"
+            else -> "Ollama"
+        }
+}
 
 enum class MomentKind(val tag: String) {
     BUZZER("Buzzer-beater"), FORCED_OT("Forces overtime"), UPSET("Upset alert"), CLASSIC("Instant classic"),

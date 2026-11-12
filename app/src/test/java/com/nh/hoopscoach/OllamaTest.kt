@@ -194,4 +194,109 @@ class OllamaTest {
         assertTrue("Qwen 2.5 0.5B exists", qwen != null)
         assertTrue("Qwen has speed rating", qwen!!.speedRating.contains("tok/s"))
     }
+
+    @Test
+    fun testCloudModelPresets() {
+        assertTrue("Google models list should not be empty", Ollama.GOOGLE_MODELS.isNotEmpty())
+        val flash15 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-1.5-flash" }
+        assertTrue("Gemini 1.5 Flash exists", flash15 != null)
+        assertTrue("Has recommended tag", flash15!!.tag.contains("Recommended"))
+
+        val flash20 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-2.0-flash" }
+        assertTrue("Gemini 2.0 Flash exists", flash20 != null)
+
+        assertTrue("OpenAI models list should not be empty", Ollama.OPENAI_MODELS.isNotEmpty())
+        val gpt4oMini = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-4o-mini" }
+        assertTrue("GPT-4o mini exists", gpt4oMini != null)
+        assertTrue("Has recommended tag", gpt4oMini!!.tag.contains("Recommended"))
+
+        val gpt4o = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-4o" }
+        assertTrue("GPT-4o exists", gpt4o != null)
+    }
+
+    @Test
+    fun testMultiProviderSerialization() {
+        val lg = LeagueGen.newLeague()
+        assertEquals("ollama", lg.ollama.provider)
+        assertEquals("", lg.ollama.googleApiKey)
+        assertEquals("gemini-1.5-flash", lg.ollama.googleModel)
+        assertEquals("", lg.ollama.openAiApiKey)
+        assertEquals("gpt-4o-mini", lg.ollama.openAiModel)
+        assertEquals("", lg.ollama.customEndpoint)
+
+        lg.ollama.provider = "google"
+        lg.ollama.googleApiKey = "test_google_key_123"
+        lg.ollama.googleModel = "gemini-2.0-flash"
+        lg.ollama.openAiApiKey = "test_openai_key_456"
+        lg.ollama.openAiModel = "gpt-4o"
+        lg.ollama.customEndpoint = "https://custom.openai.proxy/v1/chat/completions"
+
+        val encoded = SaveIO.encode(lg)
+        val decoded = SaveIO.decode(encoded)
+
+        assertEquals("google", decoded.ollama.provider)
+        assertEquals("test_google_key_123", decoded.ollama.googleApiKey)
+        assertEquals("gemini-2.0-flash", decoded.ollama.googleModel)
+        assertEquals("test_openai_key_456", decoded.ollama.openAiApiKey)
+        assertEquals("gpt-4o", decoded.ollama.openAiModel)
+        assertEquals("https://custom.openai.proxy/v1/chat/completions", decoded.ollama.customEndpoint)
+    }
+
+    @Test
+    fun testMultiProviderDisplayNames() {
+        val cfg = OllamaConfig()
+        cfg.provider = "google"
+        cfg.googleModel = "gemini-1.5-flash"
+        assertEquals("Google Gemini", cfg.providerDisplayName)
+        assertEquals("gemini-1.5-flash", cfg.activeModelName)
+        assertEquals("Google gemini-1.5-flash", cfg.fullModelDisplayName)
+        assertEquals("Gemini", cfg.shortActionName)
+
+        cfg.provider = "openai"
+        cfg.openAiModel = "gpt-4o-mini"
+        assertEquals("ChatGPT (OpenAI)", cfg.providerDisplayName)
+        assertEquals("gpt-4o-mini", cfg.activeModelName)
+        assertEquals("ChatGPT (gpt-4o-mini)", cfg.fullModelDisplayName)
+        assertEquals("ChatGPT", cfg.shortActionName)
+
+        cfg.provider = "ollama"
+        cfg.model = "llama3.2:1b"
+        assertEquals("Local Ollama", cfg.providerDisplayName)
+        assertEquals("llama3.2:1b", cfg.activeModelName)
+        assertEquals("Ollama llama3.2:1b", cfg.fullModelDisplayName)
+        assertEquals("Ollama", cfg.shortActionName)
+    }
+
+    @Test
+    fun testGoogleConnectionFailureGraceful() = runBlocking {
+        val emptyRes = Ollama.testGoogleConnection("")
+        assertTrue(emptyRes.isFailure)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("empty") == true)
+
+        val invalidRes = Ollama.testGoogleConnection("invalid_test_key_nonexistent")
+        assertTrue(invalidRes.isFailure)
+    }
+
+    @Test
+    fun testOpenAiConnectionFailureGraceful() = runBlocking {
+        val emptyRes = Ollama.testOpenAiConnection("")
+        assertTrue(emptyRes.isFailure)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("empty") == true)
+
+        val invalidRes = Ollama.testOpenAiConnection("invalid_test_key_nonexistent")
+        assertTrue(invalidRes.isFailure)
+    }
+
+    @Test
+    fun testMultiProviderGenerateMissingApiKey() = runBlocking {
+        val googleCfg = OllamaConfig(provider = "google", googleApiKey = "")
+        val googleRes = Ollama.generate(googleCfg, "Test prompt")
+        assertTrue(googleRes.isFailure)
+        assertTrue(googleRes.exceptionOrNull()?.message?.contains("Google API key is missing") == true)
+
+        val openAiCfg = OllamaConfig(provider = "openai", openAiApiKey = "")
+        val openAiRes = Ollama.generate(openAiCfg, "Test prompt")
+        assertTrue(openAiRes.isFailure)
+        assertTrue(openAiRes.exceptionOrNull()?.message?.contains("OpenAI API key is missing") == true)
+    }
 }

@@ -48,8 +48,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -253,7 +256,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var downloadStatus by remember { mutableStateOf("") }
     var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var showSetupGuide by remember { mutableStateOf(false) }
+    var showGoogleKey by remember { mutableStateOf(false) }
+    var showOpenAiKey by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) vm.exportSlot(exportSlotId ?: vm.activeSlotId, uri)
     }
@@ -371,356 +377,639 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }
             }
-            Section("AI Stories · Ollama")
+            Section("AI Dynasty Intelligence")
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Ollama controls stories", style = T.bodyB, color = P.ink)
-                        Text("Run an AI model directly on your phone or computer to generate game recaps, storylines and breaking news.", style = T.small, color = P.sub)
+                        Text("Enable AI Dynasty Intelligence", style = T.bodyB, color = P.ink)
+                        Text("Generate dynamic newspaper recaps, coach podium quotes, fan reactions, and storylines.", style = T.small, color = P.sub)
                     }
                     androidx.compose.material3.Switch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
                 }
 
-                Spacer(Modifier.height(12.dp))
-
-                // One-tap Auto-configure & detect
-                PrimaryButton(
-                    text = if (configuring) "Auto-detecting Ollama..." else "Auto-Configure (Auto-Detect)",
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !configuring && downloadingModel == null,
-                ) {
-                    configuring = true
-                    testStatus = "Detecting active Ollama instance on phone or local network..."
-                    scope.launch {
-                        val res = com.nh.hoopscoach.game.Ollama.autoConfigure(lg.ollama.host)
-                        configuring = false
-                        res.onSuccess { cfg ->
-                            testSuccess = true
-                            testStatus = cfg.message
-                            availableModels = cfg.models
-                            vm.act {
-                                it.ollama.enabled = true
-                                it.ollama.host = cfg.host
-                                it.ollama.model = cfg.selectedModel
-                            }
-                            vm.toast("Configured: using ${cfg.selectedModel}")
-                        }.onFailure { err ->
-                            testSuccess = false
-                            testStatus = err.message ?: "Could not detect Ollama"
-                        }
-                    }
-                }
-
-                if (testStatus.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(testStatus, style = T.small, color = if (testSuccess) P.good else P.bad)
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                // Phone setup guide toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showSetupGuide = !showSetupGuide }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (showSetupGuide) "▼ Hide Phone Setup Guide" else "▶ How to run Ollama on your phone (Termux)",
-                        style = T.label.copy(fontSize = 11.sp),
-                        color = P.accent,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                if (showSetupGuide) {
-                    Spacer(Modifier.height(4.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(P.surface2, RoundedCornerShape(8.dp))
-                            .border(1.dp, P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(10.dp)
-                    ) {
-                        Text("Run Ollama on your Android device in 3 steps:", style = T.bodyB, color = P.ink)
-                        Spacer(Modifier.height(4.dp))
-                        Text("1. Install Termux app on your phone (from F-Droid or GitHub).", style = T.small, color = P.sub)
-                        Text("2. In Termux, run this command:", style = T.small, color = P.sub)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "pkg install -y ollama && ollama serve",
-                            style = T.small.copy(fontSize = 11.sp),
-                            color = P.accent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(P.surface, RoundedCornerShape(4.dp))
-                                .padding(6.dp)
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        SecondaryButton("Copy Termux command", Modifier.fillMaxWidth()) {
-                            clipboard.setText(AnnotatedString("pkg install -y ollama && ollama serve"))
-                            vm.toast("Copied to clipboard! Paste in Termux.")
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text("3. Tap 'Auto-Configure' above or choose a model below to download!", style = T.small, color = P.sub)
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
-                Text("DOWNLOAD MODEL TO PHONE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                Spacer(Modifier.height(4.dp))
-                Text("Download a mobile-optimized model directly into your device's Ollama runtime:", style = T.small, color = P.sub)
-                Spacer(Modifier.height(8.dp))
-
-                // Recommended mobile models list
-                com.nh.hoopscoach.game.Ollama.RECOMMENDED_MODELS.forEach { preset ->
-                    val isDownloading = downloadingModel == preset.id
-                    val isInstalled = availableModels.contains(preset.id) || availableModels.any { it.startsWith(preset.id.substringBefore(":")) }
-                    val isCurrent = lg.ollama.model.equals(preset.id, ignoreCase = true)
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .background(if (isCurrent) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
-                            .border(
-                                width = if (isCurrent) 1.5.dp else 1.dp,
-                                color = if (isCurrent) P.accent else P.faint.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                            .padding(10.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(preset.name, style = T.bodyB, color = P.ink)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        preset.tag,
-                                        style = T.small.copy(fontSize = 10.sp),
-                                        color = if (preset.tag.contains("Recommended")) P.good else P.sub,
-                                    )
-                                }
-                                Text("${preset.size} · ${preset.description}", style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                            }
-                            Spacer(Modifier.width(8.dp))
-
-                            if (isDownloading) {
-                                Text("DOWNLOADING", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                            } else if (isCurrent) {
-                                Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
-                            } else if (isInstalled) {
-                                SmallButton("Select") {
-                                    vm.act {
-                                        it.ollama.model = preset.id
-                                        it.ollama.enabled = true
-                                    }
-                                    vm.toast("Active model: ${preset.name}")
-                                }
-                            } else {
-                                SmallButton(
-                                    text = "Download",
-                                    primary = preset.tag.contains("Recommended"),
-                                    enabled = downloadingModel == null,
-                                ) {
-                                    downloadingModel = preset.id
-                                    downloadProgress = 0f
-                                    downloadStatus = "Connecting to Ollama on ${lg.ollama.host}..."
-                                    scope.launch {
-                                        val res = com.nh.hoopscoach.game.Ollama.pullModel(lg.ollama.host, preset.id) { status, prog, details ->
-                                            downloadProgress = prog
-                                            downloadStatus = "$status: $details"
-                                        }
-                                        downloadingModel = null
-                                        res.onSuccess {
-                                            vm.act {
-                                                it.ollama.model = preset.id
-                                                it.ollama.enabled = true
-                                            }
-                                            testStatus = "Downloaded ${preset.name} successfully! Model is active."
-                                            testSuccess = true
-                                            availableModels = (availableModels + preset.id).distinct()
-                                            vm.toast("${preset.name} downloaded & active!")
-                                        }.onFailure { err ->
-                                            downloadStatus = "Download failed: ${err.message}"
-                                            vm.toast("Download error: ${err.message}")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (isDownloading) {
-                            Spacer(Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(P.surface)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(downloadProgress.coerceIn(0.02f, 1f))
-                                        .fillMaxHeight()
-                                        .background(P.accent)
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(downloadStatus, style = T.small.copy(fontSize = 11.sp), color = P.accent)
-                        }
-                    }
-                }
-
-                if (downloadingModel == null && downloadStatus.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(downloadStatus, style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                }
-
                 if (lg.ollama.enabled) {
                     Spacer(Modifier.height(14.dp))
-                    Text("MANUAL CONNECTION SETTINGS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Host endpoint (http://localhost:11434 on phone, http://10.0.2.2:11434 on emulator)", style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = lg.ollama.host,
-                        onValueChange = { h -> vm.act { it.ollama.host = h } },
-                        singleLine = true,
-                        placeholder = { Text("http://localhost:11434", color = P.faint) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text("Model name", style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = lg.ollama.model,
-                        onValueChange = { m -> vm.act { it.ollama.model = m } },
-                        singleLine = true,
-                        placeholder = { Text("llama3.2:1b", color = P.faint) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
-                            Text("Automatically generate recaps for your games using Ollama.", style = T.small, color = P.sub)
-                        }
-                        androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
-                    }
+                    Text("AI PROVIDER", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(6.dp))
 
-                    Spacer(Modifier.height(14.dp))
-                    Text("AI SPEED & ACCELERATION", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Optimize on-device generation speed, CPU threads, and memory allocation for smooth mobile performance.", style = T.small, color = P.sub)
-                    Spacer(Modifier.height(8.dp))
-
-                    // Speed Mode selector
-                    Text("SPEED PROFILE", style = T.label.copy(fontSize = 9.sp), color = P.sub)
-                    Spacer(Modifier.height(4.dp))
+                    // 3 Provider Tabs
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val modes = listOf(
-                            Triple("turbo", "⚡ Turbo", "Fastest (~2-3s)"),
-                            Triple("balanced", "⚖️ Balanced", "Standard (~5-7s)"),
-                            Triple("quality", "🎨 Quality", "Detailed (~10s)"),
+                        val providers = listOf(
+                            Triple("ollama", "🤖 Local Ollama", "On-device runtime"),
+                            Triple("google", "🌐 Google Gemini", "Free & fast cloud"),
+                            Triple("openai", "⚡ ChatGPT", "OpenAI cloud"),
                         )
-                        modes.forEach { (key, label, desc) ->
-                            val sel = lg.ollama.speedMode == key
+                        providers.forEach { (key, label, desc) ->
+                            val sel = lg.ollama.provider.equals(key, ignoreCase = true)
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (sel) P.accentSoft else P.surface2)
                                     .border(if (sel) 1.5.dp else 1.dp, if (sel) P.accent else P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .clickable { vm.act { it.ollama.speedMode = key } }
-                                    .padding(vertical = 8.dp, horizontal = 6.dp),
+                                    .clickable {
+                                        vm.act { it.ollama.provider = key }
+                                        testStatus = ""
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text(label, style = T.bodyB.copy(fontSize = 12.sp), color = if (sel) P.accent else P.ink)
-                                Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub)
+                                Text(label, style = T.bodyB.copy(fontSize = 11.sp), color = if (sel) P.accent else P.ink, textAlign = TextAlign.Center)
+                                Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub, textAlign = TextAlign.Center)
                             }
                         }
                     }
 
-                    // Tip banner if on heavier model
-                    if (lg.ollama.model.contains("llama3.2:3b") || lg.ollama.model.contains("llama3.2:1b")) {
-                        Spacer(Modifier.height(8.dp))
-                        Row(
+                    Spacer(Modifier.height(14.dp))
+
+                    // Provider Specific Configuration
+                    when (lg.ollama.provider.lowercase()) {
+                        "google" -> {
+                            Text("GOOGLE GEMINI CONFIGURATION", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Fast cloud AI with a generous free tier. Generates rich articles in 1-2 seconds with zero phone battery or memory overhead.", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(8.dp))
+
+                            Text("Gemini API Key", style = T.bodyB.copy(fontSize = 12.sp), color = P.ink)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = lg.ollama.googleApiKey,
+                                onValueChange = { k -> vm.act { it.ollama.googleApiKey = k } },
+                                singleLine = true,
+                                placeholder = { Text("AIzaSy...", color = P.faint) },
+                                visualTransformation = if (showGoogleKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Text(
+                                        if (showGoogleKey) "HIDE" else "SHOW",
+                                        style = T.label.copy(fontSize = 10.sp),
+                                        color = P.accent,
+                                        modifier = Modifier
+                                            .clickable { showGoogleKey = !showGoogleKey }
+                                            .padding(8.dp)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = fieldColors(),
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Need a free key?", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                Text(
+                                    "Get Free Key at Google AI Studio ↗",
+                                    style = T.small.copy(fontSize = 11.sp),
+                                    color = P.accent,
+                                    modifier = Modifier.clickable {
+                                        runCatching { uriHandler.openUri("https://aistudio.google.com/app/apikey") }.onFailure {
+                                            clipboard.setText(AnnotatedString("https://aistudio.google.com/app/apikey"))
+                                            vm.toast("Link copied to clipboard!")
+                                        }
+                                    }
+                                )
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+                            Text("GEMINI MODEL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(6.dp))
+
+                            com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS.forEach { m ->
+                                val sel = lg.ollama.googleModel.equals(m.id, ignoreCase = true)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .background(if (sel) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = if (sel) 1.5.dp else 1.dp,
+                                            color = if (sel) P.accent else P.faint.copy(alpha = 0.25f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { vm.act { it.ollama.googleModel = m.id } }
+                                        .padding(10.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(m.name, style = T.bodyB, color = P.ink)
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(m.tag, style = T.small.copy(fontSize = 10.sp), color = if (m.tag.contains("Recommended")) P.good else P.sub)
+                                            }
+                                            Text(m.description, style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                        }
+                                        if (sel) {
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+                            SecondaryButton(
+                                text = if (testing) "Connecting to Google AI..." else "Test Google Gemini Connection",
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !testing && lg.ollama.googleApiKey.isNotBlank(),
+                            ) {
+                                testing = true
+                                testStatus = "Contacting Google Gemini API..."
+                                scope.launch {
+                                    val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(lg.ollama.googleApiKey)
+                                    testing = false
+                                    res.onSuccess {
+                                        testSuccess = true
+                                        testStatus = "Connected to Google AI successfully! Ready for dynasty stories."
+                                        vm.toast("Google Gemini connected!")
+                                    }.onFailure { err ->
+                                        testSuccess = false
+                                        testStatus = err.message ?: "Could not connect to Google AI"
+                                    }
+                                }
+                            }
+                        }
+
+                        "openai" -> {
+                            Text("OPENAI CHATGPT CONFIGURATION", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Industry-leading conversational AI. Connect your OpenAI API key or any custom OpenAI-compatible endpoint.", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(8.dp))
+
+                            Text("OpenAI API Key", style = T.bodyB.copy(fontSize = 12.sp), color = P.ink)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = lg.ollama.openAiApiKey,
+                                onValueChange = { k -> vm.act { it.ollama.openAiApiKey = k } },
+                                singleLine = true,
+                                placeholder = { Text("sk-proj-...", color = P.faint) },
+                                visualTransformation = if (showOpenAiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Text(
+                                        if (showOpenAiKey) "HIDE" else "SHOW",
+                                        style = T.label.copy(fontSize = 10.sp),
+                                        color = P.accent,
+                                        modifier = Modifier
+                                            .clickable { showOpenAiKey = !showOpenAiKey }
+                                            .padding(8.dp)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = fieldColors(),
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Need an API key?", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                Text(
+                                    "OpenAI API Keys ↗",
+                                    style = T.small.copy(fontSize = 11.sp),
+                                    color = P.accent,
+                                    modifier = Modifier.clickable {
+                                        runCatching { uriHandler.openUri("https://platform.openai.com/api-keys") }.onFailure {
+                                            clipboard.setText(AnnotatedString("https://platform.openai.com/api-keys"))
+                                            vm.toast("Link copied to clipboard!")
+                                        }
+                                    }
+                                )
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+                            Text("Custom Endpoint (Optional)", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = lg.ollama.customEndpoint,
+                                onValueChange = { ep -> vm.act { it.ollama.customEndpoint = ep } },
+                                singleLine = true,
+                                placeholder = { Text("https://api.openai.com/v1/chat/completions", color = P.faint) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = fieldColors(),
+                            )
+
+                            Spacer(Modifier.height(12.dp))
+                            Text("CHATGPT MODEL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(6.dp))
+
+                            com.nh.hoopscoach.game.Ollama.OPENAI_MODELS.forEach { m ->
+                                val sel = lg.ollama.openAiModel.equals(m.id, ignoreCase = true)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .background(if (sel) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = if (sel) 1.5.dp else 1.dp,
+                                            color = if (sel) P.accent else P.faint.copy(alpha = 0.25f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { vm.act { it.ollama.openAiModel = m.id } }
+                                        .padding(10.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(m.name, style = T.bodyB, color = P.ink)
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(m.tag, style = T.small.copy(fontSize = 10.sp), color = if (m.tag.contains("Recommended")) P.good else P.sub)
+                                            }
+                                            Text(m.description, style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                        }
+                                        if (sel) {
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+                            SecondaryButton(
+                                text = if (testing) "Connecting to ChatGPT..." else "Test OpenAI Connection",
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !testing && lg.ollama.openAiApiKey.isNotBlank(),
+                            ) {
+                                testing = true
+                                testStatus = "Contacting OpenAI API..."
+                                scope.launch {
+                                    val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(lg.ollama.openAiApiKey, lg.ollama.customEndpoint)
+                                    testing = false
+                                    res.onSuccess {
+                                        testSuccess = true
+                                        testStatus = "Connected to OpenAI successfully! Ready for dynasty stories."
+                                        vm.toast("ChatGPT connected!")
+                                    }.onFailure { err ->
+                                        testSuccess = false
+                                        testStatus = err.message ?: "Could not connect to OpenAI"
+                                    }
+                                }
+                            }
+                        }
+
+                        else -> {
+                            // Local Ollama
+                            PrimaryButton(
+                                text = if (configuring) "Auto-detecting Ollama..." else "Auto-Configure (Auto-Detect)",
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !configuring && downloadingModel == null,
+                            ) {
+                                configuring = true
+                                testStatus = "Detecting active Ollama instance on phone or local network..."
+                                scope.launch {
+                                    val res = com.nh.hoopscoach.game.Ollama.autoConfigure(lg.ollama.host)
+                                    configuring = false
+                                    res.onSuccess { cfg ->
+                                        testSuccess = true
+                                        testStatus = cfg.message
+                                        availableModels = cfg.models
+                                        vm.act {
+                                            it.ollama.enabled = true
+                                            it.ollama.provider = "ollama"
+                                            it.ollama.host = cfg.host
+                                            it.ollama.model = cfg.selectedModel
+                                        }
+                                        vm.toast("Configured: using ${cfg.selectedModel}")
+                                    }.onFailure { err ->
+                                        testSuccess = false
+                                        testStatus = err.message ?: "Could not detect Ollama"
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            // Phone setup guide toggle
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showSetupGuide = !showSetupGuide }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    if (showSetupGuide) "▼ Hide Phone Setup Guide" else "▶ How to run Ollama on your phone (Termux)",
+                                    style = T.label.copy(fontSize = 11.sp),
+                                    color = P.accent,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+
+                            if (showSetupGuide) {
+                                Spacer(Modifier.height(4.dp))
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(P.surface2, RoundedCornerShape(8.dp))
+                                        .border(1.dp, P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        .padding(10.dp)
+                                ) {
+                                    Text("Run Ollama on your Android device in 3 steps:", style = T.bodyB, color = P.ink)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("1. Install Termux app on your phone (from F-Droid or GitHub).", style = T.small, color = P.sub)
+                                    Text("2. In Termux, run this command:", style = T.small, color = P.sub)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "pkg install -y ollama && ollama serve",
+                                        style = T.small.copy(fontSize = 11.sp),
+                                        color = P.accent,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(P.surface, RoundedCornerShape(4.dp))
+                                            .padding(6.dp)
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    SecondaryButton("Copy Termux command", Modifier.fillMaxWidth()) {
+                                        clipboard.setText(AnnotatedString("pkg install -y ollama && ollama serve"))
+                                        vm.toast("Copied to clipboard! Paste in Termux.")
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("3. Tap 'Auto-Configure' above or choose a model below to download!", style = T.small, color = P.sub)
+                                }
+                            }
+
+                            Spacer(Modifier.height(14.dp))
+                            Text("DOWNLOAD MODEL TO PHONE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Download a mobile-optimized model directly into your device's Ollama runtime:", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(8.dp))
+
+                            // Recommended mobile models list
+                            com.nh.hoopscoach.game.Ollama.RECOMMENDED_MODELS.forEach { preset ->
+                                val isDownloading = downloadingModel == preset.id
+                                val isInstalled = availableModels.contains(preset.id) || availableModels.any { it.startsWith(preset.id.substringBefore(":")) }
+                                val isCurrent = lg.ollama.model.equals(preset.id, ignoreCase = true)
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .background(if (isCurrent) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = if (isCurrent) 1.5.dp else 1.dp,
+                                            color = if (isCurrent) P.accent else P.faint.copy(alpha = 0.25f),
+                                            shape = RoundedCornerShape(8.dp),
+                                        )
+                                        .padding(10.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(preset.name, style = T.bodyB, color = P.ink)
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(
+                                                    preset.tag,
+                                                    style = T.small.copy(fontSize = 10.sp),
+                                                    color = if (preset.tag.contains("Recommended")) P.good else P.sub,
+                                                )
+                                            }
+                                            Text("${preset.size} · ${preset.description}", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+
+                                        if (isDownloading) {
+                                            Text("DOWNLOADING", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                                        } else if (isCurrent) {
+                                            Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
+                                        } else if (isInstalled) {
+                                            SmallButton("Select") {
+                                                vm.act {
+                                                    it.ollama.model = preset.id
+                                                    it.ollama.enabled = true
+                                                }
+                                                vm.toast("Active model: ${preset.name}")
+                                            }
+                                        } else {
+                                            SmallButton(
+                                                text = "Download",
+                                                primary = preset.tag.contains("Recommended"),
+                                                enabled = downloadingModel == null,
+                                            ) {
+                                                downloadingModel = preset.id
+                                                downloadProgress = 0f
+                                                downloadStatus = "Connecting to Ollama on ${lg.ollama.host}..."
+                                                scope.launch {
+                                                    val res = com.nh.hoopscoach.game.Ollama.pullModel(lg.ollama.host, preset.id) { status, prog, details ->
+                                                        downloadProgress = prog
+                                                        downloadStatus = "$status: $details"
+                                                    }
+                                                    downloadingModel = null
+                                                    res.onSuccess {
+                                                        vm.act {
+                                                            it.ollama.model = preset.id
+                                                            it.ollama.enabled = true
+                                                        }
+                                                        testStatus = "Downloaded ${preset.name} successfully! Model is active."
+                                                        testSuccess = true
+                                                        availableModels = (availableModels + preset.id).distinct()
+                                                        vm.toast("${preset.name} downloaded & active!")
+                                                    }.onFailure { err ->
+                                                        downloadStatus = "Download failed: ${err.message}"
+                                                        vm.toast("Download error: ${err.message}")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (isDownloading) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(P.surface)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth(downloadProgress.coerceIn(0.02f, 1f))
+                                                    .fillMaxHeight()
+                                                    .background(P.accent)
+                                            )
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(downloadStatus, style = T.small.copy(fontSize = 11.sp), color = P.accent)
+                                    }
+                                }
+                            }
+
+                            if (downloadingModel == null && downloadStatus.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(downloadStatus, style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                            }
+
+                            Spacer(Modifier.height(14.dp))
+                            Text("MANUAL CONNECTION SETTINGS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Host endpoint (http://localhost:11434 on phone, http://10.0.2.2:11434 on emulator)", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = lg.ollama.host,
+                                onValueChange = { h -> vm.act { it.ollama.host = h } },
+                                singleLine = true,
+                                placeholder = { Text("http://localhost:11434", color = P.faint) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = fieldColors(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("Model name", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = lg.ollama.model,
+                                onValueChange = { m -> vm.act { it.ollama.model = m } },
+                                singleLine = true,
+                                placeholder = { Text("llama3.2:1b", color = P.faint) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = fieldColors(),
+                            )
+
+                            Spacer(Modifier.height(10.dp))
+                            SecondaryButton(if (testing) "Testing..." else "Test Local Ollama Connection", Modifier.fillMaxWidth(), enabled = !testing && !configuring) {
+                                testing = true
+                                testStatus = "Testing connection to ${lg.ollama.host}..."
+                                scope.launch {
+                                    val res = com.nh.hoopscoach.game.Ollama.testConnection(lg.ollama.host)
+                                    testing = false
+                                    res.onSuccess { models ->
+                                        testSuccess = true
+                                        availableModels = models
+                                        testStatus = if (models.isNotEmpty()) "Connected! Available models: " + models.joinToString(", ")
+                                        else "Connected! (No models downloaded yet in Ollama)"
+                                    }.onFailure { err ->
+                                        testSuccess = false
+                                        testStatus = "Connection failed: ${err.message ?: "Could not reach Ollama"}"
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(14.dp))
+                            Text("LOCAL AI SPEED & ACCELERATION", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Optimize on-device generation speed, CPU threads, and memory allocation for smooth mobile performance.", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(8.dp))
+
+                            // Speed Mode selector
+                            Text("SPEED PROFILE", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                            Spacer(Modifier.height(4.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val modes = listOf(
+                                    Triple("turbo", "⚡ Turbo", "Fastest (~2-3s)"),
+                                    Triple("balanced", "⚖️ Balanced", "Standard (~5-7s)"),
+                                    Triple("quality", "🎨 Quality", "Detailed (~10s)"),
+                                )
+                                modes.forEach { (key, label, desc) ->
+                                    val sel = lg.ollama.speedMode == key
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (sel) P.accentSoft else P.surface2)
+                                            .border(if (sel) 1.5.dp else 1.dp, if (sel) P.accent else P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                            .clickable { vm.act { it.ollama.speedMode = key } }
+                                            .padding(vertical = 8.dp, horizontal = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(label, style = T.bodyB.copy(fontSize = 12.sp), color = if (sel) P.accent else P.ink)
+                                        Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub)
+                                    }
+                                }
+                            }
+
+                            // Tip banner if on heavier model
+                            if (lg.ollama.model.contains("llama3.2:3b") || lg.ollama.model.contains("llama3.2:1b")) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(P.surface2, RoundedCornerShape(8.dp))
+                                        .border(1.dp, P.gold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("⚡", fontSize = 16.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                                        Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
+                                    }
+                                    Spacer(Modifier.width(6.dp))
+                                    SmallButton("Use SmolLM2") {
+                                        vm.act { it.ollama.model = "smollm2:135m" }
+                                        vm.toast("Active model switched to SmolLM2 135M")
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            // CPU Threads selector
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("CPU Thread Allocation", style = T.bodyB, color = P.ink)
+                                    Text("Allocates performance cores on big.LITTLE phone CPUs (${if (lg.ollama.numThreads == 0) "Auto: ${com.nh.hoopscoach.game.Ollama.defaultOptimalThreads()} cores" else "${lg.ollama.numThreads} cores"}).", style = T.small, color = P.sub)
+                                }
+                                val threadOptions = listOf(0 to "Auto", 2 to "2", 4 to "4", 6 to "6")
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    threadOptions.forEach { (count, txt) ->
+                                        val sel = lg.ollama.numThreads == count
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (sel) P.accent else P.surface2)
+                                                .clickable { vm.act { it.ollama.numThreads = count } }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            // Keep warm in RAM
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Keep in RAM between games", style = T.bodyB, color = P.ink)
+                                    Text("Prevents 5-15s cold start model reloads from mobile storage.", style = T.small, color = P.sub)
+                                }
+                                val ramOptions = listOf(30 to "30m", 10 to "10m", 5 to "5m")
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    ramOptions.forEach { (mins, txt) ->
+                                        val sel = lg.ollama.keepAliveMinutes == mins
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (sel) P.accent else P.surface2)
+                                                .clickable { vm.act { it.ollama.keepAliveMinutes = mins } }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (testStatus.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(P.surface2, RoundedCornerShape(8.dp))
-                                .border(1.dp, P.gold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                                .background(if (testSuccess) P.good.copy(alpha = 0.12f) else P.bad.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .border(1.dp, if (testSuccess) P.good.copy(alpha = 0.4f) else P.bad.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(10.dp)
                         ) {
-                            Text("⚡", fontSize = 16.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                                Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            SmallButton("Use SmolLM2") {
-                                vm.act { it.ollama.model = "smollm2:135m" }
-                                vm.toast("Active model switched to SmolLM2 135M")
-                            }
+                            Text(testStatus, style = T.small, color = if (testSuccess) P.good else P.bad)
                         }
                     }
 
-                    Spacer(Modifier.height(10.dp))
-
-                    // CPU Threads selector
+                    Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("CPU Thread Allocation", style = T.bodyB, color = P.ink)
-                            Text("Allocates performance cores on big.LITTLE phone CPUs (${if (lg.ollama.numThreads == 0) "Auto: ${com.nh.hoopscoach.game.Ollama.defaultOptimalThreads()} cores" else "${lg.ollama.numThreads} cores"}).", style = T.small, color = P.sub)
+                            Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
+                            Text("Automatically generate recaps for your games using ${lg.ollama.providerDisplayName}.", style = T.small, color = P.sub)
                         }
-                        val threadOptions = listOf(0 to "Auto", 2 to "2", 4 to "4", 6 to "6")
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            threadOptions.forEach { (count, txt) ->
-                                val sel = lg.ollama.numThreads == count
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (sel) P.accent else P.surface2)
-                                        .clickable { vm.act { it.ollama.numThreads = count } }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    // Keep warm in RAM
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Keep in RAM between games", style = T.bodyB, color = P.ink)
-                            Text("Prevents 5-15s cold start model reloads from mobile storage.", style = T.small, color = P.sub)
-                        }
-                        val ramOptions = listOf(30 to "30m", 10 to "10m", 5 to "5m")
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            ramOptions.forEach { (mins, txt) ->
-                                val sel = lg.ollama.keepAliveMinutes == mins
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (sel) P.accent else P.surface2)
-                                        .clickable { vm.act { it.ollama.keepAliveMinutes = mins } }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
-                                }
-                            }
-                        }
+                        androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
                     }
 
                     Spacer(Modifier.height(10.dp))
@@ -729,7 +1018,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Instant Response Cache", style = T.bodyB, color = P.ink)
-                            Text("Cache results for 0ms instant reload on revisiting games & scouting.", style = T.small, color = P.sub)
+                            Text("Cache results for 0ms instant reload and zero wasted API quota on revisiting games & scouting.", style = T.small, color = P.sub)
                         }
                         androidx.compose.material3.Switch(lg.ollama.cacheResponses, { on -> vm.act { it.ollama.cacheResponses = on } })
                     }
@@ -793,24 +1082,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("AI writes keys to victory based on opponent matchups.", style = T.small, color = P.sub)
                         }
                         androidx.compose.material3.Switch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    SecondaryButton(if (testing) "Testing..." else "Test connection", Modifier.fillMaxWidth(), enabled = !testing && !configuring) {
-                        testing = true
-                        testStatus = "Testing connection to ${lg.ollama.host}..."
-                        scope.launch {
-                            val res = com.nh.hoopscoach.game.Ollama.testConnection(lg.ollama.host)
-                            testing = false
-                            res.onSuccess { models ->
-                                testSuccess = true
-                                availableModels = models
-                                testStatus = if (models.isNotEmpty()) "Connected! Available models: " + models.joinToString(", ")
-                                else "Connected! (No models downloaded yet in Ollama)"
-                            }.onFailure { err ->
-                                testSuccess = false
-                                testStatus = "Connection failed: ${err.message ?: "Could not reach Ollama"}"
-                            }
-                        }
                     }
                 }
             }

@@ -62,6 +62,25 @@ object Ollama {
         ),
     )
 
+    data class CloudModel(
+        val id: String,
+        val name: String,
+        val tag: String,
+        val description: String,
+    )
+
+    val GOOGLE_MODELS = listOf(
+        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · Free & Fast", "Ultra-fast multimodal reasoning with a generous free tier. Ideal for instant recaps."),
+        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Next-Gen Speed", "Google's newest flash model with sub-second generation and real-time responsiveness."),
+        CloudModel("gemini-1.5-pro", "Gemini 1.5 Pro", "Deep Journalism", "Full-length investigative columns, rich prose, and deep storylines."),
+    )
+
+    val OPENAI_MODELS = listOf(
+        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · Smart & Fast", "Affordable and remarkably fast. Exceptional basketball context and quote realism."),
+        CloudModel("gpt-4o", "GPT-4o", "Flagship Intelligence", "OpenAI's premier reasoning model for deep columns and sports commentary."),
+        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Legacy", "Classic ChatGPT model for basic headlines and recaps."),
+    )
+
     data class AutoConfigResult(
         val host: String,
         val models: List<String>,
@@ -231,8 +250,198 @@ object Ollama {
         }
     }
 
-    /** Low-level generate call using Ollama's /api/generate endpoint with streaming to prevent socket timeouts. */
+    /** Test connection to Google Gemini API using [apiKey]. */
+    suspend fun testGoogleConnection(apiKey: String): Result<List<String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val key = apiKey.trim()
+            if (key.isEmpty()) throw Exception("Google API key is empty. Enter your Gemini API key from Google AI Studio.")
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models?key=$key")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("Accept", "application/json")
+            }
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val models = root["models"]?.jsonArray?.mapNotNull {
+                    it.jsonObject["name"]?.jsonPrimitive?.content?.removePrefix("models/")
+                }?.filter { it.contains("gemini") } ?: listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro")
+                models.ifEmpty { listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro") }
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("Google AI Error ($code): $errMsg")
+            }
+        }
+    }
+
+    /** Test connection to OpenAI ChatGPT API using [apiKey] and optional [customEndpoint]. */
+    suspend fun testOpenAiConnection(apiKey: String, customEndpoint: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val key = apiKey.trim()
+            if (key.isEmpty()) throw Exception("OpenAI API key is empty. Enter your ChatGPT / OpenAI API key.")
+            val raw = customEndpoint.trim().ifEmpty { "https://api.openai.com/v1" }.removeSuffix("/chat/completions")
+            val base = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "https://$raw"
+            val url = URL("$base/models")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("Authorization", "Bearer $key")
+                setRequestProperty("Accept", "application/json")
+            }
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val models = root["data"]?.jsonArray?.mapNotNull {
+                    it.jsonObject["id"]?.jsonPrimitive?.content
+                }?.filter { it.startsWith("gpt") } ?: listOf("gpt-4o-mini", "gpt-4o")
+                models.ifEmpty { listOf("gpt-4o-mini", "gpt-4o") }
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("ChatGPT Error ($code): $errMsg")
+            }
+        }
+    }
+
+    /** Generate content using Google Gemini REST API. */
+    suspend fun generateGoogle(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val apiKey = config.googleApiKey.trim()
+            if (apiKey.isEmpty()) throw Exception("Google API key is missing. Please enter your Gemini API key in Settings.")
+            val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10000
+                readTimeout = 30000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Accept", "application/json")
+            }
+
+            val payload = buildString {
+                append("{\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]},")
+                append("\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}],")
+                append("\"generationConfig\":{")
+                append("\"temperature\":$temperature,")
+                append("\"maxOutputTokens\":$numPredict")
+                append("}}")
+            }
+
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val text = root["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
+                    ?.get("content")?.jsonObject
+                    ?.get("parts")?.jsonArray?.firstOrNull()?.jsonObject
+                    ?.get("text")?.jsonPrimitive?.content.orEmpty().trim()
+                if (text.isEmpty()) throw Exception("Empty response from Google Gemini")
+                onToken?.invoke(text)
+                text
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("Google AI Error ($code): $errMsg")
+            }
+        }
+    }
+
+    /** Generate content using OpenAI / ChatGPT REST API. */
+    suspend fun generateOpenAi(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val apiKey = config.openAiApiKey.trim()
+            if (apiKey.isEmpty()) throw Exception("OpenAI API key is missing. Please enter your ChatGPT API key in Settings.")
+            val model = config.openAiModel.ifBlank { "gpt-4o-mini" }
+            val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
+            val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
+            val url = URL(endpoint)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10000
+                readTimeout = 30000
+                doOutput = true
+                setRequestProperty("Authorization", "Bearer $apiKey")
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Accept", "application/json")
+            }
+
+            val payload = buildString {
+                append("{\"model\":").append(jsonString(model))
+                append(",\"messages\":[")
+                append("{\"role\":\"system\",\"content\":").append(jsonString(system)).append("},")
+                append("{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}")
+                append("],\"temperature\":$temperature,\"max_tokens\":$numPredict}")
+            }
+
+            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val text = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                    ?.get("message")?.jsonObject
+                    ?.get("content")?.jsonPrimitive?.content.orEmpty().trim()
+                if (text.isEmpty()) throw Exception("Empty response from ChatGPT")
+                onToken?.invoke(text)
+                text
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("ChatGPT Error ($code): $errMsg")
+            }
+        }
+    }
+
+    /** Unified generate dispatcher across all configured AI providers (Google Gemini, OpenAI ChatGPT, Local Ollama). */
     suspend fun generate(
+        config: OllamaConfig,
+        prompt: String,
+        system: String = "You are a professional basketball beat writer and columnist. Write engaging, realistic sports newspaper journalism in 2-4 clean paragraphs. Never include markdown headers, title prefixes, or conversational meta-commentary.",
+        temperature: Double = 0.7,
+        numPredict: Int = 350,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        when (config.provider.lowercase()) {
+            "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
+            "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
+            else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
+        }
+    }
+
+    /** Low-level generate call using Ollama's /api/generate endpoint with streaming to prevent socket timeouts. */
+    suspend fun generateOllama(
         config: OllamaConfig,
         prompt: String,
         system: String = "You are a professional basketball beat writer and columnist. Write engaging, realistic sports newspaper journalism in 2-4 clean paragraphs. Never include markdown headers, title prefixes, or conversational meta-commentary.",
@@ -380,7 +589,7 @@ object Ollama {
                 mine = true,
                 kind = "article",
                 body = finalBody,
-                source = "$outlet · Ollama ${config.model}",
+                source = "$outlet · ${config.fullModelDisplayName}",
                 teamId = u.id,
             )
         }
@@ -448,7 +657,7 @@ object Ollama {
             flush()
 
             if (stories.isEmpty()) {
-                listOf(Story("Ollama Spotlight", "A New Era Begins", raw.trim().take(300), userTeamId))
+                listOf(Story(config.providerDisplayName, "A New Era Begins", raw.trim().take(300), userTeamId))
             } else stories
         }
     }
@@ -459,8 +668,8 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { body ->
                 news.body = body
-                if (!news.source.contains("Ollama")) {
-                    news.source = "${news.source} · Ollama ${config.model}".trim(' ', '·')
+                if (!news.source.contains(config.shortActionName)) {
+                    news.source = "${news.source} · ${config.fullModelDisplayName}".trim(' ', '·')
                 }
             }
         }
