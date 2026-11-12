@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.SaveManager
+import com.nh.hoopscoach.game.SaveSlot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -232,6 +235,13 @@ fun fieldColors() = OutlinedTextFieldDefaults.colors(
 @Composable
 fun SettingsScreen(vm: GameViewModel, lg: League) {
     var confirm by remember { mutableStateOf(false) }
+    var slotToClone by remember { mutableStateOf<SaveSlot?>(null) }
+    var cloneTitle by remember { mutableStateOf("") }
+    var slotToRename by remember { mutableStateOf<SaveSlot?>(null) }
+    var renameTitle by remember { mutableStateOf("") }
+    var slotToDelete by remember { mutableStateOf<SaveSlot?>(null) }
+    var confirmNewDynasty by remember { mutableStateOf(false) }
+    var exportSlotId by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var testStatus by remember { mutableStateOf("") }
@@ -244,20 +254,111 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var showSetupGuide by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) vm.exportSave(uri) }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) vm.exportSlot(exportSlotId ?: vm.activeSlotId, uri)
+    }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importSave(uri) }
+
+    LaunchedEffect(Unit) {
+        vm.refreshSaveSlots()
+    }
+
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar("Settings", onBack = { vm.back() })
-            Section("Save file")
+            Section("Dynasty Saves & Slots")
             Panel {
-                Text("Your dynasty saves automatically. Back it up before reinstalling or switching phones.", style = T.small, color = P.sub)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PrimaryButton("Back up", Modifier.weight(1f)) {
-                        runCatching { exporter.launch("HoopsDynasty-${lg.user.abbr}-${lg.season}.hdsave") }.onFailure { vm.toast("No file app available") }
+                val active = vm.activeSlot ?: vm.saveSlots.firstOrNull { it.id == vm.activeSlotId }
+                val schoolName = active?.school ?: lg.user.school
+                val seasonYear = active?.season ?: lg.season
+                val rec = active?.record ?: "${lg.user.w}-${lg.user.l}"
+                val title = active?.title ?: "$schoolName Dynasty"
+                val modeLabel = active?.mode ?: if (lg.pro) "NBA Coach" else "College Coach"
+                val person = active?.coachOrPlayer ?: lg.coaches.firstOrNull { it.id == lg.userCoachId }?.name ?: "Coach"
+                val timeStr = active?.let { SaveManager.formatSaveTime(it.lastSaved) } ?: "Just now"
+                val sizeStr = active?.let { SaveManager.formatFileSize(it.sizeBytes) } ?: ""
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (active != null) {
+                        SaveSlotBadge(active, 48.dp)
+                    } else {
+                        TeamBadge(lg.user, 48.dp)
                     }
-                    SecondaryButton("Restore", Modifier.weight(1f)) { runCatching { importer.launch(arrayOf("*/*")) }.onFailure { vm.toast("No file app available") } }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(title, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.background(P.accentSoft, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                Text("ACTIVE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                            }
+                        }
+                        Text("$schoolName · $seasonYear ($rec) · $modeLabel", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("$person · Saved $timeStr${if (sizeStr.isNotBlank()) " · $sizeStr" else ""}", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrimaryButton("Snapshot", Modifier.weight(1f)) {
+                        val activeSlot = active ?: SaveSlot("default", title, schoolName, lg.user.mascot, lg.user.abbr, seasonYear, rec, modeLabel, person, lg.user.primary.toInt(), lg.user.secondary.toInt(), System.currentTimeMillis())
+                        slotToClone = activeSlot
+                        cloneTitle = "$schoolName Checkpoint ($seasonYear)"
+                    }
+                    SecondaryButton("Rename", Modifier.weight(0.7f)) {
+                        val activeSlot = active ?: SaveSlot("default", title, schoolName, lg.user.mascot, lg.user.abbr, seasonYear, rec, modeLabel, person, lg.user.primary.toInt(), lg.user.secondary.toInt(), System.currentTimeMillis())
+                        slotToRename = activeSlot
+                        renameTitle = title
+                    }
+                    SecondaryButton("Export", Modifier.weight(0.7f)) {
+                        exportSlotId = vm.activeSlotId
+                        runCatching { exporter.launch("HoopsDynasty-${lg.user.abbr}-$seasonYear.hdsave") }.onFailure { vm.toast("No file app available") }
+                    }
+                }
+            }
+
+            val otherSlots = vm.saveSlots.filter { it.id != vm.activeSlotId }
+            if (otherSlots.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text("OTHER SAVED DYNASTIES (${otherSlots.size})", style = T.label, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+                for (slot in otherSlots) {
+                    Panel(Modifier.padding(bottom = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SaveSlotBadge(slot, 42.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(slot.title, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${slot.school} · ${slot.season} (${slot.record}) · ${slot.mode}", style = T.small, color = P.sub, maxLines = 1)
+                                Text("${slot.coachOrPlayer} · Saved ${SaveManager.formatSaveTime(slot.lastSaved)} · ${SaveManager.formatFileSize(slot.sizeBytes)}", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PrimaryButton("Load", Modifier.weight(1f)) {
+                                vm.loadSlot(slot.id)
+                            }
+                            SecondaryButton("Snapshot", Modifier.weight(0.7f)) {
+                                slotToClone = slot
+                                cloneTitle = "${slot.school} Branch"
+                            }
+                            SecondaryButton("Rename", Modifier.weight(0.7f)) {
+                                slotToRename = slot
+                                renameTitle = slot.title
+                            }
+                            SecondaryButton("Delete", Modifier.weight(0.7f)) {
+                                slotToDelete = slot
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryButton("+ New Dynasty", Modifier.weight(1f)) {
+                    confirmNewDynasty = true
+                }
+                SecondaryButton("Import Save", Modifier.weight(1f)) {
+                    runCatching { importer.launch(arrayOf("*/*")) }.onFailure { vm.toast("No file app available") }
                 }
             }
             Section("Portraits")
@@ -646,6 +747,87 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         confirmButton = { TextButton({ confirm = false; vm.abandonCareer() }) { Text("Delete and start over", color = P.bad) } },
         dismissButton = { TextButton({ confirm = false }) { Text("Cancel", color = P.sub) } },
     )
+
+    if (slotToClone != null) AlertDialog(
+        onDismissRequest = { slotToClone = null }, containerColor = P.surface,
+        title = { Text("Snapshot / Clone Save", style = T.head, color = P.ink) },
+        text = {
+            Column {
+                Text("Create a snapshot checkpoint of '${slotToClone?.title}'. You can return to this checkpoint anytime.", style = T.body, color = P.sub)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = cloneTitle,
+                    onValueChange = { cloneTitle = it.take(32) },
+                    label = { Text("Snapshot Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton({
+                val s = slotToClone
+                slotToClone = null
+                if (s != null) vm.cloneSlot(s.id, cloneTitle)
+            }) { Text("Create Snapshot", color = P.accent) }
+        },
+        dismissButton = { TextButton({ slotToClone = null }) { Text("Cancel", color = P.sub) } }
+    )
+
+    if (slotToRename != null) AlertDialog(
+        onDismissRequest = { slotToRename = null }, containerColor = P.surface,
+        title = { Text("Rename Dynasty", style = T.head, color = P.ink) },
+        text = {
+            Column {
+                Text("Choose a new name for this save slot:", style = T.body, color = P.sub)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = renameTitle,
+                    onValueChange = { renameTitle = it.take(32) },
+                    label = { Text("Dynasty Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton({
+                val s = slotToRename
+                slotToRename = null
+                if (s != null && renameTitle.isNotBlank()) vm.renameSlot(s.id, renameTitle)
+            }) { Text("Save", color = P.accent) }
+        },
+        dismissButton = { TextButton({ slotToRename = null }) { Text("Cancel", color = P.sub) } }
+    )
+
+    if (slotToDelete != null) AlertDialog(
+        onDismissRequest = { slotToDelete = null }, containerColor = P.surface,
+        title = { Text("Delete Dynasty?", style = T.head, color = P.bad) },
+        text = { Text("Permanently delete '${slotToDelete?.title}' (${slotToDelete?.school}, ${slotToDelete?.season})? All backups in this slot will be erased. This cannot be undone.", style = T.body, color = P.sub) },
+        confirmButton = {
+            TextButton({
+                val s = slotToDelete
+                slotToDelete = null
+                if (s != null) vm.deleteSlot(s.id)
+            }) { Text("Delete", color = P.bad) }
+        },
+        dismissButton = { TextButton({ slotToDelete = null }) { Text("Cancel", color = P.sub) } }
+    )
+
+    if (confirmNewDynasty) AlertDialog(
+        onDismissRequest = { confirmNewDynasty = false }, containerColor = P.surface,
+        title = { Text("Start New Dynasty?", style = T.head, color = P.ink) },
+        text = { Text("Your current dynasty will stay safely saved in its slot. You can switch back anytime from Settings or the Start screen.", style = T.body, color = P.sub) },
+        confirmButton = {
+            TextButton({
+                confirmNewDynasty = false
+                vm.startNewDynasty()
+            }) { Text("Start New", color = P.accent) }
+        },
+        dismissButton = { TextButton({ confirmNewDynasty = false }) { Text("Cancel", color = P.sub) } }
+    )
 }
 
 @Composable
@@ -709,10 +891,36 @@ fun NewGameScreen(vm: GameViewModel) {
     var mode by remember { mutableIntStateOf(if (vm.roadHero != null) 1 else 0) }
     var eraIdx by remember { mutableIntStateOf(EraRules.pickable.indexOf(CollegeEra.MODERN).coerceAtLeast(0)) }
     val eras = EraRules.pickable
+
+    LaunchedEffect(Unit) {
+        vm.refreshSaveSlots()
+    }
+
     Column(Modifier.fillMaxSize().background(P.bg).statusBarsPadding()) {
         if (lg == null) { BusyScreen("Building your league"); return@Column }
         val header: @Composable () -> Unit = {
-            Column(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 26.dp, bottom = 6.dp)) {
+            if (vm.saveSlots.isNotEmpty()) {
+                Column(Modifier.padding(top = 10.dp)) {
+                    Text("RESUME SAVED DYNASTY", style = T.label, color = P.accent, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
+                    for (s in vm.saveSlots.take(2)) {
+                        Panel(Modifier.padding(bottom = 6.dp).clickable { vm.loadSlot(s.id) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SaveSlotBadge(s, 40.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(s.title, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${s.school} · ${s.season} (${s.record}) · ${s.mode}", style = T.small, color = P.sub, maxLines = 1)
+                                    Text("Saved ${SaveManager.formatSaveTime(s.lastSaved)}", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                PrimaryButton("Resume", Modifier.height(34.dp)) { vm.loadSlot(s.id) }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+            Column(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 16.dp, bottom = 6.dp)) {
                 Text("NEW CAREER", style = T.label, color = P.accent)
                 Text("HOOPS DYNASTY", style = T.hero.copy(fontSize = 46.sp, lineHeight = 46.sp), color = P.ink)
                 Text(

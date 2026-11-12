@@ -474,6 +474,50 @@ fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
+/** Badge for a saved dynasty slot, showing either its school/NBA logo or stylized monogram. */
+@Composable
+fun SaveSlotBadge(slot: com.nh.hoopscoach.game.SaveSlot, size: Dp, modifier: Modifier = Modifier) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val logo = remember(slot.abbr) {
+        com.nh.hoopscoach.game.ProLeague.logoKey(slot.abbr)?.let { Logos.asset(ctx, "nba/logos/$it.webp") }
+            ?: Logos.get(ctx, slot.abbr)
+    }
+    if (logo != null) {
+        val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White
+        val ringColor = P.line
+        Canvas(modifier.size(size)) {
+            val r = this.size.minDimension / 2
+            drawCircle(plate, r)
+            drawCircle(ringColor, r - 0.5f, style = Stroke(width = 1f))
+            val inset = this.size.width * 0.15f
+            val side = this.size.width - inset * 2
+            drawImage(
+                logo, srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                srcSize = androidx.compose.ui.unit.IntSize(logo.width, logo.height),
+                dstOffset = androidx.compose.ui.unit.IntOffset(inset.toInt(), inset.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()),
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            )
+        }
+        return
+    }
+    val primary = Color(slot.primaryColor)
+    val secondary = Color(slot.secondaryColor)
+    val ring = if (contrast(primary, secondary) > 1.6f) secondary else onColor(primary)
+    val text = if (contrast(primary, secondary) >= 3f) secondary else onColor(primary)
+    val label = slot.abbr.take(3)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val fs = with(density) { (size * when (label.length) { 1 -> 0.52f; 2 -> 0.44f; 3 -> 0.36f; else -> 0.3f }).toSp() }
+    Canvas(modifier.size(size)) {
+        val r = this.size.minDimension / 2
+        drawCircle(primary, r)
+        drawCircle(ring, r * 0.84f, style = Stroke(width = r * 0.07f))
+        val layout = measurer.measure(label, TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = fs, color = text))
+        drawText(layout, topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f))
+    }
+}
+
 /** Jersey-shaped chip with the player's number in team colors. */
 @Composable
 fun Jersey(number: Int, primary: Color, secondary: Color, size: Dp, modifier: Modifier = Modifier) {

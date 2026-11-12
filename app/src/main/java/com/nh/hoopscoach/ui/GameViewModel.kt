@@ -15,6 +15,8 @@ import com.nh.hoopscoach.game.Reactions
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.SaveIO
+import com.nh.hoopscoach.game.SaveManager
+import com.nh.hoopscoach.game.SaveSlot
 import com.nh.hoopscoach.game.Season
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -80,8 +82,14 @@ class LiveGame(val engine: GameEngine) {
 }
 
 class GameViewModel(app: Application) : AndroidViewModel(app) {
-    private val file = File(app.filesDir, "dynasty.sav")
     private val mutex = Mutex()
+
+    var activeSlotId by mutableStateOf("default")
+        private set
+    var saveSlots by mutableStateOf<List<SaveSlot>>(emptyList())
+        private set
+    var activeSlot by mutableStateOf<SaveSlot?>(null)
+        private set
 
     var league by mutableStateOf<League?>(null)
         private set
@@ -138,23 +146,29 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         if (autoLoad) viewModelScope.launch {
-            val lg = withContext(Dispatchers.IO) {
-                val primary = runCatching { if (file.exists()) SaveIO.decode(file.readBytes()) else null }.getOrNull()
-                if (primary != null) return@withContext primary
-                val bak = File(file.path + ".bak")
-                val backup = runCatching { if (bak.exists()) SaveIO.decode(bak.readBytes()) else null }.getOrNull()
-                if (backup != null) {
-                    runCatching { bak.copyTo(file, overwrite = true) }
-                    return@withContext backup
-                }
-                if (file.exists()) {
-                    runCatching { file.copyTo(File(file.path + ".corrupt"), overwrite = true) }
-                }
-                null
+            val app = getApplication<Application>()
+            val pair = withContext(Dispatchers.IO) {
+                SaveManager.migrateLegacyIfNeeded(app.filesDir)
+                val activeId = SaveManager.getActiveSlotId(app.filesDir)
+                SaveManager.loadSlot(app.filesDir, activeId)
             }
-            league = lg
+            league = pair?.first
+            activeSlot = pair?.second
+            activeSlotId = pair?.second?.id ?: SaveManager.getActiveSlotId(app.filesDir)
             loading = false
-            if (lg == null) generateDraft()
+            refreshSaveSlots()
+            if (pair == null) generateDraft()
+        }
+    }
+
+    fun refreshSaveSlots() {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val slots = withContext(Dispatchers.IO) {
+                SaveManager.listSlots(app.filesDir)
+            }
+            saveSlots = slots
+            activeSlot = slots.firstOrNull { it.id == activeSlotId }
         }
     }
 
@@ -195,14 +209,124 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val bytes = mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
         withContext(Dispatchers.IO) {
             runCatching {
-                val tmp = File(file.path + ".tmp")
-                tmp.writeBytes(bytes)
-                val bak = File(file.path + ".bak")
-                if (file.exists()) {
-                    runCatching { file.copyTo(bak, overwrite = true) }
-                }
-                if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
+                val app = getApplication<Application>()
+                val slot = SaveManager.saveSlot(app.filesDir, activeSlotId, bytes, lg)
+                activeSlot = slot
             }
+        }
+        refreshSaveSlots()
+    }
+
+    fun loadSlot(id: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            saveNow()
+            val loaded = withContext(Dispatchers.IO) {
+                SaveManager.loadSlot(app.filesDir, id)
+            }
+            if (loaded != null) {
+                mutex.withLock {
+                    league = loaded.first
+                    activeSlot = loaded.second
+                    activeSlotId = loaded.second.id
+                    draft = null
+                    stack.clear()
+                    sheet = null
+                    live = null
+                    tab = Tab.TODAY
+                }
+                refreshSaveSlots()
+                toast("Loaded: ${loaded.second.title}")
+            } else {
+                toast("Couldn't load this dynasty save")
+            }
+        }
+    }
+
+    fun cloneSlot(id: String, newTitle: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            saveNow()
+            val created = withContext(Dispatchers.IO) {
+                SaveManager.cloneSlot(app.filesDir, id, newTitle)
+            }
+            if (created != null) {
+                refreshSaveSlots()
+                toast("Snapshot created: ${created.title}")
+            } else {
+                toast("Couldn't create snapshot")
+            }
+        }
+    }
+
+    fun quickSnapshot() {
+        val lg = league ?: return
+        val title = "${lg.user.school} Checkpoint (${lg.season})"
+        cloneSlot(activeSlotId, title)
+    }
+
+    fun renameSlot(id: String, newTitle: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val updated = withContext(Dispatchers.IO) {
+                SaveManager.renameSlot(app.filesDir, id, newTitle)
+            }
+            if (updated != null) {
+                refreshSaveSlots()
+                toast("Renamed to: ${updated.title}")
+            }
+        }
+    }
+
+    fun deleteSlot(id: String) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val wasActive = (id == activeSlotId)
+            withContext(Dispatchers.IO) {
+                SaveManager.deleteSlot(app.filesDir, id)
+            }
+            if (wasActive) {
+                val remaining = withContext(Dispatchers.IO) { SaveManager.listSlots(app.filesDir) }
+                if (remaining.isNotEmpty()) {
+                    loadSlot(remaining.first().id)
+                } else {
+                    mutex.withLock {
+                        league = null
+                        activeSlot = null
+                        activeSlotId = "default"
+                        stack.clear()
+                        sheet = null
+                        live = null
+                    }
+                    generateDraft()
+                }
+            }
+            refreshSaveSlots()
+            toast("Dynasty deleted")
+        }
+    }
+
+    fun startNewDynasty() {
+        viewModelScope.launch {
+            saveNow()
+            mutex.withLock {
+                league = null
+                activeSlot = null
+                activeSlotId = "slot_${System.currentTimeMillis()}_${(100..999).random()}"
+                stack.clear()
+                sheet = null
+                live = null
+            }
+            generateDraft()
+        }
+    }
+
+    private fun ensureFreshSlot() {
+        val app = getApplication<Application>()
+        val existing = File(SaveManager.getSavesDir(app.filesDir), "$activeSlotId.sav")
+        if (existing.exists() && league == null) {
+            activeSlotId = "slot_${System.currentTimeMillis()}_${(100..999).random()}"
+            activeSlot = null
         }
     }
 
@@ -283,6 +407,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun startRoad(teamId: Int) {
         val d = draft ?: return
         val h = roadHero ?: return
+        ensureFreshSlot()
         busy = "Signing your scholarship"
         viewModelScope.launch {
             withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Road.start(d, h, teamId) }
@@ -458,6 +583,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     /** An NBA coaching career: [year]'s real league (the season it ends), coaching the team in [slot]. */
     fun startNbaCoach(year: Int, slot: String, first: String, last: String) {
         if (busy != null) return
+        ensureFreshSlot()
         busy = "Building the ${if (year >= 2027) "league" else "${year - 1}-${(year % 100).toString().padStart(2, '0')} league"}"
         viewModelScope.launch {
             val lg = withContext(Dispatchers.Default) {
@@ -475,6 +601,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startCareer(teamId: Int, first: String, last: String) {
         val d = draft ?: return
+        ensureFreshSlot()
         busy = "Setting up your first season"
         viewModelScope.launch {
             withContext(Dispatchers.Default) { Offseason.claimTeam(d, teamId, first, last) }
@@ -489,57 +616,57 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Writes the current dynasty to a file the user picked. */
     fun exportSave(uri: android.net.Uri) {
-        val lg = league ?: return
+        exportSlot(activeSlotId, uri)
+    }
+
+    fun exportSlot(id: String, uri: android.net.Uri) {
         viewModelScope.launch {
+            val app = getApplication<Application>()
             val ok = runCatching {
-                val bytes = mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
+                val bytes = withContext(Dispatchers.IO) {
+                    SaveManager.getSlotBytes(app.filesDir, id)
+                } ?: return@runCatching false
                 withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use { it.write(bytes) }
+                    app.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(bytes) }
                 }
-            }.isSuccess
+                true
+            }.getOrDefault(false)
             toast(if (ok) "Save backed up" else "Couldn't write the backup file")
         }
     }
 
-    /** Replaces the current dynasty with one from a backup file. */
+    /** Replaces or adds dynasty from a backup file into a slot. */
     fun importSave(uri: android.net.Uri) {
         viewModelScope.launch {
-            val lg = runCatching {
+            val app = getApplication<Application>()
+            val imported = runCatching {
                 withContext(Dispatchers.IO) {
-                    val bytes = getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                    SaveIO.decode(bytes)
+                    val bytes = app.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                    SaveManager.importSave(app.filesDir, bytes)
                 }
             }.getOrNull()
-            if (lg == null) { toast("That file isn't a Hoops Dynasty save"); return@launch }
+            if (imported == null) {
+                toast("That file isn't a valid Hoops Dynasty save")
+                return@launch
+            }
             mutex.withLock {
-                league = lg
+                league = imported.first
+                activeSlot = imported.second
+                activeSlotId = imported.second.id
                 draft = null
                 stack.clear()
                 sheet = null
                 live = null
                 tab = Tab.TODAY
             }
+            refreshSaveSlots()
             bump()
-            toast("Save restored: ${lg.user.school}, ${lg.season}")
+            toast("Dynasty imported: ${imported.second.title}")
         }
     }
 
     fun abandonCareer() {
-        viewModelScope.launch {
-            mutex.withLock {
-                saveJob?.cancel()
-                withContext(Dispatchers.IO) {
-                    file.delete()
-                    File(file.path + ".bak").delete()
-                    File(file.path + ".tmp").delete()
-                }
-                league = null
-                stack.clear()
-                sheet = null
-                live = null
-            }
-            generateDraft()
-        }
+        deleteSlot(activeSlotId)
     }
 
     // ---------- simulation ----------
