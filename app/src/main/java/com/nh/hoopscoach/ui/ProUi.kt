@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1186,6 +1187,14 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
     var analysis by remember(t.teamA, t.teamB, t.season, t.day) { mutableStateOf<com.nh.hoopscoach.game.Ollama.TradeAnalysis?>(null) }
     var grading by remember(t.teamA, t.teamB, t.season, t.day) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Instant load from cache if previously generated
+    LaunchedEffect(t.teamA, t.teamB, t.season, t.day) {
+        if (analysis == null) {
+            val cacheKey = "trade_${t.teamA}_${t.teamB}_${t.toA.joinToString()}_${t.toB.joinToString()}_${lg.ollama.model}"
+            com.nh.hoopscoach.game.Ollama.Cache.get<com.nh.hoopscoach.game.Ollama.TradeAnalysis>(cacheKey)?.let { analysis = it }
+        }
+    }
 
     Column(Modifier.fillMaxWidth().then(if (t.hero) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

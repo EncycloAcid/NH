@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -164,6 +165,14 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
     val scope = rememberCoroutineScope()
     val u = lg.user
     val opp = lg.team(g.opp(u.id))
+
+    // Instant load from cache if previously generated
+    LaunchedEffect(g.id) {
+        if (keys == null) {
+            val cacheKey = "scout_${u.id}_${opp.id}_${lg.season}_${lg.day}_${lg.ollama.model}"
+            Ollama.Cache.get<List<Ollama.ScoutingKey>>(cacheKey)?.let { keys = it }
+        }
+    }
 
     Spacer(Modifier.height(10.dp))
     Column(

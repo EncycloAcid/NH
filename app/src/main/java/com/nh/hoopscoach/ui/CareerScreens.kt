@@ -614,6 +614,142 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     }
 
                     Spacer(Modifier.height(14.dp))
+                    Text("AI SPEED & ACCELERATION", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Optimize on-device generation speed, CPU threads, and memory allocation for smooth mobile performance.", style = T.small, color = P.sub)
+                    Spacer(Modifier.height(8.dp))
+
+                    // Speed Mode selector
+                    Text("SPEED PROFILE", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val modes = listOf(
+                            Triple("turbo", "⚡ Turbo", "Fastest (~2-3s)"),
+                            Triple("balanced", "⚖️ Balanced", "Standard (~5-7s)"),
+                            Triple("quality", "🎨 Quality", "Detailed (~10s)"),
+                        )
+                        modes.forEach { (key, label, desc) ->
+                            val sel = lg.ollama.speedMode == key
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (sel) P.accentSoft else P.surface2)
+                                    .border(if (sel) 1.5.dp else 1.dp, if (sel) P.accent else P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .clickable { vm.act { it.ollama.speedMode = key } }
+                                    .padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(label, style = T.bodyB.copy(fontSize = 12.sp), color = if (sel) P.accent else P.ink)
+                                Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub)
+                            }
+                        }
+                    }
+
+                    // Tip banner if on heavier model
+                    if (lg.ollama.model.contains("llama3.2:3b") || lg.ollama.model.contains("llama3.2:1b")) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(P.surface2, RoundedCornerShape(8.dp))
+                                .border(1.dp, P.gold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("⚡", fontSize = 16.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                                Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            SmallButton("Use SmolLM2") {
+                                vm.act { it.ollama.model = "smollm2:135m" }
+                                vm.toast("Active model switched to SmolLM2 135M")
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    // CPU Threads selector
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("CPU Thread Allocation", style = T.bodyB, color = P.ink)
+                            Text("Allocates performance cores on big.LITTLE phone CPUs (${if (lg.ollama.numThreads == 0) "Auto: ${com.nh.hoopscoach.game.Ollama.defaultOptimalThreads()} cores" else "${lg.ollama.numThreads} cores"}).", style = T.small, color = P.sub)
+                        }
+                        val threadOptions = listOf(0 to "Auto", 2 to "2", 4 to "4", 6 to "6")
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            threadOptions.forEach { (count, txt) ->
+                                val sel = lg.ollama.numThreads == count
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (sel) P.accent else P.surface2)
+                                        .clickable { vm.act { it.ollama.numThreads = count } }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    // Keep warm in RAM
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Keep in RAM between games", style = T.bodyB, color = P.ink)
+                            Text("Prevents 5-15s cold start model reloads from mobile storage.", style = T.small, color = P.sub)
+                        }
+                        val ramOptions = listOf(30 to "30m", 10 to "10m", 5 to "5m")
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ramOptions.forEach { (mins, txt) ->
+                                val sel = lg.ollama.keepAliveMinutes == mins
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (sel) P.accent else P.surface2)
+                                        .clickable { vm.act { it.ollama.keepAliveMinutes = mins } }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    // Response Caching
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Instant Response Cache", style = T.bodyB, color = P.ink)
+                            Text("Cache results for 0ms instant reload on revisiting games & scouting.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.cacheResponses, { on -> vm.act { it.ollama.cacheResponses = on } })
+                    }
+
+                    if (lg.ollama.cacheResponses) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Text(
+                                "Clear cache (${com.nh.hoopscoach.game.Ollama.Cache.size()} items)",
+                                style = T.small.copy(fontSize = 10.sp),
+                                color = P.accent,
+                                modifier = Modifier.clickable {
+                                    com.nh.hoopscoach.game.Ollama.Cache.clear()
+                                    vm.toast("AI response cache cleared")
+                                },
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
                     Text("FINE NARRATIVE CONTROLS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                     Spacer(Modifier.height(4.dp))
                     Text("The AI controls fine narrative details, quotes, and reactions. Game simulation stats, box scores, records, and ratings are strictly computed by the engine and never modified by AI.", style = T.small, color = P.good)

@@ -134,4 +134,64 @@ class OllamaTest {
         val res = Ollama.generate(config, "Hello")
         assertTrue(res.isFailure)
     }
+
+    @Test
+    fun testSpeedOptionsAndSerialization() {
+        val lg = LeagueGen.newLeague()
+        assertEquals("turbo", lg.ollama.speedMode)
+        assertEquals(0, lg.ollama.numThreads)
+        assertEquals(512, lg.ollama.contextSize)
+        assertEquals(30, lg.ollama.keepAliveMinutes)
+        assertTrue(lg.ollama.cacheResponses)
+
+        lg.ollama.speedMode = "quality"
+        lg.ollama.numThreads = 4
+        lg.ollama.contextSize = 1024
+        lg.ollama.keepAliveMinutes = 10
+        lg.ollama.cacheResponses = false
+
+        val encoded = SaveIO.encode(lg)
+        val decoded = SaveIO.decode(encoded)
+
+        assertEquals("quality", decoded.ollama.speedMode)
+        assertEquals(4, decoded.ollama.numThreads)
+        assertEquals(1024, decoded.ollama.contextSize)
+        assertEquals(10, decoded.ollama.keepAliveMinutes)
+        assertFalse(decoded.ollama.cacheResponses)
+    }
+
+    @Test
+    fun testOptimalThreads() {
+        val threads = Ollama.defaultOptimalThreads()
+        assertTrue("Optimal threads should be at least 2", threads >= 2)
+        assertTrue("Optimal threads should not exceed core count", threads <= Runtime.getRuntime().availableProcessors())
+    }
+
+    @Test
+    fun testLruResponseCache() {
+        Ollama.Cache.clear()
+        assertEquals(0, Ollama.Cache.size())
+
+        Ollama.Cache.put("test_key_1", "value_1")
+        Ollama.Cache.put("test_key_2", 42)
+
+        assertEquals("value_1", Ollama.Cache.get<String>("test_key_1"))
+        assertEquals(42, Ollama.Cache.get<Int>("test_key_2"))
+        assertEquals(2, Ollama.Cache.size())
+
+        Ollama.Cache.clear()
+        assertEquals(0, Ollama.Cache.size())
+        assertEquals(null, Ollama.Cache.get<String>("test_key_1"))
+    }
+
+    @Test
+    fun testFastModelPresets() {
+        val smol = Ollama.RECOMMENDED_MODELS.firstOrNull { it.id == "smollm2:135m" }
+        assertTrue("SmolLM2 135M exists", smol != null)
+        assertTrue("SmolLM2 has speed rating", smol!!.speedRating.contains("tok/s"))
+
+        val qwen = Ollama.RECOMMENDED_MODELS.firstOrNull { it.id == "qwen2.5:0.5b" }
+        assertTrue("Qwen 2.5 0.5B exists", qwen != null)
+        assertTrue("Qwen has speed rating", qwen!!.speedRating.contains("tok/s"))
+    }
 }

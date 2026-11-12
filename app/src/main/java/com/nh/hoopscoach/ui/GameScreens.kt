@@ -552,17 +552,29 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
     if (!g.played) return
     var report by remember(g.id) { mutableStateOf<Ollama.PostgameReport?>(null) }
     var writing by remember(g.id) { mutableStateOf(false) }
+    var streamingText by remember(g.id) { mutableStateOf("") }
     var errorMsg by remember(g.id) { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+
+    // Instant load from cache if previously generated
+    LaunchedEffect(g.id) {
+        if (report == null) {
+            val cacheKey = "recap_${g.id}_${lg.ollama.model}_${lg.ollama.speedMode}"
+            Ollama.Cache.get<Ollama.PostgameReport>(cacheKey)?.let { report = it }
+        }
+    }
 
     Section(
         "Beat report & quotes",
         action = if (report == null && !writing) "Ollama Report ✍️" else if (writing) "Writing..." else "Rewrite",
         onAction = {
             writing = true
+            streamingText = ""
             errorMsg = ""
             scope.launch {
-                val res = Ollama.generatePostgameReport(lg.ollama, lg, g)
+                val res = Ollama.generatePostgameReport(lg.ollama, lg, g) { token ->
+                    streamingText += token
+                }
                 writing = false
                 res.onSuccess { rep ->
                     report = rep
@@ -576,14 +588,30 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
 
     Panel {
         if (writing) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = P.accent,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Ollama is writing the beat report & quotes...", style = T.small, color = P.accent)
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = P.accent,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (streamingText.isNotEmpty()) "Ollama is generating live..."
+                        else "Ollama is writing the beat report & quotes...",
+                        style = T.small,
+                        color = P.accent,
+                    )
+                }
+                if (streamingText.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        streamingText.takeLast(320),
+                        style = T.small.copy(fontSize = 11.sp),
+                        color = P.sub,
+                        maxLines = 4,
+                    )
+                }
             }
         } else if (report != null) {
             val rep = report!!
@@ -635,9 +663,12 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                 Spacer(Modifier.width(8.dp))
                 SmallButton("Generate", primary = true) {
                     writing = true
+                    streamingText = ""
                     errorMsg = ""
                     scope.launch {
-                        val res = Ollama.generatePostgameReport(lg.ollama, lg, g)
+                        val res = Ollama.generatePostgameReport(lg.ollama, lg, g) { token ->
+                            streamingText += token
+                        }
                         writing = false
                         res.onSuccess { rep ->
                             report = rep

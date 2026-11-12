@@ -640,6 +640,12 @@ class OllamaConfig(
     var gameRecaps: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
+    // Speed & Performance Optimizations
+    var speedMode: String = "turbo", // "turbo", "balanced", "quality"
+    var numThreads: Int = 0, // 0 = auto-detect optimal CPU cores
+    var contextSize: Int = 512, // 512 tokens for rapid mobile prefill & low KV cache memory
+    var keepAliveMinutes: Int = 30, // keep warm in RAM to avoid cold reload delays
+    var cacheResponses: Boolean = true, // instant 0ms load for identical queries
 )
 
 enum class MomentKind(val tag: String) {

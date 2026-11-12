@@ -24,35 +24,40 @@ object Ollama {
         val size: String,
         val tag: String,
         val description: String,
+        val speedRating: String = "Fast",
     )
 
     val RECOMMENDED_MODELS = listOf(
         ModelPreset(
-            id = "llama3.2:1b",
-            name = "Llama 3.2 1B",
-            size = "1.3 GB",
-            tag = "Recommended · Phone",
-            description = "Meta's lightweight mobile model. Fast, witty game recaps and realistic player quotes with low RAM usage.",
+            id = "smollm2:135m",
+            name = "SmolLM2 135M",
+            size = "270 MB",
+            tag = "⚡⚡⚡ Instant Nano (Fastest)",
+            speedRating = "40–60 tok/s",
+            description = "Fastest on-device model (~270MB). Instant recaps, press quotes, and takes with minimal RAM and battery impact.",
         ),
         ModelPreset(
             id = "qwen2.5:0.5b",
             name = "Qwen 2.5 0.5B",
             size = "398 MB",
-            tag = "Ultra-Lightweight",
-            description = "Extremely lightweight (~400MB). Runs smoothly on all Android phones with minimal battery and memory impact.",
+            tag = "⚡⚡ Ultra Fast",
+            speedRating = "35–45 tok/s",
+            description = "Extremely lightweight (~400MB). High-speed generation with sharp basketball intelligence.",
         ),
         ModelPreset(
-            id = "smollm2:135m",
-            name = "SmolLM2 135M",
-            size = "270 MB",
-            tag = "Nano · Instant",
-            description = "Smallest footprint (~270MB). Instant headline and recap generation with near-zero memory footprint.",
+            id = "llama3.2:1b",
+            name = "Llama 3.2 1B",
+            size = "1.3 GB",
+            tag = "Recommended · Balanced",
+            speedRating = "15–20 tok/s",
+            description = "Meta's mobile LLM (~15-20 tok/s). Fast, witty game recaps and realistic player quotes with low RAM usage.",
         ),
         ModelPreset(
             id = "llama3.2:3b",
             name = "Llama 3.2 3B",
             size = "2.0 GB",
             tag = "Pro Quality",
+            speedRating = "5–8 tok/s",
             description = "Full-length sports journalism, colorful columns, and rich storylines for mid-to-high end phones.",
         ),
     )
@@ -63,6 +68,46 @@ object Ollama {
         val selectedModel: String,
         val message: String,
     )
+
+    /** In-memory LRU response cache for 0ms instant reload on revisiting game recaps, scouting, and storylines. */
+    object Cache {
+        private const val MAX_ENTRIES = 64
+        private val entries = LinkedHashMap<String, Any>(MAX_ENTRIES, 0.75f, true)
+
+        @Synchronized
+        fun <T> get(key: String): T? {
+            @Suppress("UNCHECKED_CAST")
+            return entries[key] as? T
+        }
+
+        @Synchronized
+        fun put(key: String, value: Any) {
+            if (entries.size >= MAX_ENTRIES) {
+                val oldest = entries.keys.firstOrNull()
+                if (oldest != null) entries.remove(oldest)
+            }
+            entries[key] = value
+        }
+
+        @Synchronized
+        fun clear() {
+            entries.clear()
+        }
+
+        @Synchronized
+        fun size(): Int = entries.size
+    }
+
+    /** Optimal thread count for ARM mobile big.LITTLE processors (e.g. 4 performance cores). */
+    fun defaultOptimalThreads(): Int {
+        val cores = Runtime.getRuntime().availableProcessors()
+        return when {
+            cores >= 8 -> 4 // Target performance core cluster on Snapdragon / Dimensity / Tensor
+            cores in 5..7 -> 4
+            cores in 3..4 -> cores
+            else -> maxOf(2, cores)
+        }
+    }
 
     /** Normalizes a host string to a valid HTTP URL, defaulting to local phone host localhost:11434. */
     fun cleanHost(raw: String): String {
@@ -116,13 +161,15 @@ object Ollama {
             if (testRes.isSuccess) {
                 val models = testRes.getOrDefault(emptyList())
                 val chosen = when {
+                    models.contains("smollm2:135m") -> "smollm2:135m"
+                    models.contains("qwen2.5:0.5b") -> "qwen2.5:0.5b"
                     models.contains("llama3.2:1b") -> "llama3.2:1b"
                     models.contains("llama3.2") -> "llama3.2"
-                    models.contains("qwen2.5:0.5b") -> "qwen2.5:0.5b"
-                    models.contains("smollm2:135m") -> "smollm2:135m"
+                    models.any { it.startsWith("smol") } -> models.first { it.startsWith("smol") }
+                    models.any { it.startsWith("qwen") } -> models.first { it.startsWith("qwen") }
                     models.any { it.startsWith("llama") } -> models.first { it.startsWith("llama") }
                     models.isNotEmpty() -> models.first()
-                    else -> "llama3.2:1b"
+                    else -> "smollm2:135m"
                 }
                 val clean = cleanHost(candidate)
                 val msg = if (models.isNotEmpty()) {
@@ -204,15 +251,30 @@ object Ollama {
                 setRequestProperty("Accept", "application/json")
             }
 
+            val threads = if (config.numThreads > 0) config.numThreads else defaultOptimalThreads()
+            val ctx = config.contextSize.coerceIn(256, 4096)
+            val keepAlive = "${config.keepAliveMinutes.coerceIn(1, 180)}m"
+            val effectiveNumPredict = when (config.speedMode.lowercase()) {
+                "turbo" -> (numPredict * 0.65).toInt().coerceAtLeast(100)
+                "balanced" -> (numPredict * 0.85).toInt().coerceAtLeast(140)
+                else -> numPredict
+            }
+
             val payload = buildString {
-                append("{\"model\":")
-                append(jsonString(config.model.ifBlank { "llama3.2:1b" }))
-                append(",\"prompt\":")
-                append(jsonString(prompt))
-                append(",\"system\":")
-                append(jsonString(system))
+                append("{\"model\":").append(jsonString(config.model.ifBlank { "llama3.2:1b" }))
+                append(",\"prompt\":").append(jsonString(prompt))
+                append(",\"system\":").append(jsonString(system))
                 append(",\"stream\":true")
-                append(",\"options\":{\"temperature\":$temperature,\"num_predict\":$numPredict}}")
+                append(",\"keep_alive\":").append(jsonString(keepAlive))
+                append(",\"options\":{")
+                append("\"temperature\":$temperature")
+                append(",\"num_predict\":$effectiveNumPredict")
+                append(",\"num_ctx\":$ctx")
+                append(",\"num_thread\":$threads")
+                append(",\"top_k\":40")
+                append(",\"top_p\":0.9")
+                append(",\"stop\":[\"\\n\\n\\n\",\"---\",\"<|eot_id|>\",\"<|im_end|>\",\"</s>\"]")
+                append("}}")
             }
 
             conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
@@ -434,6 +496,10 @@ object Ollama {
         rivalry: Boolean = false,
         winner: Boolean = false,
     ): Result<PressQuestion> {
+        val cacheKey = "press_${g.id}_${player.id}_${line.pts}_${line.reb}_${line.ast}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<PressQuestion>(cacheKey)?.let { return Result.success(it) }
+        }
         val t = if (player.teamId >= 0) lg.team(player.teamId) else lg.user
         val opp = lg.team(g.opp(t.id))
         val us = g.scoreFor(t.id)
@@ -499,7 +565,7 @@ object Ollama {
             if (brash.isEmpty()) brash = "When the ball is in my hands, I expect to make plays. Tonight was just a glimpse of what we can do."
             if (analytical.isEmpty()) analytical = "We identified their defensive coverages early on and took what they gave us in transition and half-court sets."
 
-            PressQuestion(
+            val questionObj = PressQuestion(
                 season = lg.season,
                 gameId = g.id,
                 topic = topic,
@@ -511,6 +577,8 @@ object Ollama {
                 ),
                 reporter = reporter,
             )
+            if (config.cacheResponses) Cache.put(cacheKey, questionObj)
+            questionObj
         }
     }
 
@@ -523,6 +591,10 @@ object Ollama {
         line: GameLogEntry,
         won: Boolean,
     ): Result<List<Post>> {
+        val cacheKey = "social_${g.id}_${player.id}_${line.pts}_${line.reb}_${line.ast}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<List<Post>>(cacheKey)?.let { return Result.success(it) }
+        }
         val t = if (player.teamId >= 0) lg.team(player.teamId) else lg.user
         val opp = lg.team(g.opp(t.id))
         val us = g.scoreFor(t.id)
@@ -593,7 +665,7 @@ object Ollama {
                     )
                 }
             }
-            if (posts.isEmpty()) {
+            val finalPosts = if (posts.isEmpty()) {
                 listOf(
                     Post(season, day, "${t.school} Faithful", "${t.abbr.lowercase()}nation", "fan",
                         if (won) "What a performance by ${player.last}! $statLineStr in the win over ${opp.school}."
@@ -601,6 +673,8 @@ object Ollama {
                         likes = 250, gameId = g.id),
                 )
             } else posts
+            if (config.cacheResponses) Cache.put(cacheKey, finalPosts)
+            finalPosts
         }
     }
 
@@ -609,7 +683,12 @@ object Ollama {
         config: OllamaConfig,
         lg: League,
         g: Game,
+        onToken: ((String) -> Unit)? = null,
     ): Result<PostgameReport> {
+        val cacheKey = "recap_${g.id}_${config.model}_${config.speedMode}"
+        if (config.cacheResponses) {
+            Cache.get<PostgameReport>(cacheKey)?.let { return Result.success(it) }
+        }
         val home = lg.team(g.home)
         val away = lg.team(g.away)
         val winner = if (g.hs > g.aws) home else away
@@ -636,7 +715,7 @@ object Ollama {
             append("Format your response EXACTLY as:\n")
             append("HEADLINE: <Catchy newspaper headline>\n")
             append("OUTLET: <Publication name e.g. Courtside Report or Daily Dribble>\n")
-            append("STORY:\n<2 paragraphs recapping the game's decisive run and key matchup>\n")
+            append("STORY:\n<${if (config.speedMode == "turbo") "1 punchy paragraph" else "2 paragraphs"} recapping the game's decisive run and key matchup>\n")
             append("COACH_QUOTE: <Realistic postgame quote from Coach $coach>\n")
             append("STAR_QUOTE: <Postgame locker room quote from $topPlayerName>\n")
         }
@@ -645,7 +724,8 @@ object Ollama {
             config,
             prompt,
             system = "You are a professional basketball beat writer. Write engaging, realistic newspaper recaps using the exact provided statistics and final score.",
-            numPredict = 320,
+            numPredict = if (config.speedMode == "turbo") 200 else 320,
+            onToken = onToken,
         ).map { raw ->
             var headline = "${winner.school} Defeats ${loser.school} $winScore-$loseScore"
             var outlet = "Courtside Report"
@@ -670,7 +750,9 @@ object Ollama {
             if (coachQuote.isEmpty()) coachQuote = "We locked in defensively when it mattered most and trusted our offensive execution."
             if (starQuote.isEmpty()) starQuote = "We stayed aggressive, took good looks, and played for each other tonight."
 
-            PostgameReport(headline, outlet, story, coachQuote, starQuote)
+            val rep = PostgameReport(headline, outlet, story, coachQuote, starQuote)
+            if (config.cacheResponses) Cache.put(cacheKey, rep)
+            rep
         }
     }
 
@@ -681,6 +763,10 @@ object Ollama {
         userTeam: Team,
         oppTeam: Team,
     ): Result<List<ScoutingKey>> {
+        val cacheKey = "scout_${userTeam.id}_${oppTeam.id}_${lg.season}_${lg.day}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<List<ScoutingKey>>(cacheKey)?.let { return Result.success(it) }
+        }
         val oppRoster = lg.rosterOf(oppTeam)
         val oppStar = oppRoster.filter { it.stats.gp > 0 }.maxByOrNull { it.stats.ppg } ?: oppRoster.maxByOrNull { it.ovr }
         val userStar = lg.rosterOf(userTeam).filter { it.stats.gp > 0 }.maxByOrNull { it.stats.ppg }
@@ -715,13 +801,15 @@ object Ollama {
                     }
                 }
             }
-            if (keys.isEmpty()) {
+            val finalKeys = if (keys.isEmpty()) {
                 listOf(
                     ScoutingKey("Pace & Transition", "Control the tempo and limit ${oppTeam.school}'s fast-break scoring opportunities."),
                     ScoutingKey("Paint Protection", "Protect the rim and close out defensive possessions with solid rebounding."),
                     ScoutingKey("Ball Movement", "Execute offensive sets patiently and make the extra pass to open shooters."),
                 )
             } else keys
+            if (config.cacheResponses) Cache.put(cacheKey, finalKeys)
+            finalKeys
         }
     }
 
@@ -731,6 +819,10 @@ object Ollama {
         lg: League,
         trade: Trade,
     ): Result<TradeAnalysis> {
+        val cacheKey = "trade_${trade.teamA}_${trade.teamB}_${trade.toA.joinToString()}_${trade.toB.joinToString()}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<TradeAnalysis>(cacheKey)?.let { return Result.success(it) }
+        }
         val a = lg.team(trade.teamA)
         val b = lg.team(trade.teamB)
         val prompt = buildString {
@@ -767,7 +859,9 @@ object Ollama {
             val analysis = if (analysisLines.isNotEmpty()) analysisLines.joinToString("\n\n")
             else "A balanced exchange that addresses positional needs for both ${a.school} and ${b.school}."
 
-            TradeAnalysis(gradeA, gradeB, analysis)
+            val result = TradeAnalysis(gradeA, gradeB, analysis)
+            if (config.cacheResponses) Cache.put(cacheKey, result)
+            result
         }
     }
 
@@ -776,6 +870,10 @@ object Ollama {
         config: OllamaConfig,
         lg: League,
     ): Result<List<Pair<String, String>>> {
+        val cacheKey = "rumors_${lg.season}_${lg.day / 7}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<List<Pair<String, String>>>(cacheKey)?.let { return Result.success(it) }
+        }
         val buyers = lg.teams.filter { it.w + it.l >= 10 && it.winPct >= 0.52 }.take(3)
         val sellers = lg.teams.filter { it.w + it.l >= 10 && it.winPct < 0.45 }.take(3)
 
@@ -806,9 +904,11 @@ object Ollama {
                     }
                 }
             }
-            if (rumors.isEmpty()) {
+            val finalRumors = if (rumors.isEmpty()) {
                 listOf("Deadline Buzz" to "Multiple contenders have engaged sellers on perimeter scoring and interior defense ahead of the trade deadline.")
             } else rumors
+            if (config.cacheResponses) Cache.put(cacheKey, finalRumors)
+            finalRumors
         }
     }
 }
