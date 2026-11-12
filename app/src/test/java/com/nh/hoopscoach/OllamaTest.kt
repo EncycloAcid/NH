@@ -280,7 +280,7 @@ class OllamaTest {
 
         cfg.googleAccountEmail = "coach.hoops@gmail.com"
         cfg.googleSignedIn = true
-        assertEquals("Google Gemini (coach.hoops)", cfg.providerDisplayName)
+        assertEquals("Google Gemini", cfg.providerDisplayName)
 
         cfg.provider = "openai"
         cfg.openAiModel = "gpt-4o-mini"
@@ -293,7 +293,7 @@ class OllamaTest {
 
         cfg.openAiAccountEmail = "alex.ball@openai.com"
         cfg.openAiSignedIn = true
-        assertEquals("ChatGPT (alex.ball)", cfg.providerDisplayName)
+        assertEquals("ChatGPT (OpenAI)", cfg.providerDisplayName)
 
         cfg.provider = "ollama"
         cfg.model = "llama3.2:1b"
@@ -308,13 +308,13 @@ class OllamaTest {
         // Without API key or email, test connection fails
         val emptyRes = Ollama.testGoogleConnection("", "")
         assertTrue(emptyRes.isFailure)
-        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("Google account is not signed in") == true)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("API key") == true)
 
-        // With account email, succeeds with default model list
+        // Email alone does not grant API access.
         val emailRes = Ollama.testGoogleConnection("", "coach.hoops@gmail.com")
-        assertTrue(emailRes.isSuccess)
-        val models = emailRes.getOrThrow()
-        assertTrue(models.contains("gemini-1.5-flash"))
+        assertTrue(emailRes.isFailure)
+        assertTrue(emailRes.exceptionOrNull()?.message?.contains("API key") == true)
+
 
         // With invalid raw API key against network, fails gracefully
         val invalidRes = Ollama.testGoogleConnection("invalid_test_key_nonexistent")
@@ -326,13 +326,13 @@ class OllamaTest {
         // Without API key or email, test connection fails
         val emptyRes = Ollama.testOpenAiConnection("", "", "")
         assertTrue(emptyRes.isFailure)
-        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("ChatGPT account is not signed in") == true)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("API key") == true)
 
-        // With account email, succeeds with default model list
+        // Email alone does not grant API access.
         val emailRes = Ollama.testOpenAiConnection("", "", "coach.alex@openai.com")
-        assertTrue(emailRes.isSuccess)
-        val models = emailRes.getOrThrow()
-        assertTrue(models.contains("gpt-4o-mini"))
+        assertTrue(emailRes.isFailure)
+        assertTrue(emailRes.exceptionOrNull()?.message?.contains("API key") == true)
+
 
         // With invalid raw API key against network, fails gracefully
         val invalidRes = Ollama.testOpenAiConnection("invalid_test_key_nonexistent")
@@ -345,12 +345,12 @@ class OllamaTest {
         val googleCfg = OllamaConfig(provider = "google", googleApiKey = "", googleAccountEmail = "", googleSignedIn = false)
         val googleRes = Ollama.generate(googleCfg, "Test prompt")
         assertTrue(googleRes.isFailure)
-        assertTrue(googleRes.exceptionOrNull()?.message?.contains("Google account is not signed in") == true)
+        assertTrue(googleRes.exceptionOrNull()?.message?.contains("API key") == true)
 
         val openAiCfg = OllamaConfig(provider = "openai", openAiApiKey = "", openAiAccountEmail = "", openAiSignedIn = false)
         val openAiRes = Ollama.generate(openAiCfg, "Test prompt")
         assertTrue(openAiRes.isFailure)
-        assertTrue(openAiRes.exceptionOrNull()?.message?.contains("ChatGPT account is not signed in") == true)
+        assertTrue(openAiRes.exceptionOrNull()?.message?.contains("API key") == true)
     }
 
     @Test

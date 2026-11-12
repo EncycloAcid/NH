@@ -188,7 +188,7 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
                     if (idx >= 0) vm.push(Route.Article(idx))
                 }
                 Spacer(Modifier.width(8.dp))
-                AiBadge(existing.isAiGenerated, existing.source.substringAfterLast(" · ", ""))
+                AiBadge(existing.isAiGenerated, existing.source.substringAfterLast(" · ", ""), fallbackReason = existing.aiFallbackReason)
             } else {
                 SmallButton(if (loading) "Generating..." else "Generate Hype ✍️", primary = true, enabled = !loading) {
                     loading = true
@@ -246,7 +246,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("SCOUTING KEYS", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
-            AiBadge(keys?.any { it.isAi } == true, lg.ollama.providerDisplayName)
+            AiBadge(keys?.any { it.isAi } == true, lg.ollama.providerDisplayName, fallbackReason = keys?.firstOrNull()?.fallbackReason.orEmpty())
             if (keys == null && !loading) {
                 Text(
                     "Generate with ${lg.ollama.shortActionName} AI ✍️",

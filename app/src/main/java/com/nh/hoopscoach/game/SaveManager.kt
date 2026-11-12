@@ -296,6 +296,7 @@ object SaveManager {
         if (lg == null && bakFile.exists()) {
             lg = runCatching { SaveIO.decode(bakFile.readBytes()) }.getOrNull()
             if (lg != null) {
+                if (savFile.exists()) savFile.copyTo(File(savesDir, "$id.sav.corrupt.${System.currentTimeMillis()}"))
                 runCatching { bakFile.copyTo(savFile, overwrite = true) }
             }
         }
@@ -304,6 +305,7 @@ object SaveManager {
         if (lg == null && bak2File.exists()) {
             lg = runCatching { SaveIO.decode(bak2File.readBytes()) }.getOrNull()
             if (lg != null) {
+                if (savFile.exists()) savFile.copyTo(File(savesDir, "$id.sav.corrupt.${System.currentTimeMillis()}"))
                 runCatching { bak2File.copyTo(savFile, overwrite = true) }
             }
         }
@@ -331,6 +333,21 @@ object SaveManager {
         }
 
         return Pair(lg, meta)
+    }
+
+    fun resumeSlot(rootDir: File, id: String): Pair<League, SaveSlot>? {
+        val loaded = loadSlot(rootDir, id)
+        if (loaded == null) {
+            val dir = File(rootDir, "saves")
+            val exists = listOf(".sav", ".sav.bak", ".sav.bak2").any { File(dir, id + it).exists() } ||
+                dir.listFiles()?.any { it.name.endsWith(".sav") } == true || File(rootDir, "dynasty.sav").exists()
+            check(!exists) { "The selected save could not be read. All save files have been kept." }
+        } else {
+            val lg = loaded.first
+            check(lg.userTeamId in lg.teams.indices && lg.teams[lg.userTeamId].id == lg.userTeamId) { "Invalid saved team." }
+            check(!lg.pro || lg.proState != null) { "Missing saved pro season." }
+        }
+        return loaded
     }
 
     /**

@@ -3,6 +3,7 @@ package com.nh.hoopscoach
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -31,6 +32,24 @@ import kotlin.random.Random
 class StartupTest {
     @get:Rule val rule = createEmptyComposeRule()
     private val save get() = File(ApplicationProvider.getApplicationContext<android.content.Context>().filesDir, "dynasty.sav")
+
+    @Test @Config(sdk = [34]) fun corruptSlotShowsRecoveryAndOpensAnotherWithoutDeletingOriginal() {
+        val app = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val lg = Offseason.newGame(5, "Test", "Coach")
+        val good = SaveManager.saveSlot(app.filesDir, "good", SaveIO.encode(lg), lg)
+        val bad = File(app.filesDir, "saves/bad.sav").apply { writeText("corrupted save") }
+        SaveManager.setActiveSlotId(app.filesDir, "bad")
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var vm: GameViewModel
+            scenario.onActivity { vm = activityViewModel(it) }
+            rule.waitUntil(60_000) { rule.runOnIdle { vm.loadError != null } }
+            rule.onNodeWithText("Couldn't resume this career").assertIsDisplayed()
+            rule.onNodeWithText("Start a new career").assertIsDisplayed()
+            rule.onNodeWithText("Open ${good.title}").performClick()
+            rule.waitUntil(60_000) { rule.runOnIdle { vm.loadError == null && vm.league != null } }
+            org.junit.Assert.assertEquals("corrupted save", bad.readText())
+        }
+    }
 
     private fun clearTestSaves() {
         val slots = File(save.parentFile, "saves")

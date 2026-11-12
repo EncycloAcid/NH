@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.File
 import java.io.InputStream
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Loads modular 512×512 character sprites from `assets/character/`.
@@ -14,17 +13,19 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object SpriteSheets {
     @Volatile private var assets: AssetManager? = null
-    private val cache = ConcurrentHashMap<String, Bitmap>()
+    private val cache = object : android.util.LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 12).coerceIn(4L * 1024 * 1024, 16L * 1024 * 1024).toInt()) {
+        override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
+    }
 
     fun install(am: AssetManager) {
         assets = am
     }
 
-    fun bitmap(path: String): Bitmap? {
+    @Synchronized fun bitmap(path: String): Bitmap? {
         cache[path]?.let { return it }
         val bmp = open(path)?.use { BitmapFactory.decodeStream(it) } ?: return null
         val immutable = if (bmp.isMutable) bmp.copy(Bitmap.Config.ARGB_8888, false) else bmp
-        cache[path] = immutable
+        cache.put(path, immutable)
         return immutable
     }
 

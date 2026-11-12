@@ -629,6 +629,7 @@ class News(
     var approved: Boolean = false,
     /** Journalistic angle used for generation (e.g. "tactical", "beat", "skeptic", "dual", "balanced"). */
     var angle: String = "",
+    var aiFallbackReason: String = "",
 ) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
@@ -681,10 +682,10 @@ class OllamaConfig(
     var customEndpoint: String = "",
 ) {
     val isGoogleSignedIn: Boolean
-        get() = googleSignedIn || googleAccountEmail.isNotBlank() || googleApiKey.isNotBlank()
+        get() = googleApiKey.isNotBlank()
 
     val isOpenAiSignedIn: Boolean
-        get() = openAiSignedIn || openAiAccountEmail.isNotBlank() || openAiApiKey.isNotBlank()
+        get() = openAiApiKey.isNotBlank()
 
     val googleDisplayEmail: String
         get() = googleAccountEmail.ifBlank { if (googleApiKey.isNotBlank()) "Connected Google Account" else "Not Signed In" }
@@ -1402,7 +1403,7 @@ class PressAnswer(
 )
 
 @Serializable
-class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "", val isAi: Boolean = false)
+class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "", val isAi: Boolean = false, val fallbackReason: String = "")
 
 /** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
 /** One reaction to a story: who said it (and in what role), what they said, and how many liked it. */
@@ -1418,6 +1419,7 @@ class Post(
     /** The story it's about (a headline in the news), for the league feed: tap to read it. */
     val re: String = "",
     val isAi: Boolean = false,
+    val fallbackReason: String = "",
 )
 
 @Serializable

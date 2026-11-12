@@ -1228,7 +1228,7 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(P.surface2).padding(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("${a.abbr} ${an.gradeA}  ·  ${b.abbr} ${an.gradeB}", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
-                    AiBadge(an.isAi, lg.ollama.providerDisplayName)
+                    AiBadge(an.isAi, lg.ollama.providerDisplayName, fallbackReason = an.fallbackReason)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(an.analysis, style = T.small, color = P.ink)

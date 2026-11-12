@@ -2257,7 +2257,7 @@ fun AiTrainingCampCard(lg: League, team: Team, topImprover: Player, delta: Int) 
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("CAMP DEVELOPMENT", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
-                    AiBadge(report?.isAi == true, lg.ollama.providerDisplayName)
+                    AiBadge(report?.isAi == true, lg.ollama.providerDisplayName, fallbackReason = report?.fallbackReason.orEmpty())
             if (report == null && !loading) {
                 SmallButton("Generate Intel", primary = true) {
                     loading = true

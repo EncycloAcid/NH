@@ -129,7 +129,7 @@ fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
                     Text("@${p.handle}", style = T.small, color = P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Text(" · ${whenAgo(lg, p)}", style = T.small, color = P.faint, maxLines = 1)
                     Spacer(Modifier.width(6.dp))
-                    AiBadge(p.isAi, lg?.ollama?.providerDisplayName.orEmpty())
+                    AiBadge(p.isAi, lg?.ollama?.providerDisplayName.orEmpty(), fallbackReason = p.fallbackReason)
                 }
                 // A reply to a story says which one (the outlet's own post is the story).
                 if (p.re.isNotEmpty() && p.kind != "news") {
@@ -351,7 +351,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
                             color = ink, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.width(8.dp))
-                        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""))
+                        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""), fallbackReason = n.aiFallbackReason)
                     }
                     Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
                     Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))

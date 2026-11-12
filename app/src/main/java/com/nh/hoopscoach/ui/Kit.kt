@@ -83,15 +83,17 @@ val Gutter = 16.dp
 private val CardShape = RoundedCornerShape(20.dp)
 
 @Composable
-fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier) {
-    if (!isAi) return
+fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier, fallbackReason: String = "") {
+    if (!isAi && fallbackReason.isBlank()) return
     var details by remember { mutableStateOf(false) }
     Box(modifier) {
-        Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF228B50)).clickable { details = true }, contentAlignment = Alignment.Center) {
+        if (!isAi) Text("Game-written: $fallbackReason", style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 160.dp).clickable { details = true })
+        else Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF228B50)).clickable { details = true }, contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.Check, contentDescription = "AI-generated", tint = Color.White, modifier = Modifier.size(16.dp))
         }
         DropdownMenu(expanded = details, onDismissRequest = { details = false }) {
-            Text(if (provider.isBlank()) "AI-assisted content" else "Generated with $provider", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+            Text(if (!isAi) fallbackReason else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
         }
     }
 }

@@ -251,7 +251,7 @@ fun AiAwardCeremonyCard(lg: League, honor: Honor) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("AWARD CEREMONY PODIUM", style = T.label, color = P.gold, modifier = Modifier.weight(1f))
-            AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName)
+            AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName, fallbackReason = speech?.fallbackReason.orEmpty())
             if (speech == null && !loading) {
                 SmallButton("Generate Ceremony", primary = true) {
                     loading = true

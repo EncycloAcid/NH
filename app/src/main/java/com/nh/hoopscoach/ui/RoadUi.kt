@@ -527,7 +527,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            AiBadge(q.isAi, q.reporter.substringAfterLast(" · ", lg.ollama.providerDisplayName))
+            AiBadge(q.isAi, q.reporter.substringAfterLast(" · ", lg.ollama.providerDisplayName), fallbackReason = q.fallbackReason)
         }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Top) {

@@ -98,6 +98,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var loading by mutableStateOf(true)
         private set
+    var loadError by mutableStateOf<String?>(null)
+        private set
     var rev by mutableIntStateOf(0)
         private set
     var busy by mutableStateOf<String?>(null)
@@ -146,27 +148,30 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         if (autoLoad) viewModelScope.launch {
-            val app = getApplication<Application>()
-            val pair = withContext(Dispatchers.IO) {
-                SaveManager.migrateLegacyIfNeeded(app.filesDir)
-                val activeId = SaveManager.getActiveSlotId(app.filesDir)
-                SaveManager.loadSlot(app.filesDir, activeId)
-            }
-            league = pair?.first
-            activeSlot = pair?.second
-            activeSlotId = pair?.second?.id ?: SaveManager.getActiveSlotId(app.filesDir)
-            loading = false
-            refreshSaveSlots()
-            if (pair == null) generateDraft()
+            try {
+                val app = getApplication<Application>()
+                val pair = withContext(Dispatchers.IO) {
+                    SaveManager.migrateLegacyIfNeeded(app.filesDir)
+                    val activeId = SaveManager.getActiveSlotId(app.filesDir)
+                    SaveManager.resumeSlot(app.filesDir, activeId)
+                }
+                league = pair?.first
+                activeSlot = pair?.second
+                activeSlotId = pair?.second?.id ?: SaveManager.getActiveSlotId(app.filesDir)
+                loading = false
+                refreshSaveSlots()
+                if (pair == null) generateDraft()
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { showLoadError(e) }
         }
     }
 
     fun refreshSaveSlots() {
         viewModelScope.launch {
             val app = getApplication<Application>()
-            val slots = withContext(Dispatchers.IO) {
-                SaveManager.listSlots(app.filesDir)
-            }
+            val slots = try { withContext(Dispatchers.IO) { SaveManager.listSlots(app.filesDir) } }
+                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (e: Exception) { emptyList() }
             saveSlots = slots
             activeSlot = slots.firstOrNull { it.id == activeSlotId }
         }
@@ -192,6 +197,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private var saveJob: Job? = null
+    private val saveMutex = Mutex()
     private fun scheduleSave() {
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
@@ -204,42 +210,56 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { saveNow() }
     }
 
-    private suspend fun saveNow() {
-        val lg = league ?: return
-        val bytes = mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
-        withContext(Dispatchers.IO) {
-            runCatching {
+    private suspend fun saveNow(): Boolean = saveMutex.withLock {
+        val lg = league ?: return@withLock true
+        val slotId = activeSlotId
+        try {
+            val bytes = mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
+            val saved = withContext(Dispatchers.IO) {
                 val app = getApplication<Application>()
-                val slot = SaveManager.saveSlot(app.filesDir, activeSlotId, bytes, lg)
-                activeSlot = slot
+                SaveManager.saveSlot(app.filesDir, slotId, bytes, lg)
             }
-        }
+            if (activeSlotId == slotId) activeSlot = saved
+            refreshSaveSlots()
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { toast("Couldn't save this career (${e.javaClass.simpleName}). Existing save files have been kept."); false }
+    }
+
+    private fun showLoadError(error: Exception) {
+        loading = false
+        busy = null
+        loadError = "The selected slot couldn't be opened (${error.javaClass.simpleName})."
         refreshSaveSlots()
     }
 
     fun loadSlot(id: String) {
         viewModelScope.launch {
-            val app = getApplication<Application>()
-            saveNow()
-            val loaded = withContext(Dispatchers.IO) {
-                SaveManager.loadSlot(app.filesDir, id)
-            }
-            if (loaded != null) {
-                mutex.withLock {
-                    league = loaded.first
-                    activeSlot = loaded.second
-                    activeSlotId = loaded.second.id
-                    draft = null
-                    stack.clear()
-                    sheet = null
-                    live = null
-                    tab = Tab.TODAY
+            try {
+                val app = getApplication<Application>()
+                if (!saveNow()) return@launch
+                val loaded = withContext(Dispatchers.IO) {
+                    SaveManager.resumeSlot(app.filesDir, id)
                 }
-                refreshSaveSlots()
-                toast("Loaded: ${loaded.second.title}")
-            } else {
-                toast("Couldn't load this dynasty save")
-            }
+                if (loaded != null) {
+                    mutex.withLock {
+                        league = loaded.first
+                        activeSlot = loaded.second
+                        activeSlotId = loaded.second.id
+                        draft = null
+                        stack.clear()
+                        sheet = null
+                        live = null
+                        tab = Tab.TODAY
+                        loadError = null
+                    }
+                    refreshSaveSlots()
+                    toast("Loaded: ${loaded.second.title}")
+                } else {
+                    showLoadError(IllegalStateException("Missing save"))
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { showLoadError(e) }
         }
     }
 
@@ -308,11 +328,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startNewDynasty() {
         viewModelScope.launch {
-            saveNow()
+            if (!saveNow()) return@launch
             mutex.withLock {
                 league = null
                 activeSlot = null
                 activeSlotId = "slot_${System.currentTimeMillis()}_${(100..999).random()}"
+                loadError = null
                 stack.clear()
                 sheet = null
                 live = null
@@ -363,9 +384,12 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun generateDraft(startYear: Int = 2026) {
         busy = "Building your league"
         viewModelScope.launch {
-            val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
-            draft = lg
-            busy = null
+            try {
+                val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
+                draft = lg
+                busy = null
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { showLoadError(e) }
         }
     }
 

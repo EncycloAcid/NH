@@ -74,7 +74,7 @@ fun AiInjuryAnalysisCard(lg: League, player: Player, team: Team) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("MEDICAL OUTLOOK", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
-            AiBadge(analysis?.isAi == true, lg.ollama.providerDisplayName)
+            AiBadge(analysis?.isAi == true, lg.ollama.providerDisplayName, fallbackReason = analysis?.fallbackReason.orEmpty())
             if (analysis == null && !loading) {
                 SmallButton("Generate Breakdown", primary = true) {
                     loading = true

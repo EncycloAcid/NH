@@ -51,14 +51,14 @@ fun NewsTag(n: News, modifier: Modifier = Modifier) {
         n.kind == "team" -> "STREAK" to P.warn
         else -> null
     }
-    if (!n.isAiGenerated && regularTag == null) return
+    if (!n.isAiGenerated && n.aiFallbackReason.isBlank() && regularTag == null) return
 
     Row(modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
         if (regularTag != null) {
             Tag(regularTag.first, regularTag.second)
         }
         Spacer(Modifier.weight(1f))
-        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""))
+        AiBadge(n.isAiGenerated, n.source.substringAfterLast(" · ", ""), fallbackReason = n.aiFallbackReason)
     }
     Spacer(Modifier.height(3.dp))
 }

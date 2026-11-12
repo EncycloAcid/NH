@@ -687,7 +687,7 @@ internal fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Bo
                     Text("%02d · %s".format(i + 1, s.kicker.uppercase()), style = T.label, color = accent, modifier = Modifier.weight(1f))
                     TeamBadge(t, 36.dp)
                     Spacer(Modifier.width(8.dp))
-                    AiBadge(s.isAiGenerated, s.aiProvider)
+                    AiBadge(s.isAiGenerated, s.aiProvider, fallbackReason = s.fallbackReason)
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(s.head, style = T.title.copy(fontSize = 30.sp, lineHeight = 31.sp), color = fg)
@@ -711,7 +711,7 @@ internal fun StoryCard(vm: GameViewModel, lg: League, s: Story, i: Int, lead: Bo
                 Spacer(Modifier.weight(1f))
                 if (t != null) TeamBadge(t, 28.dp)
                 Spacer(Modifier.width(8.dp))
-                AiBadge(s.isAiGenerated, s.aiProvider)
+                AiBadge(s.isAiGenerated, s.aiProvider, fallbackReason = s.fallbackReason)
             }
             Spacer(Modifier.height(6.dp))
             Text(s.head, style = T.h2, color = P.ink)

@@ -305,7 +305,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text("COACH'S RECRUITING PITCH", style = T.label, color = P.good, modifier = Modifier.weight(1f))
-                                    AiBadge(pitchLetter?.isAi == true, pitchLetter?.provider.orEmpty())
+                                    AiBadge(pitchLetter?.isAi == true, pitchLetter?.provider.orEmpty(), fallbackReason = pitchLetter?.fallbackReason.orEmpty())
                                 }
                                 Text("Personalized pitch letter targeting ${r.pref.label}.", style = T.small, color = P.sub)
                             }

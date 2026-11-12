@@ -439,7 +439,7 @@ private fun CallCard(lg: League, lv: LiveGame, c: com.nh.hoopscoach.game.GameEng
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("LOCKER ROOM", style = T.label, color = P.onHero, modifier = Modifier.weight(1f))
-                    AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName)
+                    AiBadge(speech?.isAi == true, lg.ollama.providerDisplayName, fallbackReason = speech?.fallbackReason.orEmpty())
                     if (speech == null && !loadingSpeech) {
                         SmallButton("Generate AI Speech", primary = true) {
                             loadingSpeech = true
@@ -665,7 +665,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
             val rep = report!!
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(rep.outlet.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.weight(1f))
-                AiBadge(rep.isAi, lg.ollama.providerDisplayName)
+                AiBadge(rep.isAi, lg.ollama.providerDisplayName, fallbackReason = rep.fallbackReason)
             }
             Spacer(Modifier.height(4.dp))
             Text(rep.headline, style = T.head, color = P.ink)

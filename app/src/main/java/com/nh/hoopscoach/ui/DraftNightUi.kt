@@ -317,7 +317,7 @@ private fun AiProspectScoutingCard(lg: League, pr: Prospect, p: Player) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("DRAFT SCOUTING", style = T.label, color = P.accent, modifier = Modifier.weight(1f))
-            AiBadge(report?.isAi == true, lg.ollama.providerDisplayName)
+            AiBadge(report?.isAi == true, lg.ollama.providerDisplayName, fallbackReason = report?.fallbackReason.orEmpty())
             if (report == null && !loading) {
                 SmallButton("Generate Intel", primary = true) {
                     loading = true

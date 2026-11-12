@@ -126,11 +126,11 @@ class AiGroundingTest {
         assertNotEquals(next, AiFacts.version(lg))
     }
 
-    @Test fun commentaryAboutMethodsIsRejected() {
+    @Test fun editorialVocabularyAloneIsNotAFactualError() {
         val lg = league()
         val facts = AiFacts.build(lg, lg.user.name)
         listOf("The simulations favor ${lg.user.school}.", "No results have been assumed.", "The roster includes the team's players.").forEach {
-            assertTrue(AiGrounding.validate(it, facts).contains("meta-commentary instead of sports copy"))
+            assertFalse(AiGrounding.validate(it, facts).contains("meta-commentary instead of sports copy"))
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.AiTemplates
@@ -43,6 +44,17 @@ class AiUiScreenshotTest {
     }
 
     @Test fun gameWrittenFallbackHasNoCheck() = render("fallback-light", false)
+    @Test fun diagnosticsFetchWithNoApiKeyShowsAnActionableFailure() {
+        val config = com.nh.hoopscoach.game.OllamaConfig(provider = "google")
+        rule.activity.setContent { HoopsTheme { com.nh.hoopscoach.ui.AiDiagnosticsPanel(config) {} } }
+        rule.onNodeWithText("Fetch available models").performClick()
+        rule.waitUntil(30_000) { com.nh.hoopscoach.game.AiDiagnostics.last?.let { it.request == "Model list" && it.result == "network error" } == true }
+        org.junit.Assert.assertTrue(com.nh.hoopscoach.game.AiDiagnostics.last!!.detail.contains("API key"))
+        rule.onNodeWithText("Test AI").performClick()
+        rule.waitUntil(30_000) { com.nh.hoopscoach.game.AiDiagnostics.last?.let { it.request == "Test AI" && it.result == "network error" } == true }
+        org.junit.Assert.assertTrue(com.nh.hoopscoach.game.AiDiagnostics.last!!.detail.contains("API key"))
+        shot("diagnostics-key-required")
+    }
 
     private fun render(mode: String, isAi: Boolean = true) {
         GameViewModel.autoLoad = false
@@ -55,7 +67,7 @@ class AiUiScreenshotTest {
             StatLine(gp = 30, pts = 510, orb = 18, drb = 114, ast = 138), teamId = lg.userTeamId)
         lg.news += News(lg.season, lg.day, "${lg.user.school} faces a changing rotation as ${star.name} anchors the preseason outlook",
             source = if (isAi) "Courtside Report · Google Gemini" else "Game-written · Courtside Report", teamId = lg.userTeamId, pid = star.id, kind = "column", aiLabeled = isAi,
-            body = AiTemplates.previewCopy(lg, lg.user))
+            body = AiTemplates.previewCopy(lg, lg.user), aiFallbackReason = if (isAi) "" else "Gemini requires an API key. Configure it in AI settings.")
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
         vm.install(lg)
         rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, lg.news.lastIndex) } }

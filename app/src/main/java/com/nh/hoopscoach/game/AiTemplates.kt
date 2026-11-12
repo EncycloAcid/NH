@@ -2,7 +2,7 @@ package com.nh.hoopscoach.game
 
 import java.util.Locale
 
-data class AiText(val text: String, val isAi: Boolean = false, val provider: String = "") {
+data class AiText(val text: String, val isAi: Boolean = false, val provider: String = "", val fallbackReason: String = "") {
     fun source(outlet: String) = if (isAi) "$outlet · $provider" else "Game-written · $outlet"
 
     fun applyTo(news: News) {
@@ -11,6 +11,7 @@ data class AiText(val text: String, val isAi: Boolean = false, val provider: Str
         news.body = text
         news.aiLabeled = isAi
         news.source = source(outlet)
+        news.aiFallbackReason = fallbackReason
     }
 }
 

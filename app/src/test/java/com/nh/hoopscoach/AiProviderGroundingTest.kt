@@ -7,6 +7,10 @@ import com.nh.hoopscoach.game.OllamaConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.int
 import org.junit.Assert.*
 import org.junit.Test
 import java.net.ServerSocket
@@ -61,6 +65,12 @@ class AiProviderGroundingTest {
             assertEquals(2, calls.get())
             assertTrue(requests.all { it.contains("FACT SHEET") && it.contains("current record 7-3") })
             assertTrue(requests.last().contains("previous draft was rejected"))
+            requests.forEach { request ->
+                val payload = Json.parseToJsonElement(request).jsonObject
+                val options = payload.getValue("options").jsonObject
+                val required = (payload.getValue("prompt").jsonPrimitive.content.length + payload.getValue("system").jsonPrimitive.content.length) / 3 + options.getValue("num_predict").jsonPrimitive.int + 256
+                assertTrue(options.getValue("num_ctx").jsonPrimitive.int >= required)
+            }
             validSecond = false
             calls.set(0)
             val rejected = Ollama.generateArticle(config, lg, news)

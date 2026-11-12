@@ -13,7 +13,7 @@ class Odds(val conf: Double, val ncaa: Double, val s16: Double, val f4: Double, 
 
 /** One storyline: a kicker, a headline and a few sentences, about a team or a player. */
 @Serializable
-class Story(val kicker: String, val head: String, var body: String, val teamId: Int = -1, val pid: Int = -1, val aiProvider: String = "") {
+class Story(val kicker: String, val head: String, var body: String, val teamId: Int = -1, val pid: Int = -1, val aiProvider: String = "", var fallbackReason: String = "") {
     val isAiGenerated get() = aiProvider.isNotBlank()
 }
 

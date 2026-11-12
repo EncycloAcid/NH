@@ -14,6 +14,7 @@ data class AiFactSheet(
     val preseason: Boolean,
     val preview: Boolean = false,
     val upcoming: Boolean = false,
+    val entityAliases: Map<String, String> = emptyMap(),
 )
 
 object AiFacts {
@@ -89,7 +90,13 @@ object AiFacts {
             }
             if (extra.isNotBlank()) appendLine("EVENT FACTS: $extra")
         }
-        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming)
+        val shortNames = mutableMapOf<String, String>()
+        teams.filter { t -> t.mascot.length > 2 && lg.teams.count { it.mascot.equals(t.mascot, true) } == 1 }.forEach { shortNames[it.mascot] = it.name }
+        featured.forEach { p ->
+            val last = p.name.substringAfterLast(' ')
+            if (last.length > 2 && population.count { it.name.substringAfterLast(' ').equals(last, true) } == 1 && lg.coaches.none { it.name.substringAfterLast(' ').equals(last, true) }) shortNames[last] = p.name
+        }
+        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames)
     }
 
     fun version(lg: League): String {
@@ -110,15 +117,40 @@ object AiGrounding {
     private val pair = Regex("\\b(\\d{1,3})\\s*[-–—]\\s*(\\d{1,3})\\b")
     private fun normalized(n: String) = BigDecimal(n.removeSuffix("%")).stripTrailingZeros().toPlainString() + if (n.endsWith("%")) "%" else ""
     private fun canonicalPairs(text: String) = pair.findAll(text).map { "${it.groupValues[1].toInt()}-${it.groupValues[2].toInt()}" }.toSet()
+    private val wordValues = (listOf("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen").mapIndexed { i, s -> s to i } +
+        listOf("twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety").mapIndexed { i, s -> s to (i + 2) * 10 }).toMap()
+    private fun numericWords(text: String): String = Regex("\\b(${wordValues.keys.joinToString("|")})(?:[ -](one|two|three|four|five|six|seven|eight|nine))?(?=\\s+(?:wins?|losses|points?|rebounds?|assists?)\\b)", RegexOption.IGNORE_CASE).replace(text) { m ->
+        m.value.lowercase(Locale.US).split(' ', '-').sumOf { wordValues.getValue(it) }.toString()
+    }
+
+    private fun equivalent(a: String, b: String): Boolean {
+        if (a.endsWith('%') != b.endsWith('%')) return false
+        val x = a.removeSuffix("%"); val y = b.removeSuffix("%")
+        if (!x.contains('.') && !y.contains('.')) return x == y
+        val digits = minOf(x.substringAfter('.', "").length, y.substringAfter('.', "").length)
+        return kotlin.math.abs(x.toDouble() - y.toDouble()) <= 0.5 * Math.pow(10.0, -digits.toDouble()) + 1e-9
+    }
+
+    private fun canonicalText(text: String, facts: AiFactSheet): String {
+        var result = text
+        val names = facts.entityAliases.values.distinct().sortedByDescending { it.length }
+        fun word(s: String) = Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(s)}(?![\\p{L}\\d])")
+        names.forEachIndexed { i, name -> result = result.replace(word(name), "@@ENTITY$i@@") }
+        facts.entityAliases.entries.sortedByDescending { it.key.length }.forEach { (alias, name) -> result = result.replace(word(alias), "@@ENTITY${names.indexOf(name)}@@") }
+        names.forEachIndexed { i, name -> result = result.replace("@@ENTITY$i@@", name) }
+        return result
+    }
 
     fun validate(text: String, facts: AiFactSheet): List<String> {
         if (text.isBlank()) return listOf("empty response")
         val errors = mutableListOf<String>()
-        if (Regex("\\b(simulat\\w*|sims|assum\\w*|rosters?)\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)) errors += "meta-commentary instead of sports copy"
-        val content = text.lines().filterNot { it.startsWith("OUTLET:", true) || it.startsWith("REPORTER:", true) }
+        val content = numericWords(canonicalText(text, facts)).lines().filterNot { it.startsWith("OUTLET:", true) || it.startsWith("REPORTER:", true) }
             .joinToString("\n") { it.replace(Regex("^(SCOOP|RUMOR) \\d+:"), "ITEM:") }
-        val numbers = number.findAll(facts.text).map { normalized(it.value) }.toSet()
-        if (number.findAll(content).any { normalized(it.value) !in numbers }) errors += "unsupported number"
+        val numbers = number.findAll(facts.text).map { it.value }.toSet()
+        if (number.findAll(content).any { m ->
+                val rate = m.value.endsWith('%') || Regex("^\\s*(PPG|RPG|APG|MPG|points per game|rebounds per game|assists per game)\\b", RegexOption.IGNORE_CASE).containsMatchIn(content.substring(m.range.last + 1))
+                numbers.none { normalized(m.value) == normalized(it) || (rate && equivalent(m.value, it)) }
+            }) errors += "unsupported number"
         Regex("(\\d+(?:\\.\\d+)?)\\s*(PPG|RPG|APG|PTS|REB|AST|STL|BLK|TOV|MIN|points|rebounds|assists)\\b", RegexOption.IGNORE_CASE).findAll(content).forEach { m ->
             val prefix = content.substring((m.range.first - 100).coerceAtLeast(0), m.range.first)
             val player = facts.names.mapNotNull { name ->
@@ -135,11 +167,10 @@ object AiGrounding {
                 val expected = facts.text.lines().filter { if (metric in setOf("PPG", "RPG", "APG"))
                     it.startsWith("CURRENT $player:") || it.startsWith("LAST SEASON $player,")
                     else it.startsWith("BOX $player:") || it.startsWith("GAME LINE $player:") }
-                    .flatMap { Regex("(\\d+(?:\\.\\d+)?) $metric\\b", RegexOption.IGNORE_CASE).findAll(it).map { match -> normalized(match.groupValues[1]) }.toList() }.toSet()
-                if (normalized(m.groupValues[1]) !in expected) errors += "statistic belongs to another player"
+                    .flatMap { Regex("(\\d+(?:\\.\\d+)?) $metric\\b", RegexOption.IGNORE_CASE).findAll(it).map { match -> match.groupValues[1] }.toList() }.toSet()
+                if (expected.none { if (metric in setOf("PPG", "RPG", "APG")) equivalent(m.groupValues[1], it) else normalized(m.groupValues[1]) == normalized(it) }) errors += "statistic belongs to another player"
             }
         }
-        if (Regex("\\b(one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[ -]+(wins|losses|points|rebounds|assists)\\b", RegexOption.IGNORE_CASE).containsMatchIn(content)) errors += "numeric claims must use fact-sheet digits"
         val scores = facts.text.lines().filter { it.startsWith("RESULT") || it.startsWith("EVENT FACTS") }.flatMap { canonicalPairs(it) }
         val allowedPairs = canonicalPairs(facts.text) + scores.map { p -> p.split('-').let { v -> "${v[1]}-${v[0]}" } }
         pair.findAll(content).forEach { m ->
@@ -160,9 +191,13 @@ object AiGrounding {
         }
         val common = setOf("Final Four", "Sweet Sixteen", "Sweet Sixteen", "Elite Eight", "Head Coach", "Coach", "Game Winner", "The Favorite", "New Era", "Courtside Report", "National Championship", "March Madness", "All America", "Most Valuable Player", "First Team", "Second Team", "Third Team", "Staff", "Hot Seat")
         common.sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
-        if (Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b").containsMatchIn(residue)) errors += "unknown proper name"
+        val prose = residue.lines().filterNot { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
+        val headers = residue.lines().filter { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
+        val firstNames = facts.allNames.map { it.substringBefore(' ') }.toSet()
+        val properName = Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b")
+        if (properName.containsMatchIn(prose) || properName.findAll(headers).any { it.value.substringBefore(' ') in firstNames }) errors += "unknown proper name"
         val subjects = setOf("He", "She", "It", "This", "That", "There", "They", "We", "What", "Who", "Basketball", "March", "April", "Defense", "Offense", "Depth", "Availability", "Continuity", "Nothing", "Everyone", "Nobody", "Something")
-        if (Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(residue).any { it.groupValues[1] !in subjects }) errors += "unknown named subject"
+        if (Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).any { it.groupValues[1] !in subjects }) errors += "unknown named subject"
         val lower = content.lowercase(Locale.US)
         if ((facts.preseason || facts.preview || facts.upcoming) && Regex("\\b(tonight's win|tonight's loss|won tonight|lost tonight|just defeated|clinched|eliminated|advanced to|celebrated the win)\\b").containsMatchIn(lower)) errors += "result claimed before event"
         if (facts.phase == Phase.OFFSEASON && Regex("\\b(tonight's game|tonight's win|tonight's loss|tomorrow's game)\\b").containsMatchIn(lower)) errors += "wrong season phase"
@@ -180,6 +215,7 @@ object AiGrounding {
             val prompt = "$instructions\n\nFACT SHEET\n${facts.text}\nEND FACT SHEET\n\nWRITING REQUEST\n$request" +
                 if (attempt == 0) "" else "\nYour previous draft was rejected ($reasons). Rewrite conservatively from the fact sheet only."
             val result = try { producer(prompt) } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+            (result.exceptionOrNull() as? CancellationException)?.let { throw it }
             if (result.isSuccess) {
                 val raw = result.getOrThrow()
                 val output = raw.lines()

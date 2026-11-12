@@ -101,6 +101,7 @@ object Ollama {
 
         @Synchronized
         fun put(key: String, value: Any) {
+            if (!cacheable(value)) return
             if (entries.size >= MAX_ENTRIES) {
                 val oldest = entries.keys.firstOrNull()
                 if (oldest != null) entries.remove(oldest)
@@ -115,6 +116,25 @@ object Ollama {
 
         @Synchronized
         fun size(): Int = entries.size
+
+        private fun cacheable(value: Any?): Boolean = when (value) {
+            is List<*> -> value.isNotEmpty() && value.all { cacheable(it) }
+            is AiText -> value.isAi
+            is PressQuestion -> value.isAi
+            is Post -> value.isAi
+            is News -> value.isAiGenerated
+            is Story -> value.isAiGenerated
+            is Brief -> value.isAi
+            is PostgameReport -> value.isAi
+            is ScoutingKey -> value.isAi
+            is TradeAnalysis -> value.isAi
+            is ProspectReport -> value.isAi
+            is InjuryAnalysis -> value.isAi
+            is AwardSpeech -> value.isAi
+            is HalftimeSpeech -> value.isAi
+            is TrainingCampReport -> value.isAi
+            else -> true
+        }
     }
 
     /** Optimal thread count for ARM mobile big.LITTLE processors (e.g. 4 performance cores). */
@@ -250,7 +270,13 @@ object Ollama {
         }
     }
 
-    /** Test connection to Google Gemini API using [apiKey] or account [email]. */
+    internal fun googleTextModels(body: String): List<String> = json.parseToJsonElement(body).jsonObject["models"]?.jsonArray?.mapNotNull {
+        val model = it.jsonObject
+        val name = model["name"]?.jsonPrimitive?.content?.removePrefix("models/") ?: return@mapNotNull null
+        name.takeIf { it.contains("gemini") && model["supportedGenerationMethods"]?.jsonArray?.any { it.jsonPrimitive.content == "generateContent" } == true }
+    }.orEmpty()
+
+    /** Test connection to Google Gemini API using [apiKey]. */
     suspend fun testGoogleConnection(apiKey: String = "", email: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             val key = apiKey.trim()
@@ -265,11 +291,7 @@ object Ollama {
                 val code = conn.responseCode
                 if (code in 200..299) {
                     val body = conn.inputStream.bufferedReader().use { it.readText() }
-                    val root = json.parseToJsonElement(body).jsonObject
-                    val models = root["models"]?.jsonArray?.mapNotNull {
-                        it.jsonObject["name"]?.jsonPrimitive?.content?.removePrefix("models/")
-                    }?.filter { it.contains("gemini") } ?: listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro")
-                    models.ifEmpty { listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro") }
+                    googleTextModels(body).ifEmpty { throw IllegalStateException("Provider lists no compatible text models.") }
                 } else {
                     val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
                     val errMsg = runCatching {
@@ -277,15 +299,13 @@ object Ollama {
                     }.getOrNull() ?: err
                     throw Exception("Google AI Error ($code): $errMsg")
                 }
-            } else if (email.isNotBlank()) {
-                listOf("gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro")
             } else {
-                throw Exception("Google account is not signed in. Please enter your account credentials.")
+                throw Exception("Gemini requires an API key. Email/password sign-in is not supported.")
             }
         }
     }
 
-    /** Test connection to OpenAI ChatGPT API using [apiKey] and optional [customEndpoint] or account [email]. */
+    /** Test connection to OpenAI ChatGPT API using [apiKey] and optional [customEndpoint]. */
     suspend fun testOpenAiConnection(apiKey: String = "", customEndpoint: String = "", email: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             val key = apiKey.trim()
@@ -306,8 +326,8 @@ object Ollama {
                     val root = json.parseToJsonElement(body).jsonObject
                     val models = root["data"]?.jsonArray?.mapNotNull {
                         it.jsonObject["id"]?.jsonPrimitive?.content
-                    }?.filter { it.startsWith("gpt") } ?: listOf("gpt-4o-mini", "gpt-4o")
-                    models.ifEmpty { listOf("gpt-4o-mini", "gpt-4o") }
+                    }?.filter { it.startsWith("gpt") }.orEmpty()
+                    models.ifEmpty { throw IllegalStateException("Provider lists no compatible text models.") }
                 } else {
                     val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
                     val errMsg = runCatching {
@@ -315,10 +335,8 @@ object Ollama {
                     }.getOrNull() ?: err
                     throw Exception("ChatGPT Error ($code): $errMsg")
                 }
-            } else if (email.isNotBlank()) {
-                listOf("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo")
             } else {
-                throw Exception("ChatGPT account is not signed in. Please enter your account credentials.")
+                throw Exception("OpenAI requires an API key. Email/password sign-in is not supported.")
             }
         }
     }
@@ -334,18 +352,18 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!config.isGoogleSignedIn) {
-            return@withContext Result.failure(Exception("Google account is not signed in. Please tap 'Sign In with Google' in Settings."))
+            return@withContext Result.failure(Exception("Gemini requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.googleApiKey.trim()
         if (apiKey.isNotEmpty()) {
             val remoteResult = runCatching {
                 val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
-                val candidates = listOf(model, "$model-latest", "gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro-latest", "gemini-1.5-pro", "gemini-pro").distinct()
+                val candidates = listOf(model)
                 var lastErr: Exception? = null
                 var text: String? = null
 
                 for (cand in candidates) {
-                    for (apiVersion in listOf("v1beta", "v1")) {
+                    for (apiVersion in listOf("v1beta")) {
                         try {
                             val url = URL("https://generativelanguage.googleapis.com/$apiVersion/models/$cand:generateContent?key=$apiKey")
                             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -416,7 +434,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!config.isOpenAiSignedIn) {
-            return@withContext Result.failure(Exception("ChatGPT account is not signed in. Please tap 'Sign In with ChatGPT' in Settings."))
+            return@withContext Result.failure(Exception("OpenAI requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.openAiApiKey.trim()
         if (apiKey.isNotEmpty()) {
@@ -508,13 +526,11 @@ object Ollama {
             }
 
             val threads = if (config.numThreads > 0) config.numThreads else defaultOptimalThreads()
-            val ctx = config.contextSize.coerceIn(256, 4096)
+            val needed = (prompt.length + system.length) / 3 + numPredict + 256
+            require(needed <= 8192) { "The fact sheet exceeds the model context budget. Use game-written coverage for this request." }
+            val ctx = maxOf(config.contextSize, needed).coerceIn(2048, 8192)
             val keepAlive = "${config.keepAliveMinutes.coerceIn(1, 180)}m"
-            val effectiveNumPredict = when (config.speedMode.lowercase()) {
-                "turbo" -> (numPredict * 0.65).toInt().coerceAtLeast(100)
-                "balanced" -> (numPredict * 0.85).toInt().coerceAtLeast(140)
-                else -> numPredict
-            }
+            val effectiveNumPredict = numPredict.coerceIn(128, 4096)
 
             val payload = buildString {
                 append("{\"model\":").append(jsonString(config.model.ifBlank { "llama3.2:1b" }))
@@ -582,10 +598,18 @@ object Ollama {
         validateDraft: (String) -> List<String> = { emptyList() },
     ): Result<AiText> {
         val facts = AiFacts.build(lg, prompt, extraFacts, extraPlayers, preview, upcoming)
+        val requestId = AiDiagnostics.begin(config, if (prompt.contains("KEY 1:")) "Scouting report" else if (prompt.contains("KICKER:")) "Preview stories" else "Game report")
+        var providerError: Throwable? = null
+        var gotResponse = false
         val result = AiGrounding.generate(facts, prompt, validateDraft) { grounded ->
-            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = numPredict)
+            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = numPredict).also {
+                gotResponse = it.isSuccess
+                if (it.isFailure) providerError = it.exceptionOrNull()
+            }
         }
-        val draft = result.fold({ AiText(it, true, config.fullModelDisplayName) }, { return runCatching { AiTemplates.create(facts, prompt) }.onSuccess { onToken?.invoke(it.text) } })
+        val reason = if (gotResponse) "Fact check failed: " + result.exceptionOrNull()?.message.orEmpty().substringAfter('(').substringBefore(").") else AiDiagnostics.networkReason(providerError, config)
+        AiDiagnostics.finish(requestId, if (result.isSuccess) "success" else if (gotResponse) "validation failure" else "network error", if (result.isFailure) reason else "Verified against game facts")
+        val draft = result.fold({ AiText(it, true, config.fullModelDisplayName) }, { return runCatching { AiTemplates.create(facts, prompt).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
         onToken?.invoke(draft.text)
         return Result.success(draft)
     }
@@ -689,7 +713,7 @@ object Ollama {
                 source = draft.source(outlet),
                 teamId = champion.id,
                 pid = finalsMvp?.id ?: -1,
-                aiLabeled = draft.isAi,
+                aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason,
                 approved = false,
             )
         }
@@ -773,7 +797,7 @@ object Ollama {
                 body = finalBody,
                 source = draft.source(outlet),
                 teamId = u.id,
-                aiLabeled = draft.isAi,
+                aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason,
                 approved = false,
             )
         }
@@ -811,7 +835,7 @@ object Ollama {
                     val head = tr.substringAfter(":").substringBefore("|").trim()
                     val body = tr.substringAfter("|").trim()
                     if (head.isNotEmpty() && body.isNotEmpty()) {
-                        scoops.add(Brief(head, body, draft.isAi))
+                        scoops.add(Brief(head, body, draft.isAi, draft.fallbackReason))
                     }
                 }
             }
@@ -870,7 +894,7 @@ object Ollama {
                 body = finalBody,
                 source = draft.source(outlet),
                 teamId = u.id,
-                aiLabeled = draft.isAi,
+                aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason,
             )
         }
     }
@@ -900,7 +924,7 @@ object Ollama {
             val subjects = raw.split(Regex("(?im)(?=^KICKER:)")).filter { it.contains("HEADLINE:", true) }.map { PreviewTopics.match(lg, topics, it)?.subject }
             if (subjects.size != 3 || subjects.any { it == null } || subjects.distinct().size != 3) listOf("three distinct verified preview subjects required") else emptyList()
         }).mapCatching { draft ->
-            if (!draft.isAi) return@mapCatching PreviewTopics.stories(lg, topics).take(3)
+            if (!draft.isAi) return@mapCatching PreviewTopics.stories(lg, topics).take(3).onEach { it.fallbackReason = draft.fallbackReason }
             val raw = draft.text
             val stories = mutableListOf<Story>()
             var kicker = ""
@@ -1002,14 +1026,16 @@ object Ollama {
         val coachQuote: String,
         val starQuote: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
-    data class Brief(val first: String, val second: String, val isAi: Boolean = false)
+    data class Brief(val first: String, val second: String, val isAi: Boolean = false, val fallbackReason: String = "")
 
     data class ScoutingKey(
         val title: String,
         val detail: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class TradeAnalysis(
@@ -1017,6 +1043,7 @@ object Ollama {
         val gradeB: String,
         val analysis: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class ProspectReport(
@@ -1026,6 +1053,7 @@ object Ollama {
         val upside: String,
         val blurb: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class InjuryAnalysis(
@@ -1034,6 +1062,7 @@ object Ollama {
         val nextManUpStrategy: String,
         val quote: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class AwardSpeech(
@@ -1041,12 +1070,14 @@ object Ollama {
         val acceptanceSpeech: String,
         val mediaTribute: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class HalftimeSpeech(
         val lockerRoomSpeech: String,
         val tacticalAdjustment: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     data class TrainingCampReport(
@@ -1054,6 +1085,7 @@ object Ollama {
         val standoutAnalysis: String,
         val seasonOutlook: String,
         val isAi: Boolean = false,
+        val fallbackReason: String = "",
     )
 
     /** Generates a dynamic postgame press conference question & answers tailored to the exact game stats. */
@@ -1149,7 +1181,7 @@ object Ollama {
                     PressAnswer(analytical, followers = 0.008, fans = 1, teammates = 1, persona = 0),
                 ),
                 reporter = if (draft.isAi) "$reporter · ${draft.provider}" else "Staff",
-                isAi = draft.isAi,
+                isAi = draft.isAi, fallbackReason = draft.fallbackReason,
             )
             if (config.cacheResponses) Cache.put(cacheKey, questionObj)
             questionObj
@@ -1237,7 +1269,7 @@ object Ollama {
                             likes = likes,
                             verified = role == "analyst" || role == "teammate",
                             gameId = g.id,
-                            isAi = draft.isAi,
+                            isAi = draft.isAi, fallbackReason = draft.fallbackReason,
                         ),
                     )
                 }
@@ -1247,7 +1279,7 @@ object Ollama {
                     Post(season, day, "${t.school} Faithful", "${t.abbr.lowercase()}nation", "fan",
                         if (won) "What a performance by ${player.last}! $statLineStr in the win over ${opp.school}."
                         else "Tough loss tonight against ${opp.school}, but ${player.last} gave everything with $statLineStr.",
-                        likes = 250, gameId = g.id, isAi = draft.isAi),
+                        likes = 250, gameId = g.id, isAi = draft.isAi, fallbackReason = draft.fallbackReason),
                 )
             } else posts
             if (config.cacheResponses) Cache.put(cacheKey, finalPosts)
@@ -1329,7 +1361,7 @@ object Ollama {
             if (coachQuote.isEmpty()) coachQuote = "We locked in defensively when it mattered most and trusted our offensive execution."
             if (starQuote.isEmpty()) starQuote = "We stayed aggressive, took good looks, and played for each other tonight."
 
-            val rep = PostgameReport(headline, outlet, story, if (draft.isAi) coachQuote else "", if (draft.isAi) starQuote else "", draft.isAi)
+            val rep = PostgameReport(headline, outlet, story, if (draft.isAi) coachQuote else "", if (draft.isAi) starQuote else "", draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, rep)
             rep
         }
@@ -1378,7 +1410,7 @@ object Ollama {
                     val title = tr.substringAfter(":").substringBefore("|").trim().ifEmpty { "Game Key" }
                     val detail = tr.substringAfter("|").trim()
                     if (detail.isNotEmpty()) {
-                        keys.add(ScoutingKey(title, detail, draft.isAi))
+                        keys.add(ScoutingKey(title, detail, draft.isAi, draft.fallbackReason))
                     }
                 }
             }
@@ -1443,7 +1475,7 @@ object Ollama {
             val analysis = if (analysisLines.isNotEmpty()) analysisLines.joinToString("\n\n")
             else "A balanced exchange that addresses positional needs for both ${a.school} and ${b.school}."
 
-            val result = TradeAnalysis(gradeA, gradeB, analysis, draft.isAi)
+            val result = TradeAnalysis(gradeA, gradeB, analysis, draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, result)
             result
         }
@@ -1486,7 +1518,7 @@ object Ollama {
                     val head = tr.substringAfter(":").substringBefore("|").trim()
                     val body = tr.substringAfter("|").trim()
                     if (head.isNotEmpty() && body.isNotEmpty()) {
-                        rumors.add(Brief(head, body, draft.isAi))
+                        rumors.add(Brief(head, body, draft.isAi, draft.fallbackReason))
                     }
                 }
             }
@@ -1533,7 +1565,7 @@ object Ollama {
             val upside = lines.firstOrNull { it.startsWith("UPSIDE:") }?.removePrefix("UPSIDE:")?.trim() ?: "Quality starter with high developmental upside."
             val blurb = lines.firstOrNull { it.startsWith("BLURB:") }?.removePrefix("BLURB:")?.trim()
                 ?: text.substringAfter("BLURB:").trim().ifEmpty { text }
-            val report = ProspectReport(comp, strengths, weaknesses, upside, blurb, draft.isAi)
+            val report = ProspectReport(comp, strengths, weaknesses, upside, blurb, draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, report)
             report
         }
@@ -1574,7 +1606,7 @@ object Ollama {
             val outlook = lines.firstOrNull { it.startsWith("SEVERITY_OUTLOOK:") }?.removePrefix("SEVERITY_OUTLOOK:")?.trim() ?: "Player is making steady progress toward full clearance."
             val nextMan = lines.firstOrNull { it.startsWith("NEXT_MAN_UP:") }?.removePrefix("NEXT_MAN_UP:")?.trim() ?: "Roster depth will be tested as rotational minutes shift."
             val quote = lines.firstOrNull { it.startsWith("QUOTE:") }?.removePrefix("QUOTE:")?.trim() ?: "We trust our medical staff and look forward to getting back at 100%."
-            val analysis = InjuryAnalysis(headline, outlook, nextMan, if (draft.isAi) quote else "", draft.isAi)
+            val analysis = InjuryAnalysis(headline, outlook, nextMan, if (draft.isAi) quote else "", draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, analysis)
             analysis
         }
@@ -1612,7 +1644,7 @@ object Ollama {
                 ?: "I want to thank my teammates, coaches, and the fans for pushing me to be my best every night."
             val tribute = lines.firstOrNull { it.startsWith("MEDIA_TRIBUTE:") }?.removePrefix("MEDIA_TRIBUTE:")?.trim()
                 ?: "A legendary campaign marked by historic clutch execution and supreme leadership."
-            val award = AwardSpeech(title, speech, tribute, draft.isAi)
+            val award = AwardSpeech(title, speech, tribute, draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, award)
             award
         }
@@ -1648,7 +1680,7 @@ object Ollama {
                 ?: "Lock in for the final 20 minutes! Defense and rebounds decide the outcome."
             val adjustment = lines.firstOrNull { it.startsWith("TACTICAL_ADJUSTMENT:") }?.removePrefix("TACTICAL_ADJUSTMENT:")?.trim()
                 ?: "Push tempo off missed shots and close out aggressively on perimeter shooters."
-            val result = HalftimeSpeech(speech, adjustment, draft.isAi)
+            val result = HalftimeSpeech(speech, adjustment, draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, result)
             result
         }
@@ -1688,7 +1720,7 @@ object Ollama {
                 ?: "${topImprover.name} arrived at camp with revamped footwork and sharpened perimeter accuracy, showing an impressive +$delta progression."
             val outlook = lines.firstOrNull { it.startsWith("SEASON_OUTLOOK:") }?.removePrefix("SEASON_OUTLOOK:")?.trim()
                 ?: "${team.name} enters the new campaign with bolstered depth and palpable chemistry on both ends of the floor."
-            val report = TrainingCampReport(headline, standout, outlook, draft.isAi)
+            val report = TrainingCampReport(headline, standout, outlook, draft.isAi, draft.fallbackReason)
             if (config.cacheResponses) Cache.put(cacheKey, report)
             report
         }

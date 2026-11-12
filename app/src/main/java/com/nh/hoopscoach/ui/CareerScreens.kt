@@ -260,18 +260,18 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var showOpenAiKey by remember { mutableStateOf(false) }
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
     var showOpenAiLoginDialog by remember { mutableStateOf(false) }
-    var googleLoginEmail by remember { mutableStateOf("") }
-    var googleLoginPassword by remember { mutableStateOf("") }
-    var googleLoginKey by remember { mutableStateOf("") }
-    var showGooglePassword by remember { mutableStateOf(false) }
-    var rememberGoogleLogin by remember { mutableStateOf(true) }
-    var openAiLoginEmail by remember { mutableStateOf("") }
-    var openAiLoginPassword by remember { mutableStateOf("") }
-    var openAiLoginKey by remember { mutableStateOf("") }
-    var showOpenAiPassword by remember { mutableStateOf(false) }
-    var rememberOpenAiLogin by remember { mutableStateOf(true) }
-    var loggingIn by remember { mutableStateOf(false) }
-    var loginError by remember { mutableStateOf("") }
+
+
+
+
+
+
+
+
+
+
+
+
     var showAdvancedSettings by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
@@ -393,6 +393,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Section("AI Dynasty Intelligence")
+            AiDiagnosticsPanel(lg.ollama) { model -> vm.act { l ->
+                when (l.ollama.provider) { "google" -> l.ollama.googleModel = model; "openai" -> l.ollama.openAiModel = model; else -> l.ollama.model = model }
+                com.nh.hoopscoach.game.Ollama.Cache.clear()
+            } }
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -466,21 +470,21 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(lg.ollama.googleDisplayEmail, style = T.bodyB, color = P.ink)
                                                 Spacer(Modifier.width(6.dp))
-                                                Tag("SIGNED IN", P.good)
+                                                Tag("KEY SAVED", P.good)
                                             }
-                                            Text("Google Cloud Account · Active", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                            Text("Gemini API key configured", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                                         }
                                     }
                                     Spacer(Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        SecondaryButton("Switch Account", Modifier.weight(1f)) {
-                                            googleLoginEmail = lg.ollama.googleAccountEmail
-                                            googleLoginPassword = lg.ollama.googleAccountPassword
-                                            googleLoginKey = lg.ollama.googleApiKey
-                                            loginError = ""
+                                        SecondaryButton("Edit API key", Modifier.weight(1f)) {
+
+
+
+
                                             showGoogleLoginDialog = true
                                         }
-                                        SecondaryButton("Sign Out", Modifier.weight(1f)) {
+                                        SecondaryButton("Remove key", Modifier.weight(1f)) {
                                             vm.act {
                                                 it.ollama.googleSignedIn = false
                                                 it.ollama.googleApiKey = ""
@@ -488,12 +492,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                                 it.ollama.googleAccountPassword = ""
                                                 it.ollama.googleAccountName = ""
                                             }
-                                            vm.toast("Signed out of Google account")
+                                            vm.toast("Gemini key removed")
                                         }
                                     }
                                 }
                             } else {
-                                // Sign In with Google Prompt Card
+                                // Configure Gemini API Prompt Card
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -510,16 +514,16 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         }
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text("Google Account Sign-In", style = T.bodyB, color = P.ink)
-                                            Text("Sign into your Google account for Gemini AI recaps and quotes.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                            Text("Gemini API access", style = T.bodyB, color = P.ink)
+                                            Text("A Gemini API key is required for recaps and quotes.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                                         }
                                     }
                                     Spacer(Modifier.height(10.dp))
-                                    PrimaryButton("Sign In with Google", Modifier.fillMaxWidth()) {
-                                        googleLoginEmail = lg.ollama.googleAccountEmail
-                                        googleLoginPassword = lg.ollama.googleAccountPassword
-                                        googleLoginKey = lg.ollama.googleApiKey
-                                        loginError = ""
+                                    PrimaryButton("Configure Gemini API", Modifier.fillMaxWidth()) {
+
+
+
+
                                         showGoogleLoginDialog = true
                                     }
                                 }
@@ -662,21 +666,21 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(lg.ollama.openAiDisplayEmail, style = T.bodyB, color = P.ink)
                                                 Spacer(Modifier.width(6.dp))
-                                                Tag("SIGNED IN", P.good)
+                                                Tag("KEY SAVED", P.good)
                                             }
-                                            Text("ChatGPT Account · Active", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                            Text("OpenAI API key configured", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                                         }
                                     }
                                     Spacer(Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        SecondaryButton("Switch Account", Modifier.weight(1f)) {
-                                            openAiLoginEmail = lg.ollama.openAiAccountEmail
-                                            openAiLoginPassword = lg.ollama.openAiAccountPassword
-                                            openAiLoginKey = lg.ollama.openAiApiKey
-                                            loginError = ""
+                                        SecondaryButton("Edit API key", Modifier.weight(1f)) {
+
+
+
+
                                             showOpenAiLoginDialog = true
                                         }
-                                        SecondaryButton("Sign Out", Modifier.weight(1f)) {
+                                        SecondaryButton("Remove key", Modifier.weight(1f)) {
                                             vm.act {
                                                 it.ollama.openAiSignedIn = false
                                                 it.ollama.openAiApiKey = ""
@@ -684,12 +688,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                                 it.ollama.openAiAccountPassword = ""
                                                 it.ollama.openAiAccountName = ""
                                             }
-                                            vm.toast("Signed out of ChatGPT account")
+                                            vm.toast("OpenAI key removed")
                                         }
                                     }
                                 }
                             } else {
-                                // Sign In with ChatGPT Prompt Card
+                                // Configure OpenAI API Prompt Card
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -706,16 +710,16 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         }
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text("ChatGPT Account Sign-In", style = T.bodyB, color = P.ink)
-                                            Text("Sign into your OpenAI or ChatGPT account for GPT-4o intelligence.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                                            Text("OpenAI API access", style = T.bodyB, color = P.ink)
+                                            Text("Configure an OpenAI API key for AI reports.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                                         }
                                     }
                                     Spacer(Modifier.height(10.dp))
-                                    PrimaryButton("Sign In with ChatGPT", Modifier.fillMaxWidth()) {
-                                        openAiLoginEmail = lg.ollama.openAiAccountEmail
-                                        openAiLoginPassword = lg.ollama.openAiAccountPassword
-                                        openAiLoginKey = lg.ollama.openAiApiKey
-                                        loginError = ""
+                                    PrimaryButton("Configure OpenAI API", Modifier.fillMaxWidth()) {
+
+
+
+
                                         showOpenAiLoginDialog = true
                                     }
                                 }
@@ -1518,297 +1522,16 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         dismissButton = { TextButton({ confirmNewDynasty = false }) { Text("Cancel", color = P.sub) } }
     )
 
-    if (showGoogleLoginDialog) AlertDialog(
-        onDismissRequest = { if (!loggingIn) showGoogleLoginDialog = false },
-        containerColor = P.surface,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(28.dp).clip(CircleShape).background(P.good.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("G", style = T.bodyB.copy(fontSize = 15.sp), color = P.good)
-                }
-                Spacer(Modifier.width(10.dp))
-                Text("Sign in with Google", style = T.head, color = P.ink)
-            }
-        },
-        text = {
-            Column {
-                Text("Sign into your Google Account to unlock Gemini AI dynasty recaps, press conferences, and scouting analysis.", style = T.small, color = P.sub)
-                Spacer(Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(P.surface2)
-                        .border(1.dp, P.good.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                        .clickable {
-                            runCatching { uriHandler.openUri("https://accounts.google.com") }.onFailure {
-                                clipboard.setText(AnnotatedString("https://accounts.google.com"))
-                                vm.toast("Google login link copied!")
-                            }
-                        }
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🌐", fontSize = 16.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Google Account Web Portal", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                        Text("Tap to open accounts.google.com in your mobile browser.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
-                    }
-                    Text("OPEN ↗", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Text("Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = googleLoginEmail,
-                    onValueChange = { googleLoginEmail = it.trim(); loginError = "" },
-                    label = { Text("Google Email or Phone") },
-                    placeholder = { Text("coach@gmail.com", color = P.faint) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = googleLoginPassword,
-                    onValueChange = { googleLoginPassword = it; loginError = "" },
-                    label = { Text("Password") },
-                    placeholder = { Text("••••••••••••", color = P.faint) },
-                    visualTransformation = if (showGooglePassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        Text(
-                            if (showGooglePassword) "HIDE" else "SHOW",
-                            style = T.label.copy(fontSize = 10.sp),
-                            color = P.accent,
-                            modifier = Modifier.clickable { showGooglePassword = !showGooglePassword }.padding(8.dp)
-                        )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { rememberGoogleLogin = !rememberGoogleLogin }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (rememberGoogleLogin) P.good else P.surface2)
-                            .border(1.dp, if (rememberGoogleLogin) P.good else P.faint, RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (rememberGoogleLogin) {
-                            Text("✓", color = Color.White, fontSize = 12.sp)
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text("Keep me signed in on this device", style = T.small.copy(fontSize = 11.sp), color = P.ink)
-                }
-
-                if (loginError.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(loginError, style = T.small.copy(fontSize = 11.sp), color = P.bad)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !loggingIn && googleLoginEmail.isNotBlank(),
-                onClick = {
-                    loggingIn = true
-                    loginError = ""
-                    val email = googleLoginEmail.trim().let { if (it.contains("@")) it else "$it@gmail.com" }
-                    scope.launch {
-                        val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(googleLoginKey, email)
-                        loggingIn = false
-                        res.onSuccess {
-                            vm.act {
-                                it.ollama.googleAccountEmail = email
-                                it.ollama.googleAccountPassword = if (rememberGoogleLogin) googleLoginPassword else ""
-                                it.ollama.googleAccountName = email.substringBefore("@")
-                                it.ollama.googleSignedIn = true
-                                it.ollama.provider = "google"
-                                it.ollama.enabled = true
-                                it.ollama.autoGenerate = true
-                            }
-                            showGoogleLoginDialog = false
-                            vm.toast("Signed in with Google ($email)!")
-                        }.onFailure { err ->
-                            loginError = err.message ?: "Authentication failed. Please verify credentials."
-                        }
-                    }
-                }
-            ) {
-                Text(if (loggingIn) "Signing in..." else "Sign In", color = P.good)
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !loggingIn, onClick = { showGoogleLoginDialog = false }) {
-                Text("Cancel", color = P.sub)
-            }
-        }
-    )
-
-    if (showOpenAiLoginDialog) AlertDialog(
-        onDismissRequest = { if (!loggingIn) showOpenAiLoginDialog = false },
-        containerColor = P.surface,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(28.dp).clip(CircleShape).background(P.accentSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("⚡", style = T.bodyB.copy(fontSize = 14.sp), color = P.accent)
-                }
-                Spacer(Modifier.width(10.dp))
-                Text("Sign in with ChatGPT", style = T.head, color = P.ink)
-            }
-        },
-        text = {
-            Column {
-                Text("Sign into your OpenAI or ChatGPT account to enable GPT-4o intelligence for your dynasty.", style = T.small, color = P.sub)
-                Spacer(Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(P.surface2)
-                        .border(1.dp, P.accent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                        .clickable {
-                            runCatching { uriHandler.openUri("https://chatgpt.com") }.onFailure {
-                                clipboard.setText(AnnotatedString("https://chatgpt.com"))
-                                vm.toast("ChatGPT login link copied!")
-                            }
-                        }
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("⚡", fontSize = 16.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("ChatGPT Web Portal", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                        Text("Tap to open chatgpt.com in your mobile browser.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
-                    }
-                    Text("OPEN ↗", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Text("Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = openAiLoginEmail,
-                    onValueChange = { openAiLoginEmail = it.trim(); loginError = "" },
-                    label = { Text("OpenAI / ChatGPT Email") },
-                    placeholder = { Text("coach@openai.com", color = P.faint) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = openAiLoginPassword,
-                    onValueChange = { openAiLoginPassword = it; loginError = "" },
-                    label = { Text("Password") },
-                    placeholder = { Text("••••••••••••", color = P.faint) },
-                    visualTransformation = if (showOpenAiPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        Text(
-                            if (showOpenAiPassword) "HIDE" else "SHOW",
-                            style = T.label.copy(fontSize = 10.sp),
-                            color = P.accent,
-                            modifier = Modifier.clickable { showOpenAiPassword = !showOpenAiPassword }.padding(8.dp)
-                        )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { rememberOpenAiLogin = !rememberOpenAiLogin }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (rememberOpenAiLogin) P.accent else P.surface2)
-                            .border(1.dp, if (rememberOpenAiLogin) P.accent else P.faint, RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (rememberOpenAiLogin) {
-                            Text("✓", color = Color.White, fontSize = 12.sp)
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text("Keep me signed in on this device", style = T.small.copy(fontSize = 11.sp), color = P.ink)
-                }
-
-                if (loginError.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(loginError, style = T.small.copy(fontSize = 11.sp), color = P.bad)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !loggingIn && openAiLoginEmail.isNotBlank(),
-                onClick = {
-                    loggingIn = true
-                    loginError = ""
-                    val email = openAiLoginEmail.trim().let { if (it.contains("@")) it else "$it@chatgpt.com" }
-                    scope.launch {
-                        val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(openAiLoginKey, lg.ollama.customEndpoint, email)
-                        loggingIn = false
-                        res.onSuccess {
-                            vm.act {
-                                it.ollama.openAiAccountEmail = email
-                                it.ollama.openAiAccountPassword = if (rememberOpenAiLogin) openAiLoginPassword else ""
-                                it.ollama.openAiAccountName = email.substringBefore("@")
-                                it.ollama.openAiSignedIn = true
-                                it.ollama.provider = "openai"
-                                it.ollama.enabled = true
-                                it.ollama.autoGenerate = true
-                            }
-                            showOpenAiLoginDialog = false
-                            vm.toast("Signed in to ChatGPT ($email)!")
-                        }.onFailure { err ->
-                            loginError = err.message ?: "Authentication failed. Please verify credentials."
-                        }
-                    }
-                }
-            ) {
-                Text(if (loggingIn) "Signing in..." else "Sign In", color = P.accent)
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !loggingIn, onClick = { showOpenAiLoginDialog = false }) {
-                Text("Cancel", color = P.sub)
-            }
-        }
-    )
+    if (showGoogleLoginDialog) ApiKeyDialog("Google Gemini", lg.ollama.googleApiKey, { key ->
+        vm.act { it.ollama.googleApiKey = key; it.ollama.googleAccountPassword = ""; it.ollama.googleSignedIn = false; it.ollama.provider = "google"; it.ollama.enabled = true }
+        showGoogleLoginDialog = false
+        vm.toast("API key saved. Use Test AI to check access.")
+    }, { showGoogleLoginDialog = false })
+    if (showOpenAiLoginDialog) ApiKeyDialog("OpenAI", lg.ollama.openAiApiKey, { key ->
+        vm.act { it.ollama.openAiApiKey = key; it.ollama.openAiAccountPassword = ""; it.ollama.openAiSignedIn = false; it.ollama.provider = "openai"; it.ollama.enabled = true }
+        showOpenAiLoginDialog = false
+        vm.toast("API key saved. Use Test AI to check access.")
+    }, { showOpenAiLoginDialog = false })
 }
 
 @Composable

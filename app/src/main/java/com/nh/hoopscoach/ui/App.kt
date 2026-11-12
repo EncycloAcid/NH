@@ -75,6 +75,18 @@ object NavIcons {
 
 @Composable
 fun App(vm: GameViewModel) {
+    androidx.compose.runtime.SideEffect {
+        com.nh.hoopscoach.CrashReporter.lastScreen = when {
+            vm.loadError != null -> "Save recovery"
+            vm.loading -> "Loading career"
+            vm.league == null -> "New career"
+            else -> "${vm.tab.name}/${vm.stack.lastOrNull() ?: "Home"}"
+        }
+    }
+    if (vm.loadError != null) {
+        HoopsTheme { SaveRecoveryScreen(vm) }
+        return
+    }
     SpriteSheets.install(LocalContext.current.assets)
     val lg = vm.league
     val user = lg?.user
