@@ -337,6 +337,12 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     val serif = androidx.compose.ui.text.font.FontFamily.Serif
     val outlet = n.source.substringAfter(" · ", n.source).ifEmpty { "The Daily" }
     val byline = n.source.substringBefore(" · ", "").takeIf { it.isNotEmpty() && n.source.contains(" · ") }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showAngleDialog by remember { mutableStateOf(false) }
+    var editHeadline by remember { mutableStateOf(n.text) }
+    var editBody by remember { mutableStateOf(n.body) }
+    var selectedAngle by remember { mutableStateOf(n.angle.ifEmpty { lg.ollama.defaultStoryAngle }) }
+
     Column(Modifier.fillMaxSize()) {
         BackBar(outlet, "${n.season} season · day ${n.day}", onBack = { vm.back() })
         LazyColumn(Modifier.weight(1f)) {
@@ -350,7 +356,12 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
                     if (n.isAiGenerated) {
                         Spacer(Modifier.height(4.dp))
-                        Tag("✨ LABELED BY AI · ${n.source.substringAfter(" · ", lg.ollama.providerDisplayName).uppercase()}", P.accent)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Tag("✨ LABELED BY AI · ${n.source.substringAfter(" · ", lg.ollama.providerDisplayName).uppercase()}", P.accent)
+                            if (n.approved) Tag("✓ APPROVED", P.good)
+                            else Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
+                            if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
+                        }
                     }
                     Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
                         color = ink, modifier = Modifier.padding(top = 6.dp))
@@ -383,43 +394,76 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         Spacer(Modifier.height(10.dp))
                         val provider = lg.ollama.providerDisplayName
                         val action = lg.ollama.shortActionName
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("$provider AI STORY", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp), color = if (P.dark) Color(0xFFE5A823) else Color(0xFFB45309))
-                                    Tag("✨ LABELED BY AI", P.good)
+
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (n.approved) P.surface2.copy(alpha = 0.8f) else (if (P.dark) Color(0xFF2E2616) else Color(0xFFFEF3C7)))
+                                .padding(12.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            if (n.approved) "✓ APPROVED & PUBLISHED" else "EDITOR'S DESK · DRAFT PENDING REVIEW",
+                                            style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp),
+                                            color = if (n.approved) P.good else (if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309)),
+                                        )
+                                        if (n.isAiGenerated) Tag("✨ AI LABELED", P.accent)
+                                        if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
+                                    }
+                                    Text(
+                                        if (generating) "Writing story with $action AI ($selectedAngle)..."
+                                        else if (n.approved) "Approved by editor. Published to front page."
+                                        else "Review, edit quotes, or re-roll the reporter's angle before publishing.",
+                                        style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 12.sp),
+                                        color = faded,
+                                    )
                                 }
-                                Text(
-                                    if (generating) "Writing story with $action AI..."
-                                    else if (n.isAiGenerated) "Generated by $provider (${lg.ollama.activeModelName})"
-                                    else "Have $action AI control and rewrite this article.",
-                                    style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 12.sp), color = faded,
-                                )
                             }
-                            Spacer(Modifier.width(8.dp))
-                            SmallButton(
-                                if (generating) "Writing..." else if (n.isAiGenerated) "Regenerate" else "Rewrite with $action AI",
-                                enabled = !generating,
-                                primary = true,
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                generating = true
-                                ollamaError = null
-                                scope.launch {
-                                    val res = Ollama.generateArticle(lg.ollama, lg, n)
-                                    generating = false
-                                    res.onSuccess { text ->
+                                if (!n.approved) {
+                                    SmallButton(
+                                        "✓ Approve & Publish",
+                                        primary = true,
+                                        enabled = !generating,
+                                    ) {
                                         vm.act {
                                             val target = it.news.getOrNull(index) ?: return@act
-                                            target.body = text
-                                            target.aiLabeled = true
-                                            if (!target.source.contains("AI") && !target.source.contains("Ollama")) {
-                                                target.source = "${target.source} · $provider".trim(' ', '·')
-                                            }
+                                            target.approved = true
                                         }
-                                    }.onFailure { err ->
-                                        ollamaError = err.message ?: "Failed"
-                                        vm.toast("AI: ${err.message ?: "Connection failed"}")
+                                        vm.toast("Story approved and published to front page! 📰")
                                     }
+                                } else {
+                                    SmallButton(
+                                        "Mark as Draft",
+                                        enabled = !generating,
+                                    ) {
+                                        vm.act {
+                                            val target = it.news.getOrNull(index) ?: return@act
+                                            target.approved = false
+                                        }
+                                        vm.toast("Story moved back to editor's drafts.")
+                                    }
+                                }
+                                SmallButton(
+                                    "✏️ Edit",
+                                    enabled = !generating,
+                                ) {
+                                    editHeadline = n.text
+                                    editBody = n.body
+                                    showEditDialog = true
+                                }
+                                SmallButton(
+                                    "🎲 Re-roll Angle",
+                                    enabled = !generating,
+                                ) {
+                                    showAngleDialog = true
                                 }
                             }
                         }
@@ -445,6 +489,117 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
             }
         }
     }
+
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            containerColor = P.surface,
+            title = { Text("Edit Story & Quotes", style = T.head, color = P.ink) },
+            text = {
+                Column {
+                    Text("HEADLINE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = editHeadline,
+                        onValueChange = { editHeadline = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("ARTICLE BODY", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = editBody,
+                        onValueChange = { editBody = it },
+                        modifier = Modifier.fillMaxWidth().height(180.dp),
+                        colors = fieldColors(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showEditDialog = false
+                    vm.act {
+                        val target = it.news.getOrNull(index) ?: return@act
+                        target.text = editHeadline.trim()
+                        target.body = editBody.trim()
+                    }
+                    vm.toast("Story edits saved.")
+                }) { Text("Save Edits", color = P.accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = P.sub) }
+            },
+        )
+    }
+
+    if (showAngleDialog) {
+        val angles = listOf(
+            "balanced" to ("Balanced News Desk" to "Comprehensive game recap with player quotes, key moments, and standings."),
+            "tactical" to ("📊 Tactical Film Room" to "Deep dive into shooting splits, pick-and-roll defense, and pace efficiency."),
+            "beat" to ("🎙️ Local Beat Columnist" to "Raw emotion, hometown passion, crowd noise, and locker room camaraderie."),
+            "skeptic" to ("🥊 National Skeptic" to "Critical eye questioning sustainability, turnovers, and ceiling against elite teams."),
+            "dual" to ("⚖️ Dual Locker Room" to "Balanced postgame quotes from BOTH the winning and losing coaches and stars."),
+        )
+        AlertDialog(
+            onDismissRequest = { showAngleDialog = false },
+            containerColor = P.surface,
+            title = { Text("Choose Reporter Angle", style = T.head, color = P.ink) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Select a reporting perspective to re-write this story:", style = T.small, color = P.sub)
+                    Spacer(Modifier.height(4.dp))
+                    angles.forEach { (id, info) ->
+                        val (label, desc) = info
+                        val selected = selectedAngle == id
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (selected) P.accent.copy(alpha = 0.15f) else P.surface2)
+                                .clickable { selectedAngle = id }
+                                .padding(10.dp)
+                        ) {
+                            Text(label, style = T.bodyB, color = if (selected) P.accent else P.ink)
+                            Text(desc, style = T.small, color = P.sub)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAngleDialog = false
+                        generating = true
+                        ollamaError = null
+                        scope.launch {
+                            val res = Ollama.generateArticle(lg.ollama, lg, n, angle = selectedAngle)
+                            generating = false
+                            res.onSuccess { text ->
+                                vm.act {
+                                    val target = it.news.getOrNull(index) ?: return@act
+                                    target.body = text
+                                    target.angle = selectedAngle
+                                    target.aiLabeled = true
+                                    target.approved = false
+                                    if (!target.source.contains("AI") && !target.source.contains("Ollama")) {
+                                        target.source = "${target.source} · ${lg.ollama.providerDisplayName}".trim(' ', '·')
+                                    }
+                                }
+                                vm.toast("Story re-written with $selectedAngle perspective!")
+                            }.onFailure { err ->
+                                ollamaError = err.message ?: "Failed"
+                                vm.toast("AI: ${err.message ?: "Connection failed"}")
+                            }
+                        }
+                    },
+                    enabled = !generating,
+                ) { Text("Re-roll Story", color = P.accent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAngleDialog = false }) { Text("Cancel", color = P.sub) }
+            },
+        )
+    }
 }
 
 /** A headline as shown: "No. 1" never breaks across lines. */
@@ -457,7 +612,11 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(if (n.mine) P.accent else P.line))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            NewsTag(n)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                NewsTag(n)
+                if (n.needsApproval) Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
+                else if (n.approved) Tag("APPROVED", P.good)
+            }
             Text(headline(n.text), style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
             // One line under the headline: the byline (shortened if it must), then the reactions and "Read", never wrapped.
             val said = if (n.reactions.isEmpty()) null else "${n.reactions.size}\u00A0${if (n.reactions.size == 1) "reaction" else "reactions"}"
@@ -526,6 +685,7 @@ private fun newsFilter(lg: League, n: News, f: Int): Boolean = when (f) {
     2 -> n.kind in setOf("game", "recap", "article", "series", "upset", "buzzer", "moment", "rivalry") || n.rivalry
     3 -> n.kind == "trade" || n.kind == "move" || n.text.startsWith("Free agency") || n.text.startsWith("Front office") || n.text.startsWith("Coaching change") || n.text.contains(" signs ")
     4 -> n.kind == "column" || n.kind == "quote"
+    5 -> n.needsApproval
     else -> true
 }
 
@@ -539,6 +699,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
     val scope = rememberCoroutineScope()
     val all = lg.news.filter { it.season >= lg.season - 1 }.reversed()
     val shown = all.filter { newsFilter(lg, it, filter) }
+    val draftsCount = all.count { it.needsApproval }
     // The top story: the newest real article, the user's first.
     val top = shown.take(25).filter { it.body.isNotEmpty() }.maxByOrNull { (if (it.mine) 2 else 0) + (if (it.kind in setOf("trade", "series", "game")) 1 else 0) + it.day / 1000.0 + it.season }
     Column(Modifier.fillMaxSize()) {
@@ -550,14 +711,19 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
         LazyColumn(Modifier.weight(1f)) {
             item {
                 Spacer(Modifier.height(6.dp))
-                Segmented(listOf("All", "Your team", "Games", "Moves", "Columns"), filter, { filter = it }, scroll = true)
+                Segmented(
+                    listOf("All", "Your team", "Games", "Moves", "Columns", if (draftsCount > 0) "Drafts ($draftsCount)" else "Drafts"),
+                    filter,
+                    { filter = it },
+                    scroll = true,
+                )
             }
             if (top != null) item {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
             }
             if (filter == 0) item { LeagueInjuries(vm, lg) }
-            if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text("No stories here yet.", style = T.body, color = P.sub) } }
+            if (shown.isEmpty()) item { Spacer(Modifier.height(10.dp)); Panel { Text(if (filter == 5) "No pending drafts in the editor's desk. All stories approved!" else "No stories here yet.", style = T.body, color = P.sub) } }
             val byDay = shown.filter { it !== top }.take(120).groupBy { it.season * 1000 + it.day }
             byDay.forEach { (key, list) ->
                 item {
@@ -576,6 +742,8 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             "Rivalry tension & bad blood",
             "Breakout star feature",
             "Conference title race breakdown",
+            "Championship coronation & parade",
+            "Free agency & star trade demands",
         )
         AlertDialog(
             onDismissRequest = { if (!writingStory) showOllamaDialog = false },

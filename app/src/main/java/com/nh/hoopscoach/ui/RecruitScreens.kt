@@ -19,10 +19,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.nh.hoopscoach.game.Ollama
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -236,6 +242,10 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
     val cycle = Recruiting.inCycle(lg)
     val ctx = remember(vm.rev, lg) { Recruiting.Ctx(lg) }
     val proj = if (cycle && !committed) Recruiting.project(lg, r, ctx) else r.interest
+    var pitchLetter by remember { mutableStateOf<String?>(null) }
+    var draftingPitch by remember { mutableStateOf(false) }
+    var pitchSent by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar(p.name, if (r.transfer) "Transfer · ${p.pos} · ${p.cls}" else "${p.stars}-star ${p.pos} · No. ${p.recruitRank} nationally · No. ${p.posRank} ${p.pos}", onBack = { vm.back() })
@@ -277,6 +287,84 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                     Column {
                         Text(r.pref.label, style = T.bodyB, color = P.ink)
                         Text(r.pref.blurb, style = T.small, color = P.sub)
+                    }
+                }
+
+                if (lg.ollama.enabled && lg.ollama.recruitingPitches && !lg.pro) {
+                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(P.line))
+                    Spacer(Modifier.height(10.dp))
+
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (P.dark) Color(0xFF1E262A) else Color(0xFFF0FDF4))
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("✉️ COACH'S RECRUITING PITCH", style = T.label.copy(fontSize = 11.sp), color = P.good)
+                                    Tag("✨ AI PITCH", P.accent)
+                                }
+                                Text("Personalized pitch letter targeting ${r.pref.label}.", style = T.small, color = P.sub)
+                            }
+                            if (pitchLetter == null) {
+                                SmallButton(if (draftingPitch) "Drafting..." else "Draft Letter ✍️", primary = true, enabled = !draftingPitch) {
+                                    draftingPitch = true
+                                    scope.launch {
+                                        val res = Ollama.generateRecruitPitchLetter(lg.ollama, lg, r)
+                                        draftingPitch = false
+                                        res.onSuccess { text ->
+                                            pitchLetter = text
+                                        }.onFailure { err ->
+                                            vm.toast("AI: ${err.message ?: "Failed"}")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (pitchLetter != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Column(
+                                Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (P.dark) Color(0xFF181F22) else Color(0xFFFFFFFF))
+                                    .padding(12.dp)
+                            ) {
+                                for (pPara in pitchLetter!!.split("\n\n")) {
+                                    Text(pPara.trim(), style = T.body, color = P.ink)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (!pitchSent && !committed) {
+                                    SmallButton("Send to ${p.name} (+Interest)", primary = true) {
+                                        vm.act {
+                                            val cur = r.interest[u.id] ?: 0
+                                            r.interest[u.id] = (cur + 5).coerceAtMost(100)
+                                        }
+                                        pitchSent = true
+                                        vm.toast("Pitch letter sent to ${p.name}! +5 Interest gained.")
+                                    }
+                                } else if (pitchSent) {
+                                    Tag("✓ LETTER SENT (+5 INTEREST)", P.good)
+                                }
+                                SmallButton(if (draftingPitch) "Re-drafting..." else "Re-draft", enabled = !draftingPitch) {
+                                    draftingPitch = true
+                                    scope.launch {
+                                        val res = Ollama.generateRecruitPitchLetter(lg.ollama, lg, r)
+                                        draftingPitch = false
+                                        res.onSuccess { text ->
+                                            pitchLetter = text
+                                        }.onFailure { err ->
+                                            vm.toast("AI: ${err.message ?: "Failed"}")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

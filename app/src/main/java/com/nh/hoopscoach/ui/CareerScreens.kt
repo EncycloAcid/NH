@@ -1323,6 +1323,48 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         }
                         androidx.compose.material3.Switch(lg.ollama.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } })
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Championship celebrations & Finals MVP", style = T.bodyB, color = P.ink)
+                            Text("AI writes champagne celebrations, trophy ceremonies, and Finals MVP speeches.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.championshipCelebrations, { on -> vm.act { it.ollama.championshipCelebrations = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (!lg.pro) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("College recruiting pitch letters", style = T.bodyB, color = P.ink)
+                                Text("AI drafts custom coach pitch letters targeting recruits' specific priorities.", style = T.small, color = P.sub)
+                            }
+                            androidx.compose.material3.Switch(lg.ollama.recruitingPitches, { on -> vm.act { it.ollama.recruitingPitches = on } })
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Pregame rivalry previews & bad blood", style = T.bodyB, color = P.ink)
+                            Text("AI writes high-stakes pregame buildup and bulletin-board quotes.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.pregameRivalries, { on -> vm.act { it.ollama.pregameRivalries = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Free agency rumors & contract demands", style = T.bodyB, color = P.ink)
+                            Text("AI writes insider scoops on expiring contracts and max contract pursuits.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.freeAgencyBuzz, { on -> vm.act { it.ollama.freeAgencyBuzz = on } })
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("DEFAULT BEAT WRITER ANGLE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Spacer(Modifier.height(4.dp))
+                    val angleOptions = listOf("balanced" to "Balanced", "tactical" to "Tactical", "beat" to "Beat", "skeptic" to "Skeptic", "dual" to "Dual")
+                    val curAngleIdx = angleOptions.indexOfFirst { it.first == lg.ollama.defaultStoryAngle }.coerceAtLeast(0)
+                    Segmented(angleOptions.map { it.second }, curAngleIdx, { idx ->
+                        vm.act { it.ollama.defaultStoryAngle = angleOptions[idx].first }
+                    }, scroll = true)
                 }
             }
             lg.road?.let { rd ->

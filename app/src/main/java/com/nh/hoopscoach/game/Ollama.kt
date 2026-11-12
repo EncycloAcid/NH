@@ -450,6 +450,81 @@ object Ollama {
                     append("SEASON_OUTLOOK: The coaching staff enters the upcoming season with upgraded depth, versatile lineup configurations, and renewed defensive energy.")
                 }
 
+                // Championship Celebration & Finals MVP Coronation
+                prompt.contains("CHAMPIONSHIP_CELEBRATION:") || (prompt.contains("Finals Outcome:") && prompt.contains("Champion:")) -> {
+                    val champ = prompt.lines().firstOrNull { it.startsWith("Champion:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Champions" }
+                    val runnerUp = prompt.lines().firstOrNull { it.startsWith("Runner-Up:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "the runner-up" }
+                    val finalsOutcome = prompt.lines().firstOrNull { it.startsWith("Finals Outcome:", true) }?.substringAfter(":")?.trim().orEmpty()
+                    val headCoach = prompt.lines().firstOrNull { it.startsWith("Head Coach:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { userHandle }
+                    val mvpLine = prompt.lines().firstOrNull { it.startsWith("Finals MVP / MOP:", true) }?.substringAfter(":")?.trim().orEmpty()
+                    val mvpName = if (mvpLine.contains("(")) mvpLine.substringBefore("(").trim() else mvpLine.ifEmpty { "The star MVP" }
+
+                    appendLine("HEADLINE: Champions! $champ Reaches the Mountaintop in Historic Coronation")
+                    appendLine("OUTLET: Championship Chronicle · $provider")
+                    appendLine("BODY:")
+                    appendLine("Confetti rained from the rafters as the final horn sounded, setting off a wild celebration as $champ defeated $runnerUp${if (finalsOutcome.isNotEmpty()) " ($finalsOutcome)" else ""} to claim the ultimate crown in basketball. Teammates embraced in tears and elation at midcourt before hoisting the championship trophy aloft to deafening roars from the traveling faithful. Inside the champagne-soaked locker room, players donned commemorative championship caps and ski goggles, taking turns dancing with the trophy.")
+                    appendLine()
+                    appendLine("\"We talked about this exact moment from the opening day of training camp,\" said an emotional Coach $headCoach amid the celebrations. \"Every tough film session, every late-night drill, and every sacrifice was for this. This team possessed championship DNA, trusted each other through every bout of adversity, and earned their place in basketball lore forever.\"")
+                    appendLine()
+                    append("Finals MVP $mvpName capped a historic postseason run with an MVP masterpiece, delivering clutch buckets, anchoring the defense, and steadying the squad whenever the game hung in the balance. \"This belongs to our entire city, our fans, and my brothers in this locker room,\" beamed $mvpName, clutching the MVP award. A massive championship victory parade through downtown is set for later this week.")
+                }
+
+                // College Recruiting Pitch Letter
+                prompt.contains("RECRUIT_PITCH:") || prompt.contains("Official College Basketball Recruiting Pitch Letter") -> {
+                    val recruit = prompt.lines().firstOrNull { it.startsWith("Recruit:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Prospect" }
+                    val priority = prompt.lines().firstOrNull { it.startsWith("Recruit Priority:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Player development" }
+                    val school = prompt.lines().firstOrNull { it.startsWith("School:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Our University" }
+                    val coachName = prompt.lines().firstOrNull { it.startsWith("Head Coach:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { userHandle }
+
+                    val priorityMessage = when {
+                        priority.contains("MINUTES", true) || priority.contains("Early playing time", true) ->
+                            "We are not bringing you in to sit and wait; we are building our backcourt/frontcourt around your playmaking from Day 1. You will have the green light to lead our offense, play through mistakes, and showcase your complete skillset on national television against top-25 competition."
+                        priority.contains("WINNING", true) || priority.contains("Winning now", true) ->
+                            "Our program is built to win championships right now. With our returning core, elite culture, and deep tournament pedigree, you are the missing piece that takes us from a contender to cutting down the nets on Monday night in April."
+                        priority.contains("NIL", true) || priority.contains("money", true) ->
+                            "Through our premier alumni collective and corporate partnerships, our student-athletes maximize their brand value in a top-tier media market. Our comprehensive NIL infrastructure ensures you and your family are fully supported as you build generational wealth."
+                        priority.contains("PROS", true) || priority.contains("pros", true) ->
+                            "Our player development system is an established NBA pipeline. NBA general managers and scouts are in our gym every single week. We will teach you modern pro pick-and-roll reads, defensive schemes, and pro habits that guarantee you hear your name called in the first round of the draft."
+                        priority.contains("HOME", true) || priority.contains("home", true) ->
+                            "There is nothing more special in sports than putting on the jersey for your home state and playing in front of your family and hometown fans every single night. Your legacy here will be immortalized forever."
+                        else ->
+                            "Our program combines iconic basketball prestige, world-class athletic facilities, and an unshakeable family culture that empowers you to reach your maximum potential both on the court and beyond."
+                    }
+
+                    appendLine("Dear $recruit,")
+                    appendLine()
+                    appendLine("On behalf of the entire coaching staff and basketball family at $school, I want to personally congratulate you on an exceptional high school career. We have tracked your growth closely, and we firmly believe you possess the competitive motor, high basketball IQ, and elite skill required to be a generational cornerstone for our program.")
+                    appendLine()
+                    appendLine(priorityMessage)
+                    appendLine()
+                    appendLine("We don't just recruit talent; we invest in people. When you commit to $school, you join a brotherhood that will stand by your side for life. We would love to host you and your family on campus for an official visit so you can feel the energy of our program firsthand.")
+                    appendLine()
+                    append("Warmly,\nCoach $coachName\n$school Basketball")
+                }
+
+                // Pregame Rivalry Preview & Hype
+                prompt.contains("PREGAME_RIVALRY:") || prompt.contains("High-Stakes Rivalry Showdown Preview") -> {
+                    val home = prompt.lines().firstOrNull { it.startsWith("Home Team:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "The Home Team" }
+                    val away = prompt.lines().firstOrNull { it.startsWith("Away Team:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "The Visitors" }
+                    val rivalry = prompt.lines().firstOrNull { it.startsWith("Rivalry:", true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Rivalry Showdown" }
+
+                    appendLine("HEADLINE: Bad Blood Reignited: $home and $away Collide in Fierce $rivalry")
+                    appendLine("OUTLET: The Rivalry Beat · $provider")
+                    appendLine("BODY:")
+                    appendLine("Throw out the season records and historical averages. When $home and $away take the hardwood tonight, decades of fierce bad blood, campus bragging rights, and intense conference stakes will dictate every single possession. The tension in both locker rooms has reached a boiling point after a week of traded subtle jabs in the media.")
+                    appendLine()
+                    appendLine("The clash will be decided in the trenches. With physical half-court defense and relentless perimeter ball-pressure expected from the opening tip, whichever backcourt can maintain composure through opponent scoring runs will hold the upper hand. The crowd inside the sold-out arena is expected to generate a deafening atmosphere.")
+                    appendLine()
+                    append("\"There is no love lost between these two jerseys,\" remarked the coaching staff heading into shootaround. \"You don't need a fiery pregame speech for this matchup. If you don't match their physicality and win the 50-50 loose balls, you won't survive. We expect an absolute 40-minute dogfight.\"")
+                }
+
+                // Free Agency Buzz & Trade Demands
+                prompt.contains("FREE_AGENCY_BUZZ:") || prompt.contains("Star Free Agency & Trade Demand Intel") -> {
+                    appendLine("SCOOP 1: All-Star Contract Negotiations Stall | League sources confirm an elite All-Star playmaker has paused contract extension discussions, signaling a strong desire to test unrestricted free agency and explore maximum offer sheets this summer.")
+                    appendLine("SCOOP 2: Contenders Mobilizing Aggressive Cap Relief | Multiple championship contenders have begun exploratory trade calls to dump expiring salary, positioning themselves to make a run at marquee free agents when the market opens.")
+                    append("SCOOP 3: Disgruntled Forward Seeking Fresh Start | Insiders report rising tension behind closed doors regarding offensive touches, with rival front offices closely monitoring the situation for a potential formal trade demand ahead of the deadline.")
+                }
+
                 // Custom breaking story or feature article
                 prompt.contains("HEADLINE:") && prompt.contains("OUTLET:") && prompt.contains("BODY:") -> {
                     val topic = prompt.lines().firstOrNull { it.startsWith("Topic:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty().ifEmpty { "Season Outlook" }
@@ -567,13 +642,22 @@ object Ollama {
 
                     val isTripleDouble = headline.contains("triple-double", ignoreCase = true) || notes.contains("triple-double", ignoreCase = true)
 
+                    val angle = prompt.lines().firstOrNull { it.startsWith("Angle:", ignoreCase = true) }?.substringAfter(":")?.trim().orEmpty().lowercase()
+                    val angleAnalysis = when (angle) {
+                        "tactical" -> "\n\nFrom a tactical film room perspective, $derivedTeam seized control by dominating the pick-and-roll coverage, generating high-quality corner threes, and forcing $derivedOpp into contested midrange pull-ups. The defensive rating in crunch time anchored the win."
+                        "beat" -> "\n\nInside the building, the roar of the crowd shook the floorboards as the home faithful celebrated every defensive stand. In a joyful postgame locker room, players soaked in the moment, proving that chemistry and grit continue to define this group's identity."
+                        "skeptic" -> "\n\nDespite the victory, national analysts caution that this style of play faces steep regression tests ahead, questioning whether the recent stretch is truly sustainable. Lingering half-court turnover concerns, defensive flaws, and reliance on contested jump-shooting leave little room for error against elite playoff competition."
+                        "dual" -> "\n\nDual Locker Room Perspectives:\nWinning Side: \"We stayed disciplined and executed down the wire,\" noted $derivedTeam's bench.\nLosing Side: On the other side, $derivedOpp took accountability: \"We blew simple rotations and gave up transition run-outs. In this league, you can't spot a good team easy points and expect to win.\""
+                        else -> ""
+                    }
+
                     when {
                         // Assist clinic (e.g. Larkin 18 assists, Carter-Williams 24 assists)
                         assists != null || headline.contains("assists", ignoreCase = true) -> {
                             val countStr = assists?.let { "$it assists" } ?: "a flurry of assists"
                             appendLine("It was a masterclass in floor vision and offensive orchestration as $playerName delivered a dazzling performance, dishing out $countStr to propel $derivedTeam past $derivedOpp${if (score.isNotEmpty()) " by a final score of $score" else ""}. From the opening tip, $playerLast dictated the tempo of the contest, picking apart defensive traps and finding cutters with laser-guided bounce passes and pinpoint cross-court skips.")
                             appendLine()
-                            appendLine("\"When our ball movement is flowing like that, the entire floor opens up,\" said $playerLast after the game. \"My teammates did a tremendous job knocking down shots and making hard cuts to the rim. It's easy to create when everyone trusts the offense and stays unselfish.\"")
+                            appendLine("\"When our ball movement is flowing like that, the entire floor opens up,\" said $playerLast after the game. \"My teammates did a tremendous job knocking down shots and making hard cuts to the rim. It's easy to create when everyone trusts the offense and stays unselfish.\"$angleAnalysis")
                             appendLine()
                             append("${if (teamRecord.isNotEmpty()) "Now standing at $teamRecord, " else ""}$derivedTeam demonstrated the poise and tactical discipline required to contend at the highest level. If $playerLast continues to direct traffic with this level of precision, opposing scouting reports will have their hands full trying to contain this high-powered offensive machine.")
                         }
@@ -582,7 +666,7 @@ object Ollama {
                         loseStreakCount != null || (headline.contains("lose", ignoreCase = true) && (headline.contains("in a row", ignoreCase = true) || headline.contains("straight", ignoreCase = true))) -> {
                             appendLine("The searching continues for $derivedTeam as their downward slide deepened, dropping their ${loseStreakCount ?: "recent run of"} straight game in a grueling stretch that has tested the resolve of the locker room. Costly turnovers, untimely defensive lapses, and cold shooting stretches down the stretch once again proved fatal against opportunistic competition.")
                             appendLine()
-                            appendLine("\"There are no shortcuts out of a hole like this,\" acknowledged the coaching staff during the postgame media session. \"Nobody is going to feel sorry for us. Every player in this locker room has to look in the mirror, take accountability for the little details, and compete for a full 48 minutes. It starts on the defensive glass and taking care of the basketball.\"")
+                            appendLine("\"There are no shortcuts out of a hole like this,\" acknowledged the coaching staff during the postgame media session. \"Nobody is going to feel sorry for us. Every player in this locker room has to look in the mirror, take accountability for the little details, and compete for a full 48 minutes. It starts on the defensive glass and taking care of the basketball.\"$angleAnalysis")
                             appendLine()
                             append("With the schedule offering little respite${if (teamRecord.isNotEmpty()) " at $teamRecord" else ""}, $derivedTeam faces a critical juncture in their season. Finding consistent leadership and rediscovering defensive urgency will be paramount if they hope to stop the bleeding and reverse course before the postseason picture slips away.")
                         }
@@ -592,7 +676,7 @@ object Ollama {
                             val countStr = winStreakCount?.let { "$it" } ?: "another"
                             appendLine("$derivedTeam is playing some of the most cohesive basketball in the league right now, extending their scorching winning streak to $countStr consecutive victories. Operating with supreme confidence and relentless defensive grit, the squad executed down the wire to preserve momentum and overwhelm their opponents.")
                             appendLine()
-                            appendLine("\"We have developed real trust in our system and each other,\" remarked team leaders following the buzzer. \"When you play disciplined team basketball and communicate on every rotation, good things happen. We celebrate the progress, but our focus immediately shifts to the next challenge.\"")
+                            appendLine("\"We have developed real trust in our system and each other,\" remarked team leaders following the buzzer. \"When you play disciplined team basketball and communicate on every rotation, good things happen. We celebrate the progress, but our focus immediately shifts to the next challenge.\"$angleAnalysis")
                             appendLine()
                             append("Sitting comfortably${if (teamRecord.isNotEmpty()) " at $teamRecord" else ""}, $derivedTeam has firmly established themselves as a formidable contender. If they maintain this level of defensive communication and unselfish execution, their ceiling in the upcoming postseason looks higher with every passing game.")
                         }
@@ -601,7 +685,7 @@ object Ollama {
                         points != null && points >= 30 -> {
                             appendLine("It was a breathtaking scoring clinic as $playerName put on an unforgettable offensive showcase, erupting for $points points to lift $derivedTeam against $derivedOpp${if (score.isNotEmpty()) " in a $score battle" else ""}. Scoring from beyond the arc, slicing through double-teams, and getting to the charity stripe at will, $playerLast proved virtually unstoppable all night.")
                             appendLine()
-                            appendLine("\"When a scorer gets into a rhythm like that, you just try to space the floor and let him work,\" noted the coaching staff. \"He attacked the rim with purpose and hit timely, contested buckets whenever the opposing defense attempted to make a run.\"")
+                            appendLine("\"When a scorer gets into a rhythm like that, you just try to space the floor and let him work,\" noted the coaching staff. \"He attacked the rim with purpose and hit timely, contested buckets whenever the opposing defense attempted to make a run.\"$angleAnalysis")
                             appendLine()
                             append("The commanding performance underscored $playerLast's status as a premier offensive weapon${if (teamRecord.isNotEmpty()) " as $derivedTeam moves to $teamRecord" else ""}. When their primary star plays with this degree of swagger and efficiency, $derivedTeam possesses the firepower to challenge any heavyweight in the league.")
                         }
@@ -610,7 +694,7 @@ object Ollama {
                         isTripleDouble -> {
                             appendLine("$playerName stuffed the stat sheet with an exceptional all-around masterpiece, recording a triple-double to guide $derivedTeam past $derivedOpp${if (score.isNotEmpty()) " ($score)" else ""}. Impacting every phase of the game, $playerLast dominated the glass, anchored defensive stops, and orchestrated the transition break with veteran savvy.")
                             appendLine()
-                            appendLine("\"Winning basketball isn't just about scoring; it's about doing whatever the game demands on every single possession,\" said $playerLast. \"Securing the defensive rebound, making the hockey assist, and diving for loose balls—that's how championships are built.\"")
+                            appendLine("\"Winning basketball isn't just about scoring; it's about doing whatever the game demands on every single possession,\" said $playerLast. \"Securing the defensive rebound, making the hockey assist, and diving for loose balls—that's how championships are built.\"$angleAnalysis")
                             appendLine()
                             append("${if (teamRecord.isNotEmpty()) "Now $teamRecord on the year, " else ""}$derivedTeam continues to thrive when their floor general impacts all 94 feet of hardwood with versatile, high-IQ basketball.")
                         }
@@ -624,7 +708,7 @@ object Ollama {
                             }
                             appendLine("A dominant physical presence inside the paint powered $derivedTeam, anchored by $playerName's stellar effort ($feat) against $derivedOpp${if (score.isNotEmpty()) " ($score)" else ""}. Protecting the rim and securing second-chance opportunities, $playerLast set an uncompromising tone in the trenches.")
                             appendLine()
-                            appendLine("\"We challenged our bigs to control the painted area, and they responded with toughness and grit,\" said the coaching staff. \"Controlling the backboards and altering shots without fouling changes everything for our transition game.\"")
+                            appendLine("\"We challenged our bigs to control the painted area, and they responded with toughness and grit,\" said the coaching staff. \"Controlling the backboards and altering shots without fouling changes everything for our transition game.\"$angleAnalysis")
                             appendLine()
                             append("With $derivedTeam${if (teamRecord.isNotEmpty()) " improving to $teamRecord" else ""}, this physical interior identity provides a dependable anchor against explosive perimeter opponents.")
                         }
@@ -633,7 +717,7 @@ object Ollama {
                         else -> {
                             appendLine("In an intense contest that kept fans on the edge of their seats${if (score.isNotEmpty()) " to the final $score buzzer" else ""}, $derivedTeam clashed with $derivedOpp in a high-stakes showdown. Early momentum swings and physical half-court battles set the stage for a tense stretch decided by clutch execution.")
                             appendLine()
-                            appendLine("${if (playerName.isNotBlank()) "$playerName led the charge with steady composure, while " else ""}$derivedTeam capitalized on timely defensive stops and clutch free-throw shooting to seize control during the game's decisive moments.")
+                            appendLine("${if (playerName.isNotBlank()) "$playerName led the charge with steady composure, while " else ""}$derivedTeam capitalized on timely defensive stops and clutch free-throw shooting to seize control during the game's decisive moments.$angleAnalysis")
                             appendLine()
                             append("${if (teamRecord.isNotEmpty()) "Moving forward at $teamRecord, " else ""}$derivedTeam looks to build on this performance as conference competition tightens down the stretch.")
                         }
@@ -922,7 +1006,12 @@ object Ollama {
             .replace("\t", "\\t") + "\""
 
     /** Generate or rewrite a complete newspaper article for a [News] item. */
-    suspend fun generateArticle(config: OllamaConfig, lg: League, news: News): Result<String> {
+    suspend fun generateArticle(
+        config: OllamaConfig,
+        lg: League,
+        news: News,
+        angle: String = news.angle.ifEmpty { config.defaultStoryAngle },
+    ): Result<String> {
         val team = lg.teams.getOrNull(news.teamId)
         val player = lg.playerOrNull(news.pid)
         val game = if (news.gameId >= 0) lg.games.firstOrNull { it.id == news.gameId } else null
@@ -933,15 +1022,221 @@ object Ollama {
             append("Headline: ${news.text}\n")
             append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
             append("Season: ${news.season}, Day: ${news.day}\n")
+            append("Angle: ${angle.ifEmpty { "balanced" }}\n")
             if (team != null) append("Team: ${team.school} (${team.w}-${team.l})\n")
             if (opp != null) append("Opponent: ${opp.school} (${opp.record})\n")
-            if (game != null) append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
+            if (game != null) {
+                append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
+                if (game.played) {
+                    val margin = kotlin.math.abs(game.hs - game.aws)
+                    append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
+                }
+            }
             if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
             if (news.body.isNotEmpty()) append("Background notes: ${news.body}\n")
-            append("\nWrite 2-4 compelling paragraphs of realistic basketball journalism. Include quotes from coach or players, game context, and descriptive color. Do not write a title or headline, just the article body paragraphs separated by blank lines.")
+            val angleInstruction = when (angle) {
+                "tactical" -> "Focus heavily on tactical film breakdown: shooting splits, half-court execution, pick-and-roll defense, transition tempo, and lineup efficiency."
+                "beat" -> "Write with the raw emotion and passion of a hometown beat columnist: crowd energy, locker room chemistry, player heart, and what this victory/loss means to the program."
+                "skeptic" -> "Write from the perspective of a sharp national critic: question whether this run is sustainable, point out turnover issues and shooting anomalies, and evaluate their true ceiling against championship contenders."
+                "dual" -> "Provide balanced dual-locker room coverage: include direct quotes and postgame reactions from BOTH the winning and losing head coaches and star players."
+                else -> "Include quotes from coach or players, game context, and descriptive color."
+            }
+            append("\nWrite 2-4 compelling paragraphs of realistic basketball journalism. $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
         }
 
         return generate(config, prompt)
+    }
+
+    /** Generates an epic coronation newspaper feature for the National Champion or NBA Finals winner. */
+    suspend fun generateChampionshipStory(
+        config: OllamaConfig,
+        lg: League,
+        champion: Team,
+        runnerUp: Team,
+        finalsMvp: Player?,
+        seriesOrScore: String,
+    ): Result<News> {
+        val coach = lg.coachOf(champion)
+        val mvpName = finalsMvp?.name ?: "The Finals MVP"
+        val mvpStats = finalsMvp?.let { "${it.posLabel}, averaging ${"%.1f".format(it.stats.ppg)} ppg, ${"%.1f".format(it.stats.rpg)} rpg" } ?: ""
+
+        val prompt = buildString {
+            append("CHAMPIONSHIP_CELEBRATION: Complete championship coronation newspaper story\n")
+            append("League: ${if (lg.pro) "NBA" else "NCAA College Basketball"}\n")
+            append("Champion: ${champion.name} (${champion.w}-${champion.l})\n")
+            append("Runner-Up: ${runnerUp.name} (${runnerUp.w}-${runnerUp.l})\n")
+            append("Finals Outcome: $seriesOrScore\n")
+            append("Head Coach: ${coach.name} (${coach.titles} titles)\n")
+            if (finalsMvp != null) append("Finals MVP / MOP: $mvpName ($mvpStats)\n")
+            append("\nFormat your response EXACTLY as:\n")
+            append("HEADLINE: <Epic championship headline>\n")
+            append("OUTLET: <Publication, e.g. Championship Chronicle or The Daily Dribble>\n")
+            append("BODY:\n<3 paragraphs of vivid championship coverage: confetti shower, locker room champagne celebration, emotional coach and MVP quotes, franchise legacy, and the upcoming parade.>")
+        }
+
+        return generate(config, prompt, numPredict = 360).map { text ->
+            val lines = text.lines()
+            var headline = ""
+            var outlet = "Championship Chronicle"
+            val bodyLines = mutableListOf<String>()
+            var readingBody = false
+
+            for (l in lines) {
+                when {
+                    l.startsWith("HEADLINE:", ignoreCase = true) -> headline = l.substringAfter(":").trim()
+                    l.startsWith("OUTLET:", ignoreCase = true) -> outlet = l.substringAfter(":").trim()
+                    l.startsWith("BODY:", ignoreCase = true) -> readingBody = true
+                    readingBody -> bodyLines += l
+                    headline.isEmpty() && l.isNotBlank() && !l.startsWith("OUTLET", true) -> headline = l.trim()
+                }
+            }
+
+            val finalBody = if (bodyLines.isNotEmpty()) bodyLines.joinToString("\n").trim() else text.trim()
+            val finalHead = if (headline.isNotEmpty()) headline else "Champions! ${champion.name} reach the mountaintop"
+
+            News(
+                season = lg.season,
+                day = lg.day,
+                text = finalHead,
+                mine = champion.id == lg.userTeamId,
+                kind = "moment",
+                body = finalBody,
+                source = "$outlet · ${config.fullModelDisplayName}",
+                teamId = champion.id,
+                pid = finalsMvp?.id ?: -1,
+                aiLabeled = true,
+                approved = false,
+            )
+        }
+    }
+
+    /** Generates a personalized recruiting pitch letter from Coach to a top recruit targeting their key priority. */
+    suspend fun generateRecruitPitchLetter(
+        config: OllamaConfig,
+        lg: League,
+        r: Recruit,
+    ): Result<String> {
+        val u = lg.user
+        val coachName = if (lg.userCoachId >= 0) lg.coaches.firstOrNull { it.id == lg.userCoachId }?.name ?: "Head Coach" else "Head Coach"
+        val p = r.p
+
+        val prompt = buildString {
+            append("RECRUIT_PITCH: Official College Basketball Recruiting Pitch Letter\n")
+            append("Recruit: ${p.name} (${p.stars}-star ${p.posLabel})\n")
+            append("Hometown: ${p.hometown} (${p.highSchool})\n")
+            append("Recruit Priority: ${r.pref.label} — ${r.pref.blurb}\n")
+            append("School: ${u.school} (${u.w}-${u.l}), Conference: ${lg.conf(u.confId).name}, Prestige: ${u.prestige}/100\n")
+            append("Head Coach: $coachName\n")
+            append("\nWrite a 3-paragraph persuasive personal recruiting letter from Coach $coachName to ${p.name}. Directly address his priority of '${r.pref.label}'. Explain why our system, culture, and track record will prepare him for the NBA while competing for national championships. End with a coach sign-off.")
+        }
+
+        return generate(config, prompt, numPredict = 320)
+    }
+
+    /** Generates a pregame rivalry preview building maximum hype and bad blood before a showdown. */
+    suspend fun generatePregameRivalryPreview(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+    ): Result<News> {
+        val u = lg.user
+        val opp = lg.team(g.opp(u.id))
+        val coachU = if (lg.userCoachId >= 0) lg.coaches.firstOrNull { it.id == lg.userCoachId }?.name ?: "Head Coach" else "Head Coach"
+        val coachOpp = lg.coachOf(opp)
+        val rivalry = lg.rivalry(g)
+
+        val prompt = buildString {
+            append("PREGAME_RIVALRY: High-Stakes Rivalry Showdown Preview\n")
+            append("Home Team: ${if (g.neutral) "${u.school} (Neutral)" else if (g.home == u.id) "${u.school} (Home, ${u.record})" else "${opp.school} (Home, ${opp.record})"}\n")
+            append("Away Team: ${if (g.neutral) "${opp.school} (Neutral)" else if (g.home == u.id) "${opp.school} (Away, ${opp.record})" else "${u.school} (Away, ${u.record})"}\n")
+            append("Rivalry: ${rivalry?.name ?: "Conference Showdown"}\n")
+            append("Coaches: Coach $coachU vs Coach ${coachOpp.name}\n")
+            append("\nFormat your response EXACTLY as:\n")
+            append("HEADLINE: <Fiery pregame headline>\n")
+            append("OUTLET: <Publication, e.g. Courtside Dispatch or The Rivalry Beat>\n")
+            append("BODY:\n<3 paragraphs of intense pregame analysis: history of bad blood, key individual matchup, bulletin-board quotes from both benches, and the electric atmosphere.>")
+        }
+
+        return generate(config, prompt, numPredict = 320).map { text ->
+            val lines = text.lines()
+            var headline = ""
+            var outlet = "Rivalry Beat"
+            val bodyLines = mutableListOf<String>()
+            var readingBody = false
+
+            for (l in lines) {
+                when {
+                    l.startsWith("HEADLINE:", ignoreCase = true) -> headline = l.substringAfter(":").trim()
+                    l.startsWith("OUTLET:", ignoreCase = true) -> outlet = l.substringAfter(":").trim()
+                    l.startsWith("BODY:", ignoreCase = true) -> readingBody = true
+                    readingBody -> bodyLines += l
+                    headline.isEmpty() && l.isNotBlank() && !l.startsWith("OUTLET", true) -> headline = l.trim()
+                }
+            }
+
+            val finalBody = if (bodyLines.isNotEmpty()) bodyLines.joinToString("\n").trim() else text.trim()
+            val finalHead = if (headline.isNotEmpty()) headline else "Rivalry Week: ${u.school} and ${opp.school} collide"
+
+            News(
+                season = lg.season,
+                day = lg.day,
+                text = finalHead,
+                mine = true,
+                gameId = g.id,
+                kind = "rivalry",
+                body = finalBody,
+                source = "$outlet · ${config.fullModelDisplayName}",
+                teamId = u.id,
+                aiLabeled = true,
+                approved = false,
+            )
+        }
+    }
+
+    /** Generates 3 insider reports regarding impending free agency decisions and star contract demands. */
+    suspend fun generateFreeAgencyBuzz(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<List<Pair<String, String>>> {
+        val cacheKey = "fa_buzz_${lg.season}_${lg.day / 7}_${config.model}"
+        if (config.cacheResponses) {
+            Cache.get<List<Pair<String, String>>>(cacheKey)?.let { return Result.success(it) }
+        }
+        val contenders = lg.teams.sortedByDescending { it.elo }.take(3)
+        val rebuilding = lg.teams.sortedBy { it.elo }.take(3)
+
+        val prompt = buildString {
+            append("FREE_AGENCY_BUZZ: Star Free Agency & Trade Demand Intel\n")
+            append("Contenders looking to add a superstar: ${contenders.joinToString(", ") { it.name }}\n")
+            append("Teams with maximum cap space: ${rebuilding.joinToString(", ") { it.name }}\n")
+            append("\nFormat your response EXACTLY as:\n")
+            append("SCOOP 1: <Insider headline> | <2 sentence report on star discontent or max contract pursuit>\n")
+            append("SCOOP 2: <Insider headline> | <2 sentence report on star discontent or max contract pursuit>\n")
+            append("SCOOP 3: <Insider headline> | <2 sentence report on star discontent or max contract pursuit>\n")
+        }
+
+        return generate(config, prompt, system = "You are a top basketball insider with league-wide sources.", numPredict = 240).map { raw ->
+            val scoops = mutableListOf<Pair<String, String>>()
+            for (lineStr in raw.lines()) {
+                val tr = lineStr.trim()
+                if (tr.startsWith("SCOOP", true) && tr.contains("|")) {
+                    val head = tr.substringAfter(":").substringBefore("|").trim()
+                    val body = tr.substringAfter("|").trim()
+                    if (head.isNotEmpty() && body.isNotEmpty()) {
+                        scoops.add(head to body)
+                    }
+                }
+            }
+            val finalScoops = if (scoops.isEmpty()) {
+                listOf(
+                    "Superstar Contract Talks Stall" to "Sources report an All-Star guard has paused extension discussions, keeping options open for unrestricted free agency.",
+                    "Contenders Clear Maximum Cap Room" to "Multiple championship contenders have begun exploratory trade calls to dump expiring salary, positioning themselves to make a run at marquee free agents when the market opens.",
+                    "Locker Room Frustration Mounts" to "Rival executives are closely monitoring a prominent forward whose frustration with offensive touches could prompt a formal trade request."
+                )
+            } else scoops
+            if (config.cacheResponses) Cache.put(cacheKey, finalScoops)
+            finalScoops
+        }
     }
 
     /** Generate a fresh custom story on demand. */

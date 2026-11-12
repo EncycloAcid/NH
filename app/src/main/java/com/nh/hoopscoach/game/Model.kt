@@ -625,10 +625,15 @@ class News(
     var reactions: List<Reaction> = emptyList(),
     /** Explicitly marks whether this article was generated and labeled by AI. */
     var aiLabeled: Boolean = false,
+    /** Story Approval & Editor's Desk status: whether reviewed and published by the editor/coach. */
+    var approved: Boolean = false,
+    /** Journalistic angle used for generation (e.g. "tactical", "beat", "skeptic", "dual", "balanced"). */
+    var angle: String = "",
 ) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
     val isAiGenerated get() = aiLabeled || source.split(" ", "·", "-", "/", "_").any { it.equals("AI", ignoreCase = true) } || source.contains("Ollama", ignoreCase = true) || source.contains("Gemini", ignoreCase = true) || source.contains("ChatGPT", ignoreCase = true)
+    val needsApproval get() = isAiGenerated && !approved
 }
 
 /** Settings for local Ollama LLM integration to control and generate stories. */
@@ -648,6 +653,11 @@ class OllamaConfig(
     var awardCeremonies: Boolean = true,
     var halftimeSpeeches: Boolean = true,
     var playerDevelopment: Boolean = true,
+    var recruitingPitches: Boolean = true,
+    var pregameRivalries: Boolean = true,
+    var championshipCelebrations: Boolean = true,
+    var freeAgencyBuzz: Boolean = true,
+    var defaultStoryAngle: String = "balanced", // "tactical", "beat", "skeptic", "dual", "balanced"
     // Speed & Performance Optimizations
     var speedMode: String = "turbo", // "turbo", "balanced", "quality"
     var numThreads: Int = 0, // 0 = auto-detect optimal CPU cores

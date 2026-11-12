@@ -7,7 +7,10 @@ import com.nh.hoopscoach.game.Honor
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.OllamaConfig
+import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Prospect
+import com.nh.hoopscoach.game.Recruit
+import com.nh.hoopscoach.game.RecruitPref
 import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.Trade
 import kotlinx.coroutines.runBlocking
@@ -638,6 +641,206 @@ class OllamaTest {
         assertTrue("Body is generated", news.body.isNotEmpty())
         assertFalse("Body must not contain static fallback", news.body.contains("Basketball analysts around the country are taking notice"))
         assertTrue("Headline or body references topic", news.text.contains("Rivalry Week Showdowns", ignoreCase = true) || news.body.contains("Rivalry Week Showdowns", ignoreCase = true))
+    }
+
+    @Test
+    fun testStoryApprovalAndEditingWorkflow() {
+        val lg = LeagueGen.newLeague()
+        val n = News(
+            season = 2026,
+            day = 10,
+            text = "Draft Headline: Boston dominates Brooklyn",
+            body = "Boston controlled the pace throughout the second half.",
+            source = "The Daily Herald · Google Gemini",
+            aiLabeled = true,
+            approved = false,
+            angle = "balanced"
+        )
+        assertTrue("AI labeled news is recognized as AI generated", n.isAiGenerated)
+        assertFalse("Initially unapproved", n.approved)
+        assertTrue("Needs approval because it is AI draft", n.needsApproval)
+
+        // Editor modifies headline and body
+        n.text = "Boston dismantles Brooklyn with fourth-quarter surge"
+        n.body = "A 14-2 run in the fourth quarter sealed the road victory."
+        n.angle = "tactical"
+
+        // Editor approves story
+        n.approved = true
+        assertFalse("Once approved, no longer needs approval", n.needsApproval)
+
+        lg.news.add(n)
+        lg.ollama.recruitingPitches = true
+        lg.ollama.pregameRivalries = true
+        lg.ollama.championshipCelebrations = true
+        lg.ollama.freeAgencyBuzz = true
+        lg.ollama.defaultStoryAngle = "beat"
+
+        val encoded = SaveIO.encode(lg)
+        val decoded = SaveIO.decode(encoded)
+
+        val restoredNews = decoded.news.first { it.text.contains("Boston dismantles") }
+        assertTrue(restoredNews.approved)
+        assertFalse(restoredNews.needsApproval)
+        assertEquals("tactical", restoredNews.angle)
+        assertEquals("beat", decoded.ollama.defaultStoryAngle)
+        assertTrue(decoded.ollama.recruitingPitches)
+        assertTrue(decoded.ollama.pregameRivalries)
+        assertTrue(decoded.ollama.championshipCelebrations)
+        assertTrue(decoded.ollama.freeAgencyBuzz)
+    }
+
+    @Test
+    fun testJournalisticReporterAngles() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "editor@gmail.com",
+            googleSignedIn = true,
+        )
+
+        val baseNews = News(
+            season = 2026,
+            day = 25,
+            text = "Lakers edge Warriors 108-105 in nailbiter",
+            body = "A late 3-pointer by LeBron James secured the victory.",
+            source = "Courtside Daily",
+        )
+
+        // 1. Tactical Angle
+        val tacticalRes = Ollama.generateArticle(config, lg, baseNews, angle = "tactical")
+        assertTrue("Tactical angle succeeds", tacticalRes.isSuccess)
+        val tacticalBody = tacticalRes.getOrThrow()
+        assertTrue("Tactical body includes scheme analysis", tacticalBody.contains("Tactical Scheme", ignoreCase = true) || tacticalBody.contains("spacing", ignoreCase = true) || tacticalBody.contains("execution", ignoreCase = true))
+
+        // 2. Beat Writer Angle
+        val beatRes = Ollama.generateArticle(config, lg, baseNews, angle = "beat")
+        assertTrue("Beat writer angle succeeds", beatRes.isSuccess)
+        val beatBody = beatRes.getOrThrow()
+        assertTrue("Beat writer body includes emotional pulse", beatBody.contains("Emotional Pulse", ignoreCase = true) || beatBody.contains("locker room", ignoreCase = true) || beatBody.contains("grit", ignoreCase = true))
+
+        // 3. National Skeptic Angle
+        val skepticRes = Ollama.generateArticle(config, lg, baseNews, angle = "skeptic")
+        assertTrue("Skeptic angle succeeds", skepticRes.isSuccess)
+        val skepticBody = skepticRes.getOrThrow()
+        assertTrue("Skeptic body includes regression analysis", skepticBody.contains("regression", ignoreCase = true) || skepticBody.contains("flaws", ignoreCase = true) || skepticBody.contains("sustainable", ignoreCase = true) || skepticBody.contains("caution", ignoreCase = true))
+
+        // 4. Dual Locker Room Reactions Angle
+        val dualRes = Ollama.generateArticle(config, lg, baseNews, angle = "dual")
+        assertTrue("Dual locker room angle succeeds", dualRes.isSuccess)
+        val dualBody = dualRes.getOrThrow()
+        assertTrue("Dual body includes winning and losing perspectives", (dualBody.contains("Winning", ignoreCase = true) && dualBody.contains("Losing", ignoreCase = true)) || (dualBody.contains("locker room", ignoreCase = true) && dualBody.contains("accountability", ignoreCase = true)))
+    }
+
+    @Test
+    fun testChampionshipCoronationStory() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "openai",
+            openAiApiKey = "",
+            openAiAccountEmail = "coach@chatgpt.com",
+            openAiSignedIn = true,
+        )
+        val champion = lg.teams[0]
+        val runnerUp = lg.teams[1]
+        val finalsMvp = lg.players.first { it.teamId == champion.id }
+
+        val storyRes = Ollama.generateChampionshipStory(
+            config = config,
+            lg = lg,
+            champion = champion,
+            runnerUp = runnerUp,
+            finalsMvp = finalsMvp,
+            seriesOrScore = "4-2"
+        )
+        assertTrue("Championship story succeeds", storyRes.isSuccess)
+        val story = storyRes.getOrThrow()
+        assertTrue("Headline announces champion", story.text.contains("champions", ignoreCase = true) || story.text.contains("coronation", ignoreCase = true) || story.text.contains(champion.name, ignoreCase = true))
+        assertTrue("Body details champagne/confetti celebration", story.body.contains("confetti", ignoreCase = true) || story.body.contains("trophy", ignoreCase = true) || story.body.contains("champagne", ignoreCase = true))
+        assertTrue("Body references Finals MVP", story.body.contains(finalsMvp.name) || story.body.contains("Finals MVP", ignoreCase = true))
+        assertTrue("Story is marked as draft requiring editor approval", story.needsApproval)
+    }
+
+    @Test
+    fun testRecruitPitchLetterGeneration() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "recruiter@gmail.com",
+            googleSignedIn = true,
+        )
+
+        val p1 = lg.players[0]
+        p1.first = "Jalen"
+        p1.last = "Vance"
+        val recruitMinutes = Recruit(
+            p = p1,
+            pref = RecruitPref.MINUTES,
+        )
+        val minutesRes = Ollama.generateRecruitPitchLetter(config, lg, recruitMinutes)
+        assertTrue("Recruit letter for MINUTES succeeds", minutesRes.isSuccess)
+        val minutesLetter = minutesRes.getOrThrow()
+        assertTrue("Addresses player name", minutesLetter.contains("Jalen Vance"))
+        assertTrue("Mentions priority or program role", minutesLetter.contains("Minutes", ignoreCase = true) || minutesLetter.contains("Playing Time", ignoreCase = true) || minutesLetter.contains("cornerstone", ignoreCase = true))
+
+        val p2 = lg.players[1]
+        p2.first = "Marcus"
+        p2.last = "Knight"
+        val recruitNil = Recruit(
+            p = p2,
+            pref = RecruitPref.NIL,
+        )
+        val nilRes = Ollama.generateRecruitPitchLetter(config, lg, recruitNil)
+        assertTrue("Recruit letter for NIL succeeds", nilRes.isSuccess)
+        val nilLetter = nilRes.getOrThrow()
+        assertTrue("Addresses player name", nilLetter.contains("Marcus Knight"))
+        assertTrue("Mentions NIL or market opportunities", nilLetter.contains("NIL", ignoreCase = true) || nilLetter.contains("opportunities", ignoreCase = true))
+    }
+
+    @Test
+    fun testPregameRivalryPreview() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "beat@gmail.com",
+            googleSignedIn = true,
+        )
+        val rivalryGame = Game(
+            id = 88,
+            day = 45,
+            home = 0,
+            away = 1,
+            neutral = false,
+            type = GameType.CONF,
+        )
+
+        val previewRes = Ollama.generatePregameRivalryPreview(config, lg, rivalryGame)
+        assertTrue("Rivalry preview succeeds", previewRes.isSuccess)
+        val preview = previewRes.getOrThrow()
+        assertTrue("Headline contains clash or rivalry", preview.text.contains("Clash", ignoreCase = true) || preview.text.contains("Rivalry", ignoreCase = true) || preview.text.contains("Showdown", ignoreCase = true))
+        assertTrue("Body highlights tensions/bad blood", preview.body.contains("tensions", ignoreCase = true) || preview.body.contains("bad blood", ignoreCase = true) || preview.body.contains("rivalry", ignoreCase = true))
+        assertTrue("New preview marked as draft requiring editor approval", preview.needsApproval)
+    }
+
+    @Test
+    fun testFreeAgencyBuzzGeneration() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val config = OllamaConfig(
+            provider = "openai",
+            openAiApiKey = "",
+            openAiAccountEmail = "insider@chatgpt.com",
+            openAiSignedIn = true,
+        )
+
+        val buzzRes = Ollama.generateFreeAgencyBuzz(config, lg)
+        assertTrue("Free agency buzz succeeds", buzzRes.isSuccess)
+        val scoops = buzzRes.getOrThrow()
+        assertTrue("Returns at least 3 scoops", scoops.size >= 3)
+        assertTrue("First scoop has headline and detail", scoops[0].first.isNotEmpty() && scoops[0].second.isNotEmpty())
+        assertTrue("Contains free agency or contract rumors", scoops.any { it.first.contains("Contract", ignoreCase = true) || it.first.contains("Trade", ignoreCase = true) || it.second.contains("free agent", ignoreCase = true) })
     }
 }
 

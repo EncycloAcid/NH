@@ -154,6 +154,65 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         if (lg.ollama.enabled && lg.ollama.scoutingKeys) {
             AiScoutingCard(vm, lg, g)
         }
+        if (lg.ollama.enabled && lg.ollama.pregameRivalries && (rivalry != null || big.isNotEmpty() || g.type == GameType.CONF || g.type == GameType.PLAYOFF)) {
+            AiRivalryHypeCard(vm, lg, g)
+        }
+    }
+}
+
+/** AI-generated pregame rivalry hype and bad blood preview. */
+@Composable
+fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
+    var loading by remember(g.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val opp = lg.team(g.opp(lg.userTeamId))
+    val existing = lg.news.firstOrNull { it.gameId == g.id && it.kind == "rivalry" && it.isAiGenerated }
+
+    Spacer(Modifier.height(8.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (P.dark) Color(0xFF2C1E1B) else Color(0xFFFFF1F0))
+            .padding(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("🔥 PREGAME RIVALRY HYPE", style = T.label.copy(fontSize = 10.sp), color = P.bad)
+                Tag("✨ AI HYPE", P.accent)
+            }
+            if (existing != null) {
+                SmallButton("Read Preview 📰") {
+                    val idx = lg.news.indexOf(existing)
+                    if (idx >= 0) vm.push(Route.Article(idx))
+                }
+            } else {
+                SmallButton(if (loading) "Generating..." else "Generate Hype ✍️", primary = true, enabled = !loading) {
+                    loading = true
+                    scope.launch {
+                        val res = Ollama.generatePregameRivalryPreview(lg.ollama, lg, g)
+                        loading = false
+                        res.onSuccess { story ->
+                            vm.act { it.news.add(story) }
+                            vm.push(Route.Article(lg.news.lastIndex))
+                        }.onFailure { err ->
+                            vm.toast("AI: ${err.message ?: "Failed"}")
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (existing != null) "Pregame preview generated: \"${existing.text}\""
+            else "Have ${lg.ollama.providerDisplayName} write a fiery pregame rivalry preview breaking down bad blood and quotes.",
+            style = T.small,
+            color = P.sub,
+        )
     }
 }
 

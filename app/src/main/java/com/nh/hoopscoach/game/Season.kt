@@ -330,13 +330,17 @@ object Season {
         val titleGame = ncaa.gameIds.lastOrNull()?.firstOrNull()?.takeIf { it >= 0 }?.let { lg.game(it) }
         val ws = ncaa.seeds[champ.id] ?: 0
         val ls = ncaa.seeds[runnerUp] ?: 0
-        lg.news += News(
+        val titleNews = News(
             lg.season, lg.day,
             Reports.titleHeadline(champ, lg.team(runnerUp), ws, ls, titleGame?.let { kotlin.math.abs(it.hs - it.aws) } ?: 0, titleGame?.ot ?: 0),
             champ.id == lg.userTeamId,
             titleGame?.id ?: -1,
             "moment",
         )
+        lg.news += titleNews
+        if (lg.ollama.enabled && lg.ollama.championshipCelebrations) {
+            Ollama.maybeAutoGenerate(lg.ollama, lg, titleNews)
+        }
         // The parade for his team's title, then awards night for his (or his players') big honors.
         if (champ.id == lg.userTeamId) runCatching { Celebrations.parade(lg) }
         runCatching { Celebrations.awardsNight(lg) }
