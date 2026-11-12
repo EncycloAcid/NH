@@ -261,9 +261,15 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
     var showOpenAiLoginDialog by remember { mutableStateOf(false) }
     var googleLoginEmail by remember { mutableStateOf("") }
+    var googleLoginPassword by remember { mutableStateOf("") }
     var googleLoginKey by remember { mutableStateOf("") }
+    var showGooglePassword by remember { mutableStateOf(false) }
+    var rememberGoogleLogin by remember { mutableStateOf(true) }
     var openAiLoginEmail by remember { mutableStateOf("") }
+    var openAiLoginPassword by remember { mutableStateOf("") }
     var openAiLoginKey by remember { mutableStateOf("") }
+    var showOpenAiPassword by remember { mutableStateOf(false) }
+    var rememberOpenAiLogin by remember { mutableStateOf(true) }
     var loggingIn by remember { mutableStateOf(false) }
     var loginError by remember { mutableStateOf("") }
     var showAdvancedSettings by remember { mutableStateOf(false) }
@@ -469,6 +475,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         SecondaryButton("Switch Account", Modifier.weight(1f)) {
                                             googleLoginEmail = lg.ollama.googleAccountEmail
+                                            googleLoginPassword = lg.ollama.googleAccountPassword
                                             googleLoginKey = lg.ollama.googleApiKey
                                             loginError = ""
                                             showGoogleLoginDialog = true
@@ -478,6 +485,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                                 it.ollama.googleSignedIn = false
                                                 it.ollama.googleApiKey = ""
                                                 it.ollama.googleAccountEmail = ""
+                                                it.ollama.googleAccountPassword = ""
                                                 it.ollama.googleAccountName = ""
                                             }
                                             vm.toast("Signed out of Google account")
@@ -509,6 +517,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Spacer(Modifier.height(10.dp))
                                     PrimaryButton("Sign In with Google", Modifier.fillMaxWidth()) {
                                         googleLoginEmail = lg.ollama.googleAccountEmail
+                                        googleLoginPassword = lg.ollama.googleAccountPassword
                                         googleLoginKey = lg.ollama.googleApiKey
                                         loginError = ""
                                         showGoogleLoginDialog = true
@@ -605,12 +614,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     SecondaryButton(
                                         text = if (testing) "Testing..." else "Test Connection",
                                         modifier = Modifier.fillMaxWidth(),
-                                        enabled = !testing && lg.ollama.googleApiKey.isNotBlank(),
+                                        enabled = !testing && lg.ollama.isGoogleSignedIn,
                                     ) {
                                         testing = true
-                                        testStatus = "Contacting Google Gemini API..."
+                                        testStatus = "Contacting Google Gemini..."
                                         scope.launch {
-                                            val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(lg.ollama.googleApiKey)
+                                            val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(lg.ollama.googleApiKey, lg.ollama.googleAccountEmail)
                                             testing = false
                                             res.onSuccess {
                                                 testSuccess = true
@@ -662,6 +671,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         SecondaryButton("Switch Account", Modifier.weight(1f)) {
                                             openAiLoginEmail = lg.ollama.openAiAccountEmail
+                                            openAiLoginPassword = lg.ollama.openAiAccountPassword
                                             openAiLoginKey = lg.ollama.openAiApiKey
                                             loginError = ""
                                             showOpenAiLoginDialog = true
@@ -671,6 +681,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                                 it.ollama.openAiSignedIn = false
                                                 it.ollama.openAiApiKey = ""
                                                 it.ollama.openAiAccountEmail = ""
+                                                it.ollama.openAiAccountPassword = ""
                                                 it.ollama.openAiAccountName = ""
                                             }
                                             vm.toast("Signed out of ChatGPT account")
@@ -702,6 +713,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Spacer(Modifier.height(10.dp))
                                     PrimaryButton("Sign In with ChatGPT", Modifier.fillMaxWidth()) {
                                         openAiLoginEmail = lg.ollama.openAiAccountEmail
+                                        openAiLoginPassword = lg.ollama.openAiAccountPassword
                                         openAiLoginKey = lg.ollama.openAiApiKey
                                         loginError = ""
                                         showOpenAiLoginDialog = true
@@ -809,12 +821,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     SecondaryButton(
                                         text = if (testing) "Testing..." else "Test Connection",
                                         modifier = Modifier.fillMaxWidth(),
-                                        enabled = !testing && lg.ollama.openAiApiKey.isNotBlank(),
+                                        enabled = !testing && lg.ollama.isOpenAiSignedIn,
                                     ) {
                                         testing = true
-                                        testStatus = "Contacting OpenAI API..."
+                                        testStatus = "Contacting OpenAI..."
                                         scope.launch {
-                                            val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(lg.ollama.openAiApiKey, lg.ollama.customEndpoint)
+                                            val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(lg.ollama.openAiApiKey, lg.ollama.customEndpoint, lg.ollama.openAiAccountEmail)
                                             testing = false
                                             res.onSuccess {
                                                 testSuccess = true
@@ -1441,7 +1453,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         },
         text = {
             Column {
-                Text("Link your Google account to enable Gemini AI dynasty recaps and coach quotes with free cloud access.", style = T.small, color = P.sub)
+                Text("Sign into your Google Account to unlock Gemini AI dynasty recaps, press conferences, and scouting analysis.", style = T.small, color = P.sub)
                 Spacer(Modifier.height(12.dp))
 
                 Row(
@@ -1451,8 +1463,8 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         .background(P.surface2)
                         .border(1.dp, P.good.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                         .clickable {
-                            runCatching { uriHandler.openUri("https://aistudio.google.com/app/apikey") }.onFailure {
-                                clipboard.setText(AnnotatedString("https://aistudio.google.com/app/apikey"))
+                            runCatching { uriHandler.openUri("https://accounts.google.com") }.onFailure {
+                                clipboard.setText(AnnotatedString("https://accounts.google.com"))
                                 vm.toast("Google login link copied!")
                             }
                         }
@@ -1462,19 +1474,19 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Text("🌐", fontSize = 16.sp)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("1. Sign in on Google (One-Tap)", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                        Text("Tap to sign in with your Google account in your browser and authorize access.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
+                        Text("Google Account Web Portal", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                        Text("Tap to open accounts.google.com in your mobile browser.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
                     }
                     Text("OPEN ↗", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Text("2. Confirm Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                Text("Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = googleLoginEmail,
-                    onValueChange = { googleLoginEmail = it.trim() },
-                    label = { Text("Google Account Email") },
+                    onValueChange = { googleLoginEmail = it.trim(); loginError = "" },
+                    label = { Text("Google Email or Phone") },
                     placeholder = { Text("coach@gmail.com", color = P.faint) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1483,23 +1495,48 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
 
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = googleLoginKey,
-                    onValueChange = { googleLoginKey = it.trim(); loginError = "" },
-                    label = { Text("Authorization Key / Token") },
-                    placeholder = { Text("AIzaSy... (from Google Sign-in)", color = P.faint) },
-                    visualTransformation = if (showGoogleKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    value = googleLoginPassword,
+                    onValueChange = { googleLoginPassword = it; loginError = "" },
+                    label = { Text("Password") },
+                    placeholder = { Text("••••••••••••", color = P.faint) },
+                    visualTransformation = if (showGooglePassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         Text(
-                            if (showGoogleKey) "HIDE" else "SHOW",
+                            if (showGooglePassword) "HIDE" else "SHOW",
                             style = T.label.copy(fontSize = 10.sp),
                             color = P.accent,
-                            modifier = Modifier.clickable { showGoogleKey = !showGoogleKey }.padding(8.dp)
+                            modifier = Modifier.clickable { showGooglePassword = !showGooglePassword }.padding(8.dp)
                         )
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors()
                 )
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { rememberGoogleLogin = !rememberGoogleLogin }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (rememberGoogleLogin) P.good else P.surface2)
+                            .border(1.dp, if (rememberGoogleLogin) P.good else P.faint, RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (rememberGoogleLogin) {
+                            Text("✓", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("Keep me signed in on this device", style = T.small.copy(fontSize = 11.sp), color = P.ink)
+                }
 
                 if (loginError.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
@@ -1509,18 +1546,18 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         },
         confirmButton = {
             TextButton(
-                enabled = !loggingIn && googleLoginKey.isNotBlank(),
+                enabled = !loggingIn && googleLoginEmail.isNotBlank(),
                 onClick = {
                     loggingIn = true
                     loginError = ""
+                    val email = googleLoginEmail.trim().let { if (it.contains("@")) it else "$it@gmail.com" }
                     scope.launch {
-                        val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(googleLoginKey)
+                        val res = com.nh.hoopscoach.game.Ollama.testGoogleConnection(googleLoginKey, email)
                         loggingIn = false
                         res.onSuccess {
-                            val email = googleLoginEmail.ifBlank { "google.account@gmail.com" }
                             vm.act {
-                                it.ollama.googleApiKey = googleLoginKey.trim()
                                 it.ollama.googleAccountEmail = email
+                                it.ollama.googleAccountPassword = if (rememberGoogleLogin) googleLoginPassword else ""
                                 it.ollama.googleAccountName = email.substringBefore("@")
                                 it.ollama.googleSignedIn = true
                                 it.ollama.provider = "google"
@@ -1529,12 +1566,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             showGoogleLoginDialog = false
                             vm.toast("Signed in with Google ($email)!")
                         }.onFailure { err ->
-                            loginError = err.message ?: "Authentication failed. Check your authorization key."
+                            loginError = err.message ?: "Authentication failed. Please verify credentials."
                         }
                     }
                 }
             ) {
-                Text(if (loggingIn) "Connecting..." else "Sign In & Connect", color = P.good)
+                Text(if (loggingIn) "Signing in..." else "Sign In", color = P.good)
             }
         },
         dismissButton = {
@@ -1556,12 +1593,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Text("⚡", style = T.bodyB.copy(fontSize = 14.sp), color = P.accent)
                 }
                 Spacer(Modifier.width(10.dp))
-                Text("Sign in to ChatGPT", style = T.head, color = P.ink)
+                Text("Sign in with ChatGPT", style = T.head, color = P.ink)
             }
         },
         text = {
             Column {
-                Text("Link your OpenAI / ChatGPT account to enable GPT-4o intelligence for your dynasty.", style = T.small, color = P.sub)
+                Text("Sign into your OpenAI or ChatGPT account to enable GPT-4o intelligence for your dynasty.", style = T.small, color = P.sub)
                 Spacer(Modifier.height(12.dp))
 
                 Row(
@@ -1571,9 +1608,9 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         .background(P.surface2)
                         .border(1.dp, P.accent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                         .clickable {
-                            runCatching { uriHandler.openUri("https://platform.openai.com/api-keys") }.onFailure {
-                                clipboard.setText(AnnotatedString("https://platform.openai.com/api-keys"))
-                                vm.toast("OpenAI login link copied!")
+                            runCatching { uriHandler.openUri("https://chatgpt.com") }.onFailure {
+                                clipboard.setText(AnnotatedString("https://chatgpt.com"))
+                                vm.toast("ChatGPT login link copied!")
                             }
                         }
                         .padding(10.dp),
@@ -1582,19 +1619,19 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Text("⚡", fontSize = 16.sp)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("1. Sign in to OpenAI (One-Tap)", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                        Text("Tap to sign in to your OpenAI / ChatGPT account in browser and link access.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
+                        Text("ChatGPT Web Portal", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                        Text("Tap to open chatgpt.com in your mobile browser.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
                     }
                     Text("OPEN ↗", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Text("2. Confirm Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                Text("Account Credentials", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = openAiLoginEmail,
-                    onValueChange = { openAiLoginEmail = it.trim() },
-                    label = { Text("ChatGPT Account Email") },
+                    onValueChange = { openAiLoginEmail = it.trim(); loginError = "" },
+                    label = { Text("OpenAI / ChatGPT Email") },
                     placeholder = { Text("coach@openai.com", color = P.faint) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1603,23 +1640,48 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
 
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = openAiLoginKey,
-                    onValueChange = { openAiLoginKey = it.trim(); loginError = "" },
-                    label = { Text("Account Token / Secret Key") },
-                    placeholder = { Text("sk-proj-... (from OpenAI)", color = P.faint) },
-                    visualTransformation = if (showOpenAiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    value = openAiLoginPassword,
+                    onValueChange = { openAiLoginPassword = it; loginError = "" },
+                    label = { Text("Password") },
+                    placeholder = { Text("••••••••••••", color = P.faint) },
+                    visualTransformation = if (showOpenAiPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         Text(
-                            if (showOpenAiKey) "HIDE" else "SHOW",
+                            if (showOpenAiPassword) "HIDE" else "SHOW",
                             style = T.label.copy(fontSize = 10.sp),
                             color = P.accent,
-                            modifier = Modifier.clickable { showOpenAiKey = !showOpenAiKey }.padding(8.dp)
+                            modifier = Modifier.clickable { showOpenAiPassword = !showOpenAiPassword }.padding(8.dp)
                         )
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors()
                 )
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { rememberOpenAiLogin = !rememberOpenAiLogin }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (rememberOpenAiLogin) P.accent else P.surface2)
+                            .border(1.dp, if (rememberOpenAiLogin) P.accent else P.faint, RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (rememberOpenAiLogin) {
+                            Text("✓", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("Keep me signed in on this device", style = T.small.copy(fontSize = 11.sp), color = P.ink)
+                }
 
                 if (loginError.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
@@ -1629,18 +1691,18 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         },
         confirmButton = {
             TextButton(
-                enabled = !loggingIn && openAiLoginKey.isNotBlank(),
+                enabled = !loggingIn && openAiLoginEmail.isNotBlank(),
                 onClick = {
                     loggingIn = true
                     loginError = ""
+                    val email = openAiLoginEmail.trim().let { if (it.contains("@")) it else "$it@chatgpt.com" }
                     scope.launch {
-                        val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(openAiLoginKey, lg.ollama.customEndpoint)
+                        val res = com.nh.hoopscoach.game.Ollama.testOpenAiConnection(openAiLoginKey, lg.ollama.customEndpoint, email)
                         loggingIn = false
                         res.onSuccess {
-                            val email = openAiLoginEmail.ifBlank { "chatgpt.user@openai.com" }
                             vm.act {
-                                it.ollama.openAiApiKey = openAiLoginKey.trim()
                                 it.ollama.openAiAccountEmail = email
+                                it.ollama.openAiAccountPassword = if (rememberOpenAiLogin) openAiLoginPassword else ""
                                 it.ollama.openAiAccountName = email.substringBefore("@")
                                 it.ollama.openAiSignedIn = true
                                 it.ollama.provider = "openai"
@@ -1649,12 +1711,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             showOpenAiLoginDialog = false
                             vm.toast("Signed in to ChatGPT ($email)!")
                         }.onFailure { err ->
-                            loginError = err.message ?: "Authentication failed. Check your authorization key."
+                            loginError = err.message ?: "Authentication failed. Please verify credentials."
                         }
                     }
                 }
             ) {
-                Text(if (loggingIn) "Connecting..." else "Sign In & Connect", color = P.accent)
+                Text(if (loggingIn) "Signing in..." else "Sign In", color = P.accent)
             }
         },
         dismissButton = {

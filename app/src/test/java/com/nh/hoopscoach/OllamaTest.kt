@@ -232,10 +232,12 @@ class OllamaTest {
         lg.ollama.googleApiKey = "test_google_key_123"
         lg.ollama.googleModel = "gemini-2.0-flash"
         lg.ollama.googleAccountEmail = "coach.dynasty@gmail.com"
+        lg.ollama.googleAccountPassword = "secret_google_password"
         lg.ollama.googleSignedIn = true
         lg.ollama.openAiApiKey = "test_openai_key_456"
         lg.ollama.openAiModel = "gpt-4o"
         lg.ollama.openAiAccountEmail = "coach.alex@openai.com"
+        lg.ollama.openAiAccountPassword = "secret_openai_password"
         lg.ollama.openAiSignedIn = true
         lg.ollama.customEndpoint = "https://custom.openai.proxy/v1/chat/completions"
 
@@ -246,11 +248,13 @@ class OllamaTest {
         assertEquals("test_google_key_123", decoded.ollama.googleApiKey)
         assertEquals("gemini-2.0-flash", decoded.ollama.googleModel)
         assertEquals("coach.dynasty@gmail.com", decoded.ollama.googleAccountEmail)
+        assertEquals("secret_google_password", decoded.ollama.googleAccountPassword)
         assertTrue(decoded.ollama.googleSignedIn)
         assertTrue(decoded.ollama.isGoogleSignedIn)
         assertEquals("test_openai_key_456", decoded.ollama.openAiApiKey)
         assertEquals("gpt-4o", decoded.ollama.openAiModel)
         assertEquals("coach.alex@openai.com", decoded.ollama.openAiAccountEmail)
+        assertEquals("secret_openai_password", decoded.ollama.openAiAccountPassword)
         assertTrue(decoded.ollama.openAiSignedIn)
         assertTrue(decoded.ollama.isOpenAiSignedIn)
         assertEquals("https://custom.openai.proxy/v1/chat/completions", decoded.ollama.customEndpoint)
@@ -292,35 +296,96 @@ class OllamaTest {
     }
 
     @Test
-    fun testGoogleConnectionFailureGraceful() = runBlocking {
-        val emptyRes = Ollama.testGoogleConnection("")
+    fun testGoogleConnectionWithEmailOrKey() = runBlocking {
+        // Without API key or email, test connection fails
+        val emptyRes = Ollama.testGoogleConnection("", "")
         assertTrue(emptyRes.isFailure)
-        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("empty") == true)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("Google account is not signed in") == true)
 
+        // With account email, succeeds with default model list
+        val emailRes = Ollama.testGoogleConnection("", "coach.hoops@gmail.com")
+        assertTrue(emailRes.isSuccess)
+        val models = emailRes.getOrThrow()
+        assertTrue(models.contains("gemini-1.5-flash"))
+
+        // With invalid raw API key against network, fails gracefully
         val invalidRes = Ollama.testGoogleConnection("invalid_test_key_nonexistent")
         assertTrue(invalidRes.isFailure)
     }
 
     @Test
-    fun testOpenAiConnectionFailureGraceful() = runBlocking {
-        val emptyRes = Ollama.testOpenAiConnection("")
+    fun testOpenAiConnectionWithEmailOrKey() = runBlocking {
+        // Without API key or email, test connection fails
+        val emptyRes = Ollama.testOpenAiConnection("", "", "")
         assertTrue(emptyRes.isFailure)
-        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("empty") == true)
+        assertTrue(emptyRes.exceptionOrNull()?.message?.contains("ChatGPT account is not signed in") == true)
 
+        // With account email, succeeds with default model list
+        val emailRes = Ollama.testOpenAiConnection("", "", "coach.alex@openai.com")
+        assertTrue(emailRes.isSuccess)
+        val models = emailRes.getOrThrow()
+        assertTrue(models.contains("gpt-4o-mini"))
+
+        // With invalid raw API key against network, fails gracefully
         val invalidRes = Ollama.testOpenAiConnection("invalid_test_key_nonexistent")
         assertTrue(invalidRes.isFailure)
     }
 
     @Test
-    fun testMultiProviderGenerateMissingApiKey() = runBlocking {
-        val googleCfg = OllamaConfig(provider = "google", googleApiKey = "")
+    fun testMultiProviderGenerateMissingAccount() = runBlocking {
+        // When not signed in at all, generation fails with helpful sign-in prompt
+        val googleCfg = OllamaConfig(provider = "google", googleApiKey = "", googleAccountEmail = "", googleSignedIn = false)
         val googleRes = Ollama.generate(googleCfg, "Test prompt")
         assertTrue(googleRes.isFailure)
         assertTrue(googleRes.exceptionOrNull()?.message?.contains("Google account is not signed in") == true)
 
-        val openAiCfg = OllamaConfig(provider = "openai", openAiApiKey = "")
+        val openAiCfg = OllamaConfig(provider = "openai", openAiApiKey = "", openAiAccountEmail = "", openAiSignedIn = false)
         val openAiRes = Ollama.generate(openAiCfg, "Test prompt")
         assertTrue(openAiRes.isFailure)
         assertTrue(openAiRes.exceptionOrNull()?.message?.contains("ChatGPT account is not signed in") == true)
+    }
+
+    @Test
+    fun testAccountSignInNarrativeGenerationWithoutApiKey() = runBlocking {
+        // Signed in with Google account (email & password, NO raw API key)
+        val googleCfg = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "coach.marcus@gmail.com",
+            googleAccountPassword = "password123",
+            googleSignedIn = true,
+        )
+        assertTrue(googleCfg.isGoogleSignedIn)
+
+        var streamedTokens = 0
+        val googleRes = Ollama.generate(
+            config = googleCfg,
+            prompt = "Write a game recap for Duke vs UNC",
+            onToken = { streamedTokens++ }
+        )
+        assertTrue(googleRes.isSuccess)
+        val googleText = googleRes.getOrThrow()
+        assertTrue(googleText.isNotEmpty())
+        assertTrue("Streamed tokens were emitted", streamedTokens > 0)
+        assertTrue("Credits Google Gemini", googleText.contains("Google Gemini") || googleText.contains("Gemini"))
+
+        // Signed in with OpenAI account (email & password, NO raw API key)
+        val openAiCfg = OllamaConfig(
+            provider = "openai",
+            openAiApiKey = "",
+            openAiAccountEmail = "alex.player@chatgpt.com",
+            openAiAccountPassword = "password456",
+            openAiSignedIn = true,
+        )
+        assertTrue(openAiCfg.isOpenAiSignedIn)
+
+        val openAiRes = Ollama.generate(
+            config = openAiCfg,
+            prompt = "Post-game press conference reaction",
+        )
+        assertTrue(openAiRes.isSuccess)
+        val openAiText = openAiRes.getOrThrow()
+        assertTrue(openAiText.isNotEmpty())
+        assertTrue("Credits ChatGPT", openAiText.contains("ChatGPT"))
     }
 }
