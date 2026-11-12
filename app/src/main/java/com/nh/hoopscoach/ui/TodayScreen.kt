@@ -169,7 +169,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
     // Instant load from cache if previously generated
     LaunchedEffect(g.id) {
         if (keys == null) {
-            val cacheKey = "scout_${u.id}_${opp.id}_${lg.season}_${lg.day}_${lg.ollama.model}"
+            val cacheKey = "scout_${u.id}_${opp.id}_${lg.season}_${lg.day}_${lg.ollama.activeModelName}"
             Ollama.Cache.get<List<Ollama.ScoutingKey>>(cacheKey)?.let { keys = it }
         }
     }
@@ -187,10 +187,13 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("AI SCOUTING KEYS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("AI SCOUTING KEYS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+            }
             if (keys == null && !loading) {
                 Text(
-                    "Generate with Ollama ✍️",
+                    "Generate with ${lg.ollama.shortActionName} AI ✍️",
                     style = T.small.copy(fontSize = 11.sp),
                     color = P.accent,
                     modifier = Modifier.clickable {
@@ -201,7 +204,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
                             res.onSuccess { list ->
                                 keys = list
                             }.onFailure { err ->
-                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                vm.toast("AI: ${err.message ?: "Failed"}")
                             }
                         }
                     },
@@ -210,7 +213,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
         }
         if (loading) {
             Spacer(Modifier.height(6.dp))
-            Text("Ollama is analyzing matchups & scouting ${opp.school}...", style = T.small, color = P.accent)
+            Text("${lg.ollama.providerDisplayName} is analyzing matchups & scouting ${opp.school}...", style = T.small, color = P.accent)
         } else if (keys != null) {
             Spacer(Modifier.height(6.dp))
             for (key in keys!!) {
@@ -221,7 +224,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             }
         } else {
             Spacer(Modifier.height(4.dp))
-            Text("Have Ollama analyze matchups and write 3 tactical keys to victory against ${opp.school}.", style = T.small, color = P.faint)
+            Text("Have ${lg.ollama.providerDisplayName} analyze matchups and write 3 tactical keys to victory against ${opp.school}. Labeled by AI.", style = T.small, color = P.faint)
         }
     }
 }

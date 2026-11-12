@@ -38,7 +38,7 @@ fun momentColor(kind: MomentKind): Color = when (kind) {
 /** Tag for a headline in the news feed, if it's a special one. */
 @Composable
 fun NewsTag(n: News) {
-    val (label, color) = when {
+    val regularTag = when {
         n.rivalry -> "RIVALRY" to P.bad
         n.kind == "upset" -> "UPSET ALERT" to P.bad
         n.kind == "buzzer" -> "BUZZER-BEATER" to P.gold
@@ -49,9 +49,18 @@ fun NewsTag(n: News) {
         n.kind == "trade" -> "TRADE" to P.good
         n.kind == "column" -> "COLUMN" to P.sub
         n.kind == "team" -> "STREAK" to P.warn
-        else -> return
+        else -> null
     }
-    Tag(label, color)
+    if (!n.isAiGenerated && regularTag == null) return
+
+    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+        if (n.isAiGenerated) {
+            Tag("✨ AI LABELED", P.accent)
+        }
+        if (regularTag != null) {
+            Tag(regularTag.first, regularTag.second)
+        }
+    }
     Spacer(Modifier.height(3.dp))
 }
 

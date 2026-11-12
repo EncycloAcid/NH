@@ -160,7 +160,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         }
         Spacer(Modifier.height(10.dp))
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
-        lv.call?.let { c -> CallCard(lv, c); Spacer(Modifier.height(8.dp)) }
+        lv.call?.let { c -> CallCard(lg, lv, c); Spacer(Modifier.height(8.dp)) }
         lv.momentResult?.takeIf { lv.moment == null && lv.call == null }?.let {
             Panel(Modifier.popIn(it), color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
             Spacer(Modifier.height(8.dp))
@@ -413,12 +413,60 @@ private fun PeriodRow(label: String, values: List<String>, color: Color, header:
 
 /** Coach mode: a call to make (a timeout, the closing five, the last play on either end). */
 @Composable
-private fun CallCard(lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
+private fun CallCard(lg: League, lv: LiveGame, c: com.nh.hoopscoach.game.GameEngine.CoachCall) {
     val e = lv.engine
     Panel(Modifier.popIn(c), color = P.hero) {
         Text(when (c.kind) { "timeout" -> "THEIR RUN"; "closers" -> "CRUNCH TIME"; "defense" -> "ONE STOP"; "halftime" -> "HALFTIME"; else -> "YOUR CALL" }, style = T.label, color = heroKicker)
         Text(c.title, style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.onHero)
         Text(c.sub, style = T.small, color = P.onHero.copy(alpha = 0.85f))
+        if (c.kind == "halftime" && lg.ollama.enabled && lg.ollama.halftimeSpeeches) {
+            val usScore = if (e.coachSide >= 0) e.score[e.coachSide] else e.score[0]
+            val themScore = if (e.coachSide >= 0) e.score[1 - e.coachSide] else e.score[1]
+            var speech by remember(e.game.id, usScore, themScore) { mutableStateOf<Ollama.HalftimeSpeech?>(null) }
+            var loadingSpeech by remember(e.game.id) { mutableStateOf(false) }
+            val scope = rememberCoroutineScope()
+            LaunchedEffect(e.game.id) {
+                val cacheKey = "halftime_${e.game.id}_${usScore}_${themScore}_${lg.ollama.activeModelName}"
+                Ollama.Cache.get<Ollama.HalftimeSpeech>(cacheKey)?.let { speech = it }
+            }
+            Spacer(Modifier.height(8.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(P.onHero.copy(alpha = 0.12f))
+                    .padding(10.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.gold)
+                    Spacer(Modifier.weight(1f))
+                    if (speech == null && !loadingSpeech) {
+                        SmallButton("Generate AI Speech", primary = true) {
+                            loadingSpeech = true
+                            scope.launch {
+                                val res = Ollama.generateHalftimeSpeech(lg.ollama, lg, e.game, usScore, themScore)
+                                loadingSpeech = false
+                                res.onSuccess { speech = it }
+                            }
+                        }
+                    }
+                }
+                if (loadingSpeech) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("AI is delivering halftime locker room address...", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                } else if (speech != null) {
+                    val s = speech!!
+                    Spacer(Modifier.height(6.dp))
+                    Text("LOCKER ROOM ADDRESS", style = T.label.copy(fontSize = 9.sp), color = heroKicker)
+                    Spacer(Modifier.height(2.dp))
+                    Text("\u201c${s.lockerRoomSpeech}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp), color = P.onHero)
+                    Spacer(Modifier.height(6.dp))
+                    Text("TACTICAL ADJUSTMENT", style = T.label.copy(fontSize = 9.sp), color = heroKicker)
+                    Spacer(Modifier.height(2.dp))
+                    Text(s.tacticalAdjustment, style = T.small.copy(fontSize = 12.sp), color = P.onHero.copy(alpha = 0.9f))
+                }
+            }
+        }
         Spacer(Modifier.height(10.dp))
         fun choose(id: String) { e.playCall(id); lv.momentResult = e.lastCall; lv.call = null; lv.tick++ }
         if (c.options.size > 4) {
@@ -559,14 +607,14 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
     // Instant load from cache if previously generated
     LaunchedEffect(g.id) {
         if (report == null) {
-            val cacheKey = "recap_${g.id}_${lg.ollama.model}_${lg.ollama.speedMode}"
+            val cacheKey = "recap_${g.id}_${lg.ollama.activeModelName}_${lg.ollama.speedMode}"
             Ollama.Cache.get<Ollama.PostgameReport>(cacheKey)?.let { report = it }
         }
     }
 
     Section(
         "Beat report & quotes",
-        action = if (report == null && !writing) "Ollama Report ✍️" else if (writing) "Writing..." else "Rewrite",
+        action = if (report == null && !writing) "${lg.ollama.shortActionName} Report ✍️" else if (writing) "Writing..." else "Rewrite",
         onAction = {
             writing = true
             streamingText = ""
@@ -580,7 +628,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                     report = rep
                 }.onFailure { err ->
                     errorMsg = err.message ?: "Generation failed"
-                    vm.toast("Ollama: $errorMsg")
+                    vm.toast("AI: $errorMsg")
                 }
             }
         },
@@ -597,8 +645,8 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (streamingText.isNotEmpty()) "Ollama is generating live..."
-                        else "Ollama is writing the beat report & quotes...",
+                        if (streamingText.isNotEmpty()) "${lg.ollama.providerDisplayName} is generating live..."
+                        else "${lg.ollama.providerDisplayName} is writing the beat report & quotes...",
                         style = T.small,
                         color = P.accent,
                     )
@@ -617,7 +665,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
             val rep = report!!
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(rep.outlet.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.weight(1f))
-                Text("AI REPORT", style = T.label.copy(fontSize = 10.sp), color = P.good)
+                Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
             }
             Spacer(Modifier.height(4.dp))
             Text(rep.headline, style = T.head, color = P.ink)
@@ -631,7 +679,10 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                     .background(P.surface2, RoundedCornerShape(10.dp))
                     .padding(10.dp),
             ) {
-                Text("COACH'S PODIUM", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("COACH'S PODIUM", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+                    Tag("✨ AI QUOTE", P.accent)
+                }
                 Spacer(Modifier.height(2.dp))
                 Text("\u201c${rep.coachQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
             }
@@ -643,7 +694,10 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                     .background(P.surface2, RoundedCornerShape(10.dp))
                     .padding(10.dp),
             ) {
-                Text("LOCKER ROOM REACTION", style = T.label.copy(fontSize = 9.sp), color = P.gold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("LOCKER ROOM REACTION", style = T.label.copy(fontSize = 9.sp), color = P.gold)
+                    Tag("✨ AI QUOTE", P.gold)
+                }
                 Spacer(Modifier.height(2.dp))
                 Text("\u201c${rep.starQuote}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
             }
@@ -654,8 +708,8 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Ollama Beat Report", style = T.bodyB, color = P.ink)
-                    Text("Generate a postgame story with coach and locker room quotes using ${lg.ollama.model}.", style = T.small, color = P.sub)
+                    Text("${lg.ollama.providerDisplayName} Beat Report", style = T.bodyB, color = P.ink)
+                    Text("Generate a postgame story with coach and locker room quotes using ${lg.ollama.providerDisplayName} (${lg.ollama.activeModelName}). Labeled by AI.", style = T.small, color = P.sub)
                     if (errorMsg.isNotEmpty()) {
                         Text(errorMsg, style = T.small, color = P.bad)
                     }
@@ -674,7 +728,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
                             report = rep
                         }.onFailure { err ->
                             errorMsg = err.message ?: "Generation failed"
-                            vm.toast("Ollama: $errorMsg")
+                            vm.toast("AI: $errorMsg")
                         }
                     }
                 }

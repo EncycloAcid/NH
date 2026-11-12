@@ -1191,7 +1191,7 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
     // Instant load from cache if previously generated
     LaunchedEffect(t.teamA, t.teamB, t.season, t.day) {
         if (analysis == null) {
-            val cacheKey = "trade_${t.teamA}_${t.teamB}_${t.toA.joinToString()}_${t.toB.joinToString()}_${lg.ollama.model}"
+            val cacheKey = "trade_${t.teamA}_${t.teamB}_${t.toA.joinToString()}_${t.toB.joinToString()}_${lg.ollama.activeModelName}"
             com.nh.hoopscoach.game.Ollama.Cache.get<com.nh.hoopscoach.game.Ollama.TradeAnalysis>(cacheKey)?.let { analysis = it }
         }
     }
@@ -1201,7 +1201,7 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
             Text(if (t.offseason) "${t.season} OFFSEASON" else "${t.season} · DAY ${t.day}", style = T.label, color = if (t.hero) P.accent else P.sub, modifier = Modifier.weight(1f))
             if (lg.ollama.enabled && lg.ollama.tradeRumors && analysis == null) {
                 Text(
-                    if (grading) "Grading..." else "Grade with AI ✍️",
+                    if (grading) "Grading..." else "Grade with ${lg.ollama.shortActionName} AI ✍️",
                     style = T.small.copy(fontSize = 11.sp),
                     color = P.accent,
                     modifier = Modifier.clickable(enabled = !grading) {
@@ -1229,6 +1229,8 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("AI TRADE GRADES: ", style = T.label.copy(fontSize = 10.sp), color = P.accent)
                     Text("${a.abbr} ${an.gradeA}  ·  ${b.abbr} ${an.gradeB}", style = T.bodyB.copy(fontSize = 12.sp), color = P.ink)
+                    Spacer(Modifier.weight(1f))
+                    Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(an.analysis, style = T.small, color = P.ink)

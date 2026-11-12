@@ -379,6 +379,57 @@ object Ollama {
                     append("WINNER: Balanced value with immediate rotational impact.")
                 }
 
+                // Draft Prospect Scouting
+                prompt.contains("PRO_COMP:") -> {
+                    val pName = prompt.lines().firstOrNull { it.startsWith("Prospect:") }?.substringAfter(":")?.trim() ?: "Prospect"
+                    val pos = prompt.lines().firstOrNull { it.startsWith("Position:") }?.substringAfter(":")?.trim() ?: "G"
+                    val comp = when {
+                        pos.contains("PG") -> "Jalen Brunson / Tyrese Haliburton blend"
+                        pos.contains("SG") -> "Devin Booker / CJ McCollum"
+                        pos.contains("SF") -> "Mikal Bridges / Franz Wagner"
+                        pos.contains("PF") -> "Pascal Siakam / Jaren Jackson Jr."
+                        else -> "Bam Adebayo / Chet Holmgren profile"
+                    }
+                    appendLine("PRO_COMP: $comp")
+                    appendLine("STRENGTHS: Elite spatial awareness, fluid footwork off the catch, and high-IQ defensive positioning that disrupts passing lanes.")
+                    appendLine("WEAKNESSES: Needs additional functional core strength for paint finishes against physical interior rim protectors.")
+                    appendLine("UPSIDE: High-end rotation starter with All-Star upside if perimeter shot consistency translates to NBA range.")
+                    append("BLURB: $pName projects as an immediate rotation asset who excels in modern pick-and-roll schemes. Scouts rave about his competitive motor and basketball maturity.")
+                }
+
+                // Injury Analysis
+                prompt.contains("SEVERITY_OUTLOOK:") -> {
+                    val pName = prompt.lines().firstOrNull { it.startsWith("Player:") }?.substringAfter(":")?.trim() ?: "Key Starter"
+                    val inj = prompt.lines().firstOrNull { it.startsWith("Injury:") }?.substringAfter(":")?.trim() ?: "Injured"
+                    appendLine("HEADLINE: Medical Update: $pName Sidelined ($inj) as Roster Steps Up")
+                    appendLine("SEVERITY_OUTLOOK: Team physicians confirmed the recovery timeline remains on schedule with progressive non-contact conditioning.")
+                    appendLine("NEXT_MAN_UP: Bench rotations expand immediately, shifting offensive creation responsibilities to the backcourt.")
+                    append("QUOTE: \"Injuries are part of the grind. Everyone in our locker room knows their role, and we are built to withstand adversity together,\" said Coach $userHandle.")
+                }
+
+                // Award Ceremony Acceptance Speech
+                prompt.contains("ACCEPTANCE_SPEECH:") -> {
+                    val award = prompt.lines().firstOrNull { it.startsWith("Award:") }?.substringAfter(":")?.trim() ?: "Honor"
+                    val winner = prompt.lines().firstOrNull { it.startsWith("Winner:") }?.substringAfter(":")?.trim() ?: "Champion"
+                    appendLine("AWARD_TITLE: $award Recipient · $winner")
+                    appendLine("ACCEPTANCE_SPEECH: \"First and foremost, I want to thank my teammates and coaching staff. Individual honors are a reflection of collective sacrifice, early morning workouts, and trusting the system every single day. We are not finished yet.\"")
+                    append("MEDIA_TRIBUTE: An undeniable milestone in a historic campaign. $winner dominated opposing gameplans with relentless consistency, setting a gold standard for leadership.")
+                }
+
+                // Halftime Locker Room Speech & Adjustments
+                prompt.contains("HALFTIME_SPEECH:") -> {
+                    appendLine("HALFTIME_SPEECH: \"Listen up! 24 minutes left on the clock. Everything starts with taking care of the basketball and owning our defensive glass. Win the 50-50 balls, communicate through screens, and let our defense fuel transition offense!\"")
+                    append("TACTICAL_ADJUSTMENT: Force sideline pick-and-roll traps, accelerate tempo in early transition, and limit second-chance paint touches.")
+                }
+
+                // Training Camp Report
+                prompt.contains("CAMP_STANDOUT:") -> {
+                    val topPlayer = prompt.lines().firstOrNull { it.startsWith("Top Standout:") }?.substringAfter(":")?.trim() ?: "Breakout Player"
+                    appendLine("HEADLINE: Training Camp Report: $topPlayer Sparks New Dimension in Team Identity")
+                    appendLine("STANDOUT_ANALYSIS: Entering camp in peak physical shape, $topPlayer displayed notable jumps in playmaking poise and spot-up efficiency, establishing strong chemistry with the starting unit.")
+                    append("SEASON_OUTLOOK: The coaching staff enters the upcoming season with upgraded depth, versatile lineup configurations, and renewed defensive energy.")
+                }
+
                 // Article / Column
                 else -> {
                     appendLine("[$provider Feature]")
@@ -808,6 +859,7 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { body ->
                 news.body = body
+                news.aiLabeled = true
                 if (!news.source.contains(config.shortActionName)) {
                     news.source = "${news.source} · ${config.fullModelDisplayName}".trim(' ', '·')
                 }
@@ -832,6 +884,38 @@ object Ollama {
         val gradeA: String,
         val gradeB: String,
         val analysis: String,
+    )
+
+    data class ProspectReport(
+        val proComparison: String,
+        val strengths: String,
+        val weaknesses: String,
+        val upside: String,
+        val blurb: String,
+    )
+
+    data class InjuryAnalysis(
+        val headline: String,
+        val severityOutlook: String,
+        val nextManUpStrategy: String,
+        val quote: String,
+    )
+
+    data class AwardSpeech(
+        val awardTitle: String,
+        val acceptanceSpeech: String,
+        val mediaTribute: String,
+    )
+
+    data class HalftimeSpeech(
+        val lockerRoomSpeech: String,
+        val tacticalAdjustment: String,
+    )
+
+    data class TrainingCampReport(
+        val headline: String,
+        val standoutAnalysis: String,
+        val seasonOutlook: String,
     )
 
     /** Generates a dynamic postgame press conference question & answers tailored to the exact game stats. */
@@ -1258,6 +1342,199 @@ object Ollama {
             } else rumors
             if (config.cacheResponses) Cache.put(cacheKey, finalRumors)
             finalRumors
+        }
+    }
+
+    /** Generates a comprehensive pro scouting report and NBA player comparison for a draft prospect. */
+    suspend fun generateProspectScouting(
+        config: OllamaConfig,
+        lg: League,
+        prospect: Prospect,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<ProspectReport> = withContext(Dispatchers.IO) {
+        val p = prospect.p
+        val cacheKey = "prospect_${p.id}_${prospect.rank}_${config.activeModelName}"
+        if (config.cacheResponses) {
+            Cache.get<ProspectReport>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val prompt = buildString {
+            appendLine("Evaluate NBA/pro draft prospect:")
+            appendLine("Prospect: ${p.name}")
+            appendLine("Position: ${p.posLabel}")
+            appendLine("School/Team: ${prospect.school}")
+            appendLine("Age: ${p.age}, Height: ${p.height} in, Weight: ${p.weight} lb")
+            appendLine("Estimated Overall: ${prospect.rank}, Style: ${p.style.label}")
+            appendLine("Format your response EXACTLY as:")
+            appendLine("PRO_COMP: <NBA player comparison>")
+            appendLine("STRENGTHS: <2 sentence summary of strengths>")
+            appendLine("WEAKNESSES: <2 sentence summary of areas to develop>")
+            appendLine("UPSIDE: <Pro ceiling projection>")
+            appendLine("BLURB: <3-4 sentence comprehensive scouting analysis>")
+        }
+
+        generate(config, prompt, onToken = onToken).map { text ->
+            val lines = text.lines()
+            val comp = lines.firstOrNull { it.startsWith("PRO_COMP:") }?.removePrefix("PRO_COMP:")?.trim() ?: "Versatile modern wing"
+            val strengths = lines.firstOrNull { it.startsWith("STRENGTHS:") }?.removePrefix("STRENGTHS:")?.trim() ?: "High basketball IQ and solid positional size."
+            val weaknesses = lines.firstOrNull { it.startsWith("WEAKNESSES:") }?.removePrefix("WEAKNESSES:")?.trim() ?: "Needs continued development on off-hand finishes."
+            val upside = lines.firstOrNull { it.startsWith("UPSIDE:") }?.removePrefix("UPSIDE:")?.trim() ?: "Quality starter with high developmental upside."
+            val blurb = lines.firstOrNull { it.startsWith("BLURB:") }?.removePrefix("BLURB:")?.trim()
+                ?: text.substringAfter("BLURB:").trim().ifEmpty { text }
+            val report = ProspectReport(comp, strengths, weaknesses, upside, blurb)
+            if (config.cacheResponses) Cache.put(cacheKey, report)
+            report
+        }
+    }
+
+    /** Generates a medical outlook, return timeline, and tactical next-man-up breakdown for an injured player. */
+    suspend fun generateInjuryAnalysis(
+        config: OllamaConfig,
+        lg: League,
+        team: Team,
+        player: Player,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<InjuryAnalysis> = withContext(Dispatchers.IO) {
+        val cacheKey = "injury_${player.id}_${player.injGames}_${config.activeModelName}"
+        if (config.cacheResponses) {
+            Cache.get<InjuryAnalysis>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val tag = Injuries.tag(player)
+        val prompt = buildString {
+            appendLine("Analyze basketball player injury:")
+            appendLine("Player: ${player.name}")
+            appendLine("Team: ${team.name}")
+            appendLine("Position: ${player.posLabel}")
+            appendLine("Injury: $tag")
+            appendLine("Games Missed: ${player.injGames} of ${player.injTotal}")
+            appendLine("Format your response EXACTLY as:")
+            appendLine("HEADLINE: <Catchy medical news headline>")
+            appendLine("SEVERITY_OUTLOOK: <Medical recovery timeline and severity evaluation>")
+            appendLine("NEXT_MAN_UP: <Tactical adjustment for the roster>")
+            appendLine("QUOTE: <Coach or teammate quote>")
+        }
+
+        generate(config, prompt, onToken = onToken).map { text ->
+            val lines = text.lines()
+            val headline = lines.firstOrNull { it.startsWith("HEADLINE:") }?.removePrefix("HEADLINE:")?.trim() ?: "${player.name} Injury Update"
+            val outlook = lines.firstOrNull { it.startsWith("SEVERITY_OUTLOOK:") }?.removePrefix("SEVERITY_OUTLOOK:")?.trim() ?: "Player is making steady progress toward full clearance."
+            val nextMan = lines.firstOrNull { it.startsWith("NEXT_MAN_UP:") }?.removePrefix("NEXT_MAN_UP:")?.trim() ?: "Roster depth will be tested as rotational minutes shift."
+            val quote = lines.firstOrNull { it.startsWith("QUOTE:") }?.removePrefix("QUOTE:")?.trim() ?: "We trust our medical staff and look forward to getting back at 100%."
+            val analysis = InjuryAnalysis(headline, outlook, nextMan, quote)
+            if (config.cacheResponses) Cache.put(cacheKey, analysis)
+            analysis
+        }
+    }
+
+    /** Generates an award ceremony acceptance speech and columnist media tribute for a major award winner. */
+    suspend fun generateAwardSpeech(
+        config: OllamaConfig,
+        lg: League,
+        honor: Honor,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<AwardSpeech> = withContext(Dispatchers.IO) {
+        val cacheKey = "award_${honor.award}_${honor.pid}_${honor.season}_${config.activeModelName}"
+        if (config.cacheResponses) {
+            Cache.get<AwardSpeech>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val prompt = buildString {
+            appendLine("Write award ceremony speech and media tribute:")
+            appendLine("Award: ${honor.award}")
+            appendLine("Winner: ${honor.name}")
+            appendLine("Season: ${honor.season}")
+            appendLine("Stats/Line: ${honor.line}")
+            appendLine("Format your response EXACTLY as:")
+            appendLine("AWARD_TITLE: <Award title and honoree>")
+            appendLine("ACCEPTANCE_SPEECH: <Heartfelt, memorable acceptance speech from the winner>")
+            appendLine("MEDIA_TRIBUTE: <Columnist editorial celebrating their historic season>")
+        }
+
+        generate(config, prompt, onToken = onToken).map { text ->
+            val lines = text.lines()
+            val title = lines.firstOrNull { it.startsWith("AWARD_TITLE:") }?.removePrefix("AWARD_TITLE:")?.trim() ?: "${honor.award} · ${honor.name}"
+            val speech = lines.firstOrNull { it.startsWith("ACCEPTANCE_SPEECH:") }?.removePrefix("ACCEPTANCE_SPEECH:")?.trim()
+                ?: "I want to thank my teammates, coaches, and the fans for pushing me to be my best every night."
+            val tribute = lines.firstOrNull { it.startsWith("MEDIA_TRIBUTE:") }?.removePrefix("MEDIA_TRIBUTE:")?.trim()
+                ?: "A legendary campaign marked by historic clutch execution and supreme leadership."
+            val award = AwardSpeech(title, speech, tribute)
+            if (config.cacheResponses) Cache.put(cacheKey, award)
+            award
+        }
+    }
+
+    /** Generates an inspiring halftime locker room speech and second-half tactical adjustments. */
+    suspend fun generateHalftimeSpeech(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+        usScore: Int,
+        themScore: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<HalftimeSpeech> = withContext(Dispatchers.IO) {
+        val cacheKey = "halftime_${g.id}_${usScore}_${themScore}_${config.activeModelName}"
+        if (config.cacheResponses) {
+            Cache.get<HalftimeSpeech>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val prompt = buildString {
+            appendLine("Write dynamic halftime locker room speech and tactical adjustments:")
+            appendLine("Score: Us $usScore, Opponent $themScore")
+            appendLine("Situation: ${if (usScore > themScore) "Leading by ${usScore - themScore}" else if (usScore < themScore) "Trailing by ${themScore - usScore}" else "Tied at $usScore"}")
+            appendLine("Format your response EXACTLY as:")
+            appendLine("HALFTIME_SPEECH: <Inspiring coach locker room address to the team>")
+            appendLine("TACTICAL_ADJUSTMENT: <Specific on-court tactical adjustments for second half>")
+        }
+
+        generate(config, prompt, onToken = onToken).map { text ->
+            val lines = text.lines()
+            val speech = lines.firstOrNull { it.startsWith("HALFTIME_SPEECH:") }?.removePrefix("HALFTIME_SPEECH:")?.trim()
+                ?: "Lock in for the final 20 minutes! Defense and rebounds decide the outcome."
+            val adjustment = lines.firstOrNull { it.startsWith("TACTICAL_ADJUSTMENT:") }?.removePrefix("TACTICAL_ADJUSTMENT:")?.trim()
+                ?: "Push tempo off missed shots and close out aggressively on perimeter shooters."
+            val result = HalftimeSpeech(speech, adjustment)
+            if (config.cacheResponses) Cache.put(cacheKey, result)
+            result
+        }
+    }
+
+    /** Generates a training camp report and player development breakdown for top improvers. */
+    suspend fun generateTrainingCampReport(
+        config: OllamaConfig,
+        lg: League,
+        team: Team,
+        topImprover: Player,
+        delta: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<TrainingCampReport> = withContext(Dispatchers.IO) {
+        val cacheKey = "camp_${team.id}_${topImprover.id}_${delta}_${lg.season}_${config.activeModelName}"
+        if (config.cacheResponses) {
+            Cache.get<TrainingCampReport>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val prompt = buildString {
+            appendLine("Write training camp report and player development breakdown:")
+            appendLine("Team: ${team.name}")
+            appendLine("Top Standout: ${topImprover.name} (${topImprover.posLabel}, age ${topImprover.age})")
+            appendLine("Progression: +$delta Overall improvement")
+            appendLine("Format your response EXACTLY as:")
+            appendLine("HEADLINE: <Camp headline highlighting development>")
+            appendLine("STANDOUT_ANALYSIS: <2-3 sentence analysis of the standout's breakthrough in camp>")
+            appendLine("SEASON_OUTLOOK: <2 sentence team identity and season projection>")
+        }
+
+        generate(config, prompt, onToken = onToken).map { text ->
+            val lines = text.lines()
+            val headline = lines.firstOrNull { it.startsWith("HEADLINE:") }?.removePrefix("HEADLINE:")?.trim()
+                ?: "${topImprover.name} Surges in Training Camp for ${team.name}"
+            val standout = lines.firstOrNull { it.startsWith("STANDOUT_ANALYSIS:") }?.removePrefix("STANDOUT_ANALYSIS:")?.trim()
+                ?: "${topImprover.name} arrived at camp with revamped footwork and sharpened perimeter accuracy, showing an impressive +$delta progression."
+            val outlook = lines.firstOrNull { it.startsWith("SEASON_OUTLOOK:") }?.removePrefix("SEASON_OUTLOOK:")?.trim()
+                ?: "${team.name} enters the new campaign with bolstered depth and palpable chemistry on both ends of the floor."
+            val report = TrainingCampReport(headline, standout, outlook)
+            if (config.cacheResponses) Cache.put(cacheKey, report)
+            report
         }
     }
 }

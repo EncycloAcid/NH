@@ -1283,6 +1283,46 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         }
                         androidx.compose.material3.Switch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Draft prospect scouting & pro comparisons", style = T.bodyB, color = P.ink)
+                            Text("AI scouts draft prospects with player grades and pro comparisons.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.draftScouting, { on -> vm.act { it.ollama.draftScouting = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Injury medical outlooks & recovery", style = T.bodyB, color = P.ink)
+                            Text("AI medical staff evaluates injury severity and next-man-up tactical outlooks.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.injuryReports, { on -> vm.act { it.ollama.injuryReports = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Award ceremony speeches & tributes", style = T.bodyB, color = P.ink)
+                            Text("AI writes acceptance speeches and columnist tributes for major award winners.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.awardCeremonies, { on -> vm.act { it.ollama.awardCeremonies = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Halftime locker room speeches", style = T.bodyB, color = P.ink)
+                            Text("AI delivers locker room addresses and second-half tactical adjustments.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.halftimeSpeeches, { on -> vm.act { it.ollama.halftimeSpeeches = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Training camp player progression", style = T.bodyB, color = P.ink)
+                            Text("AI breaks down camp standouts and season team projections.", style = T.small, color = P.sub)
+                        }
+                        androidx.compose.material3.Switch(lg.ollama.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } })
+                    }
                 }
             }
             lg.road?.let { rd ->

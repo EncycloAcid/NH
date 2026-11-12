@@ -26,6 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.Ollama
+import com.nh.hoopscoach.game.Player
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -276,12 +282,69 @@ private fun ProspectCard(vm: GameViewModel, lg: League, dn: DraftState, pr: Pros
                         )
                     }
                 }
+                if (lg.ollama.enabled && lg.ollama.draftScouting) {
+                    AiProspectScoutingCard(lg, pr, p)
+                }
                 Spacer(Modifier.height(8.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (pr.scout < 3) SmallButton("Scout him (${dn.scoutPoints} left)", enabled = dn.scoutPoints > 0) { vm.act { DraftNight.scout(it, p.id) } }
                     if (canDraft) SmallButton("Draft ${p.last.ifEmpty { p.name }}", primary = true) { vm.act { DraftNight.pick(it, p.id) } }
                 }
             }
+        }
+    }
+}
+
+/** Tactical draft scouting breakdown with pro comparisons labeled by AI. */
+@Composable
+private fun AiProspectScoutingCard(lg: League, pr: Prospect, p: Player) {
+    var report by remember(p.id) { mutableStateOf<Ollama.ProspectReport?>(null) }
+    var loading by remember(p.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(p.id) {
+        val cacheKey = "prospect_${p.id}_${lg.season}_${lg.ollama.activeModelName}"
+        Ollama.Cache.get<Ollama.ProspectReport>(cacheKey)?.let { report = it }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(P.surface2)
+            .padding(10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("AI DRAFT SCOUTING", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            Spacer(Modifier.width(6.dp))
+            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+            Spacer(Modifier.weight(1f))
+            if (report == null && !loading) {
+                SmallButton("Generate Intel", primary = true) {
+                    loading = true
+                    scope.launch {
+                        val res = Ollama.generateProspectScouting(lg.ollama, lg, pr)
+                        loading = false
+                        res.onSuccess { report = it }
+                    }
+                }
+            }
+        }
+        if (loading) {
+            Spacer(Modifier.height(6.dp))
+            Text("AI Draft Room is compiling film and pro comparisons...", style = T.small, color = P.accent)
+        } else if (report != null) {
+            val r = report!!
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("PRO COMP: ${r.proComparison}", style = T.bodyB.copy(fontSize = 13.sp), color = P.accent, modifier = Modifier.weight(1f))
+                Tag("UPSIDE: ${r.upside}", P.gold)
+            }
+            Spacer(Modifier.height(3.dp))
+            Text(r.blurb, style = T.small.copy(fontSize = 12.sp), color = P.ink)
+            Text("• Strengths: ${r.strengths}", style = T.small, color = P.sub)
+            Text("• Weaknesses: ${r.weaknesses}", style = T.small, color = P.sub)
         }
     }
 }

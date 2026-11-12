@@ -623,9 +623,12 @@ class News(
     val teamId: Int = -1, val pid: Int = -1,
     /** What people said about it: players, coaches, analysts, insiders and fans. */
     var reactions: List<Reaction> = emptyList(),
+    /** Explicitly marks whether this article was generated and labeled by AI. */
+    var aiLabeled: Boolean = false,
 ) {
     /** Rivalry results carry their game so the headline can link to the box score. */
     val rivalry get() = kind == "rivalry" || (kind.isEmpty() && gameId >= 0)
+    val isAiGenerated get() = aiLabeled || source.split(" ", "·", "-", "/", "_").any { it.equals("AI", ignoreCase = true) } || source.contains("Ollama", ignoreCase = true) || source.contains("Gemini", ignoreCase = true) || source.contains("ChatGPT", ignoreCase = true)
 }
 
 /** Settings for local Ollama LLM integration to control and generate stories. */
@@ -640,6 +643,11 @@ class OllamaConfig(
     var gameRecaps: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
+    var draftScouting: Boolean = true,
+    var injuryReports: Boolean = true,
+    var awardCeremonies: Boolean = true,
+    var halftimeSpeeches: Boolean = true,
+    var playerDevelopment: Boolean = true,
     // Speed & Performance Optimizations
     var speedMode: String = "turbo", // "turbo", "balanced", "quality"
     var numThreads: Int = 0, // 0 = auto-detect optimal CPU cores

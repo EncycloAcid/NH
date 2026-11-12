@@ -14,11 +14,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import kotlinx.coroutines.launch
 import com.nh.hoopscoach.game.Era
 import com.nh.hoopscoach.game.Eras
 import com.nh.hoopscoach.game.Honor
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.NbaAwards
+import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Player
 
@@ -110,7 +122,13 @@ fun LazyListScope.proAwards(vm: GameViewModel, lg: League) {
             )
         }
     }
-    honors(vm, lg, "Awards night", pick(NIGHT), era)
+    val night = pick(NIGHT)
+    honors(vm, lg, "Awards night", night, era)
+    if (lg.ollama.enabled && lg.ollama.awardCeremonies && night.isNotEmpty()) {
+        item {
+            AiAwardCeremonyCard(lg, night.first())
+        }
+    }
     if (season == lg.season && ps.mvpVotes.isNotEmpty()) item {
         Section("MVP vote")
         GroupList(ps.mvpVotes.take(10).withIndex().toList()) { (i, v) ->
@@ -209,4 +227,59 @@ fun TrophyCase(p: Player, limit: Int = 16) {
         }
     }
     if (groups.size > limit) Text("And ${groups.size - limit} more", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
+}
+
+/** Award ceremony acceptance speech and media tribute card labeled by AI. */
+@Composable
+fun AiAwardCeremonyCard(lg: League, honor: Honor) {
+    var speech by remember(honor.award, honor.pid, honor.season) { mutableStateOf<Ollama.AwardSpeech?>(null) }
+    var loading by remember(honor.award, honor.pid, honor.season) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(honor.award, honor.pid, honor.season) {
+        val cacheKey = "award_${honor.award}_${honor.pid}_${honor.season}_${lg.ollama.activeModelName}"
+        Ollama.Cache.get<Ollama.AwardSpeech>(cacheKey)?.let { speech = it }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Gutter, vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(P.surface)
+            .padding(14.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("AWARD CEREMONY PODIUM", style = T.label.copy(fontSize = 10.sp), color = P.gold)
+            Spacer(Modifier.width(6.dp))
+            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+            Spacer(Modifier.weight(1f))
+            if (speech == null && !loading) {
+                SmallButton("Generate Ceremony", primary = true) {
+                    loading = true
+                    scope.launch {
+                        val res = Ollama.generateAwardSpeech(lg.ollama, lg, honor)
+                        loading = false
+                        res.onSuccess { speech = it }
+                    }
+                }
+            }
+        }
+        if (loading) {
+            Spacer(Modifier.height(6.dp))
+            Text("AI is generating acceptance speech and columnist tribute...", style = T.small, color = P.accent)
+        } else if (speech != null) {
+            val sp = speech!!
+            Spacer(Modifier.height(8.dp))
+            Text(sp.awardTitle, style = T.head, color = P.ink)
+            Spacer(Modifier.height(6.dp))
+            Text("ACCEPTANCE SPEECH", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+            Spacer(Modifier.height(2.dp))
+            Text("\u201c${sp.acceptanceSpeech}\u201d", style = T.bodyB.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
+            Spacer(Modifier.height(6.dp))
+            Text("MEDIA TRIBUTE", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+            Spacer(Modifier.height(2.dp))
+            Text(sp.mediaTribute, style = T.small, color = P.faint)
+        }
+    }
 }

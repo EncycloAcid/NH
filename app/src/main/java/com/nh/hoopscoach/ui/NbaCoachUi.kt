@@ -30,12 +30,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.launch
+import com.nh.hoopscoach.game.Ollama
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1560,6 +1564,9 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     }
                     Section("Training Camp Report")
                     val grown = lg.rosterOf(u).map { it to (it.ovr - (ps.before[it.id] ?: it.ovr)) }.sortedByDescending { it.second }
+                    if (lg.ollama.enabled && lg.ollama.playerDevelopment && grown.isNotEmpty()) {
+                        AiTrainingCampCard(lg, u, grown.first().first, grown.first().second)
+                    }
                     GroupList(grown, inset = 70.dp) { (p, d) ->
                         PlayerLine(vm, lg, u, p, "${p.posLabel} · age ${p.age} · ${Road.dollars(Payroll.salaryOf(lg, p))}") {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2224,6 +2231,57 @@ private fun AutoResignCard(vm: GameViewModel, lg: League) {
                     exp.filter { it !in keep }.let { if (it.isEmpty()) "" else ". Would let go: " + it.joinToString(", ") { p -> p.name } } + ".",
                 style = T.small, color = P.ink,
             )
+        }
+    }
+}
+
+/** Training camp progression report and standout breakdown labeled by AI. */
+@Composable
+fun AiTrainingCampCard(lg: League, team: Team, topImprover: Player, delta: Int) {
+    var report by remember(team.id, topImprover.id, delta, lg.season) { mutableStateOf<Ollama.TrainingCampReport?>(null) }
+    var loading by remember(team.id, topImprover.id, delta, lg.season) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(team.id, topImprover.id, delta, lg.season) {
+        val cacheKey = "camp_${team.id}_${topImprover.id}_${delta}_${lg.season}_${lg.ollama.activeModelName}"
+        Ollama.Cache.get<Ollama.TrainingCampReport>(cacheKey)?.let { report = it }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(P.surface2)
+            .padding(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("CAMP DEVELOPMENT INTEL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+            Spacer(Modifier.width(6.dp))
+            Tag("✨ LABELED BY AI · ${lg.ollama.providerDisplayName.uppercase()}", P.good)
+            Spacer(Modifier.weight(1f))
+            if (report == null && !loading) {
+                SmallButton("Generate Intel", primary = true) {
+                    loading = true
+                    scope.launch {
+                        val res = Ollama.generateTrainingCampReport(lg.ollama, lg, team, topImprover, delta)
+                        loading = false
+                        res.onSuccess { report = it }
+                    }
+                }
+            }
+        }
+        if (loading) {
+            Spacer(Modifier.height(6.dp))
+            Text("AI Coaching Staff is analyzing player breakthroughs & camp drills...", style = T.small, color = P.accent)
+        } else if (report != null) {
+            val r = report!!
+            Spacer(Modifier.height(6.dp))
+            Text(r.headline, style = T.bodyB, color = P.ink)
+            Spacer(Modifier.height(4.dp))
+            Text("• Standout: ${r.standoutAnalysis}", style = T.small, color = P.sub)
+            Spacer(Modifier.height(2.dp))
+            Text("• Outlook: ${r.seasonOutlook}", style = T.small, color = P.sub)
         }
     }
 }

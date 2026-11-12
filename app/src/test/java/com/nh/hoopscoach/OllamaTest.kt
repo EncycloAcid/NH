@@ -3,9 +3,11 @@ package com.nh.hoopscoach
 import com.nh.hoopscoach.game.Game
 import com.nh.hoopscoach.game.GameType
 import com.nh.hoopscoach.game.LeagueGen
+import com.nh.hoopscoach.game.Honor
 import com.nh.hoopscoach.game.News
 import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.OllamaConfig
+import com.nh.hoopscoach.game.Prospect
 import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.Trade
 import kotlinx.coroutines.runBlocking
@@ -387,5 +389,118 @@ class OllamaTest {
         val openAiText = openAiRes.getOrThrow()
         assertTrue(openAiText.isNotEmpty())
         assertTrue("Credits ChatGPT", openAiText.contains("ChatGPT"))
+    }
+
+    @Test
+    fun testNewsAiGeneratedAndLabeledProperty() {
+        val plainNews = News(season = 2026, day = 1, text = "Big win", source = "The Daily Herald")
+        assertFalse("Standard human story is not AI generated", plainNews.isAiGenerated)
+        assertFalse("Default aiLabeled is false", plainNews.aiLabeled)
+
+        plainNews.aiLabeled = true
+        assertTrue("aiLabeled = true makes isAiGenerated true", plainNews.isAiGenerated)
+
+        val ollamaNews = News(season = 2026, day = 1, text = "Story", source = "The Daily Herald · Ollama llama3.2")
+        assertTrue("Source with Ollama is AI generated", ollamaNews.isAiGenerated)
+
+        val geminiNews = News(season = 2026, day = 1, text = "Story", source = "The Daily Herald · Google Gemini")
+        assertTrue("Source with Gemini is AI generated", geminiNews.isAiGenerated)
+
+        val chatGptNews = News(season = 2026, day = 1, text = "Story", source = "The Daily Herald · ChatGPT")
+        assertTrue("Source with ChatGPT is AI generated", chatGptNews.isAiGenerated)
+
+        val aiNews = News(season = 2026, day = 1, text = "Story", source = "The Daily Herald · AI Beat Writer")
+        assertTrue("Source with AI is AI generated", aiNews.isAiGenerated)
+    }
+
+    @Test
+    fun testFiveNewFineNarrativeGeneratorsWithAccountFallback() = runBlocking {
+        val lg = LeagueGen.newLeague()
+        val p = lg.players.first()
+        val t = lg.teams.first()
+        val g = Game(id = 10, day = 1, home = 0, away = 1, neutral = false, type = GameType.NONCONF, hs = 78, aws = 74)
+        lg.games.add(g)
+
+        val config = OllamaConfig(
+            provider = "google",
+            googleApiKey = "",
+            googleAccountEmail = "coach.test@gmail.com",
+            googleAccountPassword = "password",
+            googleSignedIn = true,
+        )
+
+        // 1. Prospect Scouting
+        val prospect = Prospect(p = p, rank = 1, school = "Duke", line = "21.4 pts, 8.5 reb", noiseO = 0, noiseP = 0)
+        val scoutRes = Ollama.generateProspectScouting(config, lg, prospect)
+        assertTrue("Prospect scouting succeeds", scoutRes.isSuccess)
+        val scout = scoutRes.getOrThrow()
+        assertTrue("Has pro comparison", scout.proComparison.isNotEmpty())
+        assertTrue("Has strengths", scout.strengths.isNotEmpty())
+        assertTrue("Has weaknesses", scout.weaknesses.isNotEmpty())
+        assertTrue("Has upside", scout.upside.isNotEmpty())
+        assertTrue("Has blurb", scout.blurb.isNotEmpty())
+
+        // 2. Injury Analysis
+        p.injury = "Sprained Ankle"
+        p.injGames = 3
+        p.injTotal = 5
+        val injRes = Ollama.generateInjuryAnalysis(config, lg, t, p)
+        assertTrue("Injury analysis succeeds", injRes.isSuccess)
+        val inj = injRes.getOrThrow()
+        assertTrue("Has headline", inj.headline.isNotEmpty())
+        assertTrue("Has severity outlook", inj.severityOutlook.isNotEmpty())
+        assertTrue("Has next man up strategy", inj.nextManUpStrategy.isNotEmpty())
+        assertTrue("Has quote", inj.quote.isNotEmpty())
+
+        // 3. Award Speech
+        val honor = Honor(season = 2026, day = 82, award = "MVP", pid = p.id, name = p.name, teamId = t.id, line = "28.5 pts, 7.2 reb, 9.1 ast")
+        val awardRes = Ollama.generateAwardSpeech(config, lg, honor)
+        assertTrue("Award speech succeeds", awardRes.isSuccess)
+        val award = awardRes.getOrThrow()
+        assertTrue("Has award title", award.awardTitle.isNotEmpty())
+        assertTrue("Has acceptance speech", award.acceptanceSpeech.isNotEmpty())
+        assertTrue("Has media tribute", award.mediaTribute.isNotEmpty())
+
+        // 4. Halftime Speech
+        val halfRes = Ollama.generateHalftimeSpeech(config, lg, g, usScore = 42, themScore = 38)
+        assertTrue("Halftime speech succeeds", halfRes.isSuccess)
+        val half = halfRes.getOrThrow()
+        assertTrue("Has locker room speech", half.lockerRoomSpeech.isNotEmpty())
+        assertTrue("Has tactical adjustment", half.tacticalAdjustment.isNotEmpty())
+
+        // 5. Training Camp Report
+        val campRes = Ollama.generateTrainingCampReport(config, lg, t, topImprover = p, delta = 4)
+        assertTrue("Training camp report succeeds", campRes.isSuccess)
+        val camp = campRes.getOrThrow()
+        assertTrue("Has headline", camp.headline.isNotEmpty())
+        assertTrue("Has standout analysis", camp.standoutAnalysis.isNotEmpty())
+        assertTrue("Has season outlook", camp.seasonOutlook.isNotEmpty())
+    }
+
+    @Test
+    fun testOllamaConfigFineNarrativeControlsPersistence() {
+        val lg = LeagueGen.newLeague()
+        // Verify default is true
+        assertTrue(lg.ollama.draftScouting)
+        assertTrue(lg.ollama.injuryReports)
+        assertTrue(lg.ollama.awardCeremonies)
+        assertTrue(lg.ollama.halftimeSpeeches)
+        assertTrue(lg.ollama.playerDevelopment)
+
+        // Toggle values
+        lg.ollama.draftScouting = false
+        lg.ollama.injuryReports = true
+        lg.ollama.awardCeremonies = false
+        lg.ollama.halftimeSpeeches = true
+        lg.ollama.playerDevelopment = false
+
+        val encoded = SaveIO.encode(lg)
+        val decoded = SaveIO.decode(encoded)
+
+        assertFalse(decoded.ollama.draftScouting)
+        assertTrue(decoded.ollama.injuryReports)
+        assertFalse(decoded.ollama.awardCeremonies)
+        assertTrue(decoded.ollama.halftimeSpeeches)
+        assertFalse(decoded.ollama.playerDevelopment)
     }
 }
