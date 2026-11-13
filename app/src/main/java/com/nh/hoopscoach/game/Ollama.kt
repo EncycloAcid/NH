@@ -221,6 +221,7 @@ object Ollama {
             is HalftimeSpeech -> value.isAi
             is TrainingCampReport -> value.isAi
             is PlayerInterview -> value.isAi
+            is Journalism.Package -> value.isAi
             else -> true
         }
     }
@@ -1078,6 +1079,93 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
         }
+    }
+
+    /** Fire-and-forget national sports desk package after a day of games. */
+    fun maybeAutoGenerateJournalism(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.sportsJournalism || !config.autoGenerate) return
+        if (lg.day < 3 || lg.day % 3 != 0) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateSportsJournalism(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+            }
+        }
+    }
+
+    /**
+     * National sports journalism package grounded in [Journalism.eventBrief]:
+     * headlines, a controversial column, rankings debate, and recruiting/trade rumor.
+     */
+    suspend fun generateSportsJournalism(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<Journalism.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.sportsJournalism) {
+            return@withContext Result.success(Journalism.fallbackPackage(lg))
+        }
+        val brief = Journalism.eventBrief(lg)
+        val cacheKey = "journalism_${lg.season}_${lg.day}_${config.activeModelName}" + "_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<Journalism.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val rumorLabel = if (lg.pro) "TRADE_RUMOR" else "RECRUITING_RUMOR"
+        val prompt = buildString {
+            appendLine("You are a national basketball desk. Using ONLY the EVENT BRIEF, write four pieces.")
+            appendLine("Do not invent scores, commits, trades, injuries, or quotes.")
+            appendLine("EVENT BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY:")
+            appendLine("NATIONAL_HEADLINE: <punchy headline from today's real results>")
+            appendLine("NATIONAL_BODY: <2 short paragraphs>")
+            appendLine("HOT_TAKE_HEADLINE: <controversial but fact-based column headline>")
+            appendLine("HOT_TAKE_BODY: <2 paragraphs arguing from the brief>")
+            appendLine("RANKINGS_HEADLINE: <rankings / power-board debate headline>")
+            appendLine("RANKINGS_BODY: <debate the top of the Elo board with records>")
+            appendLine("${rumorLabel}_HEADLINE: <${if (lg.pro) "trade/FA" else "recruiting"} speculation headline>")
+            appendLine("${rumorLabel}_BODY: <conditional analysis only — no confirmed deals>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "National sports desk. Facts only from the brief. Speculation must be labeled as such.",
+            numPredict = 480,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..24) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Desk")
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String, teamId: Int = lg.userTeamId, mine: Boolean = true) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = kind, body = body, source = outlet,
+                    teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("article", "NATIONAL_HEADLINE", "NATIONAL_BODY", teamId = lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
+            add("column", "HOT_TAKE_HEADLINE", "HOT_TAKE_BODY")
+            add("column", "RANKINGS_HEADLINE", "RANKINGS_BODY", teamId = lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
+            add("column", "${rumorLabel}_HEADLINE", "${rumorLabel}_BODY", mine = false)
+            val pack = if (stories.size >= 2) Journalism.Package(stories, draft.isAi, "Desk filed ${stories.size} pieces.")
+            else Journalism.fallbackPackage(lg).copy(detail = "AI thin — used game-written desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { Journalism.fallbackPackage(lg) }
     }
 
     /** Fire-and-forget postgame player interviews for the user's game. */

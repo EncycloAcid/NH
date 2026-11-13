@@ -657,6 +657,8 @@ class OllamaConfig(
     var playerInterviews: Boolean = true,
     var socialFeed: Boolean = true,
     var gameRecaps: Boolean = true,
+    /** AI sports desk: headlines, debates, rumors, national coverage from real events. */
+    var sportsJournalism: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
     var draftScouting: Boolean = true,

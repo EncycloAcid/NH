@@ -1221,6 +1221,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI sports journalism desk", style = T.bodyB, color = P.ink)
+                            Text("Headlines, hot takes, rankings debates, and recruiting/trade rumors from real results.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.sportsJournalism, { on -> vm.act { it.ollama.sportsJournalism = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
                         }
