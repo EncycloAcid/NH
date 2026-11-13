@@ -110,13 +110,23 @@ private fun vibe(p: Post): String = when {
 fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
     var appeared by remember(p.season, p.day, p.handle, p.text) { androidx.compose.runtime.mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
-    val enter by animateFloatAsState(if (appeared) 1f else 0f, tween(280), label = "post")
+    val enter by animateFloatAsState(
+        if (appeared) 1f else 0f,
+        tween(360, easing = Motion.EmphasizedDecel),
+        label = "post",
+    )
     val replies = (p.likes / 17).coerceAtLeast(if (p.likes > 20) 1 else 0)
     val reposts = (p.likes / 11).coerceAtLeast(if (p.likes > 40) 1 else 0)
     Column(
         Modifier
             .fillMaxWidth()
-            .graphicsLayer { alpha = 0.35f + 0.65f * enter; translationY = (1f - enter) * 10f }
+            .graphicsLayer {
+                alpha = 0.25f + 0.75f * enter
+                translationY = (1f - enter) * 14f
+                val s = 0.985f + 0.015f * enter
+                scaleX = s
+                scaleY = s
+            }
             .then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
