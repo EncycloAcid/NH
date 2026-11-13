@@ -108,10 +108,12 @@ class ArticleWritingTest {
     }
     @Test fun cloudCompletionMetadataAndAllTextPartsAreRespected() {
         assertEquals("A complete story.", Ollama.googleResponse("""{"candidates":[{"finishReason":"STOP","content":{"parts":[{"thought":true,"text":"private reasoning"},{"text":"A complete "},{"text":"story."}]}}]}"""))
-        assertTrue(runCatching { Ollama.googleResponse("""{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"Cut off to"}]}}]}""") }.isFailure)
+        assertEquals("Cut off to", Ollama.googleResponse("""{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"Cut off to"}]}}]}"""))
+        assertTrue(runCatching { Ollama.googleResponse("""{"candidates":[{"finishReason":"SAFETY","content":{"parts":[{"text":"blocked"}]}}]}""") }.isFailure)
         assertTrue(runCatching { Ollama.googleResponse("""{"candidates":[]}""") }.isFailure)
         assertEquals("Complete.", Ollama.openAiResponse("""{"choices":[{"finish_reason":"stop","message":{"content":"Complete."}}]}"""))
-        for (reason in listOf("length", "content_filter")) assertTrue(runCatching { Ollama.openAiResponse("""{"choices":[{"finish_reason":"$reason","message":{"content":"Cut off to"}}]}""") }.isFailure)
+        assertEquals("Cut off to", Ollama.openAiResponse("""{"choices":[{"finish_reason":"length","message":{"content":"Cut off to"}}]}"""))
+        assertTrue(runCatching { Ollama.openAiResponse("""{"choices":[{"finish_reason":"content_filter","message":{"content":"Cut off to"}}]}""") }.isFailure)
         assertTrue(runCatching { Ollama.openAiResponse("""{"choices":[]}""") }.isFailure)
     }
     @Test fun realisticCutoffIsFactuallyValidButCannotReceiveACheck() = runBlocking {

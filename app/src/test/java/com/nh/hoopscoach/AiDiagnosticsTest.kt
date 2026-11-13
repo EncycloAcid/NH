@@ -45,6 +45,9 @@ class AiDiagnosticsTest {
         assertEquals("gemini-3.1-flash-lite", cfg.googleModel)
         assertTrue(Ollama.isModelAccessError("Google AI Error (404): models/gemini-1.5-flash is not found"))
         assertFalse(Ollama.isModelAccessError("Google AI Error (429): Resource exhausted"))
+        assertTrue(Ollama.isTransientProviderError("Google AI Error (429): Resource exhausted"))
+        assertTrue(Ollama.isTransientProviderError("ChatGPT Error (503): Service unavailable"))
+        assertFalse(Ollama.isTransientProviderError("Google AI Error (401): API key invalid"))
         assertEquals(
             listOf("gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
             Ollama.googleGenerateCandidates(OllamaConfig(googleModel = "gemini-1.5-flash")),

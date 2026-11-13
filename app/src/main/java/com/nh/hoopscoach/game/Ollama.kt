@@ -2,7 +2,10 @@ package com.nh.hoopscoach.game
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -18,6 +21,8 @@ import java.util.Collections
  */
 object Ollama {
     private val json = Json { ignoreUnknownKeys = true }
+    /** Free-tier keys get hammered when every desk launches at once — queue cloud/local generates. */
+    private val generateGate = Mutex()
 
     data class ModelPreset(
         val id: String,
@@ -336,12 +341,36 @@ object Ollama {
     /** True when the provider error looks like a bad / missing / blocked model id (safe to try the next candidate). */
     internal fun isModelAccessError(message: String?): Boolean {
         val m = message?.lowercase().orEmpty()
-        if ("429" in m || "rate limit" in m || "resource_exhausted" in m) return false
+        if (isTransientProviderError(m)) return false
         return "404" in m || "403" in m || "not found" in m || "not supported" in m || "is not found" in m ||
             "does not exist" in m || "invalid model" in m || "model_not_found" in m ||
             "no longer available" in m || "has been shut down" in m || "deprecated" in m ||
             "not available" in m || "not enabled" in m || "permission" in m || "not allowed" in m ||
             "does not have access" in m || "not eligible" in m || "unsupported" in m
+    }
+
+    /** Rate limits, overloads, and socket blips — retry same model before giving up. */
+    internal fun isTransientProviderError(message: String?): Boolean {
+        val m = message?.lowercase().orEmpty()
+        return "429" in m || "502" in m || "503" in m || "504" in m || "408" in m ||
+            "rate limit" in m || "resource_exhausted" in m || "unavailable" in m ||
+            "timeout" in m || "timed out" in m || "connection reset" in m ||
+            "connection refused" in m || "temporarily" in m || "try again" in m ||
+            "socket" in m || "broken pipe" in m
+    }
+
+    private suspend fun <T> retryTransient(attempts: Int = 3, block: suspend (attempt: Int) -> T): T {
+        var last: Exception? = null
+        repeat(attempts) { i ->
+            try {
+                return block(i)
+            } catch (e: Exception) {
+                last = e
+                if (!isTransientProviderError(e.message) || i == attempts - 1) throw e
+                delay(400L * (1L shl i)) // 400ms, 800ms
+            }
+        }
+        throw (last ?: Exception("Provider request failed"))
     }
 
     /**
@@ -680,87 +709,78 @@ object Ollama {
             return@withContext Result.failure(Exception("Gemini requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.googleApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            val remoteResult = runCatching {
-                val candidates = googleGenerateCandidates(config)
-                var lastErr: Exception? = null
-                var text: String? = null
-                var used: String? = null
+        if (apiKey.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No Google model credential; use game-written coverage."))
+        }
+        runCatching {
+            val candidates = googleGenerateCandidates(config)
+            var lastErr: Exception? = null
+            var text: String? = null
+            var used: String? = null
 
-                for (cand in candidates) {
-                    for (apiVersion in listOf("v1beta")) {
-                        try {
-                            val url = URL("https://generativelanguage.googleapis.com/$apiVersion/models/$cand:generateContent?key=$apiKey")
-                            val conn = (url.openConnection() as HttpURLConnection).apply {
-                                requestMethod = "POST"
-                                connectTimeout = 8000
-                                readTimeout = 90000
-                                doOutput = true
-                                setRequestProperty("x-goog-api-key", apiKey)
-                                if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
-                                    setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
-                                }
-                                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                                setRequestProperty("Accept", "application/json")
+            for (cand in candidates) {
+                try {
+                    val content = retryTransient {
+                        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$cand:generateContent?key=$apiKey")
+                        val conn = (url.openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 12000
+                            readTimeout = 90000
+                            doOutput = true
+                            setRequestProperty("x-goog-api-key", apiKey)
+                            if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
+                                setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
                             }
+                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            setRequestProperty("Accept", "application/json")
+                        }
 
-                            val payload = buildString {
-                                append("{\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}]")
-                                if (system.isNotBlank()) {
-                                    append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
-                                }
-                                append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict}}")
+                        val payload = buildString {
+                            append("{\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}]")
+                            if (system.isNotBlank()) {
+                                append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
                             }
+                            append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict}}")
+                        }
 
-                            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+                        conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
 
-                            val code = conn.responseCode
-                            if (code in 200..299) {
-                                val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                                val content = googleResponse(body)
-                                if (content.isNotEmpty()) {
-                                    onToken?.invoke(content)
-                                    text = content
-                                    used = cand
-                                    break
-                                }
-                            } else {
-                                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                                val errMsg = runCatching {
-                                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                                }.getOrNull() ?: err
-                                lastErr = Exception("Google AI Error ($code): $errMsg")
-                                if (isModelAccessError("$code $errMsg")) {
-                                    rememberFailedModel(cand)
-                                } else {
-                                    throw lastErr!!
-                                }
-                            }
-                        } catch (e: Exception) {
-                            lastErr = e
-                            if (isModelAccessError(e.message)) {
-                                rememberFailedModel(cand)
-                            } else {
-                                throw e
-                            }
+                        val code = conn.responseCode
+                        if (code in 200..299) {
+                            val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                            googleResponse(body)
+                        } else {
+                            val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                            val errMsg = runCatching {
+                                json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                            }.getOrNull() ?: err
+                            throw Exception("Google AI Error ($code): $errMsg")
                         }
                     }
-                    if (text != null) break
-                }
-                if (text != null && used != null) {
-                    forgetFailedModel(used)
-                    if ((config.autoPickModel || isRetiredGoogleModel(config.googleModel) || config.googleModel.isBlank() || isFailedModel(config.googleModel)) &&
-                        !used.equals(config.googleModel, true)
-                    ) {
-                        config.googleModel = used
+                    if (content.isNotEmpty()) {
+                        onToken?.invoke(content)
+                        text = content
+                        used = cand
+                        break
+                    }
+                } catch (e: Exception) {
+                    lastErr = e
+                    when {
+                        isModelAccessError(e.message) -> rememberFailedModel(cand)
+                        isTransientProviderError(e.message) -> { /* already retried; try next model */ }
+                        else -> throw e // auth / hard failures
                     }
                 }
-                text ?: throw (lastErr ?: Exception("Google AI request failed"))
             }
-
-            remoteResult
-        } else {
-            Result.failure(IllegalStateException("No Google model credential; use game-written coverage."))
+            if (text != null && used != null) {
+                forgetFailedModel(used)
+                if ((config.autoPickModel || isRetiredGoogleModel(config.googleModel) || config.googleModel.isBlank() || isFailedModel(config.googleModel)) &&
+                    !used.equals(config.googleModel, true)
+                ) {
+                    config.googleModel = used
+                }
+            }
+            text ?: throw (lastErr ?: Exception("Google AI request failed"))
         }
     }
 
@@ -777,20 +797,23 @@ object Ollama {
             return@withContext Result.failure(Exception("OpenAI requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.openAiApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            val remoteResult = runCatching {
-                val candidates = openAiGenerateCandidates(config)
-                val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
-                val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
-                var lastErr: Exception? = null
-                var text: String? = null
-                var used: String? = null
-                for (model in candidates) {
-                    try {
+        if (apiKey.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No ChatGPT model credential; use game-written coverage."))
+        }
+        runCatching {
+            val candidates = openAiGenerateCandidates(config)
+            val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
+            val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
+            var lastErr: Exception? = null
+            var text: String? = null
+            var used: String? = null
+            for (model in candidates) {
+                try {
+                    val content = retryTransient {
                         val url = URL(endpoint)
                         val conn = (url.openConnection() as HttpURLConnection).apply {
                             requestMethod = "POST"
-                            connectTimeout = 10000
+                            connectTimeout = 12000
                             readTimeout = 90000
                             doOutput = true
                             setRequestProperty("Authorization", "Bearer $apiKey")
@@ -811,47 +834,37 @@ object Ollama {
                         val code = conn.responseCode
                         if (code in 200..299) {
                             val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                            val content = openAiResponse(body)
-                            if (content.isEmpty()) throw Exception("Empty response from ChatGPT")
-                            onToken?.invoke(content)
-                            text = content
-                            used = model
-                            break
+                            openAiResponse(body).also { if (it.isEmpty()) throw Exception("Empty response from ChatGPT") }
                         } else {
                             val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
                             val errMsg = runCatching {
                                 json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                             }.getOrNull() ?: err
-                            lastErr = Exception("ChatGPT Error ($code): $errMsg")
-                            if (isModelAccessError("$code $errMsg")) {
-                                rememberFailedModel(model)
-                            } else {
-                                throw lastErr!!
-                            }
-                        }
-                    } catch (e: Exception) {
-                        lastErr = e
-                        if (isModelAccessError(e.message)) {
-                            rememberFailedModel(model)
-                        } else {
-                            throw e
+                            throw Exception("ChatGPT Error ($code): $errMsg")
                         }
                     }
-                }
-                if (text != null && used != null) {
-                    forgetFailedModel(used)
-                    if ((config.autoPickModel || config.openAiModel.isBlank() || isFailedModel(config.openAiModel)) &&
-                        !used.equals(config.openAiModel, true)
-                    ) {
-                        config.openAiModel = used
+                    onToken?.invoke(content)
+                    text = content
+                    used = model
+                    break
+                } catch (e: Exception) {
+                    lastErr = e
+                    when {
+                        isModelAccessError(e.message) -> rememberFailedModel(model)
+                        isTransientProviderError(e.message) -> { /* already retried; try next model */ }
+                        else -> throw e
                     }
                 }
-                text ?: throw (lastErr ?: Exception("ChatGPT request failed"))
             }
-
-            remoteResult
-        } else {
-            Result.failure(IllegalStateException("No ChatGPT model credential; use game-written coverage."))
+            if (text != null && used != null) {
+                forgetFailedModel(used)
+                if ((config.autoPickModel || config.openAiModel.isBlank() || isFailedModel(config.openAiModel)) &&
+                    !used.equals(config.openAiModel, true)
+                ) {
+                    config.openAiModel = used
+                }
+            }
+            text ?: throw (lastErr ?: Exception("ChatGPT request failed"))
         }
     }
 
@@ -865,10 +878,12 @@ object Ollama {
         numPredict: Int = 350,
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
-        when (config.provider.lowercase()) {
-            "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
-            "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
-            else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
+        generateGate.withLock {
+            when (config.provider.lowercase()) {
+                "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
+                "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
+                else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
+            }
         }
     }
 
@@ -959,7 +974,10 @@ object Ollama {
     internal fun googleResponse(body: String): String {
         val candidate = json.parseToJsonElement(body).jsonObject["candidates"]?.jsonArray?.firstOrNull()?.jsonObject ?: error("Empty response from Gemini")
         val reason = candidate["finishReason"]?.jsonPrimitive?.content
-        check(reason == null || reason == "STOP") { "Model response was incomplete or filtered ($reason)" }
+        // MAX_TOKENS is truncated but often still usable; only reject true safety blocks / empty.
+        check(reason == null || reason == "STOP" || reason == "MAX_TOKENS") {
+            "Model response was incomplete or filtered ($reason)"
+        }
         return candidate["content"]?.jsonObject?.get("parts")?.jsonArray?.mapNotNull { part ->
             part.jsonObject.takeUnless { it["thought"]?.jsonPrimitive?.content == "true" }?.get("text")?.jsonPrimitive?.content
         }?.joinToString("").orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from Gemini" } }
@@ -968,7 +986,9 @@ object Ollama {
     internal fun openAiResponse(body: String): String {
         val choice = json.parseToJsonElement(body).jsonObject["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: error("Empty response from ChatGPT")
         val reason = choice["finish_reason"]?.jsonPrimitive?.content
-        check(reason == null || reason == "stop") { "Model response was incomplete or filtered ($reason)" }
+        check(reason == null || reason == "stop" || reason == "length") {
+            "Model response was incomplete or filtered ($reason)"
+        }
         return choice["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content.orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from ChatGPT" } }
     }
 

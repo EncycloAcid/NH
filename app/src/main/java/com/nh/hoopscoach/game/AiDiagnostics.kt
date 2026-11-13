@@ -47,7 +47,8 @@ object AiDiagnostics {
         return when (code) {
             "401", "403" -> "Provider rejected API access (HTTP $code). Check the API key and permissions."
             "404" -> "Model or endpoint not found (HTTP 404). Select a model available to your account."
-            "429" -> "Provider quota or rate limit reached (HTTP 429). Check API billing and quota."
+            "429" -> "Provider quota or rate limit reached (HTTP 429). The app retries and queues AI desks; wait a moment or lower auto-generate desks."
+            "502", "503", "504" -> "Provider temporarily overloaded (HTTP $code). The app retries automatically — try Test AI again if it still fails."
             null -> if (config.provider == "ollama") "Ollama could not respond. Check the server address, installed model and connection. Localhost is this phone." else "Provider connection failed (${error?.javaClass?.simpleName ?: "unknown error"}). Check connectivity and API settings."
             else -> "Provider request failed (HTTP $code). Try again or check AI settings."
         }
