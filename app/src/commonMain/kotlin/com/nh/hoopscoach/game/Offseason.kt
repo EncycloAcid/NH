@@ -115,7 +115,7 @@ object Offseason {
         t.roster.remove(pid)
         lg.offseason?.let { it.released += p.name; it.freedOther += p.nil }
         toPortal(lg, p, t.id)
-        Gameplan.validate(lg, t)
+        Tactics.validate(lg, t)
     }
 
     private fun toPortal(lg: League, p: Player, fromId: Int) {
@@ -183,7 +183,7 @@ object Offseason {
                 if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
                 toPortal(lg, p, t.id)
             }
-            Gameplan.validate(lg, t)
+            Tactics.validate(lg, t)
         }
     }
 
@@ -239,7 +239,7 @@ object Offseason {
         }
         os.entrants.retainAll(drafted)
         // Lineups can't point at players who just left.
-        for (t in lg.teams) Gameplan.validate(lg, t)
+        for (t in lg.teams) Tactics.validate(lg, t)
     }
 
     private fun hallOfFameCheck(lg: League, p: Player, t: Team) {
@@ -352,7 +352,7 @@ object Offseason {
             Fans.newSeason(t)
             t.totals = StatLine(); t.opp = StatLine(); t.ap = 0; t.net = 0
             if (!lg.humanCoach(t)) Morale.aiNilRefresh(lg, t)
-            if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
+            if (!lg.humanCoach(t) || t.plan.auto) Tactics.autoAllocate(lg, t) else Tactics.validate(lg, t)
         }
         lg.phase = Phase.REGULAR
         lg.day = 1
@@ -556,7 +556,7 @@ object Coaching {
             lg.removePlayer(p)
             Careers.keep(lg, p, oldTeam, 0, "Left ${oldTeam.school} when ${me.name} took the ${newTeam.school} job in ${lg.season}")
         }
-        Gameplan.validate(lg, oldTeam)
+        Tactics.validate(lg, oldTeam)
         val other = lg.coachOf(newTeam)
         other.teamId = oldTeam.id
         oldTeam.coachId = other.id

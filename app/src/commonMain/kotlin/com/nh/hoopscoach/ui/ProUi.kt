@@ -69,7 +69,7 @@ import com.nh.hoopscoach.game.Team
 
 /** Planned minutes: the plan is written per 40, and a pro game runs 48. */
 fun planMin(lg: League, t: Team, pid: Int): Int {
-    val m = com.nh.hoopscoach.game.Gameplan.plannedMinutes(t, pid)
+    val m = com.nh.hoopscoach.game.Tactics.plannedMinutes(t, pid)
     return if (lg.pro) (m * 1.2).toInt() else m
 }
 
@@ -423,7 +423,7 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
         if (vm.teamTab != 1) {
             val plan = u.plan.slots
             val starters = plan.map { it.starter }.toSet()
-            val roster = lg.rosterOf(u).sortedWith(compareByDescending<Player> { it.id in starters }.thenByDescending { com.nh.hoopscoach.game.Gameplan.plannedMinutes(u, it.id) }.thenByDescending { it.ovr })
+            val roster = lg.rosterOf(u).sortedWith(compareByDescending<Player> { it.id in starters }.thenByDescending { com.nh.hoopscoach.game.Tactics.plannedMinutes(u, it.id) }.thenByDescending { it.ovr })
             item {
                 Section("Roster · ${roster.size} players")
                 GroupList(roster, inset = 66.dp) { p ->
@@ -967,7 +967,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         if (vm.meTab == 0) item { RivalPanel(vm, lg) }
         if (vm.meTab == 1) item { ContenderPanel(vm, lg) }
         if (vm.meTab == 1) item {
-            val mins = com.nh.hoopscoach.game.Gameplan.plannedMinutes(t, h.id)
+            val mins = com.nh.hoopscoach.game.Tactics.plannedMinutes(t, h.id)
             Section("Your role")
             Panel {
                 Text(Road.role(lg).uppercase(), style = T.label, color = P.accent)

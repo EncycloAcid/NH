@@ -33,7 +33,7 @@ object Rival {
             t.roster.remove(cut.id)
             lg.removePlayer(cut)
         }
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         r.rivalId = p.id
         r.rivalName = p.name
         lg.news += News(

@@ -72,7 +72,7 @@ object Staffing {
         t.coachId = c.id
         t.plan.offense = if (c.off >= c.def) Rng.pick(listOf(Offense.UPTEMPO, Offense.PERIMETER, Offense.BALANCED)) else Rng.pick(listOf(Offense.GRIND, Offense.INSIDE, Offense.BALANCED))
         t.plan.defense = if (c.def >= 80) Rng.pick(listOf(Defense.MAN, Defense.PACKLINE)) else Rng.pick(listOf(Defense.MAN, Defense.ZONE, Defense.MAN))
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         val line = if (poachedFrom != null) "The ${t.name} hire ${c.name} away from the ${poachedFrom.name} (${t.plan.offense.label}, ${t.plan.defense.label})"
             else "The ${t.name} hire ${c.name} as head coach (${t.plan.offense.label}, ${t.plan.defense.label})"
         ps?.staffMoves?.add(line)

@@ -114,7 +114,7 @@ object Season {
             }
         }
         // AI coaches re-tune their rotations as players develop.
-        if (lg.day % 7 == 0) for (t in lg.teams) if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t)
+        if (lg.day % 7 == 0) for (t in lg.teams) if (!lg.humanCoach(t) || t.plan.auto) Tactics.autoAllocate(lg, t)
     }
 
     // ---------- in-season events ----------

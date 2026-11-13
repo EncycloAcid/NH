@@ -16,7 +16,7 @@ class MediaTest {
         val h = lg.hero!!
         h.proYears = 1
         repeat(40) { if (h.ovr < 88) for (i in h.attrs.indices) h.attrs[i] = (h.attrs[i] + 1).coerceAtMost(99) }
-        com.nh.hoopscoach.game.Gameplan.autoAllocate(lg, lg.team(h.teamId))
+        com.nh.hoopscoach.game.Tactics.autoAllocate(lg, lg.team(h.teamId))
         val r = lg.road!!
         val topics = mutableSetOf<String>()
         var reporters = 0

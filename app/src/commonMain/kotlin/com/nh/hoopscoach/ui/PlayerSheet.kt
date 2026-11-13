@@ -51,7 +51,7 @@ import com.nh.hoopscoach.game.Attr
 import com.nh.hoopscoach.game.PRO_YEAR
 import com.nh.hoopscoach.game.Careers
 import com.nh.hoopscoach.game.Finance
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Mood
 import com.nh.hoopscoach.game.Morale
@@ -108,7 +108,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
-                    if (team != null) Text("${team.school} · ${Gameplan.role(lg, team, p.id)}", style = T.small, color = P.accent)
+                    if (team != null) Text("${team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
                     if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = injuryColor(p))
                     // A pro's contract.

@@ -91,7 +91,7 @@ object Tryouts {
         lg.addPlayer(p)
         t.roster += p.id
         // The cut player is gone, so the lineup can't point at him.
-        Gameplan.validate(lg, t)
+        Tactics.validate(lg, t)
     }
 
     private fun level(v: Double) = ((v - 36) / 6.0).roundToInt().coerceIn(0, 3)
@@ -148,7 +148,7 @@ object Tryouts {
         t.roster.remove(pid)
         lg.removePlayer(p)
         lg.offseason?.released?.add(p.name)
-        Gameplan.validate(lg, t)
+        Tactics.validate(lg, t)
         return true
     }
 

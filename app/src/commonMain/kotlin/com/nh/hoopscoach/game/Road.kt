@@ -163,7 +163,7 @@ object Road {
             lg.removePlayer(cut)
         }
         lg.road?.let { if (it.schools.lastOrNull() != t.id) it.schools += t.id }
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
     }
 
     /** "Your team" follows the user's player, and its head coach is whoever coaches there now. */
@@ -360,7 +360,7 @@ object Road {
         if (r.offers.none { it.teamId == teamId }) return
         val old = lg.team(h.teamId)
         old.roster.remove(h.id)
-        Gameplan.validate(lg, old)
+        Tactics.validate(lg, old)
         h.transferFrom = old.id
         join(lg, h, lg.team(teamId))
         r.portal = false
@@ -614,6 +614,6 @@ object Road {
     fun role(lg: League): String {
         val h = lg.playerOrNull(lg.heroId) ?: return ""
         val t = lg.team(h.teamId)
-        return Gameplan.role(t, h.id)
+        return Tactics.role(t, h.id)
     }
 }

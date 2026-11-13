@@ -92,7 +92,7 @@ object Assistants {
             lg.coaches += c
             opening.coachId = c.id
             GenerationalLegacy.inheritProgram(lg, opening, c, mentor = lg.userCoach.name)
-            Gameplan.autoAllocate(lg, opening)
+            Tactics.autoAllocate(lg, opening)
             lg.staff.remove(a)
             val where = if (lg.pro) "the ${opening.name}" else opening.school
             lg.tree += TreeBranch(a.name, a.skill, a.seasons, lg.season, if (lg.pro) opening.name else opening.school, c.id)

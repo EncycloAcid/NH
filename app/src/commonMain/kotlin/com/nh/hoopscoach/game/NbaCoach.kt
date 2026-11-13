@@ -422,7 +422,7 @@ object NbaCoach {
         // The years he spent in college pass here too: everyone ages, the old guard retires, new classes arrive.
         val years = first - 1 - lg.season
         if (years > 0) ProLeague.ageForward(lg, years)
-        for (tm in lg.teams) Gameplan.autoAllocate(lg, tm)
+        for (tm in lg.teams) Tactics.autoAllocate(lg, tm)
         Picks.ensure(lg)
         return lg
     }
@@ -552,7 +552,7 @@ object NbaCoach {
         ps.expect = -1
         // Past the draft already (he retired when nobody called): his free agents are up now.
         if (ps.step != ProStep.REVIEW) ps.userKeep += expiring(lg).filter { Trades.value(it) >= 1.5 }.map { it.id }
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         val was = lg.playedAs?.proTeams?.contains(t.name) == true
         val head = "From the court to the bench: the ${t.name} name ${h.name} head coach" + if (was) ", back with a team he played for" else ""
         // The farewell screen is behind him; now the press conference.
@@ -582,7 +582,7 @@ object NbaCoach {
         c.security = 60
         ps.fired = false
         ps.jobOffers.clear()
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         val head = "${c.name} is the new head coach of the ${t.name}"
         runCatching { Farewell.hire(lg, head) }.onFailure { lg.news += News(lg.season, lg.day, head, true) }
     }

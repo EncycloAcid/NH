@@ -245,8 +245,8 @@ object StarRecruit {
         to.roster += star.id
         ProLeague.trim(lg, to)
         while (from.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(85, 89), Rng.range(26, 32), from)
-        Gameplan.autoAllocate(lg, from)
-        Gameplan.autoAllocate(lg, to)
+        Tactics.autoAllocate(lg, from)
+        Tactics.autoAllocate(lg, to)
         lg.reindex()
         r.recruitNote = "${star.name} is in. He signs with the ${to.name} to play with you."
         lg.news += News(lg.season, 0, "${star.name} leaves the ${from.name} to team up with ${lg.hero?.name} on the ${to.name}", true)

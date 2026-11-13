@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Arch
 import com.nh.hoopscoach.game.Defense
 import com.nh.hoopscoach.game.Finance
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Mood
 import com.nh.hoopscoach.game.Morale
@@ -90,9 +90,9 @@ fun TeamScreen(vm: GameViewModel, lg: League) {
 fun TeamRings(lg: League, t: Team) {
     Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            RingStat("Overall", Gameplan.teamRating(lg, t))
-            RingStat("Offense", Gameplan.teamRating(lg, t) { Ratings.offense(it) })
-            RingStat("Defense", Gameplan.teamRating(lg, t) { Ratings.defense(it) })
+            RingStat("Overall", Tactics.teamRating(lg, t))
+            RingStat("Offense", Tactics.teamRating(lg, t) { Ratings.offense(it) })
+            RingStat("Defense", Tactics.teamRating(lg, t) { Ratings.defense(it) })
             RingStat("Power", Rankings.power(lg, t))
             RingStat("Prestige", t.prestige)
         }
@@ -127,7 +127,7 @@ fun LazyListScope.rosterList(vm: GameViewModel, lg: League, t: Team, mine: Boole
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) {
-    val mins = Gameplan.plannedMinutes(t, p.id)
+    val mins = Tactics.plannedMinutes(t, p.id)
     val you = p.id == lg.heroId
     ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (you) Modifier.background(P.accentSoft) else Modifier) {
         PlayerJersey(p, t, 44.dp)
@@ -184,7 +184,7 @@ fun traitColor(t: Trait): Color = when (t) {
 internal fun LazyListScope.lineup(vm: GameViewModel, lg: League, t: Team) {
     item {
         Section("Game plan", action = if (t.plan.auto) "Auto ✓" else "Auto-set", onAction = {
-            vm.act { Gameplan.autoAllocate(it, it.user); it.user.plan.auto = true }
+            vm.act { Tactics.autoAllocate(it, it.user); it.user.plan.auto = true }
             vm.toast("Rotation set automatically")
         })
         Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -248,14 +248,14 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                                 if (sat) Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
                                 else Modifier.clickable {
                                     choose = null
-                                    vm.act { Gameplan.swapInto(it, it.user, idx, starter, p.id) }
+                                    vm.act { Tactics.swapInto(it, it.user, idx, starter, p.id) }
                                 }.padding(vertical = 8.dp, horizontal = 4.dp),
                             ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(p.posLabel, style = T.small, color = if (p.plays(Pos.entries[idx])) P.accent else P.sub, modifier = Modifier.width(50.dp))
                             Text(p.name, style = T.bodyB, color = if (sat) P.faint else P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(Gameplan.role(lg, t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
+                            Text(Tactics.role(lg, t, p.id), style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 8.dp))
                             Ring(p.ovr, 34.dp, textSize = 14.sp)
                         }
                     }

@@ -39,7 +39,7 @@ import com.nh.hoopscoach.game.Bracket
 import com.nh.hoopscoach.game.Bracketology
 import com.nh.hoopscoach.game.Game
 import com.nh.hoopscoach.game.GameType
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Player
@@ -148,9 +148,9 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         val theirs = teamInk(opp).let { if (contrast(it, mine) < 1.4f) P.faint else it }
         WinChance(p, opp)
         Spacer(Modifier.height(12.dp))
-        Compare("Overall", Gameplan.teamRating(lg, u), Gameplan.teamRating(lg, opp), mine, theirs)
-        Compare("Offense", Gameplan.teamRating(lg, u) { Ratings.offense(it) }, Gameplan.teamRating(lg, opp) { Ratings.offense(it) }, mine, theirs)
-        Compare("Defense", Gameplan.teamRating(lg, u) { Ratings.defense(it) }, Gameplan.teamRating(lg, opp) { Ratings.defense(it) }, mine, theirs)
+        Compare("Overall", Tactics.teamRating(lg, u), Tactics.teamRating(lg, opp), mine, theirs)
+        Compare("Offense", Tactics.teamRating(lg, u) { Ratings.offense(it) }, Tactics.teamRating(lg, opp) { Ratings.offense(it) }, mine, theirs)
+        Compare("Defense", Tactics.teamRating(lg, u) { Ratings.defense(it) }, Tactics.teamRating(lg, opp) { Ratings.defense(it) }, mine, theirs)
         if (lg.ollama.enabled && lg.ollama.scoutingKeys) {
             AiScoutingCard(vm, lg, g)
         }

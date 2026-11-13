@@ -91,7 +91,7 @@ object LeagueGen {
             lg.addPlayer(p)
             t.roster += p.id
         }
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         Shoes.assignApparel(t, force = true)
         Morale.setInitialNil(lg, t)
         Shoes.seedRoster(lg, t)

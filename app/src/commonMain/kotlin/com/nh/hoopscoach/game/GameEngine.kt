@@ -385,7 +385,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     init {
-        for (t in teams) Gameplan.validate(lg, t)
+        for (t in teams) Tactics.validate(lg, t)
         for (side in 0..1) for (p in rosters[side]) lines[side][p.id] = StatLine()
         starters = Array(2) { side -> teams[side].plan.slots.map { it.starter }.filter { it >= 0 }.toSet() }
         if (pbp) {
@@ -513,7 +513,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (shots == 1) freeThrows(o, shooter, 2, offense, defense, oneAndOne = true) else freeThrows(o, shooter, 2, offense, defense)
 
     private fun usage(side: Int, p: Player): Double {
-        var u = Gameplan.usageFor(p, lg.pro).toDouble() * 0.8
+        var u = Tactics.usageFor(p, lg.pro).toDouble() * 0.8
         for (s in teams[side].plan.slots) {
             if (s.starter == p.id) { u = s.starterUsg.toDouble(); break }
             if (s.reserve == p.id) { u = s.reserveUsg.toDouble(); break }

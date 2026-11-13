@@ -113,10 +113,10 @@ object Payroll {
                 p.teamId = claimer.id
                 p.salary = ProCareer.minSalary(lg, p.proYears)
                 p.contractYears = 1
-                Gameplan.autoAllocate(lg, claimer)
+                Tactics.autoAllocate(lg, claimer)
             }
         }
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         lg.news += News(lg.season, lg.day, "The ${t.name} buy out ${p.name}, freeing ${Road.dollars(saved)} in cap space (${Road.dollars(hit)}/yr dead cap for $yrs yrs)", t.id == lg.userTeamId)
         return true
     }

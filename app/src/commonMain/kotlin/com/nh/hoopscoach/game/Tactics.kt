@@ -2,7 +2,7 @@ package com.nh.hoopscoach.game
 
 import kotlin.math.roundToInt
 
-object Gameplan {
+object Tactics {
 
     private val NEIGHBORS = mapOf(
         Pos.PG to listOf(Pos.PG, Pos.SG, Pos.SF, Pos.PF, Pos.C),

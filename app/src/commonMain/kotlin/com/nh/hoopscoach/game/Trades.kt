@@ -167,7 +167,7 @@ object Trades {
         for (t in listOf(a, b)) {
             ProLeague.trim(lg, t)
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         ps.moved += (fromA + fromB).map { it.id }
         // The trade changes how good each team is (on top of how it has played).
@@ -582,7 +582,7 @@ object Trades {
             else if (t.winPct >= 0.6) { s += 10; why += "Winning: ${t.w}-${t.l}" }
         }
         val rank = lg.rosterOf(t).sortedByDescending { it.ovr }.indexOfFirst { it.id == h.id } + 1
-        val mins = (Gameplan.plannedMinutes(t, h.id) * 1.2).roundToInt()
+        val mins = (Tactics.plannedMinutes(t, h.id) * 1.2).roundToInt()
         val want = when (rank) { 1 -> 34; 2 -> 32; 3 -> 30; else -> 24 }
         if (mins < want - 4) { s -= (want - mins) * 2.0; why += "Minutes: $mins a game; you want $want" }
         else if (rank <= 2 && mins >= want) why += "You're a focal point"

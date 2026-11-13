@@ -689,7 +689,7 @@ object Market {
         }
         for (t in lg.teams) {
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(80, 86), Rng.range(22, 30), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         Payroll.sign(lg)
         ps.userKeep.clear()
@@ -802,7 +802,7 @@ object Market {
         }
         for (t in lg.teams) {
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(80, 86), Rng.range(22, 30), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         Payroll.sign(lg)
         ps.userKeep.clear()

@@ -62,7 +62,7 @@ import com.nh.hoopscoach.game.CoachSkill
 import com.nh.hoopscoach.game.Coaching
 import com.nh.hoopscoach.game.CollegeEra
 import com.nh.hoopscoach.game.EraRules
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Names
 import com.nh.hoopscoach.game.Phase
@@ -814,7 +814,7 @@ fun NewGameScreen(vm: GameViewModel) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(t.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${lg.conf(t.confId).abbr} · ${prestigeLabel(t.prestige)} · roster ${Gameplan.teamRating(lg, t)}", style = T.small, color = P.sub, maxLines = 1)
+                            Text("${lg.conf(t.confId).abbr} · ${prestigeLabel(t.prestige)} · roster ${Tactics.teamRating(lg, t)}", style = T.small, color = P.sub, maxLines = 1)
                         }
                         Ring(t.prestige, 40.dp, textSize = 15.sp)
                     }

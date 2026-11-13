@@ -54,8 +54,8 @@ object Analysis {
     /** The average age of the top eight. */
     fun rotationAge(lg: League, t: Team): Double = lg.rosterOf(t).sortedByDescending { it.ovr }.take(8).map { it.age }.average().takeIf { !it.isNaN() } ?: 0.0
 
-    fun offense(lg: League, t: Team) = Gameplan.teamRating(lg, t) { Ratings.offense(it) }
-    fun defense(lg: League, t: Team) = Gameplan.teamRating(lg, t) { Ratings.defense(it) }
+    fun offense(lg: League, t: Team) = Tactics.teamRating(lg, t) { Ratings.offense(it) }
+    fun defense(lg: League, t: Team) = Tactics.teamRating(lg, t) { Ratings.defense(it) }
 
     /** Where [t] ranks (1 = best) among [teams] by [f]. */
     fun rank(teams: List<Team>, t: Team, f: (Team) -> Int): Int = teams.sortedByDescending(f).indexOfFirst { it.id == t.id } + 1

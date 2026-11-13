@@ -191,7 +191,7 @@ object ProLeague {
         for (t in lg.teams) {
             trim(lg, t)
             while (t.roster.size < ROSTER) makePro(lg, scarcest(lg, t), Rng.range(80, 85), Rng.range(23, 31), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         lg.reindex()
         rateTeams(lg)
@@ -344,7 +344,7 @@ object ProLeague {
         for (t in lg.teams) {
             trim(lg, t)
             while (t.roster.size < ROSTER) makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         lg.reindex()
         rateTeams(lg)
@@ -603,7 +603,7 @@ object ProLeague {
         for (t in lg.teams) {
             trim(lg, t)
             while (t.roster.size < ROSTER) makePro(lg, scarcest(lg, t), Rng.range(80, 85), Rng.range(23, 31), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         lg.reindex()
         rateTeams(lg)
@@ -842,7 +842,7 @@ object ProSeason {
             ProLeague.rookieCap(lg, p)
         }
         // Weekly rotation tune-ups, except a rotation the user set himself when he coaches the team.
-        if (lg.day % 7 == 0) for (t in lg.teams) if (!(NbaCoach.active(lg) && t.id == lg.userTeamId && !t.plan.auto)) Gameplan.autoAllocate(lg, t)
+        if (lg.day % 7 == 0) for (t in lg.teams) if (!(NbaCoach.active(lg) && t.id == lg.userTeamId && !t.plan.auto)) Tactics.autoAllocate(lg, t)
     }
 
     fun standings(lg: League, conf: Int): List<Team> =
@@ -1178,7 +1178,7 @@ object ProSeason {
             t.w = 0; t.l = 0; t.cw = 0; t.cl = 0; t.streak = 0
             t.totals = StatLine(); t.opp = StatLine()
             t.homeGames = 0; t.homeAtt = 0; t.sellouts = 0
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
         for (p in lg.players) {
             p.stats = StatLine(); p.tourney = StatLine(); p.log = mutableListOf()
@@ -1685,7 +1685,7 @@ object ProCareer {
         // The money he left on the table buys a good veteran.
         val add = ProLeague.makePro(lg, Rng.pick(Pos.entries), (88 + saved / 2500).coerceAtMost(94), Rng.range(27, 31), t)
         ProLeague.trim(lg, t)
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         lg.reindex()
         lg.news += News(lg.season, 0, "${lg.hero?.name} takes less to chase a ring; the ${t.name} use the room to sign ${add.name}", true)
         return "You took ${Road.dollars(saved)} less a season. The ${t.name} spent it on ${add.name} (${Ratings.shownPro(add.ovr)})."
@@ -1724,10 +1724,10 @@ object ProCareer {
             to.roster += h.id
             ProLeague.trim(lg, to)
             while (from.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), from)
-            Gameplan.autoAllocate(lg, from)
+            Tactics.autoAllocate(lg, from)
             if (r.proTeams.lastOrNull() != to.id) r.proTeams += to.id
         }
-        Gameplan.autoAllocate(lg, to)
+        Tactics.autoAllocate(lg, to)
         val kind = if (o.salary >= maxSalary(lg, h.proYears) - 10) "Max" else if (o.salary <= minSalary(lg, h.proYears)) "Minimum" else "Veteran"
         r.contract = Contract(to.id, o.salary, o.years, kind, lg.season)
         r.proOffers.clear()
@@ -1754,7 +1754,7 @@ object ProCareer {
         val ovr = (median + 3 + (h.ovr - 90) * 0.4).roundToInt().coerceIn(87, 93)
         val add = ProLeague.makePro(lg, weak, ovr, Rng.range(27, 31), t)
         ProLeague.trim(lg, t)
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         lg.reindex()
         lg.news += News(lg.season, 0, "Building around ${h.name}: the ${t.name} sign ${add.name}, a ${Ratings.shownPro(add.ovr)}-rated ${add.pos}", true)
     }
@@ -1841,7 +1841,7 @@ object ProCareer {
         r.retired = true
         r.ended = true
         lg.team(h.teamId).roster.remove(h.id)
-        Gameplan.autoAllocate(lg, lg.team(h.teamId))
+        Tactics.autoAllocate(lg, lg.team(h.teamId))
         h.lastTeam = h.teamId
         h.teamId = -1
         h.left = "Retired in ${lg.season}"

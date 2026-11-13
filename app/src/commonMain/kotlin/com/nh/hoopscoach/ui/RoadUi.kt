@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Arch
 import com.nh.hoopscoach.game.DraftPick
 import com.nh.hoopscoach.game.Awards
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.Geo
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.NilDeal
@@ -329,7 +329,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         if (vm.meTab == 3) item { MediaPanel(lg) }
         if (vm.meTab == 3 && (lg.road?.feed?.isNotEmpty() == true)) item { SocialStrip(vm, lg) }
         if (vm.meTab == 1) item {
-            val mins = Gameplan.plannedMinutes(t, h.id)
+            val mins = Tactics.plannedMinutes(t, h.id)
             Section("Your role")
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -354,7 +354,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(if (p.id == h.id) "${p.name} (you)" else p.name, style = T.bodyB, color = if (p.id == h.id) P.accent else P.ink, maxLines = 1)
-                        Text("${p.cls} · ${Gameplan.plannedMinutes(t, p.id)} min planned", style = T.small, color = P.sub)
+                        Text("${p.cls} · ${Tactics.plannedMinutes(t, p.id)} min planned", style = T.small, color = P.sub)
                     }
                     Ring(p.ovr, 40.dp)
                 }

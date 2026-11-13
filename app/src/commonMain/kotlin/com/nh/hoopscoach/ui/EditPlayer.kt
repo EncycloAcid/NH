@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.nh.hoopscoach.game.Face
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Legacy
 import com.nh.hoopscoach.game.Pos
@@ -267,7 +267,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                         pl.style = st
                         val tm = it.team(pl.teamId)
                         if (moved) {
-                            if (tm.plan.auto) Gameplan.autoAllocate(it, tm) else Gameplan.validate(it, tm)
+                            if (tm.plan.auto) Tactics.autoAllocate(it, tm) else Tactics.validate(it, tm)
                         }
                     }
                     vm.toast("Saved")

@@ -30,8 +30,8 @@ object Rankings {
     }
 
     fun strength(lg: League, t: Team): Double {
-        Gameplan.validate(lg, t)
-        val rating = Gameplan.teamRating(lg, t)
+        Tactics.validate(lg, t)
+        val rating = Tactics.teamRating(lg, t)
         val c = lg.coachOf(t)
         return rating + (c.off + c.def - 140) * 0.03
     }

@@ -62,7 +62,7 @@ object Redshirts {
             // rsClass stays: he was planned as a redshirt prospect; clear only if never used.
             if (!p.usedAcademicRs && !p.usedMedicalRs) p.rsClass = false
             val t = lg.team(p.teamId)
-            if (t.plan.auto) Gameplan.autoAllocate(lg, t) else Gameplan.validate(lg, t)
+            if (t.plan.auto) Tactics.autoAllocate(lg, t) else Tactics.validate(lg, t)
         }
         return true
     }
@@ -88,9 +88,9 @@ object Redshirts {
         }
         if (touched) {
             t.plan.auto = false
-            Gameplan.validate(lg, t)
+            Tactics.validate(lg, t)
             if (t.plan.slots.any { it.starter == -1 } || t.plan.slots.count { it.reserve == -1 } >= 3) {
-                Gameplan.autoAllocate(lg, t)
+                Tactics.autoAllocate(lg, t)
             }
         }
     }
@@ -132,7 +132,7 @@ object Redshirts {
                     p.rsClass = true
                 }
             }
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
     }
 

@@ -103,7 +103,7 @@ object Franchises {
         }
         for (t in lg.teams) {
             while (t.roster.size < ProLeague.ROSTER) ProLeague.makePro(lg, Rng.pick(Pos.entries), if (t in fresh) Rng.range(80, 86) else Rng.range(83, 87), Rng.range(22, 31), t)
-            Gameplan.autoAllocate(lg, t)
+            Tactics.autoAllocate(lg, t)
         }
     }
 }

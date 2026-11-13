@@ -36,7 +36,7 @@ object SaveIO {
                 fixed += before - kept.size
             }
             val stale = t.plan.slots.any { (it.starter != -1 && it.starter !in t.roster) || (it.reserve != -1 && it.reserve !in t.roster) }
-            if (kept.size != before || stale) Gameplan.validate(lg, t)
+            if (kept.size != before || stale) Tactics.validate(lg, t)
             for (pid in t.roster) lg.player(pid).let { if (it.teamId < 0) it.teamId = t.id }
         }
         return fixed

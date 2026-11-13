@@ -40,7 +40,7 @@ object EraCollege {
             lg.eraIds[c.id] = p.id
             touched += t
         }
-        for (t in touched) Gameplan.autoAllocate(lg, t)
+        for (t in touched) Tactics.autoAllocate(lg, t)
         lg.reindex()
     }
 

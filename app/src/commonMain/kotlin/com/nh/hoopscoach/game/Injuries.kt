@@ -83,7 +83,7 @@ object Injuries {
         p.injGames = games
         p.injTotal = games
         // Coaches re-do the rotation around him.
-        if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t)
+        if (!lg.humanCoach(t) || t.plan.auto) Tactics.autoAllocate(lg, t)
         val mine = t.id == lg.userTeamId
         val star = lg.rosterOf(t).sortedByDescending { it.ovr }.take(2).any { it.id == p.id }
         val hero = p.id == lg.heroId
@@ -112,7 +112,7 @@ object Injuries {
         val long = p.injTotal >= 10
         p.injury = ""
         p.injTotal = 0
-        if (!lg.humanCoach(t) || t.plan.auto) Gameplan.autoAllocate(lg, t)
+        if (!lg.humanCoach(t) || t.plan.auto) Tactics.autoAllocate(lg, t)
         val mine = t.id == lg.userTeamId
         val star = lg.rosterOf(t).sortedByDescending { it.ovr }.take(2).any { it.id == p.id }
         if (long && (mine || star || p.id == lg.heroId)) {

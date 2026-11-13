@@ -48,6 +48,11 @@ jobs:
           # Best-effort Linux installer; the runnable jar is the required Linux artifact.
           ./gradlew :app:packageDeb --no-daemon || echo "packageDeb skipped"
 
+      - name: Check no two classes differ only by case (Windows would drop one)
+        run: |
+          dupes=$(find app/build/classes/kotlin/desktop/main -name '*.class' | tr 'A-Z' 'a-z' | sort | uniq -d)
+          if [ -n "$dupes" ]; then echo "Class names that clash on Windows:"; echo "$dupes"; exit 1; fi
+
       - name: Collect Linux PC artifacts
         run: |
           mkdir -p pc-dist
