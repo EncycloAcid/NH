@@ -91,7 +91,7 @@ class MenuShotsTest {
         var days = 0
         while ((days < 30 || lg.news.none { it.kind == "article" }) && days++ < 80) { Sim.playDay(lg); lg.road!!.press?.let { com.nh.hoopscoach.game.Road.answer(lg, 1) } }
         Sim.playDay(lg)
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         vm.select(Tab.TODAY); idle()
@@ -113,7 +113,7 @@ class MenuShotsTest {
         val lg = ProLeague.create(ProTest().toDraft(21), com.nh.hoopscoach.game.Era.Y1996)
         while (lg.phase == Phase.OFFSEASON) ProCareer.next(lg)
         repeat(12) { Sim.playDay(lg) }
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         vm.select(Tab.LEAGUE); vm.leagueTab = 3; idle(); shot("Z05_era_leaders")
@@ -126,7 +126,7 @@ class MenuShotsTest {
     fun statePicker() {
         GameViewModel.autoLoad = false
         Rng.r = Random(9)
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.installDraft(LeagueGen.newLeague())
         rule.setContent { App(vm) }
         rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
@@ -142,7 +142,7 @@ class MenuShotsTest {
     fun stylePicker() {
         GameViewModel.autoLoad = false
         Rng.r = Random(9)
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.installDraft(LeagueGen.newLeague())
         rule.setContent { App(vm) }
         rule.onAllNodes(hasText("Play as a player")).onFirst().performClick(); idle()
@@ -159,7 +159,7 @@ class MenuShotsTest {
         val base = LeagueGen.newLeague()
         val college = Offseason.claimTeam(base, base.teams.first { it.school == "Kentucky" }.id, "Jordan", "Reed")
         repeat(4) { Season.playDay(college) }
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(college)
         rule.setContent { App(vm) }
         vm.select(Tab.TODAY); idle()

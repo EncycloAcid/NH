@@ -83,7 +83,7 @@ class RoadUiTest {
         GameViewModel.autoLoad = false
         Rng.r = Random(9)
         val draft = LeagueGen.newLeague()
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.installDraft(draft)
         rule.setContent { App(vm) }
         shot("Y00_new_game")
