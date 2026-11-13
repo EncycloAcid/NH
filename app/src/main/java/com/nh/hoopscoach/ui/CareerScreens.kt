@@ -249,6 +249,9 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var showAnthropicLoginDialog by remember { mutableStateOf(false) }
     var showGroqLoginDialog by remember { mutableStateOf(false) }
     var showDeepseekLoginDialog by remember { mutableStateOf(false) }
+    var showOpenRouterLoginDialog by remember { mutableStateOf(false) }
+    var showCerebrasLoginDialog by remember { mutableStateOf(false) }
+    var showMistralLoginDialog by remember { mutableStateOf(false) }
 
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) vm.exportSlot(exportSlotId ?: vm.activeSlotId, uri)
@@ -380,6 +383,9 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 onShowAnthropicLogin = { showAnthropicLoginDialog = true },
                 onShowGroqLogin = { showGroqLoginDialog = true },
                 onShowDeepseekLogin = { showDeepseekLoginDialog = true },
+                onShowOpenRouterLogin = { showOpenRouterLoginDialog = true },
+                onShowCerebrasLogin = { showCerebrasLoginDialog = true },
+                onShowMistralLogin = { showMistralLoginDialog = true },
             )
             }
 
@@ -560,6 +566,21 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         showDeepseekLoginDialog = false
         vm.toast("API key saved. Use Test AI to check access.")
     }, { showDeepseekLoginDialog = false })
+    if (showOpenRouterLoginDialog) ApiKeyDialog("OpenRouter", lg.ollama.openRouterApiKey, { key ->
+        vm.act { it.ollama.openRouterApiKey = key; it.ollama.provider = "openrouter"; it.ollama.enabled = true }
+        showOpenRouterLoginDialog = false
+        vm.toast("API key saved. Use Test AI to check access.")
+    }, { showOpenRouterLoginDialog = false })
+    if (showCerebrasLoginDialog) ApiKeyDialog("Cerebras", lg.ollama.cerebrasApiKey, { key ->
+        vm.act { it.ollama.cerebrasApiKey = key; it.ollama.provider = "cerebras"; it.ollama.enabled = true }
+        showCerebrasLoginDialog = false
+        vm.toast("API key saved. Use Test AI to check access.")
+    }, { showCerebrasLoginDialog = false })
+    if (showMistralLoginDialog) ApiKeyDialog("Mistral", lg.ollama.mistralApiKey, { key ->
+        vm.act { it.ollama.mistralApiKey = key; it.ollama.provider = "mistral"; it.ollama.enabled = true }
+        showMistralLoginDialog = false
+        vm.toast("API key saved. Use Test AI to check access.")
+    }, { showMistralLoginDialog = false })
 }
 
 @Composable

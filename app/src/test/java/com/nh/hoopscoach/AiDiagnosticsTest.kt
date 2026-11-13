@@ -44,12 +44,21 @@ class AiDiagnosticsTest {
         assertEquals("claude-haiku-4-5", Ollama.pickBestModel("anthropic", listOf("claude-opus-4", "claude-sonnet-4-5", "claude-haiku-4-5")))
         assertEquals("llama-3.1-8b-instant", Ollama.pickBestModel("groq", listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "whisper-large-v3")))
         assertEquals("deepseek-chat", Ollama.pickBestModel("deepseek", listOf("deepseek-reasoner", "deepseek-chat")))
+        assertEquals(
+            "meta-llama/llama-3.3-70b-instruct:free",
+            Ollama.pickBestModel("openrouter", listOf("openai/gpt-4o", "meta-llama/llama-3.3-70b-instruct:free", "google/gemma-2-9b-it:free")),
+        )
+        assertEquals("llama3.1-8b", Ollama.pickBestModel("cerebras", listOf("llama-3.3-70b", "llama3.1-8b")))
+        assertEquals("mistral-small-latest", Ollama.pickBestModel("mistral", listOf("mistral-large-latest", "mistral-small-latest", "open-mistral-nemo")))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama", listOf("llama3.2:1b", "smollm2:135m", "qwen2.5:0.5b")))
         assertEquals("gemini-3.8-flash", Ollama.pickBestModel("google"))
         assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai"))
         assertEquals("claude-haiku-4-5", Ollama.pickBestModel("anthropic"))
         assertEquals("llama-3.1-8b-instant", Ollama.pickBestModel("groq"))
         assertEquals("deepseek-chat", Ollama.pickBestModel("deepseek"))
+        assertEquals("meta-llama/llama-3.3-70b-instruct:free", Ollama.pickBestModel("openrouter"))
+        assertEquals("llama3.1-8b", Ollama.pickBestModel("cerebras"))
+        assertEquals("mistral-small-latest", Ollama.pickBestModel("mistral"))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama"))
         val cfg = OllamaConfig(provider = "google", googleModel = "gemini-1.5-pro", autoPickModel = true)
         assertEquals("gemini-3.1-flash-lite", Ollama.applyAutoPick(cfg, listOf("gemini-3.1-flash-lite", "gemini-1.5-pro", "gemini-2.0-flash")))

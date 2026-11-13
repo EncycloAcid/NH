@@ -124,8 +124,32 @@ object Ollama {
         CloudModel("deepseek-reasoner", "DeepSeek Reasoner", "Cheap · deeper", "Slower reasoning model — use when chat feels shallow."),
     )
 
+    /** OpenRouter curated free (:free) text models. */
+    val OPENROUTER_MODELS = listOf(
+        CloudModel("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Free", "Recommended · free", "Strong free OpenRouter Llama for dynasty copy."),
+        CloudModel("google/gemma-2-9b-it:free", "Gemma 2 9B Free", "Free · light", "Lightweight free Gemma via OpenRouter."),
+        CloudModel("mistralai/mistral-7b-instruct:free", "Mistral 7B Free", "Free · alt", "Classic free Mistral instruct via OpenRouter."),
+        CloudModel("qwen/qwen-2.5-7b-instruct:free", "Qwen 2.5 7B Free", "Free · alt", "Free Qwen instruct — good for short recaps."),
+    )
+
+    /** Cerebras free-tier OpenAI-compatible Llama. */
+    val CEREBRAS_MODELS = listOf(
+        CloudModel("llama3.1-8b", "Llama 3.1 8B", "Recommended · free", "Fast Cerebras free-tier Llama for recaps."),
+        CloudModel("llama-3.3-70b", "Llama 3.3 70B", "Free · stronger", "Stronger Cerebras free Llama when 8B is thin."),
+    )
+
+    /** Mistral cloud — free/cheap Small + open Nemo. */
+    val MISTRAL_MODELS = listOf(
+        CloudModel("mistral-small-latest", "Mistral Small", "Recommended · free tier", "Mistral free-tier small for dynasty copy."),
+        CloudModel("open-mistral-nemo", "Mistral Nemo", "Free · open", "Open Mistral Nemo — solid free alternative."),
+        CloudModel("ministral-8b-latest", "Ministral 8B", "Free · tiny", "Tiny Mistral for fast short takes."),
+    )
+
     const val GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
     const val DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
+    const val OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+    const val CEREBRAS_CHAT_URL = "https://api.cerebras.ai/v1/chat/completions"
+    const val MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
 
     /** Remaps retired / expensive / specialty ids onto the free curated default. Live flash picks stick. */
     fun snapGoogleModel(id: String): String {
@@ -162,6 +186,28 @@ object Ollama {
     fun snapDeepseekModel(id: String): String {
         val t = id.trim().ifEmpty { return DEEPSEEK_MODELS.first().id }
         return t
+    }
+
+    fun snapOpenRouterModel(id: String): String {
+        val t = id.trim().ifEmpty { return OPENROUTER_MODELS.first().id }
+        val low = t.lowercase()
+        // Prefer free; remap paid-looking picks onto curated free default.
+        if (":free" !in low && OPENROUTER_MODELS.none { it.id.equals(t, true) }) {
+            return OPENROUTER_MODELS.first().id
+        }
+        return t
+    }
+
+    fun snapCerebrasModel(id: String): String {
+        val t = id.trim().ifEmpty { return CEREBRAS_MODELS.first().id }
+        return t
+    }
+
+    fun snapMistralModel(id: String): String {
+        val t = id.trim().ifEmpty { return MISTRAL_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = "large" in low || "pixtral" in low || "ocr" in low || "embed" in low || "moderation" in low
+        return if (blocked) MISTRAL_MODELS.first().id else t
     }
 
     fun snapLocalModel(id: String): String {
@@ -214,6 +260,9 @@ object Ollama {
         "anthropic" -> ANTHROPIC_MODELS.map { it.id }
         "groq" -> GROQ_MODELS.map { it.id }
         "deepseek" -> DEEPSEEK_MODELS.map { it.id }
+        "openrouter" -> OPENROUTER_MODELS.map { it.id }
+        "cerebras" -> CEREBRAS_MODELS.map { it.id }
+        "mistral" -> MISTRAL_MODELS.map { it.id }
         else -> RECOMMENDED_MODELS.map { it.id }
     }
 
@@ -277,6 +326,39 @@ object Ollama {
                     else -> curated
                 }
             }
+            "openrouter" -> {
+                val free = raw.filter { it.lowercase().endsWith(":free") }
+                val curatedHits = curated.filter { c -> free.any { it.equals(c, true) } || raw.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    free.isNotEmpty() -> free
+                    else -> curated
+                }
+            }
+            "cerebras" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "whisper" !in k && "tts" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
+            "mistral" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "embed" !in k && "moderation" !in k && "ocr" !in k && "pixtral" !in k && "large" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
             else -> raw.ifEmpty { curated }
         }
         val ranked = catalogFetchedModels(provider, pool)
@@ -295,6 +377,9 @@ object Ollama {
                     "anthropic" -> snapAnthropicModel(it.id)
                     "groq" -> snapGroqModel(it.id)
                     "deepseek" -> snapDeepseekModel(it.id)
+                    "openrouter" -> snapOpenRouterModel(it.id)
+                    "cerebras" -> snapCerebrasModel(it.id)
+                    "mistral" -> snapMistralModel(it.id)
                     else -> snapLocalModel(it.id)
                 }
             }
@@ -362,6 +447,23 @@ object Ollama {
                 "reasoner" in key -> 1
                 else -> 8
             }
+            "openrouter" -> when {
+                key.endsWith(":free") && ("70b" in key || "llama-3.3" in key) -> 0
+                key.endsWith(":free") && ("9b" in key || "gemma" in key) -> 1
+                key.endsWith(":free") -> 2
+                else -> 8
+            }
+            "cerebras" -> when {
+                "8b" in key -> 0
+                "70b" in key -> 1
+                else -> 8
+            }
+            "mistral" -> when {
+                "small" in key -> 0
+                "nemo" in key -> 1
+                "ministral" in key || "8b" in key -> 2
+                else -> 8
+            }
             else -> when {
                 key == "smollm2:135m" || key.startsWith("smollm2:135m") -> 0
                 key == "qwen2.5:0.5b" || key.startsWith("qwen2.5:0.5") -> 1
@@ -383,6 +485,9 @@ object Ollama {
             "anthropic" -> config.anthropicModel = pick
             "groq" -> config.groqModel = pick
             "deepseek" -> config.deepseekModel = pick
+            "openrouter" -> config.openRouterModel = pick
+            "cerebras" -> config.cerebrasModel = pick
+            "mistral" -> config.mistralModel = pick
             else -> config.model = pick
         }
         return pick
@@ -452,6 +557,27 @@ object Ollama {
         return live.ifEmpty { all }
     }
 
+    fun openRouterGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapOpenRouterModel(config.openRouterModel.ifBlank { OPENROUTER_MODELS.first().id })
+        val all = (listOf(primary) + OPENROUTER_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun cerebrasGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapCerebrasModel(config.cerebrasModel.ifBlank { CEREBRAS_MODELS.first().id })
+        val all = (listOf(primary) + CEREBRAS_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun mistralGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapMistralModel(config.mistralModel.ifBlank { MISTRAL_MODELS.first().id })
+        val all = (listOf(primary) + MISTRAL_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
     /** True when the provider error looks like a bad / missing / blocked model id (safe to try the next candidate). */
     internal fun isModelAccessError(message: String?): Boolean {
         val m = message?.lowercase().orEmpty()
@@ -513,6 +639,9 @@ object Ollama {
             "anthropic" -> anthropicCatalog(key, id, title)
             "groq" -> groqCatalog(key, id, title)
             "deepseek" -> deepseekCatalog(key, id, title)
+            "openrouter" -> openRouterCatalog(key, id, title)
+            "cerebras" -> cerebrasCatalog(key, id, title)
+            "mistral" -> mistralCatalog(key, id, title)
             else -> CatalogEntry(id, title, "On-device · free", "Free · local", 0)
         }
     }
@@ -574,6 +703,25 @@ object Ollama {
         "reasoner" in key -> CatalogEntry(id, title, "Reasoner", "Cheap · deeper", 1)
         "chat" in key -> CatalogEntry(id, title, "Chat · cheap", "Cheap · text", 0)
         else -> CatalogEntry(id, title, "Other DeepSeek", "See DeepSeek pricing", 2)
+    }
+
+    private fun openRouterCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        key.endsWith(":free") -> CatalogEntry(id, title, "Free OpenRouter", "Free · text", 0)
+        else -> CatalogEntry(id, title, "Paid OpenRouter", "Paid · see OpenRouter", 1)
+    }
+
+    private fun cerebrasCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "8b" in key -> CatalogEntry(id, title, "Fast · free tier", "Free · text", 0)
+        "70b" in key -> CatalogEntry(id, title, "Strong · free tier", "Free · stronger", 1)
+        else -> CatalogEntry(id, title, "Other Cerebras", "See Cerebras pricing", 2)
+    }
+
+    private fun mistralCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "small" in key || "nemo" in key || "ministral" in key ->
+            CatalogEntry(id, title, "Free / cheap Mistral", "Free tier · text", 0)
+        "large" in key || "pixtral" in key ->
+            CatalogEntry(id, title, "Premium Mistral", "Paid · premium", 1)
+        else -> CatalogEntry(id, title, "Other Mistral", "See Mistral pricing", 2)
     }
 
     data class AutoConfigResult(
@@ -868,6 +1016,39 @@ object Ollama {
             missingKeyMessage = "DeepSeek requires an API key from platform.deepseek.com.",
         )
 
+    suspend fun testOpenRouterConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://openrouter.ai/api/v1",
+            label = "OpenRouter",
+            modelFilter = { it.lowercase().endsWith(":free") },
+            missingKeyMessage = "OpenRouter requires an API key from openrouter.ai.",
+        )
+
+    suspend fun testCerebrasConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.cerebras.ai/v1",
+            label = "Cerebras",
+            modelFilter = { id ->
+                val k = id.lowercase()
+                "whisper" !in k && "tts" !in k
+            },
+            missingKeyMessage = "Cerebras requires an API key from cloud.cerebras.ai.",
+        )
+
+    suspend fun testMistralConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.mistral.ai/v1",
+            label = "Mistral",
+            modelFilter = { id ->
+                val k = id.lowercase()
+                "embed" !in k && "moderation" !in k && "ocr" !in k
+            },
+            missingKeyMessage = "Mistral requires an API key from console.mistral.ai.",
+        )
+
     /** Test connection to Anthropic Claude API. */
     suspend fun testAnthropicConnection(apiKey: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
@@ -989,7 +1170,7 @@ object Ollama {
         }
     }
 
-    /** Shared OpenAI-compatible chat.completions generate used by ChatGPT, Groq, and DeepSeek. */
+    /** Shared OpenAI-compatible chat.completions generate used by ChatGPT, Groq, DeepSeek, OpenRouter, Cerebras, Mistral. */
     private suspend fun generateChatCompletions(
         apiKey: String,
         endpoint: String,
@@ -1001,6 +1182,7 @@ object Ollama {
         numPredict: Int,
         onToken: ((String) -> Unit)?,
         onUsedModel: (String) -> Unit,
+        extraHeaders: Map<String, String> = emptyMap(),
     ): Result<String> = withContext(Dispatchers.IO) {
         if (apiKey.isEmpty()) {
             return@withContext Result.failure(IllegalStateException("No $label model credential; use game-written coverage."))
@@ -1022,6 +1204,7 @@ object Ollama {
                             setRequestProperty("Authorization", "Bearer $apiKey")
                             setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                             setRequestProperty("Accept", "application/json")
+                            extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
                         }
 
                         val payload = buildString {
@@ -1162,6 +1345,103 @@ object Ollama {
         )
     }
 
+    suspend fun generateOpenRouter(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isOpenRouterSignedIn) {
+            return Result.failure(Exception("OpenRouter requires an API key from openrouter.ai."))
+        }
+        return generateChatCompletions(
+            apiKey = config.openRouterApiKey.trim(),
+            endpoint = OPENROUTER_CHAT_URL,
+            candidates = openRouterGenerateCandidates(config),
+            label = "OpenRouter",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.openRouterModel.isBlank() || isFailedModel(config.openRouterModel)) &&
+                    !used.equals(config.openRouterModel, true)
+                ) {
+                    config.openRouterModel = used
+                }
+            },
+            extraHeaders = mapOf(
+                "HTTP-Referer" to "https://github.com/EncycloAcid/NH",
+                "X-Title" to "Hoops Dynasty",
+            ),
+        )
+    }
+
+    suspend fun generateCerebras(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isCerebrasSignedIn) {
+            return Result.failure(Exception("Cerebras requires an API key from cloud.cerebras.ai."))
+        }
+        return generateChatCompletions(
+            apiKey = config.cerebrasApiKey.trim(),
+            endpoint = CEREBRAS_CHAT_URL,
+            candidates = cerebrasGenerateCandidates(config),
+            label = "Cerebras",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.cerebrasModel.isBlank() || isFailedModel(config.cerebrasModel)) &&
+                    !used.equals(config.cerebrasModel, true)
+                ) {
+                    config.cerebrasModel = used
+                }
+            },
+        )
+    }
+
+    suspend fun generateMistral(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isMistralSignedIn) {
+            return Result.failure(Exception("Mistral requires an API key from console.mistral.ai."))
+        }
+        return generateChatCompletions(
+            apiKey = config.mistralApiKey.trim(),
+            endpoint = MISTRAL_CHAT_URL,
+            candidates = mistralGenerateCandidates(config),
+            label = "Mistral",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.mistralModel.isBlank() || isFailedModel(config.mistralModel)) &&
+                    !used.equals(config.mistralModel, true)
+                ) {
+                    config.mistralModel = used
+                }
+            },
+        )
+    }
+
     /** Generate content using Anthropic Claude Messages API. */
     suspend fun generateAnthropic(
         config: OllamaConfig,
@@ -1258,6 +1538,9 @@ object Ollama {
                 "anthropic" -> generateAnthropic(config, prompt, system, temperature, numPredict, onToken)
                 "groq" -> generateGroq(config, prompt, system, temperature, numPredict, onToken)
                 "deepseek" -> generateDeepseek(config, prompt, system, temperature, numPredict, onToken)
+                "openrouter" -> generateOpenRouter(config, prompt, system, temperature, numPredict, onToken)
+                "cerebras" -> generateCerebras(config, prompt, system, temperature, numPredict, onToken)
+                "mistral" -> generateMistral(config, prompt, system, temperature, numPredict, onToken)
                 else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
             }
         }

@@ -124,6 +124,9 @@ fun AiDiagnosticsPanel(
                                 "anthropic" -> Ollama.testAnthropicConnection(config.anthropicApiKey)
                                 "groq" -> Ollama.testGroqConnection(config.groqApiKey)
                                 "deepseek" -> Ollama.testDeepseekConnection(config.deepseekApiKey)
+                                "openrouter" -> Ollama.testOpenRouterConnection(config.openRouterApiKey)
+                                "cerebras" -> Ollama.testCerebrasConnection(config.cerebrasApiKey)
+                                "mistral" -> Ollama.testMistralConnection(config.mistralApiKey)
                                 else -> Ollama.testConnection(config.host)
                             }
                             val ids = response.getOrNull().orEmpty()

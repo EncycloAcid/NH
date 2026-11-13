@@ -63,6 +63,9 @@ fun AiProviderConfigSection(
     onShowAnthropicLogin: () -> Unit,
     onShowGroqLogin: () -> Unit,
     onShowDeepseekLogin: () -> Unit,
+    onShowOpenRouterLogin: () -> Unit,
+    onShowCerebrasLogin: () -> Unit,
+    onShowMistralLogin: () -> Unit,
 ) {
     when (lg.ollama.provider.lowercase()) {
         "google" -> GoogleAiProviderPanel(
@@ -85,6 +88,147 @@ fun AiProviderConfigSection(
             vm, lg, scope, testing, onTesting, onTestStatus, onTestSuccess,
             onShowLogin = onShowDeepseekLogin,
         )
+        "openrouter" -> FreeCompatProviderPanel(
+            title = "OPENROUTER AI (FREE MODELS)",
+            blurb = "Route free community models (:free) — Llama, Gemma, Mistral, Qwen — with one OpenRouter key.",
+            letter = "R",
+            configured = lg.ollama.isOpenRouterSignedIn,
+            displayName = lg.ollama.openRouterDisplayEmail,
+            statusLine = "OpenRouter API key configured",
+            promptTitle = "OpenRouter API access",
+            promptBlurb = "Get a free key at openrouter.ai — prefer models ending in :free.",
+            configureLabel = "Configure OpenRouter API",
+            keyLabel = "Raw OpenRouter API Key",
+            keyPlaceholder = "sk-or-...",
+            rawKey = lg.ollama.openRouterApiKey,
+            onRawKey = { k -> vm.act { it.ollama.openRouterApiKey = k } },
+            onRemove = {
+                vm.act { it.ollama.openRouterApiKey = ""; it.ollama.openRouterAccountEmail = "" }
+                vm.toast("OpenRouter key removed")
+            },
+            models = buildList {
+                val cur = lg.ollama.openRouterModel
+                if (cur.isNotBlank() && com.nh.hoopscoach.game.Ollama.OPENROUTER_MODELS.none { it.id.equals(cur, true) }) {
+                    add(com.nh.hoopscoach.game.Ollama.CloudModel(cur, cur, "Selected", "From provider list — stays until you change it."))
+                }
+                addAll(com.nh.hoopscoach.game.Ollama.OPENROUTER_MODELS)
+            },
+            selectedModelId = lg.ollama.openRouterModel,
+            modelPickerLabel = if (lg.ollama.autoPickModel) "OpenRouter model (auto)" else "OpenRouter model",
+            onPickModel = { id -> vm.act { it.ollama.autoPickModel = false; it.ollama.openRouterModel = id } },
+            testing = testing,
+            onShowLogin = onShowOpenRouterLogin,
+            onTest = {
+                onTesting(true)
+                onTestStatus("Contacting OpenRouter...")
+                scope.launch {
+                    val res = com.nh.hoopscoach.game.Ollama.testOpenRouterConnection(lg.ollama.openRouterApiKey)
+                    onTesting(false)
+                    res.onSuccess {
+                        onTestSuccess(true)
+                        onTestStatus("Connected to OpenRouter successfully!")
+                        vm.toast("OpenRouter connected!")
+                    }.onFailure { err ->
+                        onTestSuccess(false)
+                        onTestStatus(err.message ?: "Could not connect to OpenRouter")
+                    }
+                }
+            },
+        )
+        "cerebras" -> FreeCompatProviderPanel(
+            title = "CEREBRAS AI (FREE TIER)",
+            blurb = "Ultra-fast free-tier Llama on Cerebras — great when Gemini or Groq are rate-limited.",
+            letter = "Z",
+            configured = lg.ollama.isCerebrasSignedIn,
+            displayName = lg.ollama.cerebrasDisplayEmail,
+            statusLine = "Cerebras API key configured",
+            promptTitle = "Cerebras API access",
+            promptBlurb = "Get a free key at cloud.cerebras.ai.",
+            configureLabel = "Configure Cerebras API",
+            keyLabel = "Raw Cerebras API Key",
+            keyPlaceholder = "csk-...",
+            rawKey = lg.ollama.cerebrasApiKey,
+            onRawKey = { k -> vm.act { it.ollama.cerebrasApiKey = k } },
+            onRemove = {
+                vm.act { it.ollama.cerebrasApiKey = ""; it.ollama.cerebrasAccountEmail = "" }
+                vm.toast("Cerebras key removed")
+            },
+            models = buildList {
+                val cur = lg.ollama.cerebrasModel
+                if (cur.isNotBlank() && com.nh.hoopscoach.game.Ollama.CEREBRAS_MODELS.none { it.id.equals(cur, true) }) {
+                    add(com.nh.hoopscoach.game.Ollama.CloudModel(cur, cur, "Selected", "From provider list — stays until you change it."))
+                }
+                addAll(com.nh.hoopscoach.game.Ollama.CEREBRAS_MODELS)
+            },
+            selectedModelId = lg.ollama.cerebrasModel,
+            modelPickerLabel = if (lg.ollama.autoPickModel) "Cerebras model (auto)" else "Cerebras model",
+            onPickModel = { id -> vm.act { it.ollama.autoPickModel = false; it.ollama.cerebrasModel = id } },
+            testing = testing,
+            onShowLogin = onShowCerebrasLogin,
+            onTest = {
+                onTesting(true)
+                onTestStatus("Contacting Cerebras...")
+                scope.launch {
+                    val res = com.nh.hoopscoach.game.Ollama.testCerebrasConnection(lg.ollama.cerebrasApiKey)
+                    onTesting(false)
+                    res.onSuccess {
+                        onTestSuccess(true)
+                        onTestStatus("Connected to Cerebras successfully!")
+                        vm.toast("Cerebras connected!")
+                    }.onFailure { err ->
+                        onTestSuccess(false)
+                        onTestStatus(err.message ?: "Could not connect to Cerebras")
+                    }
+                }
+            },
+        )
+        "mistral" -> FreeCompatProviderPanel(
+            title = "MISTRAL AI (FREE TIER)",
+            blurb = "Mistral free-tier Small / Nemo / Ministral — solid free cloud alternative to Gemini.",
+            letter = "M",
+            configured = lg.ollama.isMistralSignedIn,
+            displayName = lg.ollama.mistralDisplayEmail,
+            statusLine = "Mistral API key configured",
+            promptTitle = "Mistral API access",
+            promptBlurb = "Get a free key at console.mistral.ai.",
+            configureLabel = "Configure Mistral API",
+            keyLabel = "Raw Mistral API Key",
+            keyPlaceholder = "…",
+            rawKey = lg.ollama.mistralApiKey,
+            onRawKey = { k -> vm.act { it.ollama.mistralApiKey = k } },
+            onRemove = {
+                vm.act { it.ollama.mistralApiKey = ""; it.ollama.mistralAccountEmail = "" }
+                vm.toast("Mistral key removed")
+            },
+            models = buildList {
+                val cur = lg.ollama.mistralModel
+                if (cur.isNotBlank() && com.nh.hoopscoach.game.Ollama.MISTRAL_MODELS.none { it.id.equals(cur, true) }) {
+                    add(com.nh.hoopscoach.game.Ollama.CloudModel(cur, cur, "Selected", "From provider list — stays until you change it."))
+                }
+                addAll(com.nh.hoopscoach.game.Ollama.MISTRAL_MODELS)
+            },
+            selectedModelId = lg.ollama.mistralModel,
+            modelPickerLabel = if (lg.ollama.autoPickModel) "Mistral model (auto)" else "Mistral model",
+            onPickModel = { id -> vm.act { it.ollama.autoPickModel = false; it.ollama.mistralModel = id } },
+            testing = testing,
+            onShowLogin = onShowMistralLogin,
+            onTest = {
+                onTesting(true)
+                onTestStatus("Contacting Mistral...")
+                scope.launch {
+                    val res = com.nh.hoopscoach.game.Ollama.testMistralConnection(lg.ollama.mistralApiKey)
+                    onTesting(false)
+                    res.onSuccess {
+                        onTestSuccess(true)
+                        onTestStatus("Connected to Mistral successfully!")
+                        vm.toast("Mistral connected!")
+                    }.onFailure { err ->
+                        onTestSuccess(false)
+                        onTestStatus(err.message ?: "Could not connect to Mistral")
+                    }
+                }
+            },
+        )
         else -> LocalOllamaProviderPanel(
             vm, lg, scope, testing, onTesting, onTestStatus, onTestSuccess,
             configuring = configuring,
@@ -95,6 +239,102 @@ fun AiProviderConfigSection(
             onAvailableModels = onAvailableModels,
             onShowLogin = {},
         )
+    }
+}
+
+/** Compact settings UI for OpenAI-compatible free/cheap providers (OpenRouter, Cerebras, Mistral). */
+@Composable
+fun FreeCompatProviderPanel(
+    title: String,
+    blurb: String,
+    letter: String,
+    configured: Boolean,
+    displayName: String,
+    statusLine: String,
+    promptTitle: String,
+    promptBlurb: String,
+    configureLabel: String,
+    keyLabel: String,
+    keyPlaceholder: String,
+    rawKey: String,
+    onRawKey: (String) -> Unit,
+    onRemove: () -> Unit,
+    models: List<com.nh.hoopscoach.game.Ollama.CloudModel>,
+    selectedModelId: String,
+    modelPickerLabel: String,
+    onPickModel: (String) -> Unit,
+    testing: Boolean,
+    onShowLogin: () -> Unit,
+    onTest: () -> Unit,
+) {
+    var showAdvancedSettings by remember { mutableStateOf(false) }
+    var showKey by remember { mutableStateOf(false) }
+    val auto = modelPickerLabel.contains("(auto)", ignoreCase = true)
+    Text(title, style = T.label.copy(fontSize = 10.sp), color = P.accent)
+    Spacer(Modifier.height(4.dp))
+    Text(blurb, style = T.small, color = P.sub)
+    Spacer(Modifier.height(10.dp))
+    CloudApiKeyCard(
+        letter = letter,
+        configured = configured,
+        displayName = displayName,
+        statusLine = statusLine,
+        promptTitle = promptTitle,
+        promptBlurb = promptBlurb,
+        configureLabel = configureLabel,
+        onConfigure = onShowLogin,
+        onRemove = onRemove,
+    )
+    Spacer(Modifier.height(12.dp))
+    val idx = models.indexOfFirst { it.id.equals(selectedModelId, true) }.coerceAtLeast(0)
+    Picker(
+        label = modelPickerLabel,
+        current = models[idx].name,
+        options = models.map { it.name to "${it.tag} — ${it.description}" },
+        display = "${if (auto) "Auto · " else ""}${models[idx].name} · ${models[idx].tag}",
+    ) { i -> onPickModel(models[i].id) }
+    Spacer(Modifier.height(10.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { showAdvancedSettings = !showAdvancedSettings }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+            style = T.label.copy(fontSize = 11.sp),
+            color = P.sub,
+            modifier = Modifier.weight(1f),
+        )
+    }
+    if (showAdvancedSettings) {
+        Spacer(Modifier.height(6.dp))
+        Column(Modifier.fillMaxWidth().background(P.surface2, RoundedCornerShape(8.dp)).padding(10.dp)) {
+            Text(keyLabel, style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(
+                value = rawKey,
+                onValueChange = onRawKey,
+                singleLine = true,
+                placeholder = { Text(keyPlaceholder, color = P.faint) },
+                visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    Text(
+                        if (showKey) "HIDE" else "SHOW",
+                        style = T.label.copy(fontSize = 10.sp),
+                        color = P.accent,
+                        modifier = Modifier.clickable { showKey = !showKey }.padding(8.dp),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors(),
+            )
+            Spacer(Modifier.height(8.dp))
+            SecondaryButton(
+                text = if (testing) "Testing..." else "Test Connection",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !testing && configured,
+                onClick = onTest,
+            )
+        }
     }
 }
 
@@ -1229,6 +1469,9 @@ fun AiDynastySettingsPanel(
     onShowAnthropicLogin: () -> Unit,
     onShowGroqLogin: () -> Unit,
     onShowDeepseekLogin: () -> Unit,
+    onShowOpenRouterLogin: () -> Unit,
+    onShowCerebrasLogin: () -> Unit,
+    onShowMistralLogin: () -> Unit,
 ) {
     var testStatus by remember { mutableStateOf("") }
     var testSuccess by remember { mutableStateOf(false) }
@@ -1263,6 +1506,9 @@ Panel {
                         it.ollama.anthropicModel = com.nh.hoopscoach.game.Ollama.snapAnthropicModel(it.ollama.anthropicModel)
                         it.ollama.groqModel = com.nh.hoopscoach.game.Ollama.snapGroqModel(it.ollama.groqModel)
                         it.ollama.deepseekModel = com.nh.hoopscoach.game.Ollama.snapDeepseekModel(it.ollama.deepseekModel)
+                        it.ollama.openRouterModel = com.nh.hoopscoach.game.Ollama.snapOpenRouterModel(it.ollama.openRouterModel)
+                        it.ollama.cerebrasModel = com.nh.hoopscoach.game.Ollama.snapCerebrasModel(it.ollama.cerebrasModel)
+                        it.ollama.mistralModel = com.nh.hoopscoach.game.Ollama.snapMistralModel(it.ollama.mistralModel)
                         it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
                     }
                 }
@@ -1272,8 +1518,8 @@ Panel {
 
     if (lg.ollama.enabled) {
         Spacer(Modifier.height(14.dp))
-        val providers = listOf("ollama", "google", "openai", "anthropic", "groq", "deepseek")
-        val providerLabels = listOf("Local", "Gemini", "ChatGPT", "Claude", "Groq", "DeepSeek")
+        val providers = listOf("ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral")
+        val providerLabels = listOf("Local", "Gemini", "ChatGPT", "Claude", "Groq", "DeepSeek", "OpenRouter", "Cerebras", "Mistral")
         val providerBlurbs = listOf(
             "On-device Ollama — free, no API key.",
             "Free Gemini flash models in the cloud.",
@@ -1281,6 +1527,9 @@ Panel {
             "Anthropic Claude — Haiku cheap, Sonnet richer.",
             "Groq free-tier Llama / Gemma — very fast.",
             "DeepSeek — cheap cloud chat for dynasty copy.",
+            "OpenRouter free (:free) Llama / Gemma / Mistral / Qwen.",
+            "Cerebras free-tier ultra-fast Llama.",
+            "Mistral free-tier Small / Nemo / Ministral.",
         )
         val providerIdx = providers.indexOfFirst { it.equals(lg.ollama.provider, true) }.coerceAtLeast(0)
         Picker(
@@ -1345,6 +1594,9 @@ Panel {
             onShowAnthropicLogin = { onShowAnthropicLogin() },
             onShowGroqLogin = { onShowGroqLogin() },
             onShowDeepseekLogin = { onShowDeepseekLogin() },
+            onShowOpenRouterLogin = { onShowOpenRouterLogin() },
+            onShowCerebrasLogin = { onShowCerebrasLogin() },
+            onShowMistralLogin = { onShowMistralLogin() },
         )
 
         if (testStatus.isNotEmpty()) {
@@ -1378,10 +1630,13 @@ Panel {
                 "google" -> l.ollama.googleModel = model
                 "openai" -> l.ollama.openAiModel = model
                 "anthropic" -> l.ollama.anthropicModel = model
-                "groq" -> l.ollama.groqModel = model
-                "deepseek" -> l.ollama.deepseekModel = model
-                else -> l.ollama.model = model
-            }
+                            "groq" -> l.ollama.groqModel = model
+                            "deepseek" -> l.ollama.deepseekModel = model
+                            "openrouter" -> l.ollama.openRouterModel = model
+                            "cerebras" -> l.ollama.cerebrasModel = model
+                            "mistral" -> l.ollama.mistralModel = model
+                            else -> l.ollama.model = model
+                        }
             com.nh.hoopscoach.game.Ollama.Cache.clear()
         } }
 

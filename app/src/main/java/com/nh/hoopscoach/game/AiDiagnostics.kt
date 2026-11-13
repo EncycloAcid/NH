@@ -39,6 +39,9 @@ object AiDiagnostics {
         "anthropic" -> if (config.anthropicApiKey.isBlank()) "Claude requires an Anthropic API key from console.anthropic.com. Account login does not authorize this app." else "Claude uses your Anthropic API key; billing and quota are separate from claude.ai chat."
         "groq" -> if (config.groqApiKey.isBlank()) "Groq requires an API key from console.groq.com." else "Groq uses your API key with a generous free tier for Llama and Gemma models."
         "deepseek" -> if (config.deepseekApiKey.isBlank()) "DeepSeek requires an API key from platform.deepseek.com." else "DeepSeek uses your API key; chat is cheap for dynasty copy."
+        "openrouter" -> if (config.openRouterApiKey.isBlank()) "OpenRouter requires an API key from openrouter.ai. Prefer models ending in :free." else "OpenRouter routes free (:free) and paid models with your key."
+        "cerebras" -> if (config.cerebrasApiKey.isBlank()) "Cerebras requires an API key from cloud.cerebras.ai." else "Cerebras free-tier Llama is very fast for dynasty copy."
+        "mistral" -> if (config.mistralApiKey.isBlank()) "Mistral requires an API key from console.mistral.ai." else "Mistral free-tier Small / Nemo work well for short recaps."
         else -> "Ollama must run separately. Localhost means this phone, not your computer. Use the computer's LAN IP and port 11434 on the same network; bind Ollama to that LAN address and allow the port through its firewall. 10.0.2.2 is emulator-only."
     }
     fun networkReason(error: Throwable?, config: OllamaConfig): String {
@@ -51,6 +54,9 @@ object AiDiagnostics {
             "anthropic" -> config.anthropicApiKey.isBlank()
             "groq" -> config.groqApiKey.isBlank()
             "deepseek" -> config.deepseekApiKey.isBlank()
+            "openrouter" -> config.openRouterApiKey.isBlank()
+            "cerebras" -> config.cerebrasApiKey.isBlank()
+            "mistral" -> config.mistralApiKey.isBlank()
             else -> false
         }
         if (missingKey) return setupHint(config)

@@ -234,6 +234,9 @@ class OllamaTest {
         assertTrue(Ollama.ANTHROPIC_MODELS.any { it.id == "claude-haiku-4-5" })
         assertTrue(Ollama.GROQ_MODELS.any { it.id == "llama-3.1-8b-instant" })
         assertTrue(Ollama.DEEPSEEK_MODELS.any { it.id == "deepseek-chat" })
+        assertTrue(Ollama.OPENROUTER_MODELS.any { it.id.endsWith(":free") })
+        assertTrue(Ollama.CEREBRAS_MODELS.any { it.id == "llama3.1-8b" })
+        assertTrue(Ollama.MISTRAL_MODELS.any { it.id == "mistral-small-latest" })
         assertTrue("Opus stays out of Claude shortlist", Ollama.ANTHROPIC_MODELS.none { it.id.contains("opus") })
     }
 
