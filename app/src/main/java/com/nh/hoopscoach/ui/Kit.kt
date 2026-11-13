@@ -189,13 +189,22 @@ fun Empty(text: String, modifier: Modifier = Modifier) {
 // ---------- controls ----------
 
 @Composable
-fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, scroll: Boolean = false) {
+fun Segmented(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    scroll: Boolean = false,
+    /** Horizontal screen gutter. Off inside [Panel] so the control aligns with sibling fields. */
+    inset: Boolean = true,
+) {
     val track = Modifier.clip(RoundedCornerShape(14.dp)).background(if (P.dark) P.surface else Color(0xFFE6E8EC)).padding(3.dp)
     val rowH = remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // Where each tab sits, so the selected pill can slide from one to the next.
     val starts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
     val widths = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
     val density = LocalDensity.current
+    val edge = if (inset) Gutter else 0.dp
     val pillX by androidx.compose.animation.core.animateIntAsState(starts[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillX")
     val pillW by androidx.compose.animation.core.animateIntAsState(widths[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillW")
     val pillColor = if (P.dark) P.surface2 else Color.White
@@ -224,14 +233,14 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
         // The strip scrolls to keep the selected tab in view.
         val state = rememberScrollState()
         LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
-        Box(modifier.padding(horizontal = Gutter).horizontalScroll(state).then(track)) {
+        Box(modifier.padding(horizontal = edge).horizontalScroll(state).then(track)) {
             pill()
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
             }
         }
     } else {
-        Box(modifier.padding(horizontal = Gutter).fillMaxWidth().then(track)) {
+        Box(modifier.padding(horizontal = edge).fillMaxWidth().then(track)) {
             pill()
             Row(Modifier.fillMaxWidth()) {
                 // Five or more tabs share the width by label length so none gets cut off.
@@ -404,7 +413,15 @@ fun AppMenuDivider() = Box(Modifier.padding(horizontal = 18.dp, vertical = 5.dp)
  * as the field, checks the current choice, and opens scrolled to it in a long list.
  */
 @Composable
-fun Picker(label: String, current: String, options: List<Pair<String, String>>, modifier: Modifier = Modifier, onPick: (Int) -> Unit) {
+fun Picker(
+    label: String,
+    current: String,
+    options: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+    /** Shown in the field; defaults to [current]. Use when the value includes prefixes like "Auto ·". */
+    display: String = current,
+    onPick: (Int) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
@@ -426,7 +443,7 @@ fun Picker(label: String, current: String, options: List<Pair<String, String>>, 
         ) {
             Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = if (open) P.accent else P.sub)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(current, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(display, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Icon(Icons.Default.KeyboardArrowDown, null, tint = if (open) P.accent else P.sub, modifier = Modifier.size(20.dp).rotate(if (open) 180f else 0f))
             }
         }
