@@ -15,7 +15,8 @@ Every push builds Android and PC packages and publishes them on the **Releases**
 | Platform | Artifact | Needs |
 | --- | --- | --- |
 | Android | `HoopsDynasty.apk` | Android device (sideload) |
-| PC | `HoopsDynasty-pc.jar` | [Java 17+](https://adoptium.net/) |
+| Windows | `HoopsDynasty-windows.exe` | Windows 10+ (installer; Java is bundled) |
+| PC (jar) | `HoopsDynasty-pc.jar` | [Java 17+](https://adoptium.net/) |
 | Linux (optional) | `.deb` | when packaging succeeds on CI |
 
 ### Android
@@ -26,7 +27,13 @@ Every push builds Android and PC packages and publishes them on the **Releases**
 
 **Keep your save safe:** In **Career → Settings**, use **Back up** / **Restore**. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), the builds were signed with different keys. Back up first, uninstall, install the new build, then restore.
 
-### PC (Windows, macOS, Linux)
+### Windows
+
+1. Download `HoopsDynasty-windows.exe` from the newest release.
+2. Run the installer and open **Hoops Dynasty** from the Start menu / desktop shortcut.
+3. No separate Java install is required — the EXE bundles a runtime.
+
+### Other PC (macOS / Linux / jar)
 
 1. Install [Java 17+](https://adoptium.net/) if you don't already have it.
 2. Download `HoopsDynasty-pc.jar` from the newest release.
@@ -37,7 +44,7 @@ Every push builds Android and PC packages and publishes them on the **Releases**
 
 - The window is phone-sized on purpose (same layout and UI as Android).
 - **Escape** goes back (same as the on-screen back control).
-- Saves live at `~/.hoopsdynasty/dynasty.sav` (or your user-home equivalent on Windows/macOS).
+- Saves live at `~/.hoopsdynasty/dynasty.sav` (on Windows: `%USERPROFILE%\.hoopsdynasty\dynasty.sav`).
 - Phone and PC use the same `.hdsave` backup format. In **Career → Settings**, use **Back up** / **Restore** to move a dynasty between them.
 
 ## What's in the game
@@ -143,6 +150,7 @@ Requirements: **JDK 17+**. Android builds also need the Android SDK (Android Stu
 ./gradlew :app:assembleRelease                # Android APK → app/build/outputs/apk/release/app-release.apk
 ./gradlew :app:run                            # launch the PC app
 ./gradlew :app:packageUberJarForCurrentOS     # runnable PC jar → app/build/compose/jars/
+./gradlew :app:packageExe                     # Windows installer .exe (Windows hosts only)
 ./gradlew :app:packageDeb                     # Linux .deb (Linux hosts only)
 ./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.SimTest
 ```

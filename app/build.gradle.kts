@@ -150,7 +150,7 @@ compose.desktop {
     application {
         mainClass = "com.nh.hoopscoach.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "HoopsDynasty"
             packageVersion = "3.4.0"
             description = "College basketball coaching dynasty"
@@ -161,6 +161,9 @@ compose.desktop {
             windows {
                 menuGroup = "Hoops Dynasty"
                 upgradeUuid = "a7c3e9f1-4b2d-4e8a-9c1f-6d5e4b3a2c10"
+                shortcut = true
+                dirChooser = true
+                perUserInstall = true
             }
             macOS {
                 bundleID = "com.nh.hoopscoach"
