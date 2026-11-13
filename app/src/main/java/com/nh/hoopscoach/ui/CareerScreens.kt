@@ -553,7 +553,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 it.ollama.enabled = true
             }
             showGoogleLoginDialog = false
-            vm.toast("Google account connected. Use Test AI to verify.")
+            vm.toast("Gemini developer key saved. Use Test AI to verify.")
         },
         onDismiss = { showGoogleLoginDialog = false },
     )
@@ -569,7 +569,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 it.ollama.enabled = true
             }
             showOpenAiLoginDialog = false
-            vm.toast("OpenAI account connected. Use Test AI to verify.")
+            vm.toast("OpenAI developer key saved. Use Test AI to verify.")
         },
         onDismiss = { showOpenAiLoginDialog = false },
     )
@@ -578,7 +578,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.anthropicApiKey = key; it.ollama.anthropicAccountEmail = email; it.ollama.provider = "anthropic"; it.ollama.enabled = true }
             showAnthropicLoginDialog = false
-            vm.toast("Claude account connected. Use Test AI to verify.")
+            vm.toast("Claude developer key saved. Use Test AI to verify.")
         },
         onDismiss = { showAnthropicLoginDialog = false },
     )
@@ -587,7 +587,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.groqApiKey = key; it.ollama.groqAccountEmail = email; it.ollama.provider = "groq"; it.ollama.enabled = true }
             showGroqLoginDialog = false
-            vm.toast("Groq account connected. Use Test AI to verify.")
+            vm.toast("Groq key saved. Use Test AI to verify.")
         },
         onDismiss = { showGroqLoginDialog = false },
     )
@@ -596,7 +596,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.deepseekApiKey = key; it.ollama.deepseekAccountEmail = email; it.ollama.provider = "deepseek"; it.ollama.enabled = true }
             showDeepseekLoginDialog = false
-            vm.toast("DeepSeek account connected. Use Test AI to verify.")
+            vm.toast("DeepSeek key saved. Use Test AI to verify.")
         },
         onDismiss = { showDeepseekLoginDialog = false },
     )
@@ -605,7 +605,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.openRouterApiKey = key; it.ollama.openRouterAccountEmail = email; it.ollama.provider = "openrouter"; it.ollama.enabled = true }
             showOpenRouterLoginDialog = false
-            vm.toast("OpenRouter account connected. Use Test AI to verify.")
+            vm.toast("OpenRouter key saved. Use Test AI to verify.")
         },
         onDismiss = { showOpenRouterLoginDialog = false },
     )
@@ -614,7 +614,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.cerebrasApiKey = key; it.ollama.cerebrasAccountEmail = email; it.ollama.provider = "cerebras"; it.ollama.enabled = true }
             showCerebrasLoginDialog = false
-            vm.toast("Cerebras account connected. Use Test AI to verify.")
+            vm.toast("Cerebras key saved. Use Test AI to verify.")
         },
         onDismiss = { showCerebrasLoginDialog = false },
     )
@@ -623,7 +623,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         onSave = { key, email ->
             vm.act { it.ollama.mistralApiKey = key; it.ollama.mistralAccountEmail = email; it.ollama.provider = "mistral"; it.ollama.enabled = true }
             showMistralLoginDialog = false
-            vm.toast("Mistral account connected. Use Test AI to verify.")
+            vm.toast("Mistral key saved. Use Test AI to verify.")
         },
         onDismiss = { showMistralLoginDialog = false },
     )
