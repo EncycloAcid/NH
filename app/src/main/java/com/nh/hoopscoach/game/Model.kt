@@ -680,6 +680,8 @@ class OllamaConfig(
     var historicalRivalries: Boolean = true,
     /** AI university/franchise development: arenas, facilities, recruiting infra, brand. */
     var universityDevelopment: Boolean = true,
+    /** AI living media ecosystem: breaking news, debates, fans, recruiting, coach barbs, social, polls. */
+    var mediaEcosystem: Boolean = true,
     var championshipCelebrations: Boolean = true,
     var freeAgencyBuzz: Boolean = true,
     /** AI assigns on-court personalities (confident scorer / unselfish) and scout notes. */

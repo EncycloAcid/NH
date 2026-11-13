@@ -1392,6 +1392,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI living media ecosystem", style = T.bodyB, color = P.ink)
+                            Text("Breaking news, analyst debates, fan arguments, recruiting rumors, coach barbs, player social posts, and poll reactions — from real events.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.mediaEcosystem, { on -> vm.act { it.ollama.mediaEcosystem = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Free agency rumors & contract demands", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops on expiring contracts and max contract pursuits.", style = T.small, color = P.sub)
                         }

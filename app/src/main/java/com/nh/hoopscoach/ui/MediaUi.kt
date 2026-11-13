@@ -768,6 +768,9 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             if (filter == 0 && (lg.ollama.enabled && lg.ollama.universityDevelopment || lg.news.any { it.source.contains("Hoops Wire Campus", ignoreCase = true) })) {
                 item { UniversityDevelopmentCard(vm, lg) }
             }
+            if (filter == 0 && (lg.ollama.enabled && lg.ollama.mediaEcosystem || lg.news.any { it.source.contains("Hoops Wire Network", ignoreCase = true) })) {
+                item { MediaEcosystemCard(vm, lg) }
+            }
             if (top != null) item {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
@@ -882,6 +885,51 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                 TextButton({ showOllamaDialog = false }, enabled = !writingStory) { Text("Cancel", color = P.sub) }
             },
         )
+    }
+}
+
+/** Living media network: breaking news, debates, fans, recruiting, coach heat, polls + social. */
+@Composable
+private fun MediaEcosystemCard(vm: GameViewModel, lg: League) {
+    var writing by remember { mutableStateOf(false) }
+    var lastDetail by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    fun runDesk() {
+        writing = true
+        scope.launch {
+            val res = Ollama.generateMediaEcosystem(lg.ollama, lg)
+            writing = false
+            res.onSuccess { pack ->
+                vm.act { it.news.addAll(pack.stories) }
+                lastDetail = pack.detail
+                vm.toast(if (pack.isAi) "Network filed ${pack.stories.size} beats" else pack.detail)
+            }.onFailure { err ->
+                vm.toast("Network: ${err.message ?: "failed"}")
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Section(
+        "Network desk",
+        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} network",
+        onAction = { if (!writing) runDesk() },
+    )
+    Panel {
+        if (writing) {
+            Text("${lg.ollama.providerDisplayName} is filing breaking news, debates, recruiting, and poll coverage…", style = T.small, color = P.accent)
+        } else {
+            Text(
+                "ESPN-style breaking news, analyst debates, fan arguments, recruiting rumors, coach barbs, player social posts, and national-poll reactions — all from real game events.",
+                style = T.small,
+                color = P.sub,
+            )
+            if (lastDetail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(lastDetail, style = T.small, color = P.faint)
+            }
+            Spacer(Modifier.height(8.dp))
+            SmallButton(if (lg.ollama.enabled) "File media ecosystem package" else "File game-written network desk", primary = true) { runDesk() }
+        }
     }
 }
 

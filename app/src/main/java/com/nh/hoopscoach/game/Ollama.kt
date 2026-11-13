@@ -1087,6 +1087,96 @@ object Ollama {
         }
     }
 
+    /** Fire-and-forget living media ecosystem package (breaking + debates + social + polls). */
+    fun maybeAutoGenerateMediaEcosystem(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
+        if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateMediaEcosystem(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+            }
+        }
+    }
+
+    /** Living media ecosystem desk grounded in [MediaEcosystem.ecosystemBrief]. */
+    suspend fun generateMediaEcosystem(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<MediaEcosystem.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.mediaEcosystem) {
+            return@withContext Result.success(MediaEcosystem.fallbackPackage(lg))
+        }
+        MediaEcosystem.publishSocialBeats(lg)
+        val brief = MediaEcosystem.ecosystemBrief(lg)
+        val cacheKey = "media_eco_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<MediaEcosystem.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a living basketball media network (ESPN-style wire + talk shows + social). Using ONLY the ECOSYSTEM BRIEF, write up to six short beats.")
+            appendLine("Do not invent scores, commits, firings, poll voters, or quotes not supported by the brief.")
+            appendLine("ECOSYSTEM BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that beat has no facts):")
+            appendLine("BREAKING_HEADLINE: <breaking news from today's real results>")
+            appendLine("BREAKING_BODY: <2 short paragraphs>")
+            appendLine("ANALYST_HEADLINE: <analysts debating tournament/postseason chances>")
+            appendLine("ANALYST_BODY: <2 short paragraphs citing records/AP/Elo from the brief>")
+            appendLine("FAN_HEADLINE: <fans arguing about coaching decisions>")
+            appendLine("FAN_BODY: <2 short paragraphs grounded in security/record>")
+            appendLine("RECRUIT_HEADLINE: <recruiting insider / commitment rumor (college) or trade buzz (pro)>")
+            appendLine("RECRUIT_BODY: <conditional only — no fake commits>")
+            appendLine("COACH_HEADLINE: <coach heat / rival-program barbs>")
+            appendLine("COACH_BODY: <2 short paragraphs from the rivalry ledger>")
+            appendLine("POLL_HEADLINE: <national poll reaction to upsets or ranked results>")
+            appendLine("POLL_BODY: <2 short paragraphs from AP board facts>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Living media ecosystem desk. Facts only from the brief. Speculation must be labeled as rumor.",
+            numPredict = 560,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Network")
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String, mine: Boolean = true, teamId: Int = lg.userTeamId) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = kind, body = body, source = outlet,
+                    teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("article", "BREAKING_HEADLINE", "BREAKING_BODY", mine = false)
+            add("column", "ANALYST_HEADLINE", "ANALYST_BODY")
+            add("column", "FAN_HEADLINE", "FAN_BODY")
+            add("column", "RECRUIT_HEADLINE", "RECRUIT_BODY", mine = false)
+            add("column", "COACH_HEADLINE", "COACH_BODY")
+            add("column", "POLL_HEADLINE", "POLL_BODY", mine = false)
+            val pack = if (stories.size >= 2) MediaEcosystem.Package(stories, draft.isAi, "Network filed ${stories.size} beats + social.")
+            else MediaEcosystem.fallbackPackage(lg).copy(detail = "AI thin — used game-written media ecosystem. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { MediaEcosystem.fallbackPackage(lg) }
+    }
+
     /** Fire-and-forget campus / franchise development package. */
     fun maybeAutoGenerateUniversityDevelopment(config: OllamaConfig, lg: League, force: Boolean = false) {
         if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
