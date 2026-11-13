@@ -27,38 +27,31 @@ object Ollama {
         val speedRating: String = "Fast",
     )
 
+    /** Free / cheap on-device presets only — no large "pro" phone models. */
     val RECOMMENDED_MODELS = listOf(
         ModelPreset(
             id = "smollm2:135m",
             name = "SmolLM2 135M",
             size = "270 MB",
-            tag = "⚡⚡⚡ Instant Nano (Fastest)",
+            tag = "Fastest · free",
             speedRating = "40–60 tok/s",
-            description = "Fastest on-device model (~270MB). Instant recaps, press quotes, and takes with minimal RAM and battery impact.",
+            description = "Fastest on-device model (~270MB). Instant recaps and quotes with minimal RAM.",
         ),
         ModelPreset(
             id = "qwen2.5:0.5b",
             name = "Qwen 2.5 0.5B",
             size = "398 MB",
-            tag = "⚡⚡ Ultra Fast",
+            tag = "Ultra fast · free",
             speedRating = "35–45 tok/s",
-            description = "Extremely lightweight (~400MB). High-speed generation with sharp basketball intelligence.",
+            description = "Lightweight (~400MB). High-speed generation with sharp basketball context.",
         ),
         ModelPreset(
             id = "llama3.2:1b",
             name = "Llama 3.2 1B",
             size = "1.3 GB",
-            tag = "Recommended · Balanced",
+            tag = "Recommended · free",
             speedRating = "15–20 tok/s",
-            description = "Meta's mobile LLM (~15-20 tok/s). Fast, witty game recaps and realistic player quotes with low RAM usage.",
-        ),
-        ModelPreset(
-            id = "llama3.2:3b",
-            name = "Llama 3.2 3B",
-            size = "2.0 GB",
-            tag = "Pro Quality",
-            speedRating = "5–8 tok/s",
-            description = "Full-length sports journalism, colorful columns, and rich storylines for mid-to-high end phones.",
+            description = "Meta's mobile LLM. Fast, witty recaps and realistic quotes with low RAM.",
         ),
     )
 
@@ -69,17 +62,27 @@ object Ollama {
         val description: String,
     )
 
+    /** Free / cheap Gemini tags only — Pro is hidden from Settings. */
     val GOOGLE_MODELS = listOf(
-        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · Free & Fast", "Ultra-fast multimodal reasoning with a generous free tier. Ideal for instant recaps."),
-        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Next-Gen Speed", "Google's newest flash model with sub-second generation and real-time responsiveness."),
-        CloudModel("gemini-1.5-pro", "Gemini 1.5 Pro", "Deep Journalism", "Full-length investigative columns, rich prose, and deep storylines."),
+        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · free", "Fast free-tier model. Ideal for instant recaps."),
+        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Free · next-gen", "Newest flash model with sub-second generation."),
     )
 
+    /** Cheap OpenAI tags only — flagship gpt-4o is hidden from Settings. */
     val OPENAI_MODELS = listOf(
-        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · Smart & Fast", "Affordable and remarkably fast. Exceptional basketball context and quote realism."),
-        CloudModel("gpt-4o", "GPT-4o", "Flagship Intelligence", "OpenAI's premier reasoning model for deep columns and sports commentary."),
-        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Legacy", "Classic ChatGPT model for basic headlines and recaps."),
+        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · cheap", "Affordable and fast. Strong basketball context."),
+        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
     )
+
+    fun snapGoogleModel(id: String): String =
+        GOOGLE_MODELS.firstOrNull { it.id.equals(id, true) }?.id ?: GOOGLE_MODELS.first().id
+
+    fun snapOpenAiModel(id: String): String =
+        OPENAI_MODELS.firstOrNull { it.id.equals(id, true) }?.id ?: OPENAI_MODELS.first().id
+
+    fun snapLocalModel(id: String): String =
+        RECOMMENDED_MODELS.firstOrNull { it.id.equals(id, true) || id.startsWith(it.id.substringBefore(":")) }?.id
+            ?: RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id
 
     data class AutoConfigResult(
         val host: String,

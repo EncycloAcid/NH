@@ -335,112 +335,132 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     var generating by remember { androidx.compose.runtime.mutableStateOf(false) }
     var ollamaError by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // A newspaper page: paper, serif type, the outlet's nameplate, the headline, then the story.
-    val paper = if (P.dark) Color(0xFF221F1A) else Color(0xFFF6F1E5)
-    val ink = if (P.dark) Color(0xFFEFE8D8) else Color(0xFF1B1915)
-    val faded = ink.copy(alpha = 0.6f)
-    val serif = androidx.compose.ui.text.font.FontFamily.Serif
     val articleSource = if (n.isAiGenerated) n.source.substringBeforeLast(" · ", n.source) else n.source
-    val outlet = articleSource.substringAfter(" · ", articleSource).ifEmpty { "The Daily" }
+    val outlet = articleSource.substringAfter(" · ", articleSource).ifEmpty { "Hoops Wire" }
     val byline = articleSource.substringBefore(" · ", "").takeIf { it.isNotEmpty() && articleSource.contains(" · ") }
     var showEditDialog by remember { mutableStateOf(false) }
     var showAngleDialog by remember { mutableStateOf(false) }
     var editHeadline by remember { mutableStateOf(n.text) }
     var editBody by remember { mutableStateOf(n.body) }
     var selectedAngle by remember { mutableStateOf(n.angle.ifEmpty { lg.ollama.defaultStoryAngle }) }
+    val kindLabel = when (n.kind) {
+        "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade", "move" -> "TRANSACTIONS"
+        "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"
+        "upset", "buzzer", "moment" -> "MOMENTS"; "" -> "NEWS"; else -> "GAME STORY"
+    }
 
     Column(Modifier.fillMaxSize()) {
-        BackBar(outlet, "${n.season} season · day ${n.day}", onBack = { vm.back() })
+        BackBar("Hoops Wire", "${n.season} season · day ${n.day}", onBack = { vm.back() })
         LazyColumn(Modifier.weight(1f)) {
             item {
-                Column(Modifier.padding(horizontal = Gutter, vertical = 10.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(paper).padding(16.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
-                            color = ink, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.width(8.dp))
+                Panel {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(outlet.uppercase(), style = T.label, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("$kindLabel · ${n.season} · DAY ${n.day}", style = T.small, color = P.sub)
+                        }
                         AiBadge(verified, n.source.substringAfterLast(" · ", ""))
                     }
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
-                    Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
-                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade", "move" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; "upset", "buzzer", "moment" -> "MOMENTS"; "" -> "NEWS"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
-                        style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
                     if (n.isAiGenerated) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (n.approved) Tag("✓ APPROVED", P.good)
-                            else Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
-                            if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
+                            else Tag("DRAFT", P.gold)
+                            if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.accent)
                         }
                     }
-                    Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
-                        color = ink, modifier = Modifier.padding(top = 6.dp))
-                    Text("By ${if (verified) byline ?: "Staff" else "Staff"} · ${n.season} season, day ${n.day}", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
-                        color = faded, modifier = Modifier.padding(top = 6.dp))
-                    if (!verified && fallbackReason.isNotBlank()) Text("Game-written: $fallbackReason", style = T.small, color = faded, modifier = Modifier.padding(top = 4.dp))
-                    // The picture: the player the story is about, or his team.
+                    Spacer(Modifier.height(10.dp))
+                    Text(headline(n.text), style = T.head.copy(fontSize = 22.sp, lineHeight = 26.sp), color = P.ink)
+                    Text(
+                        "By ${if (verified) byline ?: "Staff" else "Staff"} · ${n.season} season, day ${n.day}",
+                        style = T.small,
+                        color = P.sub,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    if (!verified && fallbackReason.isNotBlank()) {
+                        Text("Game-written: $fallbackReason", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+                    }
                     val pic = lg.playerOrNull(n.pid)
                     val team = lg.teams.getOrNull(n.teamId)
                     if (pic != null || team != null) {
                         Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(ink.copy(alpha = 0.035f)).border(0.75.dp, faded.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 72.dp) else if (team != null) TeamBadge(team, 60.dp)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(team?.let { Color(it.primary).copy(alpha = 0.16f) } ?: P.surface2)
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 64.dp)
+                            else if (team != null) TeamBadge(team, 52.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(pic?.name ?: team?.name ?: "", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp), color = ink)
-                                Text(if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}" else team?.let { "${it.w}-${it.l}" } ?: "",
-                                    style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 13.sp), color = faded)
+                                Text(pic?.name ?: team?.name ?: "", style = T.bodyB, color = P.ink)
+                                Text(
+                                    if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}"
+                                    else team?.let { "${it.w}-${it.l}" } ?: "",
+                                    style = T.small,
+                                    color = P.sub,
+                                )
                                 articleGame?.box?.let { b -> (b.home + b.away).firstOrNull { it.pid == pic?.id } }?.let { line ->
-                                    Text("${line.s.pts} PTS · ${line.s.reb} REB · ${line.s.ast} AST", style = T.small, color = ink, modifier = Modifier.padding(top = 4.dp))
+                                    Text("${line.s.pts} PTS · ${line.s.reb} REB · ${line.s.ast} AST", style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
                                 }
                             }
                         }
                     }
                     articleGame?.let { g ->
-                        Column(Modifier.fillMaxWidth().padding(top = 12.dp).border(0.75.dp, faded.copy(alpha = 0.3f)).padding(12.dp)) {
-                            Text("FINAL${if (g.ot > 0) " · OT" else ""} · Current records", style = T.small, color = faded)
-                            Text("AWAY · ${lg.team(g.away).name} (${lg.team(g.away).record})  ${g.aws}", style = if (g.aws > g.hs) T.bodyB else T.body, color = ink)
-                            Text("HOME · ${lg.team(g.home).name} (${lg.team(g.home).record})  ${g.hs}", style = if (g.hs > g.aws) T.bodyB else T.body, color = ink)
+                        Spacer(Modifier.height(12.dp))
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(P.surface2)
+                                .padding(12.dp),
+                        ) {
+                            Text("FINAL${if (g.ot > 0) " · OT" else ""} · Current records", style = T.label, color = P.sub)
+                            Spacer(Modifier.height(6.dp))
+                            Text("AWAY · ${lg.team(g.away).name} (${lg.team(g.away).record})  ${g.aws}", style = if (g.aws > g.hs) T.bodyB else T.body, color = P.ink)
+                            Text("HOME · ${lg.team(g.home).name} (${lg.team(g.home).record})  ${g.hs}", style = if (g.hs > g.aws) T.bodyB else T.body, color = P.ink)
                         }
                     }
                     if (articleBody.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(14.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            for (para in articleBody.split(Regex("\\n\\s*\\n"))) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 24.sp), color = ink)
+                            for (para in articleBody.split(Regex("\\n\\s*\\n"))) {
+                                if (para.isNotBlank()) Text(para.trim(), style = T.body, color = P.ink)
+                            }
                         }
                     }
                     if (lg.ollama.enabled) {
                         Spacer(Modifier.height(14.dp))
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(faded.copy(alpha = 0.3f)))
+                        Hairline()
                         Spacer(Modifier.height(10.dp))
-                        val provider = lg.ollama.providerDisplayName
                         val action = lg.ollama.shortActionName
-
                         Column(
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (n.approved) P.surface2.copy(alpha = 0.8f) else (if (P.dark) Color(0xFF2E2616) else Color(0xFFFEF3C7)))
-                                .padding(12.dp)
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(P.surface2)
+                                .border(1.dp, P.line, RoundedCornerShape(14.dp))
+                                .padding(12.dp),
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            if (n.approved) "PUBLISHED" else "EDITOR'S DESK · DRAFT",
-                                            style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp),
-                                            color = if (n.approved) P.good else (if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309)),
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.gold)
-                                    }
-                                    Text(
-                                        if (generating) "Writing story with $action AI ($selectedAngle)..."
-                                        else if (n.approved) "Approved by editor. Published to front page."
-                                        else "Review, edit quotes, or re-roll the reporter's angle before publishing.",
-                                        style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 12.sp),
-                                        color = faded,
-                                    )
-                                }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    if (n.approved) "PUBLISHED" else "EDITOR DESK · DRAFT",
+                                    style = T.label,
+                                    color = if (n.approved) P.good else P.gold,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (n.angle.isNotEmpty()) Tag(n.angle.uppercase(), P.accent)
                             }
+                            Text(
+                                if (generating) "Writing story with $action AI ($selectedAngle)..."
+                                else if (n.approved) "Approved. Live on the wire."
+                                else "Review, edit quotes, or re-roll the angle before publishing.",
+                                style = T.small,
+                                color = P.sub,
+                            )
                             Spacer(Modifier.height(10.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -448,10 +468,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (!n.approved) {
-                                    SmallButton(
-                                        "Publish",
-                                        enabled = !generating,
-                                    ) {
+                                    SmallButton("Publish", enabled = !generating) {
                                         vm.act {
                                             val target = it.news.getOrNull(index) ?: return@act
                                             if (target.isAiGenerated && ArticleWriting.errors(target.body, it.ollama).isNotEmpty()) {
@@ -462,32 +479,23 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                                             }
                                             target.approved = true
                                         }
-                                        vm.toast("Story approved and published to front page! 📰")
+                                        vm.toast("Story published to Hoops Wire")
                                     }
                                 } else {
-                                    SmallButton(
-                                        "Mark as Draft",
-                                        enabled = !generating,
-                                    ) {
+                                    SmallButton("Mark as Draft", enabled = !generating) {
                                         vm.act {
                                             val target = it.news.getOrNull(index) ?: return@act
                                             target.approved = false
                                         }
-                                        vm.toast("Story moved back to editor's drafts.")
+                                        vm.toast("Story moved back to drafts")
                                     }
                                 }
-                                SmallButton(
-                                    "Edit",
-                                    enabled = !generating,
-                                ) {
+                                SmallButton("Edit", enabled = !generating) {
                                     editHeadline = n.text
                                     editBody = n.body
                                     showEditDialog = true
                                 }
-                                SmallButton(
-                                    "Re-roll",
-                                    enabled = !generating,
-                                ) {
+                                SmallButton("Re-roll", enabled = !generating) {
                                     showAngleDialog = true
                                 }
                             }
@@ -498,6 +506,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         }
                     }
                 }
+
                 // What people said: the players, coaches, analysts and fans, most liked first.
                 if (n.reactions.isNotEmpty()) {
                     Section("Reactions · ${n.reactions.size}")
@@ -563,10 +572,10 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     if (showAngleDialog) {
         val angles = listOf(
             "balanced" to ("Balanced News Desk" to "Comprehensive game recap with player quotes, key moments, and standings."),
-            "tactical" to ("📊 Tactical Film Room" to "Deep dive into shooting splits, pick-and-roll defense, and pace efficiency."),
-            "beat" to ("🎙️ Local Beat Columnist" to "Raw emotion, hometown passion, crowd noise, and locker room camaraderie."),
-            "skeptic" to ("🥊 National Skeptic" to "Critical eye questioning sustainability, turnovers, and ceiling against elite teams."),
-            "dual" to ("⚖️ Dual Locker Room" to "Balanced postgame quotes from BOTH the winning and losing coaches and stars."),
+            "tactical" to ("Tactical Film Room" to "Deep dive into shooting splits, pick-and-roll defense, and pace efficiency."),
+            "beat" to ("Local Beat Columnist" to "Raw emotion, hometown passion, crowd noise, and locker room camaraderie."),
+            "skeptic" to ("National Skeptic" to "Critical eye questioning sustainability, turnovers, and ceiling against elite teams."),
+            "dual" to ("Dual Locker Room" to "Balanced postgame quotes from BOTH the winning and losing coaches and stars."),
         )
         AlertDialog(
             onDismissRequest = { showAngleDialog = false },

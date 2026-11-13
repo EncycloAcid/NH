@@ -389,7 +389,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         Text("Retro portraits for everyone", style = T.bodyB, color = P.ink)
                         Text("Draw real players as retro bit portraits too, instead of their headshots.", style = T.small, color = P.sub)
                     }
-                    androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
+                    AppSwitch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }
             }
             Section("AI Dynasty Intelligence")
@@ -398,46 +398,40 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 com.nh.hoopscoach.game.Ollama.Cache.clear()
             } }
             Panel {
+                // Drop any saved premium model onto the free/cheap catalog when Settings opens.
+                LaunchedEffect(Unit) {
+                    vm.act {
+                        it.ollama.googleModel = com.nh.hoopscoach.game.Ollama.snapGoogleModel(it.ollama.googleModel)
+                        it.ollama.openAiModel = com.nh.hoopscoach.game.Ollama.snapOpenAiModel(it.ollama.openAiModel)
+                        it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Enable AI Dynasty Intelligence", style = T.bodyB, color = P.ink)
-                        Text("Generate dynamic newspaper recaps, coach podium quotes, fan reactions, and storylines.", style = T.small, color = P.sub)
+                        Text("Generate dynamic recaps, coach podium quotes, fan reactions, and storylines — free & cheap models only.", style = T.small, color = P.sub)
                     }
-                    androidx.compose.material3.Switch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
+                    AppSwitch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
                 }
 
                 if (lg.ollama.enabled) {
                     Spacer(Modifier.height(14.dp))
-                    Text("AI PROVIDER", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    val providers = listOf("ollama", "google", "openai")
+                    val providerLabels = listOf("Local", "Gemini", "ChatGPT")
+                    val providerIdx = providers.indexOfFirst { it.equals(lg.ollama.provider, true) }.coerceAtLeast(0)
+                    Segmented(providerLabels, providerIdx, { i ->
+                        vm.act { it.ollama.provider = providers[i] }
+                        testStatus = ""
+                    })
                     Spacer(Modifier.height(6.dp))
-
-                    // 3 Provider Tabs
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val providers = listOf(
-                            Triple("ollama", "🤖 Local Ollama", "On-device runtime"),
-                            Triple("google", "🌐 Google Gemini", "Free & fast cloud"),
-                            Triple("openai", "⚡ ChatGPT", "OpenAI cloud"),
-                        )
-                        providers.forEach { (key, label, desc) ->
-                            val sel = lg.ollama.provider.equals(key, ignoreCase = true)
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (sel) P.accentSoft else P.surface2)
-                                    .border(if (sel) 1.5.dp else 1.dp, if (sel) P.accent else P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        vm.act { it.ollama.provider = key }
-                                        testStatus = ""
-                                    }
-                                    .padding(vertical = 8.dp, horizontal = 4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(label, style = T.bodyB.copy(fontSize = 11.sp), color = if (sel) P.accent else P.ink, textAlign = TextAlign.Center)
-                                Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub, textAlign = TextAlign.Center)
-                            }
-                        }
-                    }
+                    Text(
+                        when (providers[providerIdx]) {
+                            "google" -> "Free Gemini flash models in the cloud."
+                            "openai" -> "Cheap ChatGPT models (mini / 3.5)."
+                            else -> "On-device Ollama — free, no API key."
+                        },
+                        style = T.small, color = P.sub,
+                    )
 
                     Spacer(Modifier.height(14.dp))
 
@@ -530,40 +524,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            Text("GEMINI MODEL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                            Spacer(Modifier.height(6.dp))
-
-                            com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS.forEach { m ->
-                                val sel = lg.ollama.googleModel.equals(m.id, ignoreCase = true)
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .background(if (sel) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
-                                        .border(
-                                            width = if (sel) 1.5.dp else 1.dp,
-                                            color = if (sel) P.accent else P.faint.copy(alpha = 0.25f),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { vm.act { it.ollama.googleModel = m.id } }
-                                        .padding(10.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(m.name, style = T.bodyB, color = P.ink)
-                                                Spacer(Modifier.width(6.dp))
-                                                Text(m.tag, style = T.small.copy(fontSize = 10.sp), color = if (m.tag.contains("Recommended")) P.good else P.sub)
-                                            }
-                                            Text(m.description, style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                                        }
-                                        if (sel) {
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
-                                        }
-                                    }
-                                }
-                            }
+                            val gModels = com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS
+                            val gIdx = gModels.indexOfFirst { it.id.equals(lg.ollama.googleModel, true) }.coerceAtLeast(0)
+                            Picker(
+                                "Gemini model",
+                                "${gModels[gIdx].name} · ${gModels[gIdx].tag}",
+                                gModels.map { it.name to "${it.tag} — ${it.description}" },
+                            ) { i -> vm.act { it.ollama.googleModel = gModels[i].id } }
 
                             Spacer(Modifier.height(10.dp))
                             // Advanced & developer toggle
@@ -659,7 +626,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                             modifier = Modifier.size(36.dp).clip(CircleShape).background(P.good.copy(alpha = 0.15f)),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text("⚡", style = T.head.copy(fontSize = 16.sp), color = P.good)
+                                            Text("O", style = T.head.copy(fontSize = 16.sp), color = P.good)
                                         }
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
@@ -706,7 +673,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                             modifier = Modifier.size(36.dp).clip(CircleShape).background(P.accentSoft),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text("⚡", style = T.head.copy(fontSize = 16.sp), color = P.accent)
+                                            Text("O", style = T.head.copy(fontSize = 16.sp), color = P.accent)
                                         }
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
@@ -726,40 +693,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            Text("CHATGPT MODEL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                            Spacer(Modifier.height(6.dp))
-
-                            com.nh.hoopscoach.game.Ollama.OPENAI_MODELS.forEach { m ->
-                                val sel = lg.ollama.openAiModel.equals(m.id, ignoreCase = true)
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .background(if (sel) P.accentSoft else P.surface2, RoundedCornerShape(8.dp))
-                                        .border(
-                                            width = if (sel) 1.5.dp else 1.dp,
-                                            color = if (sel) P.accent else P.faint.copy(alpha = 0.25f),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { vm.act { it.ollama.openAiModel = m.id } }
-                                        .padding(10.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(m.name, style = T.bodyB, color = P.ink)
-                                                Spacer(Modifier.width(6.dp))
-                                                Text(m.tag, style = T.small.copy(fontSize = 10.sp), color = if (m.tag.contains("Recommended")) P.good else P.sub)
-                                            }
-                                            Text(m.description, style = T.small.copy(fontSize = 11.sp), color = P.sub)
-                                        }
-                                        if (sel) {
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("ACTIVE", style = T.label.copy(fontSize = 11.sp), color = P.good)
-                                        }
-                                    }
-                                }
-                            }
+                            val oModels = com.nh.hoopscoach.game.Ollama.OPENAI_MODELS
+                            val oIdx = oModels.indexOfFirst { it.id.equals(lg.ollama.openAiModel, true) }.coerceAtLeast(0)
+                            Picker(
+                                "ChatGPT model",
+                                "${oModels[oIdx].name} · ${oModels[oIdx].tag}",
+                                oModels.map { it.name to "${it.tag} — ${it.description}" },
+                            ) { i -> vm.act { it.ollama.openAiModel = oModels[i].id } }
 
                             Spacer(Modifier.height(10.dp))
                             // Advanced & developer toggle
@@ -1088,35 +1028,22 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Optimize on-device generation speed, CPU threads, and memory allocation for smooth mobile performance.", style = T.small, color = P.sub)
                             Spacer(Modifier.height(8.dp))
 
-                            // Speed Mode selector
-                            Text("SPEED PROFILE", style = T.label.copy(fontSize = 9.sp), color = P.sub)
+                            val speedKeys = listOf("turbo", "balanced", "quality")
+                            val speedLabels = listOf("Turbo", "Balanced", "Quality")
+                            val speedIdx = speedKeys.indexOf(lg.ollama.speedMode).coerceAtLeast(0)
+                            Segmented(speedLabels, speedIdx, { i -> vm.act { it.ollama.speedMode = speedKeys[i] } })
                             Spacer(Modifier.height(4.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val modes = listOf(
-                                    Triple("turbo", "⚡ Turbo", "Fastest (~2-3s)"),
-                                    Triple("balanced", "⚖️ Balanced", "Standard (~5-7s)"),
-                                    Triple("quality", "🎨 Quality", "Detailed (~10s)"),
-                                )
-                                modes.forEach { (key, label, desc) ->
-                                    val sel = lg.ollama.speedMode == key
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (sel) P.accentSoft else P.surface2)
-                                            .border(if (sel) 1.5.dp else 1.dp, if (sel) P.accent else P.faint.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                            .clickable { vm.act { it.ollama.speedMode = key } }
-                                            .padding(vertical = 8.dp, horizontal = 6.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Text(label, style = T.bodyB.copy(fontSize = 12.sp), color = if (sel) P.accent else P.ink)
-                                        Text(desc, style = T.small.copy(fontSize = 9.sp), color = P.sub)
-                                    }
-                                }
-                            }
+                            Text(
+                                when (speedKeys[speedIdx]) {
+                                    "turbo" -> "Fastest (~2–3s) — shorter takes."
+                                    "quality" -> "Detailed (~10s) — richer prose."
+                                    else -> "Standard (~5–7s) — balanced."
+                                },
+                                style = T.small.copy(fontSize = 10.sp), color = P.sub,
+                            )
 
                             // Tip banner if on heavier model
-                            if (lg.ollama.model.contains("llama3.2:3b") || lg.ollama.model.contains("llama3.2:1b")) {
+                            if (lg.ollama.model.contains("llama3.2:1b") || lg.ollama.model.contains("qwen2.5:0.5b")) {
                                 Spacer(Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier
@@ -1126,8 +1053,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text("⚡", fontSize = 16.sp)
-                                    Spacer(Modifier.width(8.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                                         Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
@@ -1213,7 +1138,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
                             Text("Automatically generate recaps for your games using ${lg.ollama.providerDisplayName}.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
+                        AppSwitch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
                     }
 
                     Spacer(Modifier.height(10.dp))
@@ -1224,7 +1149,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Instant Response Cache", style = T.bodyB, color = P.ink)
                             Text("Cache results for 0ms instant reload and zero wasted API quota on revisiting games & scouting.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.cacheResponses, { on -> vm.act { it.ollama.cacheResponses = on } })
+                        AppSwitch(lg.ollama.cacheResponses, { on -> vm.act { it.ollama.cacheResponses = on } })
                     }
 
                     if (lg.ollama.cacheResponses) {
@@ -1253,7 +1178,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Postgame press conferences", style = T.bodyB, color = P.ink)
                             Text("AI writes contextual podium questions & player quotes.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.pressConference, { on -> vm.act { it.ollama.pressConference = on } })
+                        AppSwitch(lg.ollama.pressConference, { on -> vm.act { it.ollama.pressConference = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1261,15 +1186,15 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Social media hot takes", style = T.bodyB, color = P.ink)
                             Text("AI generates analyst, fan, and hater takes on your feed.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.socialFeed, { on -> vm.act { it.ollama.socialFeed = on } })
+                        AppSwitch(lg.ollama.socialFeed, { on -> vm.act { it.ollama.socialFeed = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Beat writer recaps & coach quotes", style = T.bodyB, color = P.ink)
-                            Text("AI writes newspaper reports and postgame locker room quotes.", style = T.small, color = P.sub)
+                            Text("AI writes game reports and postgame locker room quotes.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.gameRecaps, { on -> vm.act { it.ollama.gameRecaps = on } })
+                        AppSwitch(lg.ollama.gameRecaps, { on -> vm.act { it.ollama.gameRecaps = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1277,7 +1202,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.tradeRumors, { on -> vm.act { it.ollama.tradeRumors = on } })
+                        AppSwitch(lg.ollama.tradeRumors, { on -> vm.act { it.ollama.tradeRumors = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1285,7 +1210,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Tactical pregame scouting keys", style = T.bodyB, color = P.ink)
                             Text("AI writes keys to victory based on opponent matchups.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
+                        AppSwitch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1293,7 +1218,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Draft prospect scouting & pro comparisons", style = T.bodyB, color = P.ink)
                             Text("AI scouts draft prospects with player grades and pro comparisons.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.draftScouting, { on -> vm.act { it.ollama.draftScouting = on } })
+                        AppSwitch(lg.ollama.draftScouting, { on -> vm.act { it.ollama.draftScouting = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1301,7 +1226,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Injury medical outlooks & recovery", style = T.bodyB, color = P.ink)
                             Text("AI medical staff evaluates injury severity and next-man-up tactical outlooks.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.injuryReports, { on -> vm.act { it.ollama.injuryReports = on } })
+                        AppSwitch(lg.ollama.injuryReports, { on -> vm.act { it.ollama.injuryReports = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1309,7 +1234,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Award ceremony speeches & tributes", style = T.bodyB, color = P.ink)
                             Text("AI writes acceptance speeches and columnist tributes for major award winners.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.awardCeremonies, { on -> vm.act { it.ollama.awardCeremonies = on } })
+                        AppSwitch(lg.ollama.awardCeremonies, { on -> vm.act { it.ollama.awardCeremonies = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1317,7 +1242,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Halftime locker room speeches", style = T.bodyB, color = P.ink)
                             Text("AI delivers locker room addresses and second-half tactical adjustments.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.halftimeSpeeches, { on -> vm.act { it.ollama.halftimeSpeeches = on } })
+                        AppSwitch(lg.ollama.halftimeSpeeches, { on -> vm.act { it.ollama.halftimeSpeeches = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1325,7 +1250,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Training camp player progression", style = T.bodyB, color = P.ink)
                             Text("AI breaks down camp standouts and season team projections.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } })
+                        AppSwitch(lg.ollama.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1333,7 +1258,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Championship celebrations & Finals MVP", style = T.bodyB, color = P.ink)
                             Text("AI writes champagne celebrations, trophy ceremonies, and Finals MVP speeches.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.championshipCelebrations, { on -> vm.act { it.ollama.championshipCelebrations = on } })
+                        AppSwitch(lg.ollama.championshipCelebrations, { on -> vm.act { it.ollama.championshipCelebrations = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     if (!lg.pro) {
@@ -1342,7 +1267,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                 Text("College recruiting pitch letters", style = T.bodyB, color = P.ink)
                                 Text("AI drafts custom coach pitch letters targeting recruits' specific priorities.", style = T.small, color = P.sub)
                             }
-                            androidx.compose.material3.Switch(lg.ollama.recruitingPitches, { on -> vm.act { it.ollama.recruitingPitches = on } })
+                            AppSwitch(lg.ollama.recruitingPitches, { on -> vm.act { it.ollama.recruitingPitches = on } })
                         }
                         Spacer(Modifier.height(8.dp))
                     }
@@ -1351,7 +1276,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Pregame rivalry previews & bad blood", style = T.bodyB, color = P.ink)
                             Text("AI writes high-stakes pregame buildup and bulletin-board quotes.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.pregameRivalries, { on -> vm.act { it.ollama.pregameRivalries = on } })
+                        AppSwitch(lg.ollama.pregameRivalries, { on -> vm.act { it.ollama.pregameRivalries = on } })
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1359,7 +1284,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Free agency rumors & contract demands", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops on expiring contracts and max contract pursuits.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.freeAgencyBuzz, { on -> vm.act { it.ollama.freeAgencyBuzz = on } })
+                        AppSwitch(lg.ollama.freeAgencyBuzz, { on -> vm.act { it.ollama.freeAgencyBuzz = on } })
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("DEFAULT BEAT WRITER ANGLE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
@@ -1379,7 +1304,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Shot meter", style = T.bodyB, color = P.ink)
                             Text("Time your own release in big moments: perfect timing adds to your chance, a bad one takes away.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(rd.shotMeter, { on -> vm.act { it.road?.shotMeter = on } })
+                        AppSwitch(rd.shotMeter, { on -> vm.act { it.road?.shotMeter = on } })
                     }
                 }
             }
