@@ -706,7 +706,7 @@ class OllamaConfig(
     /** When on, keep the free/cheap recommended model for the active provider (re-applied on enable, provider change, and model fetch). */
     var autoPickModel: Boolean = false,
     var googleApiKey: String = "",
-    var googleModel: String = "gemini-3.5-flash-lite",
+    var googleModel: String = "gemini-3.8-flash",
     var googleAccountEmail: String = "",
     var googleAccountName: String = "",
     var googleAccountPassword: String = "",
@@ -733,7 +733,7 @@ class OllamaConfig(
 
     val activeModelName: String
         get() = when (provider.lowercase()) {
-            "google" -> googleModel.ifBlank { "gemini-3.5-flash-lite" }
+            "google" -> googleModel.ifBlank { "gemini-3.8-flash" }
             "openai" -> openAiModel.ifBlank { "gpt-4o-mini" }
             else -> model.ifBlank { "llama3.2:1b" }
         }

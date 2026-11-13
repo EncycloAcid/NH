@@ -119,18 +119,22 @@ fun AiDiagnosticsPanel(
                             val ids = response.getOrNull().orEmpty()
                             models = Ollama.catalogFetchedModels(config.provider, ids)
                             modelMenu = models.isNotEmpty()
+                            var detail = if (response.isSuccess) {
+                                "Found ${models.size} models in ${models.map { it.category }.distinct().size} categories. Select one; API generation may incur provider charges."
+                            } else AiDiagnostics.networkReason(response.exceptionOrNull(), config)
+                            var result = if (response.isSuccess) "success" else "network error"
                             if (response.isSuccess && config.autoPickModel) {
-                                val pick = Ollama.pickBestModel(config.provider, ids)
-                                model = pick
-                                onModel(pick)
+                                val verified = Ollama.applyAutoPickVerified(config, ids)
+                                verified.onSuccess { pick ->
+                                    model = pick
+                                    onModel(pick)
+                                    detail = "Auto-pick verified working model: $pick. $detail"
+                                }.onFailure { err ->
+                                    result = "network error"
+                                    detail = "Auto-pick could not verify a working model. ${AiDiagnostics.networkReason(err, config)}"
+                                }
                             }
-                            AiDiagnostics.finish(
-                                id,
-                                if (response.isSuccess) "success" else "network error",
-                                if (response.isSuccess) {
-                                    "Found ${models.size} models in ${models.map { it.category }.distinct().size} categories. Select one; API generation may incur provider charges."
-                                } else AiDiagnostics.networkReason(response.exceptionOrNull(), config),
-                            )
+                            AiDiagnostics.finish(id, result, detail)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             AiDiagnostics.finish(id, "cancelled", "Model lookup cancelled")
                             throw e
@@ -179,17 +183,27 @@ fun AiDiagnosticsPanel(
                 scope.launch {
                     val id = AiDiagnostics.begin(config, "Test AI")
                     try {
-                        val response = Ollama.generate(
-                            config,
-                            "Reply with exactly OK.",
-                            "Connection test. Reply OK only.",
-                            numPredict = 128,
-                        )
+                        val response = if (config.autoPickModel) {
+                            Ollama.applyAutoPickVerified(config)
+                        } else {
+                            Ollama.generate(
+                                config,
+                                "Reply with exactly OK.",
+                                "Connection test. Reply OK only.",
+                                numPredict = 128,
+                            ).map { config.activeModelName }
+                        }
+                        response.onSuccess { used ->
+                            model = used
+                            if (config.autoPickModel) onModel(used)
+                        }
                         AiDiagnostics.finish(
                             id,
                             if (response.isSuccess) "success" else "network error",
-                            if (response.isSuccess) "Model returned a response."
-                            else AiDiagnostics.networkReason(response.exceptionOrNull(), config),
+                            if (response.isSuccess) {
+                                if (config.autoPickModel) "Verified working model: ${response.getOrNull()}."
+                                else "Model returned a response."
+                            } else AiDiagnostics.networkReason(response.exceptionOrNull(), config),
                         )
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         AiDiagnostics.finish(id, "cancelled", "Test cancelled")

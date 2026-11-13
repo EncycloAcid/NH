@@ -449,7 +449,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         Column(Modifier.weight(1f)) {
                             Text("Auto-pick model", style = T.bodyB, color = P.ink)
                             Text(
-                                "Keep a proven free/cheap text model. Skips retired, preview, and specialty ids.",
+                                "Picks a free/cheap text model and verifies it works. Skips ids that fail for your key.",
                                 style = T.small,
                                 color = P.sub,
                                 maxLines = 2,

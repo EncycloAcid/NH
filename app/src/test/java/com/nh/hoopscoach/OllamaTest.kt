@@ -214,12 +214,12 @@ class OllamaTest {
     @Test
     fun testCloudModelPresets() {
         assertTrue("Google models list should not be empty", Ollama.GOOGLE_MODELS.isNotEmpty())
-        val lite35 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.5-flash-lite" }
-        assertTrue("Gemini 3.5 Flash-Lite exists", lite35 != null)
-        assertTrue("Has recommended tag", lite35!!.tag.contains("Recommended"))
-
         val flash38 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.8-flash" }
         assertTrue("Gemini 3.8 Flash exists", flash38 != null)
+        assertTrue("Has recommended tag", flash38!!.tag.contains("Recommended"))
+
+        val lite35 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.5-flash-lite" }
+        assertTrue("Gemini 3.5 Flash-Lite exists", lite35 != null)
         assertTrue("Retired Gemini 1.5/2.0 must not be curated", Ollama.GOOGLE_MODELS.none { it.id.startsWith("gemini-1.") || it.id.startsWith("gemini-2.0") })
 
         assertTrue("OpenAI models list should not be empty", Ollama.OPENAI_MODELS.isNotEmpty())
@@ -237,7 +237,7 @@ class OllamaTest {
         val lg = LeagueGen.newLeague()
         assertEquals("ollama", lg.ollama.provider)
         assertEquals("", lg.ollama.googleApiKey)
-        assertEquals("gemini-3.5-flash-lite", lg.ollama.googleModel)
+        assertEquals("gemini-3.8-flash", lg.ollama.googleModel)
         assertEquals("", lg.ollama.googleAccountEmail)
         assertFalse(lg.ollama.googleSignedIn)
         assertEquals("", lg.ollama.openAiApiKey)
@@ -282,10 +282,10 @@ class OllamaTest {
     fun testMultiProviderDisplayNames() {
         val cfg = OllamaConfig()
         cfg.provider = "google"
-        cfg.googleModel = "gemini-3.5-flash-lite"
+        cfg.googleModel = "gemini-3.8-flash"
         assertEquals("Google Gemini", cfg.providerDisplayName)
-        assertEquals("gemini-3.5-flash-lite", cfg.activeModelName)
-        assertEquals("Google gemini-3.5-flash-lite", cfg.fullModelDisplayName)
+        assertEquals("gemini-3.8-flash", cfg.activeModelName)
+        assertEquals("Google gemini-3.8-flash", cfg.fullModelDisplayName)
         assertEquals("Gemini", cfg.shortActionName)
 
         cfg.googleAccountEmail = "coach.hoops@gmail.com"
