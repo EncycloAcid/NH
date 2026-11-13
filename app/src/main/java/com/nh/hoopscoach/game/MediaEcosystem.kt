@@ -137,28 +137,60 @@ object MediaEcosystem {
         val outlet = "Hoops Wire Network"
         val stories = mutableListOf<News>()
         val u = lg.user
+        val defending = TitleDefense.champion(lg)
+        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(5)
+        fun titleLine(t: Team): String = if (lg.pro) {
+            val ts = NbaHistory.titles(lg, t)
+            when {
+                ts.isEmpty() -> "${t.name} has ${NbaHistory.titleWords(0)}."
+                else -> "${t.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
+            }
+        } else CollegeHistory.line(lg, t)
+        if (defending != null || titleLeaders.isNotEmpty()) {
+            val body = buildString {
+                if (defending != null) {
+                    val name = if (lg.pro) defending.name else defending.school
+                    append("Defending champion $name is ${defending.w}-${defending.l}")
+                    if (defending.ap > 0) append(" and AP #${defending.ap}")
+                    append(". ${titleLine(defending)}\n\n")
+                }
+                if (titleLeaders.isNotEmpty()) {
+                    append("League banner ledger:\n")
+                    for ((t, n) in titleLeaders) append("- ${if (lg.pro) t.name else t.school}: $n · now ${t.w}-${t.l}\n")
+                }
+                append("\n${titleLine(u)}")
+            }
+            stories += News(
+                lg.season, lg.day,
+                if (defending != null) "Network title desk: ${if (lg.pro) defending.name else defending.school} and the banner chase"
+                else "Network title desk: who owns the banners?",
+                mine = defending?.id == u.id, kind = "column", body = body, source = "Staff · $outlet",
+                teamId = defending?.id ?: titleLeaders.firstOrNull()?.first?.id ?: u.id,
+            )
+        }
         val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
             (if (it.involves(u.id)) 40 else 0) + kotlin.math.abs(it.hs - it.aws)
         }
         today.firstOrNull()?.let { g ->
             val w = lg.team(g.winner()); val l = lg.team(g.loser())
+            val champTag = defending?.let { if (it.id == w.id || it.id == l.id) " · defending champ involved" else "" } ?: ""
             stories += News(
                 lg.season, lg.day,
                 "BREAKING: ${w.school}${if (w.ap > 0) " #${w.ap}" else ""} ${g.scoreFor(w.id)}-${g.scoreFor(l.id)} ${l.school}${if (l.ap > 0) " #${l.ap}" else ""}",
                 mine = g.involves(u.id), gameId = g.id, kind = "article",
-                body = "Wire copy from the final: ${w.school} ${g.scoreFor(w.id)}, ${l.school} ${g.scoreFor(l.id)}${if (g.ot > 0) " in OT" else ""}. League memory still includes recent champions on the books — tonight's result joins the ledger.",
+                body = "Wire copy from the final: ${w.school} ${g.scoreFor(w.id)}, ${l.school} ${g.scoreFor(l.id)}${if (g.ot > 0) " in OT" else ""}$champTag. Title programs and poll teams still set the national conversation.",
                 source = "Staff · $outlet", teamId = w.id,
             )
         }
         stories += News(
             lg.season, lg.day,
-            "Analysts split: Can ${u.school} (${u.w}-${u.l}${if (u.ap > 0) ", #${u.ap}" else ""}) make noise in ${if (lg.pro) "the postseason" else "March"}?",
+            "Analysts split: Can ${u.school} (${u.w}-${u.l}${if (u.ap > 0) ", #${u.ap}" else ""}) join the title conversation?",
             mine = true, kind = "column",
             body = run {
                 val c = runCatching { lg.userCoach }.getOrNull()
                 "One side cites the ${u.w}-${u.l} mark, Program Pull ${Brand.pull(lg, u)}" +
                     (c?.let { ", and coach ${it.name}'s ${it.titles} titles. The other side points at job security ${it.security}/100" } ?: "") +
-                    " and the AP board (${if (u.ap > 0) "#${u.ap}" else "unranked"}). Debate the recorded numbers only."
+                    " and the AP board (${if (u.ap > 0) "#${u.ap}" else "unranked"}). ${titleLine(u)}"
             },
             source = "Staff · $outlet", teamId = u.id,
         )

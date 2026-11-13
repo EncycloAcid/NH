@@ -1113,27 +1113,28 @@ object Ollama {
             Cache.get<MediaEcosystem.Package>(cacheKey)?.let { return@withContext Result.success(it) }
         }
         val prompt = buildString {
-            appendLine("You are a living basketball media network (ESPN-style wire + talk shows + social). Using ONLY the ECOSYSTEM BRIEF, write up to six short beats.")
+            appendLine("You are Hoops Wire Network — a living basketball media desk obsessed with titles and the whole league.")
+            appendLine("Using ONLY the ECOSYSTEM BRIEF, write up to six short beats. Prefer banner/title and league-wide angles.")
             appendLine("Do not invent scores, commits, firings, poll voters, or quotes not supported by the brief.")
             appendLine("ECOSYSTEM BRIEF:")
             appendLine(brief)
             appendLine("Format EXACTLY (omit a block if that beat has no facts):")
-            appendLine("BREAKING_HEADLINE: <breaking news from today's real results>")
+            appendLine("TITLE_HEADLINE: <defending champ / title drought / banner ledger>")
+            appendLine("TITLE_BODY: <2 short paragraphs from title facts>")
+            appendLine("BREAKING_HEADLINE: <breaking news from today's real results, framed vs the title picture>")
             appendLine("BREAKING_BODY: <2 short paragraphs>")
-            appendLine("ANALYST_HEADLINE: <analysts debating tournament/postseason chances>")
-            appendLine("ANALYST_BODY: <2 short paragraphs citing records/AP/Elo from the brief>")
-            appendLine("FAN_HEADLINE: <fans arguing about coaching decisions>")
-            appendLine("FAN_BODY: <2 short paragraphs grounded in security/record>")
+            appendLine("ANALYST_HEADLINE: <analysts debating title/tournament chances>")
+            appendLine("ANALYST_BODY: <2 short paragraphs citing records/AP/Elo/titles from the brief>")
+            appendLine("FAN_HEADLINE: <fans arguing about coaching decisions vs the program's banner standard>")
+            appendLine("FAN_BODY: <2 short paragraphs grounded in security/record/titles>")
             appendLine("RECRUIT_HEADLINE: <recruiting insider / commitment rumor (college) or trade buzz (pro)>")
             appendLine("RECRUIT_BODY: <conditional only — no fake commits>")
-            appendLine("COACH_HEADLINE: <coach heat / rival-program barbs>")
-            appendLine("COACH_BODY: <2 short paragraphs from the rivalry ledger>")
-            appendLine("POLL_HEADLINE: <national poll reaction to upsets or ranked results>")
-            appendLine("POLL_BODY: <2 short paragraphs from AP board facts>")
+            appendLine("POLL_HEADLINE: <national poll / league-pulse reaction>")
+            appendLine("POLL_BODY: <2 short paragraphs from AP board / league situation>")
         }
         val result = groundedGenerate(
             config, lg, prompt,
-            system = "Living media ecosystem desk. Facts only from the brief. Speculation must be labeled as rumor.",
+            system = "Hoops Wire Network. Titles and league situation first. Facts only from the brief. Speculation must be labeled as rumor.",
             numPredict = 560,
         )
         result.map { draft ->
@@ -1164,11 +1165,12 @@ object Ollama {
                     teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
                 )
             }
+            val champId = TitleDefense.champion(lg)?.id ?: lg.userTeamId
+            add("column", "TITLE_HEADLINE", "TITLE_BODY", mine = champId == lg.userTeamId, teamId = champId)
             add("article", "BREAKING_HEADLINE", "BREAKING_BODY", mine = false)
             add("column", "ANALYST_HEADLINE", "ANALYST_BODY")
             add("column", "FAN_HEADLINE", "FAN_BODY")
             add("column", "RECRUIT_HEADLINE", "RECRUIT_BODY", mine = false)
-            add("column", "COACH_HEADLINE", "COACH_BODY")
             add("column", "POLL_HEADLINE", "POLL_BODY", mine = false)
             val pack = if (stories.size >= 2) MediaEcosystem.Package(stories, draft.isAi, "Network filed ${stories.size} beats + social.")
             else MediaEcosystem.fallbackPackage(lg).copy(detail = "AI thin — used game-written media ecosystem. ${draft.fallbackReason}")
@@ -1702,26 +1704,27 @@ object Ollama {
             Cache.get<Journalism.Package>(cacheKey)?.let { return@withContext Result.success(it) }
         }
         val rumorLabel = if (lg.pro) "TRADE_RUMOR" else "RECRUITING_RUMOR"
+        val champId = TitleDefense.champion(lg)?.id ?: lg.teams.maxByOrNull { TitleDefense.titles(lg, it).size }?.id ?: lg.userTeamId
         val prompt = buildString {
-            appendLine("You are a national basketball desk (Hoops Wire). Using ONLY the EVENT BRIEF, write four pieces.")
-            appendLine("Stay league-aware: titles, defending champions, polls, conference races, and hot seats from the brief.")
+            appendLine("You are Hoops Wire, a national basketball desk obsessed with titles and the whole league.")
+            appendLine("Using ONLY the EVENT BRIEF, write four pieces. Lead with banners, defending champions, droughts, and league-wide races.")
             appendLine("Do not invent scores, commits, trades, injuries, banners, or quotes.")
             appendLine("EVENT BRIEF:")
             appendLine(brief)
             appendLine("Format EXACTLY:")
-            appendLine("NATIONAL_HEADLINE: <punchy headline from today's real results or title/poll situation>")
-            appendLine("NATIONAL_BODY: <2 short paragraphs grounded in league situation>")
-            appendLine("HOT_TAKE_HEADLINE: <controversial but fact-based column — prefer title defense, droughts, or hot seats when present>")
-            appendLine("HOT_TAKE_BODY: <2 paragraphs arguing from the brief>")
-            appendLine("RANKINGS_HEADLINE: <rankings / power-board / title-watch debate headline>")
-            appendLine("RANKINGS_BODY: <debate the board with records and banner context from the brief>")
-            appendLine("${rumorLabel}_HEADLINE: <${if (lg.pro) "trade/FA" else "recruiting"} speculation headline>")
+            appendLine("TITLE_WATCH_HEADLINE: <defending champ / banner ledger / title drought headline>")
+            appendLine("TITLE_WATCH_BODY: <2 short paragraphs citing title facts from the brief>")
+            appendLine("LEAGUE_PULSE_HEADLINE: <AP/Elo board, conference races, or hot seats>")
+            appendLine("LEAGUE_PULSE_BODY: <2 paragraphs of league-wide situation>")
+            appendLine("NATIONAL_HEADLINE: <today's results framed against the title/league picture>")
+            appendLine("NATIONAL_BODY: <2 short paragraphs>")
+            appendLine("${rumorLabel}_HEADLINE: <${if (lg.pro) "trade/FA" else "recruiting"} speculation tied to programs with history when possible>")
             appendLine("${rumorLabel}_BODY: <conditional analysis only — no confirmed deals>")
         }
         val result = groundedGenerate(
             config, lg, prompt,
-            system = "National sports desk. Facts only from the brief. Prefer title and league-situation angles when present. Speculation must be labeled as such.",
-            numPredict = 520,
+            system = "Hoops Wire national desk. Titles and league situation first. Facts only from the brief. Speculation must be labeled as such.",
+            numPredict = 560,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -1734,7 +1737,7 @@ object Ollama {
                 var i = start + 1
                 while (i < lines.size) {
                     val t = lines[i].trim()
-                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..24) break
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
                     if (t.isNotEmpty()) rest += t
                     i++
                 }
@@ -1751,9 +1754,9 @@ object Ollama {
                     teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
                 )
             }
+            add("column", "TITLE_WATCH_HEADLINE", "TITLE_WATCH_BODY", teamId = champId, mine = champId == lg.userTeamId)
+            add("column", "LEAGUE_PULSE_HEADLINE", "LEAGUE_PULSE_BODY", teamId = lg.teams.filter { it.ap in 1..25 }.minByOrNull { it.ap }?.id ?: lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
             add("article", "NATIONAL_HEADLINE", "NATIONAL_BODY", teamId = lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
-            add("column", "HOT_TAKE_HEADLINE", "HOT_TAKE_BODY")
-            add("column", "RANKINGS_HEADLINE", "RANKINGS_BODY", teamId = lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
             add("column", "${rumorLabel}_HEADLINE", "${rumorLabel}_BODY", mine = false)
             val pack = if (stories.size >= 2) Journalism.Package(stories, draft.isAi, "Desk filed ${stories.size} pieces.")
             else Journalism.fallbackPackage(lg).copy(detail = "AI thin — used game-written desk. ${draft.fallbackReason}")

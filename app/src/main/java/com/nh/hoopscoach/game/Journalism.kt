@@ -1,7 +1,7 @@
 package com.nh.hoopscoach.game
 
 /**
- * Facts for the AI sports desk: only real league state (results, rankings, recruiting).
+ * Facts for the AI sports desk: only real league state (results, rankings, titles, recruiting).
  * No invented scores — the model must stay inside this brief.
  */
 object Journalism {
@@ -11,11 +11,22 @@ object Journalism {
         val detail: String,
     )
 
+    private fun label(lg: League, t: Team) = if (lg.pro) t.name else t.school
+
+    private fun titleLine(lg: League, t: Team): String = if (lg.pro) {
+        val ts = NbaHistory.titles(lg, t)
+        when {
+            ts.isEmpty() -> "${t.name} has ${NbaHistory.titleWords(0)}."
+            else -> "${t.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
+        }
+    } else CollegeHistory.line(lg, t)
+
     /** Compact event brief used by [Ollama.generateSportsJournalism]. */
     fun eventBrief(lg: League): String = buildString {
         val u = lg.user
         append(SituationAwareness.leagueBrief(lg))
-        appendLine("YOUR TEAM: ${u.school} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}")
+        appendLine("YOUR TEAM: ${label(lg, u)} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}")
+        appendLine("DESK PRIORITY: Lead with titles, defending champions, droughts, and league-wide races. Results support the title narrative — they are not the only story.")
         val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 40 else 0
         }
@@ -53,68 +64,94 @@ object Journalism {
         }
     }
 
-    /** Rule-based package when AI is off or fails — still grounded in [eventBrief] facts. */
+    /** Rule-based package when AI is off or fails — titles and league pulse first. */
     fun fallbackPackage(lg: League): Package {
         val stories = mutableListOf<News>()
         val outlet = "Hoops Wire Desk"
         val u = lg.user
-        val today = lg.games.filter { it.played && it.day == lg.day && it.involves(lg.userTeamId) }
-        today.maxByOrNull { kotlin.math.abs(it.hs - it.aws) }?.let { g ->
-            val won = g.winner() == u.id
-            val opp = lg.team(g.opp(u.id))
-            stories += News(
-                lg.season, lg.day,
-                if (won) "${u.school} holds off ${opp.school}, ${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)}"
-                else "${opp.school} stuns ${u.school}, ${g.scoreAgainst(u.id)}-${g.scoreFor(u.id)}",
-                mine = true, gameId = g.id, kind = "game",
-                body = "From the wire: ${u.school} ${if (won) "won" else "fell"} ${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)} against ${opp.school} on day ${lg.day}. All numbers from the box score.",
-                source = "Staff · $outlet", teamId = u.id,
-            )
-        }
+        val defending = TitleDefense.champion(lg)
+        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(6)
         val board = lg.teams.sortedByDescending { it.elo }
         val top = board.take(5)
-        val defending = TitleDefense.champion(lg)
-        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(5)
+
+        // 1) Title watch — always lead when we have banner facts
         if (defending != null || titleLeaders.isNotEmpty()) {
-            fun titleLine(t: Team): String = if (lg.pro) {
-                val ts = NbaHistory.titles(lg, t)
-                when {
-                    ts.isEmpty() -> "${t.name} has ${NbaHistory.titleWords(0)}."
-                    else -> "${t.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
-                }
-            } else CollegeHistory.line(lg, t)
             val body = buildString {
                 if (defending != null) {
-                    val label = if (lg.pro) defending.name else defending.school
-                    append("Defending champion $label sits ${defending.w}-${defending.l}")
+                    append("Defending champion ${label(lg, defending)} sits ${defending.w}-${defending.l}")
                     if (defending.ap > 0) append(" (AP #${defending.ap})")
-                    append(". ${titleLine(defending)}\n\n")
+                    append(". ${titleLine(lg, defending)}\n\n")
+                    val streak = TitleDefense.streak(lg, defending, lg.season - 1)
+                    if (streak >= 2) append("They are chasing ${TitleDefense.chasing(streak)}.\n\n")
                 }
                 if (titleLeaders.isNotEmpty()) {
                     append("Banner count across the league:\n")
-                    for ((t, n) in titleLeaders) append("- ${if (lg.pro) t.name else t.school}: $n · now ${t.w}-${t.l}\n")
+                    for ((t, n) in titleLeaders) append("- ${label(lg, t)}: $n · now ${t.w}-${t.l}\n")
                 }
-                append("\n${titleLine(u)}")
+                append("\n${titleLine(lg, u)}")
             }
             stories += News(
                 lg.season, lg.day,
-                if (defending != null) "Title watch: Can ${if (lg.pro) defending.name else defending.school} stay on the mountain?"
+                if (defending != null) "Title watch: Can ${label(lg, defending)} stay on the mountain?"
                 else "Title ledger: who owns the banners in this league?",
                 mine = defending?.id == u.id || titleLeaders.any { it.first.id == u.id },
                 kind = "column", body = body, source = "Staff · $outlet",
                 teamId = defending?.id ?: titleLeaders.firstOrNull()?.first?.id ?: u.id,
             )
         }
-        val debate = buildString {
-            append("National debate — who sits atop the board after day ${lg.day}?\n\n")
-            top.forEachIndexed { i, t -> append("${i + 1}. ${t.school} (${t.w}-${t.l})\n") }
-            append("\n${u.school} checks in at No.${board.indexOfFirst { it.id == u.id } + 1}. Rankings use live Elo, not vibes.")
+
+        // 2) League pulse — polls, board, hot seats
+        val hotSeats = lg.coaches.filter { it.teamId >= 0 && it.security <= 35 }.sortedBy { it.security }.take(3)
+        val poll = lg.teams.filter { it.ap in 1..10 }.sortedBy { it.ap }
+        val pulse = buildString {
+            append("League pulse after day ${lg.day}:\n\n")
+            if (poll.isNotEmpty()) {
+                append("AP board: ")
+                append(poll.joinToString { "#${it.ap} ${it.school} (${it.w}-${it.l})" })
+                append(".\n\n")
+            } else {
+                append("Elo board: ")
+                top.forEachIndexed { i, t -> append("${i + 1}. ${t.school} (${t.w}-${t.l}) ") }
+                append("\n\n")
+            }
+            if (hotSeats.isNotEmpty()) {
+                append("Hot seats: ")
+                append(hotSeats.joinToString {
+                    val t = lg.team(it.teamId)
+                    "Coach ${it.name} (${t.school}, security ${it.security})"
+                })
+                append(".\n\n")
+            }
+            append("${label(lg, u)} checks in at board No.${board.indexOfFirst { it.id == u.id } + 1} (${u.w}-${u.l}).")
         }
         stories += News(
-            lg.season, lg.day, "Rankings debate: ${top.firstOrNull()?.school ?: "the field"} holds the top spot",
-            mine = board.take(25).any { it.id == u.id }, kind = "column", body = debate, source = "Staff · $outlet",
-            teamId = top.firstOrNull()?.id ?: u.id,
+            lg.season, lg.day,
+            if (poll.isNotEmpty()) "League pulse: AP board and the title chase"
+            else "League pulse: power board after day ${lg.day}",
+            mine = true, kind = "column", body = pulse, source = "Staff · $outlet",
+            teamId = poll.firstOrNull()?.id ?: top.firstOrNull()?.id ?: u.id,
         )
+
+        // 3) Today's result — framed with title context when possible
+        val today = lg.games.filter { it.played && it.day == lg.day && it.involves(lg.userTeamId) }
+        today.maxByOrNull { kotlin.math.abs(it.hs - it.aws) }?.let { g ->
+            val won = g.winner() == u.id
+            val opp = lg.team(g.opp(u.id))
+            val champNote = defending?.let {
+                if (it.id == u.id) " The defending champions are ${if (won) "still rolling" else "under pressure"}."
+                else if (it.id == opp.id) " That was a result against the defending champion."
+                else ""
+            } ?: ""
+            stories += News(
+                lg.season, lg.day,
+                if (won) "${u.school} holds off ${opp.school}, ${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)}"
+                else "${opp.school} stuns ${u.school}, ${g.scoreAgainst(u.id)}-${g.scoreFor(u.id)}",
+                mine = true, gameId = g.id, kind = "game",
+                body = "From the wire: ${u.school} ${if (won) "won" else "fell"} ${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)} against ${opp.school} on day ${lg.day}.$champNote ${titleLine(lg, u)}",
+                source = "Staff · $outlet", teamId = u.id,
+            )
+        }
+
         if (!lg.pro) {
             val r = lg.recruits.filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
             if (r != null) {
@@ -122,21 +159,35 @@ object Journalism {
                 stories += News(
                     lg.season, lg.day, "Recruiting buzz: $no ${r.p.name} still on the board",
                     mine = false, kind = "column",
-                    body = "Insider notebook: ${r.p.name} (${r.p.stars}★ ${r.p.posLabel}) lists ${r.pref.label} as a priority. No commitment is confirmed — only the published board ranking.",
+                    body = "Insider notebook: ${r.p.name} (${r.p.stars}★ ${r.p.posLabel}) lists ${r.pref.label} as a priority. Programs with banners still sell history — ${titleLine(lg, u)} No commitment is confirmed.",
                     source = "Staff · $outlet", pid = r.p.id,
                 )
             }
         }
-        val hotTake = News(
+
+        val drought = titleLeaders.map { it.first }.firstOrNull { t ->
+            val ts = TitleDefense.titles(lg, t)
+            ts.isNotEmpty() && lg.season - ts.last() >= 10
+        }
+        stories += News(
             lg.season, lg.day,
-            if (u.streak >= 3) "Hot take: Is ${u.school}'s ${u.streak}-game surge sustainable?"
-            else if (u.streak <= -3) "Hot take: ${u.school}'s skid (${-u.streak} straight) raises hard questions"
-            else "Notebook: What ${u.school}'s ${u.w}-${u.l} start actually means",
+            when {
+                drought != null -> "Hot take: How long can ${label(lg, drought)} wait for the next banner?"
+                u.streak >= 3 -> "Hot take: Is ${u.school}'s ${u.streak}-game surge a title statement?"
+                u.streak <= -3 -> "Hot take: ${u.school}'s skid (${-u.streak} straight) and the banner standard"
+                else -> "Notebook: Where ${u.school}'s ${u.w}-${u.l} sits in the title conversation"
+            },
             mine = true, kind = "column",
-            body = "Controversial but grounded: ${u.school} sits ${u.w}-${u.l} with a ${if (u.streak >= 0) "W${u.streak}" else "L${-u.streak}"} streak. The Elo board has them No.${board.indexOfFirst { it.id == u.id } + 1}. Argue from those facts — not invented injuries or quotes.",
-            source = "Staff · $outlet", teamId = u.id,
+            body = buildString {
+                append("Controversial but grounded: ${u.school} sits ${u.w}-${u.l}")
+                append(" with a ${if (u.streak >= 0) "W${u.streak}" else "L${-u.streak}"} streak")
+                append(" and board No.${board.indexOfFirst { it.id == u.id } + 1}. ")
+                append(titleLine(lg, u))
+                if (drought != null) append(" Meanwhile ${titleLine(lg, drought)}")
+                append(" Argue from those facts — not invented injuries or quotes.")
+            },
+            source = "Staff · $outlet", teamId = drought?.id ?: u.id,
         )
-        stories += hotTake
         return Package(stories, false, "Game-written journalism desk (${stories.size} pieces).")
     }
 }

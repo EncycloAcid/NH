@@ -22,7 +22,14 @@ class JournalismTest {
         assertTrue(pack.stories.any { it.kind == "column" })
         assertTrue(pack.stories.any { it.body.isNotBlank() })
         assertTrue(pack.stories.all { it.source.contains("Hoops Wire Desk") })
+        val lead = pack.stories.first()
+        assertTrue(
+            "Hoops Wire should lead with titles/league: ${lead.text}",
+            lead.text.contains("Title", ignoreCase = true) || lead.text.contains("League pulse", ignoreCase = true) ||
+                lead.body.contains("banner", ignoreCase = true) || lead.body.contains("champion", ignoreCase = true),
+        )
         assertTrue(pack.stories.any { it.text.contains("Title", ignoreCase = true) || it.body.contains("title", ignoreCase = true) || it.body.contains("champion", ignoreCase = true) || it.body.contains("banner", ignoreCase = true) })
+        assertTrue(pack.stories.any { it.text.contains("League pulse", ignoreCase = true) || it.body.contains("AP", ignoreCase = true) || it.body.contains("board", ignoreCase = true) })
     }
 
     @Test

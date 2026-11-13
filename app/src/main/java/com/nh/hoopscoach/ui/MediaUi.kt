@@ -790,13 +790,13 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
 
     if (showOllamaDialog) {
         val topics = listOf(
-            "Locker room pulse & team chemistry",
+            "Title watch: defending champion & banner ledger",
+            "National title droughts and blue bloods",
+            "AP poll shakeup and league power board",
+            "Conference title race breakdown",
             "Coach on the hot seat",
             "Rivalry tension & bad blood",
-            "Breakout star feature",
-            "Conference title race breakdown",
             "Championship coronation & parade",
-            "Free agency & star trade demands",
         )
         AlertDialog(
             onDismissRequest = { if (!writingStory) showOllamaDialog = false },
@@ -919,7 +919,7 @@ private fun MediaEcosystemCard(vm: GameViewModel, lg: League) {
             Text("${lg.ollama.providerDisplayName} is filing breaking news, debates, recruiting, and poll coverage…", style = T.small, color = P.accent)
         } else {
             Text(
-                "ESPN-style breaking news, analyst debates, fan arguments, recruiting rumors, coach barbs, player social posts, and national-poll reactions — all from real game events.",
+                "Title desk first, then breaking news, analyst debates, fan arguments, recruiting rumors, and poll reactions — all from real league titles and game events.",
                 style = T.small,
                 color = P.sub,
             )
@@ -1190,10 +1190,10 @@ private fun WireDeskCard(vm: GameViewModel, lg: League) {
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing national coverage from today's results…", style = T.small, color = P.accent)
+            Text("${lg.ollama.providerDisplayName} is filing title watch and league pulse coverage…", style = T.small, color = P.accent)
         } else {
             Text(
-                "Headlines, hot takes, rankings debates, and ${if (lg.pro) "trade" else "recruiting"} rumors grounded in real scores, Elo, and the board.",
+                "Title watch, league pulse (polls, races, hot seats), and ${if (lg.pro) "trade" else "recruiting"} notes — grounded in banners, Elo, and real results.",
                 style = T.small,
                 color = P.sub,
             )

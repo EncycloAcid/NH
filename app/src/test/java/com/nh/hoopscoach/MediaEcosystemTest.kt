@@ -18,6 +18,7 @@ class MediaEcosystemTest {
         assertTrue(pack.stories.isNotEmpty())
         assertFalse(pack.isAi)
         assertTrue(pack.stories.any { it.source.contains("Network") })
+        assertTrue(pack.stories.any { it.text.contains("title", ignoreCase = true) || it.body.contains("banner", ignoreCase = true) || it.body.contains("champion", ignoreCase = true) })
         assertTrue(pack.stories.any { it.text.contains("Analysts", ignoreCase = true) || it.kind == "column" })
     }
 
