@@ -69,4 +69,22 @@ class OllamaTest {
         val res = Ollama.generate(config, "Hello")
         assertTrue(res.isFailure)
     }
+
+    @Test
+    fun testCheapModelFilterAndResolve() {
+        assertTrue(Ollama.modelMatches("llama3.2:latest", "llama3.2"))
+        assertTrue(Ollama.modelMatches("phi3:mini", "phi3:mini"))
+        assertFalse(Ollama.CHEAP_MODELS.any { it.id.contains("70b", ignoreCase = true) })
+
+        val installed = listOf("llama3.2:latest", "codellama:34b", "phi3:mini")
+        val cheap = Ollama.filterCheap(installed)
+        assertTrue(cheap.any { it.id.startsWith("llama3.2") })
+        assertTrue(cheap.any { it.id.startsWith("phi3") })
+        assertFalse(cheap.any { it.id.contains("34b") })
+
+        assertEquals("llama3.2:latest", Ollama.resolveModel("llama3.2", installed))
+        assertEquals("llama3.2", Ollama.resolveModel("gpt-4o", emptyList()))
+        assertTrue(Ollama.cleanOutput("```\nHello\n```").contains("Hello"))
+        assertFalse(Ollama.cleanOutput("Sure! Here is the article:\n\nBody text").startsWith("Sure"))
+    }
 }

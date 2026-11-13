@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -234,6 +235,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     var testStatus by remember { mutableStateOf("") }
     var testSuccess by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
+    var installedModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Drop any heavy/custom model left in an old save onto a free/cheap catalog id.
+    LaunchedEffect(lg.ollama.model) {
+        val snapped = com.nh.hoopscoach.game.Ollama.resolveModel(lg.ollama.model, installedModels)
+        if (snapped != lg.ollama.model) vm.act { it.ollama.model = snapped }
+    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) vm.exportSave(uri) }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importSave(uri) }
     LazyColumn(Modifier.fillMaxSize()) {
@@ -260,12 +267,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }
             }
-            Section("AI Stories · Ollama")
+            Section("AI Stories · Hoops Wire")
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Ollama controls stories", style = T.bodyB, color = P.ink)
-                        Text("Use a local Ollama instance to write game recaps, storylines and news articles.", style = T.small, color = P.sub)
+                        Text("Local AI stories", style = T.bodyB, color = P.ink)
+                        Text("Ollama writes Hoops Wire recaps, preview storylines, and news — free local models only.", style = T.small, color = P.sub)
                     }
                     androidx.compose.material3.Switch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
                 }
@@ -281,23 +288,36 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors(),
                     )
-                    Text("Use http://10.0.2.2:11434 for Android emulator, or http://localhost:11434 on-device.", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 2.dp))
+                    Text("Emulator: http://10.0.2.2:11434 · device: http://localhost:11434", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 2.dp))
                     Spacer(Modifier.height(10.dp))
-                    Text("MODEL NAME", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = lg.ollama.model,
-                        onValueChange = { m -> vm.act { it.ollama.model = m } },
-                        singleLine = true,
-                        placeholder = { Text("llama3.2", color = P.faint) },
+                    val modelOptions = remember(installedModels) {
+                        com.nh.hoopscoach.game.Ollama.pickerOptions(installedModels)
+                    }
+                    val modelLabel = remember(lg.ollama.model, modelOptions) {
+                        val id = com.nh.hoopscoach.game.Ollama.resolveModel(lg.ollama.model, installedModels)
+                        com.nh.hoopscoach.game.Ollama.CHEAP_MODELS.firstOrNull {
+                            com.nh.hoopscoach.game.Ollama.modelMatches(id, it.id)
+                        }?.label ?: id
+                    }
+                    Picker(
+                        label = "Model (free / cheap)",
+                        current = modelLabel,
+                        options = modelOptions.map { (id, blurb) ->
+                            val label = com.nh.hoopscoach.game.Ollama.CHEAP_MODELS.firstOrNull {
+                                com.nh.hoopscoach.game.Ollama.modelMatches(id, it.id)
+                            }?.label ?: id
+                            label to blurb
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(),
-                    )
+                    ) { i ->
+                        val id = modelOptions.getOrNull(i)?.first ?: return@Picker
+                        vm.act { it.ollama.model = id }
+                    }
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
-                            Text("Automatically generate recaps for your games using Ollama.", style = T.small, color = P.sub)
+                            Text("Write recaps for your big games automatically.", style = T.small, color = P.sub)
                         }
                         androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
                     }
@@ -309,9 +329,19 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             val res = com.nh.hoopscoach.game.Ollama.testConnection(lg.ollama.host)
                             testing = false
                             res.onSuccess { models ->
+                                installedModels = models
                                 testSuccess = true
-                                testStatus = if (models.isNotEmpty()) "Connected! Available models: " + models.joinToString(", ")
-                                else "Connected! (No models downloaded yet in Ollama)"
+                                val cheap = com.nh.hoopscoach.game.Ollama.filterCheap(models)
+                                val snapped = com.nh.hoopscoach.game.Ollama.resolveModel(lg.ollama.model, models)
+                                if (snapped != lg.ollama.model) vm.act { it.ollama.model = snapped }
+                                testStatus = when {
+                                    models.isEmpty() -> "Connected — no models yet. Pull one: ollama pull llama3.2"
+                                    cheap.any { c -> models.any { com.nh.hoopscoach.game.Ollama.modelMatches(it, c.id) } } ->
+                                        "Connected. Free/cheap ready: " + cheap.filter { c ->
+                                            models.any { com.nh.hoopscoach.game.Ollama.modelMatches(it, c.id) }
+                                        }.joinToString { it.label }
+                                    else -> "Connected, but no free/cheap models installed. Pull llama3.2 or phi3:mini."
+                                }
                             }.onFailure { err ->
                                 testSuccess = false
                                 testStatus = "Connection failed: ${err.message ?: "Could not reach Ollama"}"

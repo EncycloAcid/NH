@@ -399,11 +399,11 @@ private fun LazyListScope.nbaStories(vm: GameViewModel, lg: League, pv: NbaPrevi
         Panel(color = P.accentSoft) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("OLLAMA AI STORYLINES · ${lg.ollama.model}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Text("Have Ollama control and generate this season's NBA storylines.", style = T.small, color = P.ink)
+                    Text("AI STORYLINES · ${lg.ollama.model}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    Text("Have local AI write this season's NBA storylines (free/cheap models only).", style = T.small, color = P.ink)
                 }
                 Spacer(Modifier.width(8.dp))
-                SmallButton(if (generating) "Writing..." else "Generate with Ollama", primary = true, enabled = !generating) {
+                SmallButton(if (generating) "Writing..." else "Generate with AI", primary = true, enabled = !generating) {
                     generating = true
                     scope.launch {
                         val top = NbaPreviews.ranked(lg, pv).firstOrNull()?.name ?: "Favorites"
