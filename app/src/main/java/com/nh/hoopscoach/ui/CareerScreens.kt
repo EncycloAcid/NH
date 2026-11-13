@@ -541,46 +541,92 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
         dismissButton = { TextButton({ confirmNewDynasty = false }) { Text("Cancel", color = P.sub) } }
     )
 
-    if (showGoogleLoginDialog) ApiKeyDialog("Google Gemini", lg.ollama.googleApiKey, { key ->
-        vm.act { it.ollama.googleApiKey = key; it.ollama.googleAccountPassword = ""; it.ollama.googleSignedIn = false; it.ollama.provider = "google"; it.ollama.enabled = true }
-        showGoogleLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showGoogleLoginDialog = false })
-    if (showOpenAiLoginDialog) ApiKeyDialog("OpenAI", lg.ollama.openAiApiKey, { key ->
-        vm.act { it.ollama.openAiApiKey = key; it.ollama.openAiAccountPassword = ""; it.ollama.openAiSignedIn = false; it.ollama.provider = "openai"; it.ollama.enabled = true }
-        showOpenAiLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showOpenAiLoginDialog = false })
-    if (showAnthropicLoginDialog) ApiKeyDialog("Anthropic Claude", lg.ollama.anthropicApiKey, { key ->
-        vm.act { it.ollama.anthropicApiKey = key; it.ollama.provider = "anthropic"; it.ollama.enabled = true }
-        showAnthropicLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showAnthropicLoginDialog = false })
-    if (showGroqLoginDialog) ApiKeyDialog("Groq", lg.ollama.groqApiKey, { key ->
-        vm.act { it.ollama.groqApiKey = key; it.ollama.provider = "groq"; it.ollama.enabled = true }
-        showGroqLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showGroqLoginDialog = false })
-    if (showDeepseekLoginDialog) ApiKeyDialog("DeepSeek", lg.ollama.deepseekApiKey, { key ->
-        vm.act { it.ollama.deepseekApiKey = key; it.ollama.provider = "deepseek"; it.ollama.enabled = true }
-        showDeepseekLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showDeepseekLoginDialog = false })
-    if (showOpenRouterLoginDialog) ApiKeyDialog("OpenRouter", lg.ollama.openRouterApiKey, { key ->
-        vm.act { it.ollama.openRouterApiKey = key; it.ollama.provider = "openrouter"; it.ollama.enabled = true }
-        showOpenRouterLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showOpenRouterLoginDialog = false })
-    if (showCerebrasLoginDialog) ApiKeyDialog("Cerebras", lg.ollama.cerebrasApiKey, { key ->
-        vm.act { it.ollama.cerebrasApiKey = key; it.ollama.provider = "cerebras"; it.ollama.enabled = true }
-        showCerebrasLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showCerebrasLoginDialog = false })
-    if (showMistralLoginDialog) ApiKeyDialog("Mistral", lg.ollama.mistralApiKey, { key ->
-        vm.act { it.ollama.mistralApiKey = key; it.ollama.provider = "mistral"; it.ollama.enabled = true }
-        showMistralLoginDialog = false
-        vm.toast("API key saved. Use Test AI to check access.")
-    }, { showMistralLoginDialog = false })
+    if (showGoogleLoginDialog) AccountConnectDialog(
+        "google", lg.ollama.googleApiKey, lg.ollama.googleAccountEmail,
+        onSave = { key, email ->
+            vm.act {
+                it.ollama.googleApiKey = key
+                it.ollama.googleAccountEmail = email
+                it.ollama.googleAccountPassword = ""
+                it.ollama.googleSignedIn = key.isNotBlank()
+                it.ollama.provider = "google"
+                it.ollama.enabled = true
+            }
+            showGoogleLoginDialog = false
+            vm.toast("Google account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showGoogleLoginDialog = false },
+    )
+    if (showOpenAiLoginDialog) AccountConnectDialog(
+        "openai", lg.ollama.openAiApiKey, lg.ollama.openAiAccountEmail,
+        onSave = { key, email ->
+            vm.act {
+                it.ollama.openAiApiKey = key
+                it.ollama.openAiAccountEmail = email
+                it.ollama.openAiAccountPassword = ""
+                it.ollama.openAiSignedIn = key.isNotBlank()
+                it.ollama.provider = "openai"
+                it.ollama.enabled = true
+            }
+            showOpenAiLoginDialog = false
+            vm.toast("OpenAI account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showOpenAiLoginDialog = false },
+    )
+    if (showAnthropicLoginDialog) AccountConnectDialog(
+        "anthropic", lg.ollama.anthropicApiKey, lg.ollama.anthropicAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.anthropicApiKey = key; it.ollama.anthropicAccountEmail = email; it.ollama.provider = "anthropic"; it.ollama.enabled = true }
+            showAnthropicLoginDialog = false
+            vm.toast("Claude account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showAnthropicLoginDialog = false },
+    )
+    if (showGroqLoginDialog) AccountConnectDialog(
+        "groq", lg.ollama.groqApiKey, lg.ollama.groqAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.groqApiKey = key; it.ollama.groqAccountEmail = email; it.ollama.provider = "groq"; it.ollama.enabled = true }
+            showGroqLoginDialog = false
+            vm.toast("Groq account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showGroqLoginDialog = false },
+    )
+    if (showDeepseekLoginDialog) AccountConnectDialog(
+        "deepseek", lg.ollama.deepseekApiKey, lg.ollama.deepseekAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.deepseekApiKey = key; it.ollama.deepseekAccountEmail = email; it.ollama.provider = "deepseek"; it.ollama.enabled = true }
+            showDeepseekLoginDialog = false
+            vm.toast("DeepSeek account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showDeepseekLoginDialog = false },
+    )
+    if (showOpenRouterLoginDialog) AccountConnectDialog(
+        "openrouter", lg.ollama.openRouterApiKey, lg.ollama.openRouterAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.openRouterApiKey = key; it.ollama.openRouterAccountEmail = email; it.ollama.provider = "openrouter"; it.ollama.enabled = true }
+            showOpenRouterLoginDialog = false
+            vm.toast("OpenRouter account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showOpenRouterLoginDialog = false },
+    )
+    if (showCerebrasLoginDialog) AccountConnectDialog(
+        "cerebras", lg.ollama.cerebrasApiKey, lg.ollama.cerebrasAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.cerebrasApiKey = key; it.ollama.cerebrasAccountEmail = email; it.ollama.provider = "cerebras"; it.ollama.enabled = true }
+            showCerebrasLoginDialog = false
+            vm.toast("Cerebras account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showCerebrasLoginDialog = false },
+    )
+    if (showMistralLoginDialog) AccountConnectDialog(
+        "mistral", lg.ollama.mistralApiKey, lg.ollama.mistralAccountEmail,
+        onSave = { key, email ->
+            vm.act { it.ollama.mistralApiKey = key; it.ollama.mistralAccountEmail = email; it.ollama.provider = "mistral"; it.ollama.enabled = true }
+            showMistralLoginDialog = false
+            vm.toast("Mistral account connected. Use Test AI to verify.")
+        },
+        onDismiss = { showMistralLoginDialog = false },
+    )
 }
 
 @Composable

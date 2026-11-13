@@ -14,14 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -306,15 +301,15 @@ fun CloudApiKeyCard(
                             modifier = Modifier.weight(1f),
                         )
                         Spacer(Modifier.width(6.dp))
-                        Tag("KEY SAVED", P.good)
+                        Tag("CONNECTED", P.good)
                     }
                     Text(statusLine, style = T.small.copy(fontSize = 11.sp), color = P.sub)
                 }
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton("Edit API key", Modifier.weight(1f), onClick = onConfigure)
-                SecondaryButton("Remove key", Modifier.weight(1f), onClick = onRemove)
+                SecondaryButton("Reconnect", Modifier.weight(1f), onClick = onConfigure)
+                SecondaryButton("Disconnect", Modifier.weight(1f), onClick = onRemove)
             }
         }
     } else {
@@ -344,31 +339,3 @@ fun CloudApiKeyCard(
     }
 }
 
-@Composable
-fun ApiKeyDialog(provider: String, existing: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var key by remember { mutableStateOf(existing) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = P.surface,
-        title = { Text("$provider API key", style = T.head, color = P.ink) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    "Use an API key issued by $provider. This app does not support email/password login or browser OAuth. Never enter your account password here. The key is saved with this career; do not share saves containing it.",
-                    style = T.small,
-                    color = P.sub,
-                )
-                OutlinedTextField(
-                    key,
-                    { key = it.trim() },
-                    label = { Text("API key") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    colors = fieldColors(),
-                )
-            }
-        },
-        confirmButton = { TextButton(enabled = key.isNotBlank(), onClick = { onSave(key) }) { Text("Save key") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}

@@ -94,11 +94,11 @@ fun AiProviderConfigSection(
             letter = "R",
             configured = lg.ollama.isOpenRouterSignedIn,
             displayName = lg.ollama.openRouterDisplayEmail,
-            statusLine = "OpenRouter API key configured",
-            promptTitle = "OpenRouter API access",
-            promptBlurb = "Get a free key at openrouter.ai — prefer models ending in :free.",
-            configureLabel = "Configure OpenRouter API",
-            keyLabel = "Raw OpenRouter API Key",
+            statusLine = "OpenRouter account connected",
+            promptTitle = "Connect OpenRouter account",
+            promptBlurb = "Sign in at openrouter.ai, then paste the free access key from your account.",
+            configureLabel = "Connect OpenRouter account",
+            keyLabel = "Access key from account",
             keyPlaceholder = "sk-or-...",
             rawKey = lg.ollama.openRouterApiKey,
             onRawKey = { k -> vm.act { it.ollama.openRouterApiKey = k } },
@@ -141,11 +141,11 @@ fun AiProviderConfigSection(
             letter = "Z",
             configured = lg.ollama.isCerebrasSignedIn,
             displayName = lg.ollama.cerebrasDisplayEmail,
-            statusLine = "Cerebras API key configured",
-            promptTitle = "Cerebras API access",
-            promptBlurb = "Get a free key at cloud.cerebras.ai.",
-            configureLabel = "Configure Cerebras API",
-            keyLabel = "Raw Cerebras API Key",
+            statusLine = "Cerebras account connected",
+            promptTitle = "Connect Cerebras account",
+            promptBlurb = "Sign in at cloud.cerebras.ai, then paste the free access key from your account.",
+            configureLabel = "Connect Cerebras account",
+            keyLabel = "Access key from account",
             keyPlaceholder = "csk-...",
             rawKey = lg.ollama.cerebrasApiKey,
             onRawKey = { k -> vm.act { it.ollama.cerebrasApiKey = k } },
@@ -188,11 +188,11 @@ fun AiProviderConfigSection(
             letter = "M",
             configured = lg.ollama.isMistralSignedIn,
             displayName = lg.ollama.mistralDisplayEmail,
-            statusLine = "Mistral API key configured",
-            promptTitle = "Mistral API access",
-            promptBlurb = "Get a free key at console.mistral.ai.",
-            configureLabel = "Configure Mistral API",
-            keyLabel = "Raw Mistral API Key",
+            statusLine = "Mistral account connected",
+            promptTitle = "Connect Mistral account",
+            promptBlurb = "Sign in at console.mistral.ai, then paste the free access key from your account.",
+            configureLabel = "Connect Mistral account",
+            keyLabel = "Access key from account",
             keyPlaceholder = "…",
             rawKey = lg.ollama.mistralApiKey,
             onRawKey = { k -> vm.act { it.ollama.mistralApiKey = k } },
@@ -299,7 +299,7 @@ fun FreeCompatProviderPanel(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+            if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced access key",
             style = T.label.copy(fontSize = 11.sp),
             color = P.sub,
             modifier = Modifier.weight(1f),
@@ -391,17 +391,17 @@ fun GoogleAiProviderPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             Spacer(Modifier.width(6.dp))
-                            Tag("KEY SAVED", P.good)
+                            Tag("CONNECTED", P.good)
                         }
-                        Text("Gemini API key configured", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Google account connected", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SecondaryButton("Edit API key", Modifier.weight(1f)) {
+                    SecondaryButton("Reconnect", Modifier.weight(1f)) {
                         onShowLogin()
                     }
-                    SecondaryButton("Remove key", Modifier.weight(1f)) {
+                    SecondaryButton("Disconnect", Modifier.weight(1f)) {
                         vm.act {
                             it.ollama.googleSignedIn = false
                             it.ollama.googleApiKey = ""
@@ -431,12 +431,12 @@ fun GoogleAiProviderPanel(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Gemini API access", style = T.bodyB, color = P.ink)
-                        Text("A Gemini API key is required for recaps and quotes.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Connect Google account", style = T.bodyB, color = P.ink)
+                        Text("Sign in with Google in the browser, then paste the free access key from AI Studio.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                PrimaryButton("Configure Gemini API", Modifier.fillMaxWidth()) {
+                PrimaryButton("Connect Google account", Modifier.fillMaxWidth()) {
                     onShowLogin()
                 }
             }
@@ -471,7 +471,7 @@ fun GoogleAiProviderPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+                if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced access key",
                 style = T.label.copy(fontSize = 11.sp),
                 color = P.sub,
                 modifier = Modifier.weight(1f),
@@ -486,7 +486,7 @@ fun GoogleAiProviderPanel(
                     .background(P.surface2, RoundedCornerShape(8.dp))
                     .padding(10.dp)
             ) {
-                Text("Raw Gemini API Key", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                Text("Access key from Google account", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = lg.ollama.googleApiKey,
@@ -557,7 +557,7 @@ fun OpenAiProviderPanel(
 
         Text("OPENAI CHATGPT AI (CLOUD)", style = T.label.copy(fontSize = 10.sp), color = P.accent)
         Spacer(Modifier.height(4.dp))
-        Text("Industry-leading conversational AI. Connect your OpenAI or ChatGPT account for deep commentary and smart storylines.", style = T.small, color = P.sub)
+        Text("Sign in with your OpenAI / ChatGPT account in the browser, then connect with an access key for commentary and storylines.", style = T.small, color = P.sub)
         Spacer(Modifier.height(10.dp))
 
         if (lg.ollama.isOpenAiSignedIn) {
@@ -588,17 +588,17 @@ fun OpenAiProviderPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             Spacer(Modifier.width(6.dp))
-                            Tag("KEY SAVED", P.good)
+                            Tag("CONNECTED", P.good)
                         }
-                        Text("OpenAI API key configured", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("OpenAI account connected", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SecondaryButton("Edit API key", Modifier.weight(1f)) {
+                    SecondaryButton("Reconnect", Modifier.weight(1f)) {
                         onShowLogin()
                     }
-                    SecondaryButton("Remove key", Modifier.weight(1f)) {
+                    SecondaryButton("Disconnect", Modifier.weight(1f)) {
                         vm.act {
                             it.ollama.openAiSignedIn = false
                             it.ollama.openAiApiKey = ""
@@ -628,12 +628,12 @@ fun OpenAiProviderPanel(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("OpenAI API access", style = T.bodyB, color = P.ink)
-                        Text("Configure an OpenAI API key for AI reports.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Connect OpenAI / ChatGPT account", style = T.bodyB, color = P.ink)
+                        Text("Sign in with your OpenAI / ChatGPT account in the browser, then paste the access key.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                PrimaryButton("Configure OpenAI API", Modifier.fillMaxWidth()) {
+                PrimaryButton("Connect OpenAI account", Modifier.fillMaxWidth()) {
                     onShowLogin()
                 }
             }
@@ -668,7 +668,7 @@ fun OpenAiProviderPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced Key & Custom Endpoint",
+                if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced Key & Custom Endpoint",
                 style = T.label.copy(fontSize = 11.sp),
                 color = P.sub,
                 modifier = Modifier.weight(1f),
@@ -683,7 +683,7 @@ fun OpenAiProviderPanel(
                     .background(P.surface2, RoundedCornerShape(8.dp))
                     .padding(10.dp)
             ) {
-                Text("Raw OpenAI API Key", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                Text("Access key from OpenAI account", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = lg.ollama.openAiApiKey,
@@ -771,10 +771,10 @@ fun AnthropicAiProviderPanel(
             letter = "C",
             configured = lg.ollama.isAnthropicSignedIn,
             displayName = lg.ollama.anthropicDisplayEmail,
-            statusLine = "Anthropic API key configured",
-            promptTitle = "Claude API access",
-            promptBlurb = "An Anthropic API key is required for Claude.",
-            configureLabel = "Configure Claude API",
+            statusLine = "Claude account connected",
+            promptTitle = "Connect Claude account",
+            promptBlurb = "Sign in at console.anthropic.com, then paste the access key from your account.",
+            configureLabel = "Connect Claude account",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
@@ -808,7 +808,7 @@ fun AnthropicAiProviderPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+                if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced access key",
                 style = T.label.copy(fontSize = 11.sp),
                 color = P.sub,
                 modifier = Modifier.weight(1f),
@@ -817,7 +817,7 @@ fun AnthropicAiProviderPanel(
         if (showAdvancedSettings) {
             Spacer(Modifier.height(6.dp))
             Column(Modifier.fillMaxWidth().background(P.surface2, RoundedCornerShape(8.dp)).padding(10.dp)) {
-                Text("Raw Anthropic API Key", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                Text("Access key from Anthropic account", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = lg.ollama.anthropicApiKey,
@@ -889,10 +889,10 @@ fun GroqAiProviderPanel(
             letter = "Q",
             configured = lg.ollama.isGroqSignedIn,
             displayName = lg.ollama.groqDisplayEmail,
-            statusLine = "Groq API key configured",
-            promptTitle = "Groq API access",
-            promptBlurb = "A Groq API key is required from console.groq.com.",
-            configureLabel = "Configure Groq API",
+            statusLine = "Groq account connected",
+            promptTitle = "Connect Groq account",
+            promptBlurb = "Sign in at console.groq.com, then paste the free access key from your account.",
+            configureLabel = "Connect Groq account",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
@@ -926,7 +926,7 @@ fun GroqAiProviderPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+                if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced access key",
                 style = T.label.copy(fontSize = 11.sp),
                 color = P.sub,
                 modifier = Modifier.weight(1f),
@@ -935,7 +935,7 @@ fun GroqAiProviderPanel(
         if (showAdvancedSettings) {
             Spacer(Modifier.height(6.dp))
             Column(Modifier.fillMaxWidth().background(P.surface2, RoundedCornerShape(8.dp)).padding(10.dp)) {
-                Text("Raw Groq API Key", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                Text("Access key from Groq account", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = lg.ollama.groqApiKey,
@@ -1007,10 +1007,10 @@ fun DeepseekAiProviderPanel(
             letter = "D",
             configured = lg.ollama.isDeepseekSignedIn,
             displayName = lg.ollama.deepseekDisplayEmail,
-            statusLine = "DeepSeek API key configured",
-            promptTitle = "DeepSeek API access",
-            promptBlurb = "A DeepSeek API key is required from platform.deepseek.com.",
-            configureLabel = "Configure DeepSeek API",
+            statusLine = "DeepSeek account connected",
+            promptTitle = "Connect DeepSeek account",
+            promptBlurb = "Sign in at platform.deepseek.com, then paste the access key from your account.",
+            configureLabel = "Connect DeepSeek account",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
@@ -1044,7 +1044,7 @@ fun DeepseekAiProviderPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (showAdvancedSettings) "▼ Hide Advanced Key Settings" else "▶ Advanced API Key Settings",
+                if (showAdvancedSettings) "▼ Hide advanced access key" else "▶ Advanced access key",
                 style = T.label.copy(fontSize = 11.sp),
                 color = P.sub,
                 modifier = Modifier.weight(1f),
@@ -1053,7 +1053,7 @@ fun DeepseekAiProviderPanel(
         if (showAdvancedSettings) {
             Spacer(Modifier.height(6.dp))
             Column(Modifier.fillMaxWidth().background(P.surface2, RoundedCornerShape(8.dp)).padding(10.dp)) {
-                Text("Raw DeepSeek API Key", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                Text("Access key from DeepSeek account", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = lg.ollama.deepseekApiKey,
@@ -1521,7 +1521,7 @@ Panel {
         val providers = listOf("ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral")
         val providerLabels = listOf("Local", "Gemini", "ChatGPT", "Claude", "Groq", "DeepSeek", "OpenRouter", "Cerebras", "Mistral")
         val providerBlurbs = listOf(
-            "On-device Ollama — free, no API key.",
+            "On-device Ollama — free, no account needed.",
             "Free Gemini flash models in the cloud.",
             "Cheap ChatGPT models (mini / 3.5).",
             "Anthropic Claude — Haiku cheap, Sonnet richer.",

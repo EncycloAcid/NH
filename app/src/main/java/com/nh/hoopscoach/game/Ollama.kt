@@ -517,7 +517,7 @@ object Ollama {
         } else {
             val err = probe.exceptionOrNull()
             if (isModelAccessError(err?.message)) rememberFailedModel(before)
-            Result.failure(err ?: Exception("No working free/cheap model found for this API key."))
+            Result.failure(err ?: Exception("No working free/cheap model found for this account access key."))
         }
     }
 
@@ -941,7 +941,7 @@ object Ollama {
                     throw Exception("Google AI Error ($code): $errMsg")
                 }
             } else {
-                throw Exception("Gemini requires an API key. Email/password sign-in is not supported.")
+                throw Exception("Connect your Google account: sign in at AI Studio, then paste a free access key. Never enter your Google password here.")
             }
         }
     }
@@ -992,7 +992,7 @@ object Ollama {
             baseOrChatUrl = customEndpoint.ifBlank { "https://api.openai.com/v1" },
             label = "ChatGPT",
             modelFilter = { it.startsWith("gpt") },
-            missingKeyMessage = "OpenAI requires an API key. Email/password sign-in is not supported.",
+            missingKeyMessage = "Connect your OpenAI / ChatGPT account: sign in at platform.openai.com, then paste an access key. ChatGPT Plus alone is not enough.",
         )
 
     suspend fun testGroqConnection(apiKey: String = ""): Result<List<String>> =
@@ -1004,7 +1004,7 @@ object Ollama {
                 val k = id.lowercase()
                 "whisper" !in k && "tts" !in k && "guard" !in k
             },
-            missingKeyMessage = "Groq requires an API key from console.groq.com.",
+            missingKeyMessage = "Connect your Groq account: sign in at console.groq.com, then paste a free access key.",
         )
 
     suspend fun testDeepseekConnection(apiKey: String = ""): Result<List<String>> =
@@ -1013,7 +1013,7 @@ object Ollama {
             baseOrChatUrl = "https://api.deepseek.com",
             label = "DeepSeek",
             modelFilter = { it.lowercase().startsWith("deepseek") },
-            missingKeyMessage = "DeepSeek requires an API key from platform.deepseek.com.",
+            missingKeyMessage = "Connect your DeepSeek account: sign in at platform.deepseek.com, then paste an access key.",
         )
 
     suspend fun testOpenRouterConnection(apiKey: String = ""): Result<List<String>> =
@@ -1022,7 +1022,7 @@ object Ollama {
             baseOrChatUrl = "https://openrouter.ai/api/v1",
             label = "OpenRouter",
             modelFilter = { it.lowercase().endsWith(":free") },
-            missingKeyMessage = "OpenRouter requires an API key from openrouter.ai.",
+            missingKeyMessage = "Connect your OpenRouter account: sign in at openrouter.ai, then paste an access key.",
         )
 
     suspend fun testCerebrasConnection(apiKey: String = ""): Result<List<String>> =
@@ -1034,7 +1034,7 @@ object Ollama {
                 val k = id.lowercase()
                 "whisper" !in k && "tts" !in k
             },
-            missingKeyMessage = "Cerebras requires an API key from cloud.cerebras.ai.",
+            missingKeyMessage = "Connect your Cerebras account: sign in at cloud.cerebras.ai, then paste a free access key.",
         )
 
     suspend fun testMistralConnection(apiKey: String = ""): Result<List<String>> =
@@ -1046,14 +1046,14 @@ object Ollama {
                 val k = id.lowercase()
                 "embed" !in k && "moderation" !in k && "ocr" !in k
             },
-            missingKeyMessage = "Mistral requires an API key from console.mistral.ai.",
+            missingKeyMessage = "Connect your Mistral account: sign in at console.mistral.ai, then paste a free access key.",
         )
 
     /** Test connection to Anthropic Claude API. */
     suspend fun testAnthropicConnection(apiKey: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             val key = apiKey.trim()
-            if (key.isEmpty()) throw Exception("Anthropic requires an API key from console.anthropic.com.")
+            if (key.isEmpty()) throw Exception("Connect your Claude account: sign in at console.anthropic.com, then paste an access key.")
             val url = URL("https://api.anthropic.com/v1/models")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -1092,7 +1092,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!config.isGoogleSignedIn) {
-            return@withContext Result.failure(Exception("Gemini requires an API key. Email/password sign-in is not supported."))
+            return@withContext Result.failure(Exception("Connect your Google account: sign in at AI Studio, then paste a free access key. Never enter your Google password here."))
         }
         val apiKey = config.googleApiKey.trim()
         if (apiKey.isEmpty()) {
@@ -1260,7 +1260,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isOpenAiSignedIn) {
-            return Result.failure(Exception("OpenAI requires an API key. Email/password sign-in is not supported."))
+            return Result.failure(Exception("Connect your OpenAI / ChatGPT account: sign in at platform.openai.com, then paste an access key. ChatGPT Plus alone is not enough."))
         }
         val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
         return generateChatCompletions(
@@ -1292,7 +1292,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isGroqSignedIn) {
-            return Result.failure(Exception("Groq requires an API key from console.groq.com."))
+            return Result.failure(Exception("Connect your Groq account: sign in at console.groq.com, then paste a free access key."))
         }
         return generateChatCompletions(
             apiKey = config.groqApiKey.trim(),
@@ -1323,7 +1323,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isDeepseekSignedIn) {
-            return Result.failure(Exception("DeepSeek requires an API key from platform.deepseek.com."))
+            return Result.failure(Exception("Connect your DeepSeek account: sign in at platform.deepseek.com, then paste an access key."))
         }
         return generateChatCompletions(
             apiKey = config.deepseekApiKey.trim(),
@@ -1354,7 +1354,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isOpenRouterSignedIn) {
-            return Result.failure(Exception("OpenRouter requires an API key from openrouter.ai."))
+            return Result.failure(Exception("Connect your OpenRouter account: sign in at openrouter.ai, then paste an access key."))
         }
         return generateChatCompletions(
             apiKey = config.openRouterApiKey.trim(),
@@ -1389,7 +1389,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isCerebrasSignedIn) {
-            return Result.failure(Exception("Cerebras requires an API key from cloud.cerebras.ai."))
+            return Result.failure(Exception("Connect your Cerebras account: sign in at cloud.cerebras.ai, then paste a free access key."))
         }
         return generateChatCompletions(
             apiKey = config.cerebrasApiKey.trim(),
@@ -1420,7 +1420,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> {
         if (!config.isMistralSignedIn) {
-            return Result.failure(Exception("Mistral requires an API key from console.mistral.ai."))
+            return Result.failure(Exception("Connect your Mistral account: sign in at console.mistral.ai, then paste a free access key."))
         }
         return generateChatCompletions(
             apiKey = config.mistralApiKey.trim(),
@@ -1452,7 +1452,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!config.isAnthropicSignedIn) {
-            return@withContext Result.failure(Exception("Anthropic requires an API key from console.anthropic.com."))
+            return@withContext Result.failure(Exception("Connect your Claude account: sign in at console.anthropic.com, then paste an access key."))
         }
         val apiKey = config.anthropicApiKey.trim()
         if (apiKey.isEmpty()) {
