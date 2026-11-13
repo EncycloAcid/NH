@@ -68,7 +68,7 @@ class AiUiScreenshotTest {
     @Test fun diagnosticsFetchWithNoApiKeyShowsAnActionableFailure() {
         val config = com.nh.hoopscoach.game.OllamaConfig(provider = "google")
         rule.activity.setContent { HoopsTheme { com.nh.hoopscoach.ui.AiDiagnosticsPanel(config) {} } }
-        rule.onNodeWithText("Fetch available models").performClick()
+        rule.onNodeWithText("Fetch models").performClick()
         rule.waitUntil(30_000) { com.nh.hoopscoach.game.AiDiagnostics.last?.let { it.request == "Model list" && it.result == "network error" } == true }
         org.junit.Assert.assertTrue(com.nh.hoopscoach.game.AiDiagnostics.last!!.detail.contains("API key"))
         rule.onNodeWithText("Test AI").performClick()

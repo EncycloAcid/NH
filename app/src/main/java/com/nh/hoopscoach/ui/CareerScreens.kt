@@ -393,25 +393,19 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Section("AI Dynasty Intelligence")
-            AiDiagnosticsPanel(
-                lg.ollama,
-                onAutoPickChanged = { on -> vm.act { l ->
-                    l.ollama.autoPickModel = on
-                    if (on) {
-                        com.nh.hoopscoach.game.Ollama.applyAutoPick(l.ollama)
-                        com.nh.hoopscoach.game.Ollama.Cache.clear()
-                    }
-                } },
-            ) { model -> vm.act { l ->
-                when (l.ollama.provider) { "google" -> l.ollama.googleModel = model; "openai" -> l.ollama.openAiModel = model; else -> l.ollama.model = model }
-                com.nh.hoopscoach.game.Ollama.Cache.clear()
-            } }
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Enable AI Dynasty Intelligence", style = T.bodyB, color = P.ink)
-                        Text("Generate dynamic recaps, coach podium quotes, fan reactions, and storylines — free & cheap models preferred.", style = T.small, color = P.sub)
+                        Text(
+                            "Dynamic recaps, quotes, and storylines — free & cheap models preferred.",
+                            style = T.small,
+                            color = P.sub,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
+                    Spacer(Modifier.width(8.dp))
                     AppSwitch(lg.ollama.enabled, { on ->
                         vm.act {
                             it.ollama.enabled = on
@@ -439,7 +433,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             if (it.ollama.autoPickModel) com.nh.hoopscoach.game.Ollama.applyAutoPick(it.ollama)
                         }
                         testStatus = ""
-                    })
+                    }, inset = false)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         when (providers[providerIdx]) {
@@ -449,6 +443,30 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         },
                         style = T.small, color = P.sub,
                     )
+
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Auto-pick model", style = T.bodyB, color = P.ink)
+                            Text(
+                                "Keep a proven free/cheap text model. Skips retired, preview, and specialty ids.",
+                                style = T.small,
+                                color = P.sub,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        AppSwitch(lg.ollama.autoPickModel, { on ->
+                            vm.act { l ->
+                                l.ollama.autoPickModel = on
+                                if (on) {
+                                    com.nh.hoopscoach.game.Ollama.applyAutoPick(l.ollama)
+                                    com.nh.hoopscoach.game.Ollama.Cache.clear()
+                                }
+                            }
+                        })
+                    }
 
                     Spacer(Modifier.height(14.dp))
 
@@ -479,7 +497,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(lg.ollama.googleDisplayEmail, style = T.bodyB, color = P.ink)
+                                                Text(
+                                                    lg.ollama.googleDisplayEmail,
+                                                    style = T.bodyB,
+                                                    color = P.ink,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f),
+                                                )
                                                 Spacer(Modifier.width(6.dp))
                                                 Tag("KEY SAVED", P.good)
                                             }
@@ -489,10 +514,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Spacer(Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         SecondaryButton("Edit API key", Modifier.weight(1f)) {
-
-
-
-
                                             showGoogleLoginDialog = true
                                         }
                                         SecondaryButton("Remove key", Modifier.weight(1f)) {
@@ -531,10 +552,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     }
                                     Spacer(Modifier.height(10.dp))
                                     PrimaryButton("Configure Gemini API", Modifier.fillMaxWidth()) {
-
-
-
-
                                         showGoogleLoginDialog = true
                                     }
                                 }
@@ -550,9 +567,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
                             val gIdx = gModels.indexOfFirst { it.id.equals(lg.ollama.googleModel, true) }.coerceAtLeast(0)
                             Picker(
-                                if (lg.ollama.autoPickModel) "Gemini model (auto)" else "Gemini model",
-                                "${if (lg.ollama.autoPickModel) "Auto · " else ""}${gModels[gIdx].name} · ${gModels[gIdx].tag}",
-                                gModels.map { it.name to "${it.tag} — ${it.description}" },
+                                label = if (lg.ollama.autoPickModel) "Gemini model (auto)" else "Gemini model",
+                                current = gModels[gIdx].name,
+                                options = gModels.map { it.name to "${it.tag} — ${it.description}" },
+                                display = "${if (lg.ollama.autoPickModel) "Auto · " else ""}${gModels[gIdx].name} · ${gModels[gIdx].tag}",
                             ) { i -> vm.act {
                                 it.ollama.autoPickModel = false
                                 it.ollama.googleModel = gModels[i].id
@@ -657,7 +675,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         Spacer(Modifier.width(10.dp))
                                         Column(Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(lg.ollama.openAiDisplayEmail, style = T.bodyB, color = P.ink)
+                                                Text(
+                                                    lg.ollama.openAiDisplayEmail,
+                                                    style = T.bodyB,
+                                                    color = P.ink,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f),
+                                                )
                                                 Spacer(Modifier.width(6.dp))
                                                 Tag("KEY SAVED", P.good)
                                             }
@@ -667,10 +692,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     Spacer(Modifier.height(10.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         SecondaryButton("Edit API key", Modifier.weight(1f)) {
-
-
-
-
                                             showOpenAiLoginDialog = true
                                         }
                                         SecondaryButton("Remove key", Modifier.weight(1f)) {
@@ -709,10 +730,6 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                     }
                                     Spacer(Modifier.height(10.dp))
                                     PrimaryButton("Configure OpenAI API", Modifier.fillMaxWidth()) {
-
-
-
-
                                         showOpenAiLoginDialog = true
                                     }
                                 }
@@ -728,9 +745,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
                             val oIdx = oModels.indexOfFirst { it.id.equals(lg.ollama.openAiModel, true) }.coerceAtLeast(0)
                             Picker(
-                                if (lg.ollama.autoPickModel) "ChatGPT model (auto)" else "ChatGPT model",
-                                "${if (lg.ollama.autoPickModel) "Auto · " else ""}${oModels[oIdx].name} · ${oModels[oIdx].tag}",
-                                oModels.map { it.name to "${it.tag} — ${it.description}" },
+                                label = if (lg.ollama.autoPickModel) "ChatGPT model (auto)" else "ChatGPT model",
+                                current = oModels[oIdx].name,
+                                options = oModels.map { it.name to "${it.tag} — ${it.description}" },
+                                display = "${if (lg.ollama.autoPickModel) "Auto · " else ""}${oModels[oIdx].name} · ${oModels[oIdx].tag}",
                             ) { i -> vm.act {
                                 it.ollama.autoPickModel = false
                                 it.ollama.openAiModel = oModels[i].id
@@ -1072,7 +1090,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             val speedKeys = listOf("turbo", "balanced", "quality")
                             val speedLabels = listOf("Turbo", "Balanced", "Quality")
                             val speedIdx = speedKeys.indexOf(lg.ollama.speedMode).coerceAtLeast(0)
-                            Segmented(speedLabels, speedIdx, { i -> vm.act { it.ollama.speedMode = speedKeys[i] } })
+                            Segmented(speedLabels, speedIdx, { i -> vm.act { it.ollama.speedMode = speedKeys[i] } }, inset = false)
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 when (speedKeys[speedIdx]) {
@@ -1086,21 +1104,18 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             // Tip banner if on heavier model
                             if (lg.ollama.model.contains("llama3.2:1b") || lg.ollama.model.contains("qwen2.5:0.5b")) {
                                 Spacer(Modifier.height(8.dp))
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(P.surface2, RoundedCornerShape(8.dp))
                                         .border(1.dp, P.gold.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                        .padding(10.dp),
                                 ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
-                                        Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
-                                    }
-                                    Spacer(Modifier.width(6.dp))
-                                    SmallButton("Use SmolLM2") {
-                                        vm.act { it.ollama.model = "smollm2:135m" }
+                                    Text("Want maximum speed?", style = T.bodyB.copy(fontSize = 11.sp), color = P.ink)
+                                    Text("SmolLM2 135M (270MB) and Qwen 2.5 0.5B run up to 4x faster on phones.", style = T.small.copy(fontSize = 10.sp), color = P.sub)
+                                    Spacer(Modifier.height(8.dp))
+                                    SecondaryButton("Use SmolLM2", Modifier.fillMaxWidth()) {
+                                        vm.act { it.ollama.model = "smollm2:135m"; it.ollama.autoPickModel = false }
                                         vm.toast("Active model switched to SmolLM2 135M")
                                     }
                                 }
@@ -1109,51 +1124,51 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Spacer(Modifier.height(10.dp))
 
                             // CPU Threads selector
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("CPU Thread Allocation", style = T.bodyB, color = P.ink)
-                                    Text("Allocates performance cores on big.LITTLE phone CPUs (${if (lg.ollama.numThreads == 0) "Auto: ${com.nh.hoopscoach.game.Ollama.defaultOptimalThreads()} cores" else "${lg.ollama.numThreads} cores"}).", style = T.small, color = P.sub)
-                                }
-                                val threadOptions = listOf(0 to "Auto", 2 to "2", 4 to "4", 6 to "6")
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    threadOptions.forEach { (count, txt) ->
-                                        val sel = lg.ollama.numThreads == count
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(if (sel) P.accent else P.surface2)
-                                                .clickable { vm.act { it.ollama.numThreads = count } }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
-                                        }
+                            Text("CPU Thread Allocation", style = T.bodyB, color = P.ink)
+                            Text(
+                                "Performance cores on big.LITTLE CPUs (${if (lg.ollama.numThreads == 0) "Auto: ${com.nh.hoopscoach.game.Ollama.defaultOptimalThreads()} cores" else "${lg.ollama.numThreads} cores"}).",
+                                style = T.small,
+                                color = P.sub,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            val threadOptions = listOf(0 to "Auto", 2 to "2", 4 to "4", 6 to "6")
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                threadOptions.forEach { (count, txt) ->
+                                    val sel = lg.ollama.numThreads == count
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (sel) P.accent else P.surface2)
+                                            .clickable { vm.act { it.ollama.numThreads = count } }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(txt, style = T.small.copy(fontSize = 12.sp), color = if (sel) P.onAccent else P.ink)
                                     }
                                 }
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(12.dp))
 
                             // Keep warm in RAM
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Keep in RAM between games", style = T.bodyB, color = P.ink)
-                                    Text("Prevents 5-15s cold start model reloads from mobile storage.", style = T.small, color = P.sub)
-                                }
-                                val ramOptions = listOf(30 to "30m", 10 to "10m", 5 to "5m")
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    ramOptions.forEach { (mins, txt) ->
-                                        val sel = lg.ollama.keepAliveMinutes == mins
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(if (sel) P.accent else P.surface2)
-                                                .clickable { vm.act { it.ollama.keepAliveMinutes = mins } }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(txt, style = T.small.copy(fontSize = 11.sp), color = if (sel) P.onAccent else P.ink)
-                                        }
+                            Text("Keep in RAM between games", style = T.bodyB, color = P.ink)
+                            Text("Prevents 5-15s cold start reloads from storage.", style = T.small, color = P.sub)
+                            Spacer(Modifier.height(6.dp))
+                            val ramOptions = listOf(30 to "30m", 10 to "10m", 5 to "5m")
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                ramOptions.forEach { (mins, txt) ->
+                                    val sel = lg.ollama.keepAliveMinutes == mins
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (sel) P.accent else P.surface2)
+                                            .clickable { vm.act { it.ollama.keepAliveMinutes = mins } }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(txt, style = T.small.copy(fontSize = 12.sp), color = if (sel) P.onAccent else P.ink)
                                     }
                                 }
                             }
@@ -1173,12 +1188,43 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         }
                     }
 
+                    Spacer(Modifier.height(14.dp))
+                    Hairline()
+                    Spacer(Modifier.height(12.dp))
+                    AiDiagnosticsPanel(
+                        config = lg.ollama,
+                        embedded = true,
+                        onAutoPickChanged = { on -> vm.act { l ->
+                            l.ollama.autoPickModel = on
+                            if (on) {
+                                com.nh.hoopscoach.game.Ollama.applyAutoPick(l.ollama)
+                                com.nh.hoopscoach.game.Ollama.Cache.clear()
+                            }
+                        } },
+                    ) { model -> vm.act { l ->
+                        when (l.ollama.provider) {
+                            "google" -> l.ollama.googleModel = model
+                            "openai" -> l.ollama.openAiModel = model
+                            else -> l.ollama.model = model
+                        }
+                        com.nh.hoopscoach.game.Ollama.Cache.clear()
+                    } }
+
+                    Spacer(Modifier.height(14.dp))
+                    Hairline()
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
-                            Text("Automatically generate recaps for your games using ${lg.ollama.providerDisplayName}.", style = T.small, color = P.sub)
+                            Text(
+                                "Automatically generate recaps using ${lg.ollama.providerDisplayName}.",
+                                style = T.small,
+                                color = P.sub,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
+                        Spacer(Modifier.width(8.dp))
                         AppSwitch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
                     }
 
@@ -1439,7 +1485,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     val curAngleIdx = angleOptions.indexOfFirst { it.first == lg.ollama.defaultStoryAngle }.coerceAtLeast(0)
                     Segmented(angleOptions.map { it.second }, curAngleIdx, { idx ->
                         vm.act { it.ollama.defaultStoryAngle = angleOptions[idx].first }
-                    }, scroll = true)
+                    }, scroll = true, inset = false)
                 }
             }
             lg.road?.let { rd ->
