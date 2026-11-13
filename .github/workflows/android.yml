@@ -115,6 +115,46 @@ jobs:
             sleep $((attempt * 20))
           done
 
+      # Play the game on Windows with the same jars and Java modules the installer ships.
+      - name: Windows test - build a league, play a season, save, reload, offseason
+        shell: bash
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          set -euo pipefail
+          ./gradlew :app:createDistributable --no-daemon
+          APP=app/build/compose/binaries/main/app/HoopsDynasty
+          ls "$APP" "$APP/app" | head -40
+          java --limit-modules java.base,java.datatransfer,java.xml,java.prefs,java.desktop,java.logging,jdk.crypto.ec \
+            -Xmx2g -cp "$APP/app/*" com.nh.hoopscoach.WindowsSmokeKt
+
+      - name: Windows test - open the game window
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $exe = "app/build/compose/binaries/main/app/HoopsDynasty/HoopsDynasty.exe"
+          $p = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 45
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          try { [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save("windows-screen.png") } catch { "screenshot failed: $_" }
+          $log = Join-Path $env:USERPROFILE ".hoopsdynasty/hoops-log.txt"
+          if (Test-Path $log) { Get-Content $log -TotalCount 80 }
+          if ($p.HasExited) { "Game exited early with code $($p.ExitCode)"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          if ((Test-Path $log) -and (Select-String -Path $log -Pattern "Exception" -Quiet)) { "Exception in game log"; exit 1 }
+          "Game window stayed open for 45 seconds with no errors"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: windows-test-screenshot
+          path: windows-screen.png
+          if-no-files-found: ignore
+
       - name: Collect Windows artifacts
         shell: bash
         run: |
