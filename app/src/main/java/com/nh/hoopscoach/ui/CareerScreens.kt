@@ -264,7 +264,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         Text("Retro portraits for everyone", style = T.bodyB, color = P.ink)
                         Text("Draw real players as retro bit portraits too, instead of their headshots.", style = T.small, color = P.sub)
                     }
-                    androidx.compose.material3.Switch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
+                    AppSwitch(lg.retroAll, { on -> vm.act { it.retroAll = on } })
                 }
             }
             Section("AI Stories · Hoops Wire")
@@ -274,22 +274,26 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         Text("Local AI stories", style = T.bodyB, color = P.ink)
                         Text("Ollama writes Hoops Wire recaps, preview storylines, and news — free local models only.", style = T.small, color = P.sub)
                     }
-                    androidx.compose.material3.Switch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
+                    AppSwitch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
                 }
                 if (lg.ollama.enabled) {
-                    Spacer(Modifier.height(12.dp))
-                    Text("SERVER ENDPOINT", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
+                    Spacer(Modifier.height(14.dp))
+                    Hairline()
+                    Spacer(Modifier.height(14.dp))
+                    AppField(
+                        label = "Server",
                         value = lg.ollama.host,
                         onValueChange = { h -> vm.act { it.ollama.host = h } },
-                        singleLine = true,
-                        placeholder = { Text("http://10.0.2.2:11434", color = P.faint) },
+                        placeholder = "http://10.0.2.2:11434",
                         modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(),
                     )
-                    Text("Emulator: http://10.0.2.2:11434 · device: http://localhost:11434", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 2.dp))
-                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Emulator · 10.0.2.2:11434   ·   Device · localhost:11434",
+                        style = T.small.copy(fontSize = 11.sp),
+                        color = P.faint,
+                        modifier = Modifier.padding(top = 6.dp, start = 2.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
                     val modelOptions = remember(installedModels) {
                         com.nh.hoopscoach.game.Ollama.pickerOptions(installedModels)
                     }
@@ -300,7 +304,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         }?.label ?: id
                     }
                     Picker(
-                        label = "Model (free / cheap)",
+                        label = "Model",
                         current = modelLabel,
                         options = modelOptions.map { (id, blurb) ->
                             val label = com.nh.hoopscoach.game.Ollama.CHEAP_MODELS.firstOrNull {
@@ -313,15 +317,17 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         val id = modelOptions.getOrNull(i)?.first ?: return@Picker
                         vm.act { it.ollama.model = id }
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Free and cheap local tags only — heavier models stay hidden.", style = T.small, color = P.faint)
+                    Spacer(Modifier.height(14.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Auto-generate major stories", style = T.bodyB, color = P.ink)
                             Text("Write recaps for your big games automatically.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
+                        AppSwitch(lg.ollama.autoGenerate, { on -> vm.act { it.ollama.autoGenerate = on } })
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                     SecondaryButton(if (testing) "Testing..." else "Test connection", Modifier.fillMaxWidth(), enabled = !testing) {
                         testing = true
                         testStatus = "Testing connection..."
@@ -335,12 +341,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                 val snapped = com.nh.hoopscoach.game.Ollama.resolveModel(lg.ollama.model, models)
                                 if (snapped != lg.ollama.model) vm.act { it.ollama.model = snapped }
                                 testStatus = when {
-                                    models.isEmpty() -> "Connected — no models yet. Pull one: ollama pull llama3.2"
+                                    models.isEmpty() -> "Connected — pull a model: ollama pull llama3.2"
                                     cheap.any { c -> models.any { com.nh.hoopscoach.game.Ollama.modelMatches(it, c.id) } } ->
-                                        "Connected. Free/cheap ready: " + cheap.filter { c ->
+                                        "Ready · " + cheap.filter { c ->
                                             models.any { com.nh.hoopscoach.game.Ollama.modelMatches(it, c.id) }
                                         }.joinToString { it.label }
-                                    else -> "Connected, but no free/cheap models installed. Pull llama3.2 or phi3:mini."
+                                    else -> "Connected — install llama3.2 or phi3:mini"
                                 }
                             }.onFailure { err ->
                                 testSuccess = false
@@ -349,8 +355,19 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         }
                     }
                     if (testStatus.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(testStatus, style = T.small, color = if (testSuccess) P.good else P.bad)
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (testSuccess) P.good.copy(alpha = 0.12f) else P.bad.copy(alpha = 0.12f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Tag(if (testSuccess) "OK" else "ERROR", if (testSuccess) P.good else P.bad, filled = true)
+                            Spacer(Modifier.width(10.dp))
+                            Text(testStatus, style = T.small, color = if (testSuccess) P.good else P.bad, modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -362,7 +379,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             Text("Shot meter", style = T.bodyB, color = P.ink)
                             Text("Time your own release in big moments: perfect timing adds to your chance, a bad one takes away.", style = T.small, color = P.sub)
                         }
-                        androidx.compose.material3.Switch(rd.shotMeter, { on -> vm.act { it.road?.shotMeter = on } })
+                        AppSwitch(rd.shotMeter, { on -> vm.act { it.road?.shotMeter = on } })
                     }
                 }
             }

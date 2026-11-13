@@ -1,5 +1,6 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -166,7 +170,14 @@ fun NewspaperBanner(vm: GameViewModel, lg: League, g: Game, onClick: (() -> Unit
 
 @Composable
 private fun ScoreLine(t: Team, score: Int, swing: Int, winner: Boolean) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (winner) P.accentSoft else Color.Transparent)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         TeamBadge(t, 28.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -187,7 +198,7 @@ private fun ScoreLine(t: Team, score: Int, swing: Int, winner: Boolean) {
             }
         }
         Spacer(Modifier.width(8.dp))
-        Text("$score", style = T.num, color = if (winner) P.ink else P.sub, maxLines = 1)
+        Text("$score", style = T.num, color = if (winner) P.accent else P.sub, maxLines = 1)
     }
 }
 
