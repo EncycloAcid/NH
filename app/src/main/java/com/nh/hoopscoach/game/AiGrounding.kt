@@ -25,7 +25,14 @@ object AiFacts {
     private fun stats(s: StatLine) = String.format(Locale.US, "%d GP; %.1f PPG; %.1f RPG; %.1f APG; %.1f MPG; %.1f%% FG; %.1f%% 3PT; %.1f%% FT", s.gp, s.ppg, s.rpg, s.apg, s.mpg, s.fgPct * 100, s.tpPct * 100, s.ftPct * 100)
 
     fun build(lg: League, request: String, extra: String = "", players: List<Player> = emptyList(), preview: Boolean = false, upcoming: Boolean = false, eventGame: Game? = null): AiFactSheet {
-        val population = (lg.players + lg.alumni + lg.recruits.map { it.p } + players).distinctBy { it.id }
+        // Snapshot before iterating — auto article desks run on IO while the sim mutates these lists.
+        val allPlayers = LeagueLists.players(lg)
+        val alumni = LeagueLists.alumni(lg)
+        val recruits = LeagueLists.recruits(lg)
+        val leagueTeams = LeagueLists.teams(lg)
+        val coaches = LeagueLists.coaches(lg)
+        val games = LeagueLists.games(lg)
+        val population = (allPlayers + alumni + recruits.map { it.p } + players).distinctBy { it.id }
         val context = request + "\n" + extra
         val namedPlayers = population.filter { mentioned(context, it.name) }
         val gameReport = eventGame != null && !preview && !upcoming
@@ -33,8 +40,8 @@ object AiFacts {
         // box principals, and a micro title brief — no abbr/surname false-positives or desk fluff.
         val eventTeams = eventGame?.let { listOf(lg.team(it.home), lg.team(it.away)) }.orEmpty()
         val situationTeams = if (gameReport) emptyList() else SituationAwareness.namedTeams(lg).take(3)
-        val mentionedTeams = if (gameReport) emptyList() else lg.teams.filter { t -> aliases(t).any { mentioned(context, it) } }
-        val teams = (eventTeams + mentionedTeams + (if (gameReport) emptyList() else namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } }) +
+        val mentionedTeams = if (gameReport) emptyList() else leagueTeams.filter { t -> aliases(t).any { mentioned(context, it) } }
+        val teams = (eventTeams + mentionedTeams + (if (gameReport) emptyList() else namedPlayers.mapNotNull { p -> leagueTeams.firstOrNull { it.id == p.teamId } }) +
             (if (gameReport) emptyList() else listOf(lg.user)) + situationTeams)
             .distinctBy { it.id }.take(if (gameReport) 2 else 8)
         val eventPlayerIds = eventGame?.box?.let { b -> (b.home + b.away).map { it.pid }.toSet() }.orEmpty()
@@ -46,14 +53,14 @@ object AiFacts {
         } else {
             (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
                 teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } +
-                teams.mapNotNull { AiTemplates.departure(lg, it) }).distinctBy { it.id }
+                teams.mapNotNull { AiTemplates.departure(lg, it, allPlayers, alumni) }).distinctBy { it.id }
         }
         val names = (teams.flatMap { aliases(it) } + featured.map { it.name } + teams.map { lg.coachOf(it).name } +
             teams.map { lg.conf(it.confId).name } + (if (gameReport) emptyList() else lg.rivals.map { it.name }) +
             featured.flatMap { listOf(it.hometown, it.highSchool, it.injury) }.filter { it.isNotBlank() }).toMutableSet()
-        val allNames = (lg.teams.flatMap { aliases(it) } + population.map { it.name } + lg.coaches.map { it.name }).toSet()
+        val allNames = (leagueTeams.flatMap { aliases(it) } + population.map { it.name } + coaches.map { it.name }).toSet()
         val records = mutableMapOf<String, Set<String>>()
-        val preseason = lg.phase == Phase.REGULAR && lg.teams.all { it.gp == 0 }
+        val preseason = lg.phase == Phase.REGULAR && leagueTeams.all { it.gp == 0 }
         val text = buildString {
             appendLine("SEASON ${lg.season}; DATE day ${lg.day}; PHASE ${lg.phase.name}${if (preseason) " (preseason; no games played)" else ""}.")
             appendLine("League: ${if (lg.pro) "NBA" else "college basketball"}. Forecasts are simulation probabilities, not results. Missing facts are unknown.")
@@ -61,7 +68,7 @@ object AiFacts {
             if (upcoming) appendLine("PURPOSE: upcoming matchup. Do not announce a result or postgame reaction.")
             appendLine(SituationAwareness.microBrief(lg).trimEnd())
             teams.forEach { t ->
-                val order = lg.teams.filter { it.confId == t.confId }.sortedWith(compareByDescending<Team> {
+                val order = leagueTeams.filter { it.confId == t.confId }.sortedWith(compareByDescending<Team> {
                     if (lg.pro) it.winPct else if (it.cw + it.cl > 0) it.cw.toDouble() / (it.cw + it.cl) else 0.0
                 }.thenByDescending { it.elo }.thenBy { it.id })
                 val rank = if (t.gp == 0) "standings not established" else "conference standing ${order.indexOf(t) + 1} of ${order.size} (ties ordered by Elo)"
@@ -84,7 +91,7 @@ object AiFacts {
                 }
                 aliases(t).forEach { records[it] = setOf(t.record) }
             }
-            val results = (eventGame?.let { listOf(it) } ?: lg.games).filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
+            val results = (eventGame?.let { listOf(it) } ?: games).filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
                 .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(if (gameReport) 1 else 6)
             results.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
@@ -117,8 +124,8 @@ object AiFacts {
                 } }
             }
             featured.forEach { p ->
-                if (!gameReport && p in namedPlayers) lg.teams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
-                appendLine("PLAYER ${p.name}; ${p.posLabel}; class ${p.cls}; team ${lg.teams.firstOrNull { it.id == p.teamId }?.name ?: "unattached"}; age ${p.age}; height ${p.height} in; weight ${p.weight} lb; recruit rank ${p.recruitRank}; rating ${p.ovr}; potential ${p.pot}.")
+                if (!gameReport && p in namedPlayers) leagueTeams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
+                appendLine("PLAYER ${p.name}; ${p.posLabel}; class ${p.cls}; team ${leagueTeams.firstOrNull { it.id == p.teamId }?.name ?: "unattached"}; age ${p.age}; height ${p.height} in; weight ${p.weight} lb; recruit rank ${p.recruitRank}; rating ${p.ovr}; potential ${p.pot}.")
                 if (!gameReport) {
                     val best = Attr.entries.maxBy { p[it] }; val worst = Attr.entries.minBy { p[it] }
                     appendLine("SCOUT ${p.name}: strongest ${best.label} ${p[best]}; weakest ${worst.label} ${p[worst]}.")
@@ -129,9 +136,9 @@ object AiFacts {
                 if (lg.pro && !gameReport) appendLine("CONTRACT ${p.name}: salary ${p.salary} thousand dollars (${Road.dollars(p.salary)}); years remaining ${p.contractYears}.")
             }
             val scheduleGames = if (gameReport) {
-                lg.games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(2)
+                games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(2)
             } else {
-                (lg.games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it) }).distinctBy { it.id }
+                (games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it, games) }).distinctBy { it.id }
             }
             scheduleGames.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
@@ -150,20 +157,26 @@ object AiFacts {
                 if (initial != null) shortNames["$initial. $last"] = p.name
             }
         }
-        val properNames = lg.teams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + lg.coaches.map { it.name }
-        val acronyms = lg.teams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
+        val properNames = leagueTeams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + coaches.map { it.name }
+        val acronyms = leagueTeams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
         return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms)
     }
 
     fun version(lg: League): String {
+        val teams = LeagueLists.teams(lg)
+        val players = LeagueLists.players(lg)
+        val alumni = LeagueLists.alumni(lg)
+        val coaches = LeagueLists.coaches(lg)
+        val games = LeagueLists.games(lg)
+        val history = LeagueLists.history(lg)
         val snapshot = buildString {
             append("grounded3/${lg.season}/${lg.day}/${lg.phase}/${lg.userTeamId}/${lg.pro}")
-            lg.teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}:${it.titles}:${it.streak}") }
+            teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}:${it.titles}:${it.streak}") }
             TitleDefense.champion(lg)?.let { append("|champ:${it.id}") }
-            lg.history.takeLast(3).forEach { append("|hist:${it.season}:${it.champion}") }
-            (lg.players + lg.alumni).forEach { append("|${it.id}:${it.name}:${it.teamId}:${it.ovr}:${it.injGames}:${it.injury}:${it.salary}:${it.contractYears}:${it.stats.pts}:${it.stats.gp}:${it.stats.reb}:${it.stats.ast}:${it.attrs.contentHashCode()}") }
-            lg.coaches.forEach { append("|${it.name}:${it.teamId}:${it.security}:${it.titles}") }
-            lg.games.filter { it.played }.forEach { append("|${it.id}:${it.hs}:${it.aws}") }
+            history.takeLast(3).forEach { append("|hist:${it.season}:${it.champion}") }
+            (players + alumni).forEach { append("|${it.id}:${it.name}:${it.teamId}:${it.ovr}:${it.injGames}:${it.injury}:${it.salary}:${it.contractYears}:${it.stats.pts}:${it.stats.gp}:${it.stats.reb}:${it.stats.ast}:${it.attrs.contentHashCode()}") }
+            coaches.forEach { append("|${it.name}:${it.teamId}:${it.security}:${it.titles}") }
+            games.filter { it.played }.forEach { append("|${it.id}:${it.hs}:${it.aws}") }
         }
         return MessageDigest.getInstance("SHA-256").digest(snapshot.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
     }

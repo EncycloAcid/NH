@@ -10,7 +10,9 @@ object PlayerStorylines {
 
     fun detectArcs(lg: League): List<Arc> {
         val out = mutableListOf<Arc>()
-        val active = lg.players.filter { it.teamId >= 0 }
+        val players = LeagueLists.players(lg)
+        val teams = LeagueLists.teams(lg)
+        val active = players.filter { it.teamId >= 0 }
         // Bench → star: quiet prior season (or low early ovr), loud current role.
         for (p in active) {
             val prior = p.career.lastOrNull()?.s
@@ -18,7 +20,7 @@ object PlayerStorylines {
             val quietHistory = p.ovrHistory.size >= 2 && p.ovrHistory.first() <= p.ovr - 8
             val nowStar = p.stats.gp >= 5 && (p.stats.mpg >= 26.0 || p.stats.ppg >= 14.0) && p.ovr >= 78
             if ((wasBench || quietHistory) && nowStar) {
-                val school = lg.teams.getOrNull(p.teamId)?.school ?: "?"
+                val school = teams.getOrNull(p.teamId)?.school ?: "?"
                 out += Arc(
                     "BENCH_TO_STAR", p.id,
                     "From the bench to the spotlight: ${p.name}",
@@ -31,7 +33,7 @@ object PlayerStorylines {
             if (p.year < 2 && p.stats.gp < 8) continue
             val muted = p.ovr <= 76 || (p.stats.gp >= 8 && p.stats.ppg < 9.0 && p.stats.mpg < 24.0)
             if (!muted) continue
-            val school = lg.teams.getOrNull(p.teamId)?.school ?: "?"
+            val school = teams.getOrNull(p.teamId)?.school ?: "?"
             val pedigree = if (p.recruitRank > 0) "No.${p.recruitRank} ${p.stars}★" else "${p.stars}★"
             out += Arc(
                 "RECRUIT_BUST", p.id,
@@ -44,7 +46,7 @@ object PlayerStorylines {
             val tourneyHero = p.tourney.gp >= 1 && (p.tourney.ppg >= 12.0 || p.tourney.pts >= 20)
             val seasonHero = p.stats.gp >= 6 && p.stats.ppg >= 12.0 && (p.walkOn || p.story >= 1)
             if (!tourneyHero && !seasonHero && p.story < 2) continue
-            val school = lg.teams.getOrNull(p.teamId)?.school ?: "?"
+            val school = teams.getOrNull(p.teamId)?.school ?: "?"
             val path = when {
                 p.walkOn -> "current walk-on"
                 p.tryout > 0 -> "former walk-on (tryout ${p.tryout})"
@@ -101,7 +103,7 @@ object PlayerStorylines {
         arcs.firstOrNull { it.kind == "RECRUIT_BUST" }?.let { add(it) }
         arcs.firstOrNull { it.kind == "WALKON_HERO" }?.let { add(it) }
         if (stories.isEmpty()) {
-            val p = lg.rosterOf(lg.user).maxByOrNull { it.stats.ppg } ?: lg.players.firstOrNull { it.teamId == lg.userTeamId }
+            val p = lg.rosterOf(lg.user).maxByOrNull { it.stats.ppg } ?: LeagueLists.players(lg).firstOrNull { it.teamId == lg.userTeamId }
             if (p != null) {
                 stories += News(
                     lg.season, lg.day, "Storyline watch: ${p.name} at ${lg.user.school}",

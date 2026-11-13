@@ -105,6 +105,71 @@ object Ollama {
     }
 
     /**
+     * Best free/cheap model for [provider]. Prefer ids from [available] (provider list / Ollama tags);
+     * otherwise fall back to the curated Settings shortlist.
+     */
+    fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
+        val curated = when (provider.lowercase()) {
+            "google" -> GOOGLE_MODELS.map { it.id }
+            "openai" -> OPENAI_MODELS.map { it.id }
+            else -> RECOMMENDED_MODELS.map { it.id }
+        }
+        val pool = available.map { it.trim().removePrefix("models/") }.filter { it.isNotBlank() }.distinct()
+            .ifEmpty { curated }
+        val ranked = catalogFetchedModels(provider, pool)
+            .sortedWith(
+                compareBy<CatalogEntry> { it.categoryOrder }
+                    .thenBy { modelPreferenceScore(provider, it.id) }
+                    .thenBy { it.id.lowercase() },
+            )
+        val pick = ranked.firstOrNull()?.id ?: curated.first()
+        return when (provider.lowercase()) {
+            "google" -> snapGoogleModel(pick)
+            "openai" -> snapOpenAiModel(pick)
+            else -> snapLocalModel(pick)
+        }
+    }
+
+    /** Lower is better — flash-lite / mini / smol before heavier free options. */
+    internal fun modelPreferenceScore(provider: String, id: String): Int {
+        val key = id.lowercase().removePrefix("models/")
+        return when (provider.lowercase()) {
+            "google" -> when {
+                "flash-lite" in key || (key.contains("flash") && "lite" in key) -> 0
+                "flash" in key -> 1
+                "nano" in key -> 2
+                else -> 8
+            }
+            "openai" -> when {
+                "mini" in key -> 0
+                "3.5" in key -> 1
+                "nano" in key -> 2
+                else -> 8
+            }
+            else -> when {
+                key == "smollm2:135m" || key.startsWith("smollm2:135m") -> 0
+                key == "qwen2.5:0.5b" || key.startsWith("qwen2.5:0.5") -> 1
+                key == "llama3.2:1b" || key.startsWith("llama3.2:1b") -> 2
+                key.startsWith("smol") -> 3
+                key.startsWith("qwen") -> 4
+                key.startsWith("llama") -> 5
+                else -> 8
+            }
+        }
+    }
+
+    /** Writes [pickBestModel] into the active provider's model field on [config]. */
+    fun applyAutoPick(config: OllamaConfig, available: List<String> = emptyList()): String {
+        val pick = pickBestModel(config.provider, available)
+        when (config.provider.lowercase()) {
+            "google" -> config.googleModel = pick
+            "openai" -> config.openAiModel = pick
+            else -> config.model = pick
+        }
+        return pick
+    }
+
+    /**
      * One row in the fetched-model menu: provider id, display title, category header, and a short
      * price tag so long raw lists (especially Gemini) are readable.
      */
@@ -294,17 +359,7 @@ object Ollama {
             val testRes = testConnection(candidate, timeoutMs = 2500)
             if (testRes.isSuccess) {
                 val models = testRes.getOrDefault(emptyList())
-                val chosen = when {
-                    models.contains("smollm2:135m") -> "smollm2:135m"
-                    models.contains("qwen2.5:0.5b") -> "qwen2.5:0.5b"
-                    models.contains("llama3.2:1b") -> "llama3.2:1b"
-                    models.contains("llama3.2") -> "llama3.2"
-                    models.any { it.startsWith("smol") } -> models.first { it.startsWith("smol") }
-                    models.any { it.startsWith("qwen") } -> models.first { it.startsWith("qwen") }
-                    models.any { it.startsWith("llama") } -> models.first { it.startsWith("llama") }
-                    models.isNotEmpty() -> models.first()
-                    else -> "smollm2:135m"
-                }
+                val chosen = pickBestModel("ollama", models)
                 val clean = cleanHost(candidate)
                 val msg = if (models.isNotEmpty()) {
                     "Connected to $clean! Using '$chosen' (${models.size} models installed)."
@@ -710,7 +765,7 @@ object Ollama {
         eventGame: Game? = null,
     ): Result<AiText> {
         val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
-        val subject = lg.teams.filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
+        val subject = LeagueLists.teams(lg).filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
         val fallbackCopy = articleCopy.ifBlank { if (wantsArticle) ArticleWriting.news(lg, News(lg.season, lg.day, "${subject.name}: the latest outlook", teamId = subject.id)) else "" }
         // Game/series reports already carry RESULT/BOX/SERIES in the sheet; skip duplicating the
         // full game-written article into EVENT FACTS so local models stay under the 8192 budget.
@@ -743,47 +798,63 @@ object Ollama {
         news: News,
         angle: String = news.angle.ifEmpty { config.defaultStoryAngle },
     ): Result<AiText> {
-        val team = lg.teams.getOrNull(news.teamId)
-        val player = lg.playerOrNull(news.pid)
-        val game = if (news.gameId >= 0) lg.games.firstOrNull { it.id == news.gameId } else null
-        val opp = if (game != null && team != null) lg.teams.getOrNull(if (game.home == team.id) game.away else game.home) else null
+        return try {
+            val teams = LeagueLists.teams(lg)
+            val team = teams.getOrNull(news.teamId)
+            val player = lg.playerOrNull(news.pid)
+            val game = if (news.gameId >= 0) LeagueLists.games(lg).firstOrNull { it.id == news.gameId } else null
+            val opp = if (game != null && team != null) teams.getOrNull(if (game.home == team.id) game.away else game.home) else null
 
-        val seriesBits = game?.let { ArticleWriting.seriesFacts(lg, it) }.orEmpty()
-        val prompt = buildString {
-            append("Write a complete sports newspaper article for the following basketball news item:\n")
-            append("Headline: ${news.text}\n")
-            append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
-            append("Season: ${news.season}, Day: ${news.day}\n")
-            append("Angle: ${angle.ifEmpty { "balanced" }}\n")
-            if (news.kind == "series") append("Story type: playoff series clincher — lead with the series result, round, and title implications; use the clincher box only as support.\n")
-            if (team != null) append("Team: ${if (lg.pro) team.name else team.school} (${team.w}-${team.l})\n")
-            if (opp != null) append("Opponent: ${if (lg.pro) opp.name else opp.school} (${opp.record})\n")
-            if (game != null) {
-                append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
-                if (game.played) {
-                    val margin = kotlin.math.abs(game.hs - game.aws)
-                    append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
+            val seriesBits = game?.let { ArticleWriting.seriesFacts(lg, it) }.orEmpty()
+            val prompt = buildString {
+                append("Write a complete sports newspaper article for the following basketball news item:\n")
+                append("Headline: ${news.text}\n")
+                append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
+                append("Season: ${news.season}, Day: ${news.day}\n")
+                append("Angle: ${angle.ifEmpty { "balanced" }}\n")
+                if (news.kind == "series") append("Story type: playoff series clincher — lead with the series result, round, and title implications; use the clincher box only as support.\n")
+                if (team != null) append("Team: ${if (lg.pro) team.name else team.school} (${team.w}-${team.l})\n")
+                if (opp != null) append("Opponent: ${if (lg.pro) opp.name else opp.school} (${opp.record})\n")
+                if (game != null) {
+                    append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
+                    if (game.played) {
+                        val margin = kotlin.math.abs(game.hs - game.aws)
+                        append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
+                    }
                 }
+                // Series ledger lives in the fact sheet (and EVENT FACTS); keep the writing prompt short.
+                if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
+                val angleInstruction = when {
+                    news.kind == "series" -> "Stay series-aware: cite the series length, series score, and round from the fact sheet. Do not invent prior game scores."
+                    angle == "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
+                    angle == "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
+                    angle == "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
+                    angle == "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
+                    else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
+                }
+                append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
             }
-            // Series ledger lives in the fact sheet (and EVENT FACTS); keep the writing prompt short.
-            if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
-            val angleInstruction = when {
-                news.kind == "series" -> "Stay series-aware: cite the series length, series score, and round from the fact sheet. Do not invent prior game scores."
-                angle == "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
-                angle == "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
-                angle == "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
-                angle == "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
-                else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
-            }
-            append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
-        }
 
-        val copy = ArticleWriting.news(lg, news)
-        return groundedGenerate(
-            config, lg, prompt, articleCopy = copy, eventGame = game,
-            extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(),
-            extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}; kind ${news.kind}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}\n$seriesBits",
-        )
+            val copy = ArticleWriting.news(lg, news)
+            groundedGenerate(
+                config, lg, prompt, articleCopy = copy, eventGame = game,
+                extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(),
+                extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}; kind ${news.kind}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}\n$seriesBits",
+            )
+        } catch (_: java.util.ConcurrentModificationException) {
+            val body = try {
+                ArticleWriting.news(lg, news)
+            } catch (_: java.util.ConcurrentModificationException) {
+                news.body.ifBlank { news.text }
+            }
+            Result.success(
+                AiText(
+                    body,
+                    isAi = false,
+                    fallbackReason = "Desk raced the sim — used game-written article.",
+                ),
+            )
+        }
     }
 
     /** Generates an epic coronation newspaper feature for the National Champion or NBA Finals winner. */
@@ -1098,7 +1169,11 @@ object Ollama {
     fun maybeAutoGenerate(config: OllamaConfig, lg: League, news: News) {
         if (!config.enabled || !config.autoGenerate) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
+            try {
+                generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Desk raced the sim — leave the game-written body.
+            }
         }
     }
 
@@ -1107,8 +1182,12 @@ object Ollama {
         if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
         if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateMediaEcosystem(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generateMediaEcosystem(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Media desk raced the sim.
             }
         }
     }
@@ -1122,7 +1201,11 @@ object Ollama {
             return@withContext Result.success(MediaEcosystem.fallbackPackage(lg))
         }
         MediaEcosystem.publishSocialBeats(lg)
-        val brief = MediaEcosystem.ecosystemBrief(lg)
+        val brief = try {
+            MediaEcosystem.ecosystemBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(MediaEcosystem.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written media ecosystem."))
+        }
         val cacheKey = "media_eco_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<MediaEcosystem.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1199,8 +1282,12 @@ object Ollama {
         if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
         if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateUniversityDevelopment(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generateUniversityDevelopment(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Campus desk raced the sim.
             }
         }
     }
@@ -1213,7 +1300,11 @@ object Ollama {
         if (!config.enabled || !config.universityDevelopment) {
             return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg))
         }
-        val brief = UniversityDevelopment.campusBrief(lg)
+        val brief = try {
+            UniversityDevelopment.campusBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written campus package."))
+        }
         val cacheKey = "campus_dev_${lg.season}_${lg.day}_${lg.user.upgrades.size}_${lg.user.cash}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<UniversityDevelopment.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1294,7 +1385,11 @@ object Ollama {
         if (!config.enabled || !config.historicalRivalries) {
             return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg))
         }
-        val brief = HistoricalRivalries.historyBrief(lg)
+        val brief = try {
+            HistoricalRivalries.historyBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written rivalry package."))
+        }
         val cacheKey = "hist_rivals_${lg.season}_${lg.day}_${lg.rivals.size}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<HistoricalRivalries.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1376,7 +1471,11 @@ object Ollama {
         if (!config.enabled || !config.draftUniverse) {
             return@withContext Result.success(DraftUniverse.fallbackPackage(lg))
         }
-        val brief = DraftUniverse.eventBrief(lg)
+        val brief = try {
+            DraftUniverse.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(DraftUniverse.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written draft package."))
+        }
         val cacheKey = "draft_universe_${lg.season}_${lg.day}_${lg.proState?.draftNight?.at ?: -1}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<DraftUniverse.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1441,10 +1540,19 @@ object Ollama {
     fun maybeAutoGeneratePlayerStorylines(config: OllamaConfig, lg: League) {
         if (!config.enabled || !config.playerStorylines || !config.autoGenerate) return
         if (lg.day < 8 || lg.day % 7 != 0) return
-        if (PlayerStorylines.detectArcs(lg).isEmpty()) return
+        val arcs = try {
+            PlayerStorylines.detectArcs(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return
+        }
+        if (arcs.isEmpty()) return
         CoroutineScope(Dispatchers.IO).launch {
-            generatePlayerStorylines(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generatePlayerStorylines(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Storyline desk raced the sim.
             }
         }
     }
@@ -1457,7 +1565,11 @@ object Ollama {
         if (!config.enabled || !config.playerStorylines) {
             return@withContext Result.success(PlayerStorylines.fallbackPackage(lg))
         }
-        val brief = PlayerStorylines.eventBrief(lg)
+        val brief = try {
+            PlayerStorylines.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(PlayerStorylines.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written storyline package."))
+        }
         val cacheKey = "player_arcs_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<PlayerStorylines.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1545,7 +1657,11 @@ object Ollama {
         if (!config.enabled || !config.livingCoachingCareers) {
             return@withContext Result.success(CoachCareers.fallbackPackage(lg))
         }
-        val brief = CoachCareers.careerBrief(lg)
+        val brief = try {
+            CoachCareers.careerBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(CoachCareers.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written coaching package."))
+        }
         val cacheKey = "coach_careers_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<CoachCareers.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1636,7 +1752,11 @@ object Ollama {
         if (!config.enabled || !config.historicMoments) {
             return@withContext Result.success(HistoricMoments.fallbackPackage(lg, m))
         }
-        val brief = HistoricMoments.momentBrief(lg, m)
+        val brief = try {
+            HistoricMoments.momentBrief(lg, m)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(HistoricMoments.fallbackPackage(lg, m).copy(detail = "Desk raced the sim — used game-written moment package."))
+        }
         val cacheKey = "historic_${m.season}_${m.day}_${m.gameId}_${m.kind}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<HistoricMoments.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1654,7 +1774,7 @@ object Ollama {
             config, lg, prompt,
             system = "Historic moments desk. Facts only from the brief.",
             numPredict = 360,
-            eventGame = lg.games.firstOrNull { it.id == m.gameId },
+            eventGame = LeagueLists.games(lg).firstOrNull { it.id == m.gameId },
         )
         result.map { draft ->
             val lines = draft.text.lines()

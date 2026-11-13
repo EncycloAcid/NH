@@ -703,6 +703,8 @@ class OllamaConfig(
     var cacheResponses: Boolean = true, // instant 0ms load for identical queries
     // Multi-Provider AI (Google Gemini, OpenAI ChatGPT, Local Ollama)
     var provider: String = "ollama", // "ollama", "google", "openai"
+    /** When on, keep the free/cheap recommended model for the active provider (re-applied on enable, provider change, and model fetch). */
+    var autoPickModel: Boolean = false,
     var googleApiKey: String = "",
     var googleModel: String = "gemini-1.5-flash",
     var googleAccountEmail: String = "",

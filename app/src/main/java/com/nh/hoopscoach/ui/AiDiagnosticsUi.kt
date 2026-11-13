@@ -2,6 +2,7 @@ package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -27,7 +29,11 @@ import com.nh.hoopscoach.game.OllamaConfig
 import kotlinx.coroutines.launch
 
 @Composable
-fun AiDiagnosticsPanel(config: OllamaConfig, onModel: (String) -> Unit) {
+fun AiDiagnosticsPanel(
+    config: OllamaConfig,
+    onAutoPickChanged: ((Boolean) -> Unit)? = null,
+    onModel: (String) -> Unit,
+) {
     val scope = rememberCoroutineScope()
     var testing by remember { mutableStateOf(false) }
     var model by remember(config.provider, config.activeModelName) { mutableStateOf(config.activeModelName) }
@@ -35,6 +41,11 @@ fun AiDiagnosticsPanel(config: OllamaConfig, onModel: (String) -> Unit) {
     var fetching by remember { mutableStateOf(false) }
     var modelMenu by remember { mutableStateOf(false) }
     val last = AiDiagnostics.last
+    fun applyPick(available: List<String> = models.map { it.id }) {
+        val pick = Ollama.pickBestModel(config.provider, available)
+        model = pick
+        onModel(pick)
+    }
     Panel {
         Text("AI status & diagnostics", style = T.bodyB, color = P.ink)
         Text("${config.providerDisplayName} · ${config.activeModelName}", style = T.small, color = P.sub)
@@ -42,9 +53,27 @@ fun AiDiagnosticsPanel(config: OllamaConfig, onModel: (String) -> Unit) {
         Text(AiDiagnostics.setupHint(config), style = T.small, color = P.sub)
         Text(last?.let { "Last request: ${it.provider} / ${it.model} · ${it.request}\n${java.util.Date(it.time)}\n${it.result}: ${it.detail}" } ?: "No AI requests recorded yet.", style = T.small, color = P.ink)
         Spacer(Modifier.height(8.dp))
+        if (onAutoPickChanged != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Auto-pick model", style = T.bodyB, color = P.ink)
+                    Text("Keep the free/cheap recommended model for ${config.shortActionName}. Re-applies when you fetch the provider list.", style = T.small, color = P.sub)
+                }
+                AppSwitch(config.autoPickModel, { on ->
+                    onAutoPickChanged(on)
+                    if (on) applyPick()
+                })
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         OutlinedTextField(model, { model = it }, label = { Text("Model ID (must be available to your provider)") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = fieldColors())
         Spacer(Modifier.height(8.dp))
-        SmallButton("Use model", enabled = model.isNotBlank()) { onModel(model.trim()) }
+        SmallButton("Use model", enabled = model.isNotBlank()) {
+            onAutoPickChanged?.invoke(false)
+            onModel(model.trim())
+        }
+        Spacer(Modifier.height(8.dp))
+        SmallButton("Auto-pick model") { applyPick() }
         Spacer(Modifier.height(8.dp))
         Box {
             SmallButton(if (fetching) "Fetching models…" else "Fetch available models", enabled = !fetching) {
@@ -57,8 +86,10 @@ fun AiDiagnosticsPanel(config: OllamaConfig, onModel: (String) -> Unit) {
                             "openai" -> Ollama.testOpenAiConnection(config.openAiApiKey, config.customEndpoint)
                             else -> Ollama.testConnection(config.host)
                         }
-                        models = Ollama.catalogFetchedModels(config.provider, response.getOrNull().orEmpty())
+                        val ids = response.getOrNull().orEmpty()
+                        models = Ollama.catalogFetchedModels(config.provider, ids)
                         modelMenu = models.isNotEmpty()
+                        if (response.isSuccess && config.autoPickModel) applyPick(ids)
                         AiDiagnostics.finish(
                             id,
                             if (response.isSuccess) "success" else "network error",
@@ -88,6 +119,7 @@ fun AiDiagnosticsPanel(config: OllamaConfig, onModel: (String) -> Unit) {
                                 selected = entry.id.equals(model, ignoreCase = true) || entry.id.equals(config.activeModelName, ignoreCase = true),
                             ) {
                                 model = entry.id
+                                onAutoPickChanged?.invoke(false)
                                 onModel(entry.id)
                                 modelMenu = false
                             }

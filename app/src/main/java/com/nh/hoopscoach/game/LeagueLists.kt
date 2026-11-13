@@ -26,6 +26,7 @@ object LeagueLists {
     fun news(lg: League): List<News> = synchronized(lg.news) { ArrayList(lg.news) }
     fun games(lg: League): List<Game> = snap(lg.games)
     fun players(lg: League): List<Player> = snap(lg.players)
+    fun alumni(lg: League): List<Player> = snap(lg.alumni)
     fun recruits(lg: League): List<Recruit> = snap(lg.recruits)
     fun coaches(lg: League): List<Coach> = snap(lg.coaches)
     fun moments(lg: League): List<Moment> = snap(lg.moments)

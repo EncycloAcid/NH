@@ -12,8 +12,10 @@ object HistoricMoments {
     )
 
     fun momentBrief(lg: League, m: Moment): String = buildString {
-        val w = lg.teams.getOrNull(m.winner)
-        val l = lg.teams.getOrNull(m.loser)
+        val teams = LeagueLists.teams(lg)
+        val games = LeagueLists.games(lg)
+        val w = teams.getOrNull(m.winner)
+        val l = teams.getOrNull(m.loser)
         appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${m.season} · DAY ${m.day}")
         appendLine("KIND: ${m.kind.tag} · STAGE: ${m.stage}")
         appendLine("HEADLINE FACT: ${m.headline}")
@@ -23,7 +25,7 @@ object HistoricMoments {
             if (m.wSeed > 0 || m.lSeed > 0) appendLine("SEEDS: No.${m.wSeed} ${w.school} over No.${m.lSeed} ${l.school}")
             appendLine("RECORDS: ${w.school} ${w.w}-${w.l} · ${l.school} ${l.w}-${l.l}")
         }
-        lg.games.firstOrNull { it.id == m.gameId }?.let { g ->
+        games.firstOrNull { it.id == m.gameId }?.let { g ->
             if (lg.rivalry(g) != null) appendLine("RIVALRY: ${lg.rivalry(g)!!.name.ifBlank { "traditional rivalry" }}")
             appendLine("SITE: ${if (g.neutral) "neutral" else "home ${lg.team(g.home).school}"}")
         }

@@ -19,6 +19,17 @@ class AiDiagnosticsTest {
         assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))
         assertEquals("llama3.2:1b", Ollama.snapLocalModel("llama3.2:3b"))
     }
+    @Test fun autoPickPrefersFreeCheapModelsFromProviderList() {
+        assertEquals("gemini-3.5-flash-lite", Ollama.pickBestModel("google", listOf("gemini-1.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-4-argon")))
+        assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai", listOf("gpt-4o", "o1-mini", "gpt-4o-mini")))
+        assertEquals("smollm2:135m", Ollama.pickBestModel("ollama", listOf("llama3.2:1b", "smollm2:135m", "qwen2.5:0.5b")))
+        assertEquals("gemini-1.5-flash", Ollama.pickBestModel("google"))
+        assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai"))
+        assertEquals("smollm2:135m", Ollama.pickBestModel("ollama"))
+        val cfg = OllamaConfig(provider = "google", googleModel = "gemini-1.5-pro", autoPickModel = true)
+        assertEquals("gemini-2.0-flash", Ollama.applyAutoPick(cfg, listOf("gemini-2.0-flash", "gemini-1.5-pro")))
+        assertEquals("gemini-2.0-flash", cfg.googleModel)
+    }
     @Test fun fetchedModelMenuIsCategorizedWithPrices() {
         val ids = listOf(
             "gemini-3.5-flash",
