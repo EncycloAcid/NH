@@ -25,14 +25,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * How a cloud AI vendor exposes free/paid access to third-party apps.
- * Consumer chat logins (ChatGPT app, claude.ai, etc.) never authorize API calls —
- * you sign into the vendor account in the browser, then paste an access key from that account.
+ * How a cloud AI vendor exposes developer access to third-party apps.
+ *
+ * Claude Pro / Max, ChatGPT Plus, and Google Gemini Advanced (chat) subscriptions
+ * only work inside those vendors' own apps. They cannot authorize this game.
+ * Developer access uses a separate console access key (often with a free tier).
  */
 data class AiAccountProvider(
     val id: String,
     val displayName: String,
-    /** Browser URL where the user signs into their vendor account / keys console. */
+    /** Browser URL for the developer keys console. */
     val signInUrl: String,
     val keyPlaceholder: String,
     val freeNote: String,
@@ -41,72 +43,72 @@ data class AiAccountProvider(
 fun aiAccountProvider(id: String): AiAccountProvider = when (id.lowercase()) {
     "google" -> AiAccountProvider(
         id = "google",
-        displayName = "Google Gemini",
+        displayName = "Google Gemini (AI Studio)",
         signInUrl = "https://aistudio.google.com/apikey",
         keyPlaceholder = "AIza…",
-        freeNote = "Sign in with Google, create a free Gemini key, then paste it here. Never enter your Google password in this app.",
+        freeNote = "Gemini Advanced / the Gemini chat app cannot power this game. Use a free AI Studio developer key instead. Never enter your Google password here.",
     )
     "openai" -> AiAccountProvider(
         id = "openai",
-        displayName = "OpenAI / ChatGPT",
+        displayName = "OpenAI (developer)",
         signInUrl = "https://platform.openai.com/api-keys",
         keyPlaceholder = "sk-…",
-        freeNote = "Sign in with your OpenAI / ChatGPT account on the site, create an access key, then paste it. ChatGPT Plus alone does not authorize this app.",
+        freeNote = "ChatGPT Plus / the ChatGPT app cannot power this game. Use a separate OpenAI developer key (billed separately).",
     )
     "anthropic" -> AiAccountProvider(
         id = "anthropic",
-        displayName = "Anthropic Claude",
+        displayName = "Anthropic Claude (API)",
         signInUrl = "https://console.anthropic.com/settings/keys",
         keyPlaceholder = "sk-ant-…",
-        freeNote = "Sign in to Anthropic, create an access key from your account, then paste it. claude.ai chat login alone does not authorize this app.",
+        freeNote = "Claude Pro / Max / claude.ai chat cannot power this game — Anthropic blocks third-party apps from using those subscriptions. Use a Claude Console developer key instead.",
     )
     "groq" -> AiAccountProvider(
         id = "groq",
         displayName = "Groq",
         signInUrl = "https://console.groq.com/keys",
         keyPlaceholder = "gsk_…",
-        freeNote = "Sign in at Groq Console (free tier), create an access key, then paste it.",
+        freeNote = "Free tier available. Create a developer key at Groq Console, then paste it.",
     )
     "deepseek" -> AiAccountProvider(
         id = "deepseek",
         displayName = "DeepSeek",
         signInUrl = "https://platform.deepseek.com/api_keys",
         keyPlaceholder = "sk-…",
-        freeNote = "Sign in to DeepSeek, create an access key, then paste it.",
+        freeNote = "Create a developer key at DeepSeek, then paste it.",
     )
     "openrouter" -> AiAccountProvider(
         id = "openrouter",
         displayName = "OpenRouter",
         signInUrl = "https://openrouter.ai/keys",
         keyPlaceholder = "sk-or-…",
-        freeNote = "Sign in to OpenRouter (free :free models), create an access key, then paste it.",
+        freeNote = "Free :free models available. Create a key at OpenRouter, then paste it.",
     )
     "cerebras" -> AiAccountProvider(
         id = "cerebras",
         displayName = "Cerebras",
         signInUrl = "https://cloud.cerebras.ai/",
         keyPlaceholder = "csk-…",
-        freeNote = "Sign in to Cerebras Cloud (free tier), create an access key, then paste it.",
+        freeNote = "Free tier available. Create a developer key at Cerebras Cloud, then paste it.",
     )
     "mistral" -> AiAccountProvider(
         id = "mistral",
         displayName = "Mistral",
         signInUrl = "https://console.mistral.ai/api-keys/",
         keyPlaceholder = "…",
-        freeNote = "Sign in to Mistral Console (free tier), create an access key, then paste it.",
+        freeNote = "Free tier available. Create a developer key at Mistral Console, then paste it.",
     )
     else -> AiAccountProvider(
         id = id,
         displayName = id,
         signInUrl = "",
-        keyPlaceholder = "access key",
-        freeNote = "Sign in to your provider account in the browser, create an access key, then paste it here. Never enter your account password.",
+        keyPlaceholder = "developer key",
+        freeNote = "Chatbot subscriptions cannot authorize this app. Use a developer key from the provider console. Never enter your account password.",
     )
 }
 
 /**
- * Account connect flow: open the vendor site to sign in, then paste the access key from that account.
- * Passwords and in-app OAuth for ChatGPT/Claude chat are not supported by these vendors.
+ * Developer connect flow: open the vendor console, create a key, paste it.
+ * Consumer chat subscriptions (Claude Pro, ChatGPT Plus, Gemini Advanced) are not usable here.
  */
 @Composable
 fun AccountConnectDialog(
@@ -124,20 +126,20 @@ fun AccountConnectDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = P.surface,
-        title = { Text("Connect ${info.displayName}", style = T.head, color = P.ink) },
+        title = { Text("Add ${info.displayName}", style = T.head, color = P.ink) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "1. Tap Sign in to open ${info.displayName} in your browser and log into your account.\n" +
-                        "2. Create a free access key from that account.\n" +
-                        "3. Paste the key below — never enter your account password here.\n\n" +
+                    "Chatbot subscriptions (Claude Pro, ChatGPT Plus, Gemini Advanced) only work in those apps — they cannot run this game.\n\n" +
+                        "1. Open the developer console and create a key (many have a free tier).\n" +
+                        "2. Paste the key below — never enter your account password.\n\n" +
                         info.freeNote,
                     style = T.small,
                     color = P.sub,
                 )
                 Spacer(Modifier.height(10.dp))
                 if (info.signInUrl.isNotBlank()) {
-                    PrimaryButton("Sign in to ${info.displayName}", Modifier.fillMaxWidth()) {
+                    PrimaryButton("Open ${info.displayName} console", Modifier.fillMaxWidth()) {
                         runCatching { uri.openUri(info.signInUrl) }
                     }
                     Spacer(Modifier.height(10.dp))
@@ -154,7 +156,7 @@ fun AccountConnectDialog(
                 OutlinedTextField(
                     key,
                     { key = it.trim() },
-                    label = { Text("Access key from your account") },
+                    label = { Text("Developer access key") },
                     visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         Text(
@@ -173,7 +175,7 @@ fun AccountConnectDialog(
         },
         confirmButton = {
             TextButton(enabled = key.isNotBlank(), onClick = { onSave(key, email) }) {
-                Text("Connect account")
+                Text("Save key")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

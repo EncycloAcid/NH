@@ -34,14 +34,14 @@ object AiDiagnostics {
     }
     private fun persist() { val status = last ?: return; runCatching { file?.writeText(Json.encodeToString(AiRequestStatus.serializer(), status)) } }
     fun setupHint(config: OllamaConfig): String = when (config.provider.lowercase()) {
-        "google" -> if (config.googleApiKey.isBlank()) "Connect your Google account: Sign in at AI Studio in the browser, then paste the free access key here. Never enter your Google password in this app." else "Google Gemini is connected with your account access key. Quota and billing follow that Google AI account."
-        "openai" -> if (config.openAiApiKey.isBlank()) "Connect your OpenAI / ChatGPT account: Sign in at platform.openai.com in the browser, then paste an access key. ChatGPT Plus alone does not authorize this app." else "OpenAI is connected with your account access key. API billing is separate from ChatGPT Plus."
-        "anthropic" -> if (config.anthropicApiKey.isBlank()) "Connect your Claude account: Sign in at console.anthropic.com in the browser, then paste an access key. claude.ai chat login alone does not authorize this app." else "Claude is connected with your Anthropic account access key. Billing is separate from claude.ai chat."
-        "groq" -> if (config.groqApiKey.isBlank()) "Connect your Groq account: Sign in at console.groq.com (free tier), then paste an access key." else "Groq is connected — free tier covers Llama and Gemma models."
-        "deepseek" -> if (config.deepseekApiKey.isBlank()) "Connect your DeepSeek account: Sign in at platform.deepseek.com, then paste an access key." else "DeepSeek is connected with your account access key."
-        "openrouter" -> if (config.openRouterApiKey.isBlank()) "Connect your OpenRouter account: Sign in at openrouter.ai, then paste an access key. Prefer models ending in :free." else "OpenRouter is connected — free (:free) and paid models use your account key."
-        "cerebras" -> if (config.cerebrasApiKey.isBlank()) "Connect your Cerebras account: Sign in at cloud.cerebras.ai (free tier), then paste an access key." else "Cerebras is connected — free-tier Llama is very fast for dynasty copy."
-        "mistral" -> if (config.mistralApiKey.isBlank()) "Connect your Mistral account: Sign in at console.mistral.ai (free tier), then paste an access key." else "Mistral is connected — free-tier Small / Nemo work well for short recaps."
+        "google" -> if (config.googleApiKey.isBlank()) "Gemini Advanced chat cannot power this game. Add a free AI Studio developer key from aistudio.google.com." else "Gemini is using your AI Studio developer key (separate from Gemini Advanced chat)."
+        "openai" -> if (config.openAiApiKey.isBlank()) "ChatGPT Plus cannot power this game. Add an OpenAI developer key from platform.openai.com (billed separately)." else "OpenAI is using your developer key (separate from ChatGPT Plus)."
+        "anthropic" -> if (config.anthropicApiKey.isBlank()) "Claude Pro / Max cannot power this game — Anthropic blocks third-party apps from using those subscriptions. Add a Claude Console developer key, or pick a free provider (Groq / OpenRouter)." else "Claude is using your Console developer key (separate from Claude Pro chat)."
+        "groq" -> if (config.groqApiKey.isBlank()) "Add a free Groq developer key from console.groq.com." else "Groq is connected — free tier covers Llama and Gemma models."
+        "deepseek" -> if (config.deepseekApiKey.isBlank()) "Add a DeepSeek developer key from platform.deepseek.com." else "DeepSeek is connected with your developer key."
+        "openrouter" -> if (config.openRouterApiKey.isBlank()) "Add an OpenRouter key from openrouter.ai. Prefer models ending in :free." else "OpenRouter is connected — free (:free) and paid models use your key."
+        "cerebras" -> if (config.cerebrasApiKey.isBlank()) "Add a free Cerebras key from cloud.cerebras.ai." else "Cerebras is connected — free-tier Llama is very fast for dynasty copy."
+        "mistral" -> if (config.mistralApiKey.isBlank()) "Add a free Mistral key from console.mistral.ai." else "Mistral is connected — free-tier Small / Nemo work well for short recaps."
         else -> "Ollama must run separately. Localhost means this phone, not your computer. Use the computer's LAN IP and port 11434 on the same network; bind Ollama to that LAN address and allow the port through its firewall. 10.0.2.2 is emulator-only."
     }
     fun networkReason(error: Throwable?, config: OllamaConfig): String {

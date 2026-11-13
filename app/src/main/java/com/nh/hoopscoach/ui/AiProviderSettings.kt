@@ -94,10 +94,10 @@ fun AiProviderConfigSection(
             letter = "R",
             configured = lg.ollama.isOpenRouterSignedIn,
             displayName = lg.ollama.openRouterDisplayEmail,
-            statusLine = "OpenRouter account connected",
-            promptTitle = "Connect OpenRouter account",
-            promptBlurb = "Sign in at openrouter.ai, then paste the free access key from your account.",
-            configureLabel = "Connect OpenRouter account",
+            statusLine = "OpenRouter key saved",
+            promptTitle = "Add OpenRouter key (free models)",
+            promptBlurb = "Free :free models — create a key at openrouter.ai and paste it.",
+            configureLabel = "Add OpenRouter key",
             keyLabel = "Access key from account",
             keyPlaceholder = "sk-or-...",
             rawKey = lg.ollama.openRouterApiKey,
@@ -141,10 +141,10 @@ fun AiProviderConfigSection(
             letter = "Z",
             configured = lg.ollama.isCerebrasSignedIn,
             displayName = lg.ollama.cerebrasDisplayEmail,
-            statusLine = "Cerebras account connected",
-            promptTitle = "Connect Cerebras account",
-            promptBlurb = "Sign in at cloud.cerebras.ai, then paste the free access key from your account.",
-            configureLabel = "Connect Cerebras account",
+            statusLine = "Cerebras key saved",
+            promptTitle = "Add Cerebras key (free tier)",
+            promptBlurb = "Free tier — create a key at cloud.cerebras.ai and paste it.",
+            configureLabel = "Add Cerebras key",
             keyLabel = "Access key from account",
             keyPlaceholder = "csk-...",
             rawKey = lg.ollama.cerebrasApiKey,
@@ -188,10 +188,10 @@ fun AiProviderConfigSection(
             letter = "M",
             configured = lg.ollama.isMistralSignedIn,
             displayName = lg.ollama.mistralDisplayEmail,
-            statusLine = "Mistral account connected",
-            promptTitle = "Connect Mistral account",
-            promptBlurb = "Sign in at console.mistral.ai, then paste the free access key from your account.",
-            configureLabel = "Connect Mistral account",
+            statusLine = "Mistral key saved",
+            promptTitle = "Add Mistral key (free tier)",
+            promptBlurb = "Free tier — create a key at console.mistral.ai and paste it.",
+            configureLabel = "Add Mistral key",
             keyLabel = "Access key from account",
             keyPlaceholder = "…",
             rawKey = lg.ollama.mistralApiKey,
@@ -393,7 +393,7 @@ fun GoogleAiProviderPanel(
                             Spacer(Modifier.width(6.dp))
                             Tag("CONNECTED", P.good)
                         }
-                        Text("Google account connected", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Gemini developer key saved", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -431,12 +431,12 @@ fun GoogleAiProviderPanel(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Connect Google account", style = T.bodyB, color = P.ink)
-                        Text("Sign in with Google in the browser, then paste the free access key from AI Studio.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Add Gemini developer key", style = T.bodyB, color = P.ink)
+                        Text("Gemini Advanced chat cannot power this game. Get a free AI Studio developer key instead.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                PrimaryButton("Connect Google account", Modifier.fillMaxWidth()) {
+                PrimaryButton("Add Gemini developer key", Modifier.fillMaxWidth()) {
                     onShowLogin()
                 }
             }
@@ -557,7 +557,7 @@ fun OpenAiProviderPanel(
 
         Text("OPENAI CHATGPT AI (CLOUD)", style = T.label.copy(fontSize = 10.sp), color = P.accent)
         Spacer(Modifier.height(4.dp))
-        Text("Sign in with your OpenAI / ChatGPT account in the browser, then connect with an access key for commentary and storylines.", style = T.small, color = P.sub)
+        Text("ChatGPT Plus cannot power this game. Use an OpenAI developer key (separate billing) for commentary and storylines.", style = T.small, color = P.sub)
         Spacer(Modifier.height(10.dp))
 
         if (lg.ollama.isOpenAiSignedIn) {
@@ -590,7 +590,7 @@ fun OpenAiProviderPanel(
                             Spacer(Modifier.width(6.dp))
                             Tag("CONNECTED", P.good)
                         }
-                        Text("OpenAI account connected", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("OpenAI developer key saved", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -628,12 +628,12 @@ fun OpenAiProviderPanel(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Connect OpenAI / ChatGPT account", style = T.bodyB, color = P.ink)
-                        Text("Sign in with your OpenAI / ChatGPT account in the browser, then paste the access key.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                        Text("Add OpenAI developer key", style = T.bodyB, color = P.ink)
+                        Text("ChatGPT Plus cannot power this game. Add a separate OpenAI developer key.", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                PrimaryButton("Connect OpenAI account", Modifier.fillMaxWidth()) {
+                PrimaryButton("Add OpenAI developer key", Modifier.fillMaxWidth()) {
                     onShowLogin()
                 }
             }
@@ -771,10 +771,10 @@ fun AnthropicAiProviderPanel(
             letter = "C",
             configured = lg.ollama.isAnthropicSignedIn,
             displayName = lg.ollama.anthropicDisplayEmail,
-            statusLine = "Claude account connected",
-            promptTitle = "Connect Claude account",
-            promptBlurb = "Sign in at console.anthropic.com, then paste the access key from your account.",
-            configureLabel = "Connect Claude account",
+            statusLine = "Claude developer key saved",
+            promptTitle = "Add Claude developer key",
+            promptBlurb = "Claude Pro chat cannot power this game. Add a Console developer key, or use free Groq / OpenRouter.",
+            configureLabel = "Add Claude developer key",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
@@ -889,10 +889,10 @@ fun GroqAiProviderPanel(
             letter = "Q",
             configured = lg.ollama.isGroqSignedIn,
             displayName = lg.ollama.groqDisplayEmail,
-            statusLine = "Groq account connected",
-            promptTitle = "Connect Groq account",
-            promptBlurb = "Sign in at console.groq.com, then paste the free access key from your account.",
-            configureLabel = "Connect Groq account",
+            statusLine = "Groq key saved",
+            promptTitle = "Add Groq key (free tier)",
+            promptBlurb = "Free tier — create a key at console.groq.com and paste it.",
+            configureLabel = "Add Groq key",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
@@ -1007,10 +1007,10 @@ fun DeepseekAiProviderPanel(
             letter = "D",
             configured = lg.ollama.isDeepseekSignedIn,
             displayName = lg.ollama.deepseekDisplayEmail,
-            statusLine = "DeepSeek account connected",
-            promptTitle = "Connect DeepSeek account",
-            promptBlurb = "Sign in at platform.deepseek.com, then paste the access key from your account.",
-            configureLabel = "Connect DeepSeek account",
+            statusLine = "DeepSeek key saved",
+            promptTitle = "Add DeepSeek key",
+            promptBlurb = "Create a key at platform.deepseek.com and paste it.",
+            configureLabel = "Add DeepSeek key",
             onConfigure = { onShowLogin() },
             onRemove = {
                 vm.act {
