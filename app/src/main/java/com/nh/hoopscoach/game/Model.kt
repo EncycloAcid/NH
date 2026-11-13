@@ -128,6 +128,10 @@ enum class Trait(val label: String, val good: Boolean) {
     CLUTCH("Clutch", true),
     /** Earned, never rolled: a walk-on whose game suddenly took off. Develops faster. */
     LATE_BLOOMER("Late Bloomer", true),
+    /** On-court: hunts his own look, takes tough contested shots. */
+    GUNNER("Confident Scorer", false),
+    /** On-court: looks for the open teammate instead of forcing a tough shot. */
+    PASS_FIRST("Unselfish", true),
 }
 
 enum class Offense(val label: String, val blurb: String) {
@@ -324,6 +328,8 @@ class Player(
     var shoeOffer: String = "",
     var shoeOfferPay: Int = 0,
     var shoeOfferYears: Int = 0,
+    /** Short scout note on how he plays (rule-based or AI personality). */
+    var personalityNote: String = "",
 ) {
     /** Out injured. */
     val out get() = injGames > 0
@@ -658,6 +664,8 @@ class OllamaConfig(
     var pregameRivalries: Boolean = true,
     var championshipCelebrations: Boolean = true,
     var freeAgencyBuzz: Boolean = true,
+    /** AI assigns on-court personalities (confident scorer / unselfish) and scout notes. */
+    var playerPersonalities: Boolean = true,
     var defaultStoryAngle: String = "balanced", // "tactical", "beat", "skeptic", "dual", "balanced"
     // Speed & Performance Optimizations
     var speedMode: String = "turbo", // "turbo", "balanced", "quality"

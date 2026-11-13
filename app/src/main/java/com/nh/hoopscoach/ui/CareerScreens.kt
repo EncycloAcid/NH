@@ -1269,6 +1269,39 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI player personalities", style = T.bodyB, color = P.ink)
+                            Text("Confident scorers hunt tough shots; unselfish players kick to open teammates. AI assigns styles + scout notes.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.playerPersonalities, { on -> vm.act { it.ollama.playerPersonalities = on } })
+                    }
+                    if (lg.ollama.playerPersonalities) {
+                        Spacer(Modifier.height(8.dp))
+                        SecondaryButton(
+                            if (testing) "Assigning personalities…" else "Assign AI personalities to my roster",
+                            Modifier.fillMaxWidth(),
+                            enabled = !testing && lg.ollama.enabled,
+                        ) {
+                            testing = true
+                            testStatus = "Scouting on-court personalities…"
+                            scope.launch {
+                                val roster = lg.rosterOf(lg.user)
+                                val res = com.nh.hoopscoach.game.Ollama.assignPlayerPersonalities(lg.ollama, lg, roster)
+                                testing = false
+                                res.onSuccess { pass ->
+                                    testSuccess = true
+                                    testStatus = pass.detail
+                                    vm.toast(pass.detail)
+                                    vm.act { } // bump save / redraw
+                                }.onFailure { err ->
+                                    testSuccess = false
+                                    testStatus = err.message ?: "Personality assign failed"
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Championship celebrations & Finals MVP", style = T.bodyB, color = P.ink)
                             Text("AI writes champagne celebrations, trophy ceremonies, and Finals MVP speeches.", style = T.small, color = P.sub)
                         }

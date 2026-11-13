@@ -144,11 +144,14 @@ object LeagueGen {
         val pool = listOf(
             Trait.AMBITIOUS to 0.15, Trait.BAG_CHASER to 0.12, Trait.DISLOYAL to 0.07, Trait.LOYAL to 0.12,
             Trait.TEAM_PLAYER to 0.12, Trait.GYM_RAT to 0.12, Trait.CLUTCH to 0.08,
+            Trait.GUNNER to 0.14, Trait.PASS_FIRST to 0.14,
         ).shuffled(Rng.r)
         for ((tr, p) in pool) {
             if (t.size >= 2) break
             if (tr == Trait.LOYAL && Trait.DISLOYAL in t) continue
             if (tr == Trait.DISLOYAL && Trait.LOYAL in t) continue
+            if (tr == Trait.GUNNER && Trait.PASS_FIRST in t) continue
+            if (tr == Trait.PASS_FIRST && Trait.GUNNER in t) continue
             if (Rng.chance(p)) t += tr
         }
         return t

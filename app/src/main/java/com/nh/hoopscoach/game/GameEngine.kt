@@ -31,7 +31,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val rosters: Array<List<Player>> = arrayOf(
         Injuries.available(lg, teams[0], game).filter { !Redshirts.sitting(it) },
         Injuries.available(lg, teams[1], game).filter { !Redshirts.sitting(it) },
-    )
+    ).also { sides ->
+        // Existing saves may predate on-court personalities — seed once from their game.
+        Personality.seedRoster(sides[0])
+        Personality.seedRoster(sides[1])
+    }
     private val byId: Array<Map<Int, Player>> = arrayOf(rosters[0].associateBy { it.id }, rosters[1].associateBy { it.id })
     val lines: Array<LinkedHashMap<Int, StatLine>> = arrayOf(LinkedHashMap(), LinkedHashMap())
     private val starters: Array<Set<Int>>
@@ -930,11 +934,14 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
 
         var putback: Player? = null
+        var preferShooter = -1
         var attempts = 0
         while (attempts < 6) {
             attempts++
             // Pro rosters are all good, so shots spread out more than in college.
-            val shooter = putback ?: pickShooter(o, offense)
+            val sticky = if (preferShooter >= 0) offense.firstOrNull { it.id == preferShooter } else null
+            preferShooter = -1
+            val shooter = putback ?: sticky ?: pickShooter(o, offense)
             val type = if (putback != null) 0 else shotType(o, d, shooter, trail)
             // His man matters: the defender at his position (or the nearest) is 40% of the perimeter defense and 30% inside.
             val guard = defense.minByOrNull { kotlin.math.abs(it.pos.ordinal - shooter.pos.ordinal) * 10 + (if (it.pos2 == shooter.pos) -5 else 0) }
@@ -966,6 +973,17 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
+
+            // Unselfish players kick tough looks; confident scorers usually fire anyway.
+            if (putback == null && attempts < 5 && clock > 2.0 && Rng.chance(Personality.kickOutChance(shooter, pMake))) {
+                val mates = offense.filter { it.id != shooter.id }
+                val target = if (mates.isNotEmpty()) Rng.weighted(mates) { Tendency.pass(it) * (Ratings.offense(it) / skillScale) } else null
+                if (target != null) {
+                    log(o, "${shooter.short} kicks it to ${target.short} instead of forcing a tough look", 0)
+                    preferShooter = target.id
+                    continue
+                }
+            }
 
             val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * proEra.fouls else SHOOTING_FOUL_COLLEGE * era.fouls)
             val fouled = Rng.chance(foulP)
@@ -1105,11 +1123,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         // Modern pro bigs step out more than college bigs; college eras scale volume separately.
         val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
             else when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.15; Pos.SF -> .95; Pos.PF -> .55; Pos.C -> .16 }
+        val tough = Personality.toughShotAppetite(p)
         var wi = (p[Attr.INS] / skillScale).pow(3) * posIns * Tendency.inside(p)
-        var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5 * Tendency.mid(p)
+        var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5 * Tendency.mid(p) * tough
         // Pros: era threes from Eras.of. College: EraRules volume; with no line, OUT still feeds long jumpers that count as twos.
-        var w3 = if (lg.pro) (p[Attr.OUT] / skillScale).pow(1.5) * pos3 * 1.62 * proEra.threes * Tendency.three(p)
-            else (p[Attr.OUT] / skillScale).pow(4) * pos3 * 1.2 * (if (era.hasThrees) era.threes else 0.55) * Tendency.three(p)
+        var w3 = if (lg.pro) (p[Attr.OUT] / skillScale).pow(1.5) * pos3 * 1.62 * proEra.threes * Tendency.three(p) * tough
+            else (p[Attr.OUT] / skillScale).pow(4) * pos3 * 1.2 * (if (era.hasThrees) era.threes else 0.55) * Tendency.three(p) * tough
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }
             Offense.PERIMETER -> { w3 *= 1.45; wi *= 0.8 }

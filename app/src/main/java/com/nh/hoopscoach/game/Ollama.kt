@@ -1816,4 +1816,75 @@ object Ollama {
             report
         }
     }
+
+    data class PersonalityPass(val assigned: Int, val isAi: Boolean, val detail: String)
+
+    /**
+     * Assign on-court personalities (Confident Scorer / Unselfish) for [players].
+     * Uses AI when enabled; otherwise seeds from ratings. Safe for empty lists.
+     */
+    suspend fun assignPlayerPersonalities(
+        config: OllamaConfig,
+        lg: League,
+        players: List<Player>,
+    ): Result<PersonalityPass> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.playerPersonalities) {
+            Personality.seedRoster(players)
+            return@withContext Result.success(PersonalityPass(players.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }, false, "Rule-based seeding (AI personalities off)."))
+        }
+        val targets = players.filter { it.teamId >= 0 }.sortedByDescending { it.ovr }.take(12)
+        if (targets.isEmpty()) return@withContext Result.success(PersonalityPass(0, false, "No roster players."))
+
+        val rosterLines = targets.joinToString("\n") { p ->
+            "- id=${p.id} ${p.name} ${p.posLabel} ovr=${p.ovr} INS=${p[Attr.INS]} MID=${p[Attr.MID]} OUT=${p[Attr.OUT]} PAS=${p[Attr.PAS]} style=${p.style.label}"
+        }
+        val prompt = buildString {
+            appendLine("You are a basketball scout. Assign ONE on-court personality to each player.")
+            appendLine("Roles: GUNNER (confident scorer who takes tough shots), PASS_FIRST (unselfish, looks for teammates), or BALANCED.")
+            appendLine("Format EXACTLY one line per player:")
+            appendLine("ID|ROLE|Short scout note (max 18 words)")
+            appendLine("Roster:")
+            appendLine(rosterLines)
+        }
+        val system = "Reply with only the ID|ROLE|note lines. No markdown."
+        val result = generate(config, prompt, system, temperature = 0.4, numPredict = 420)
+        var assigned = 0
+        result.onSuccess { text ->
+            for (raw in text.lines()) {
+                val line = raw.trim().trimStart('-', '*', ' ')
+                if (line.isEmpty() || !line.contains('|')) continue
+                val parts = line.split('|').map { it.trim() }
+                if (parts.size < 2) continue
+                val id = parts[0].filter { it.isDigit() }.toIntOrNull() ?: continue
+                val p = targets.firstOrNull { it.id == id } ?: continue
+                val role = parts[1]
+                val note = parts.getOrNull(2).orEmpty()
+                Personality.applyAssignment(p, role, note.ifBlank {
+                    when {
+                        role.contains("GUN", true) || role.contains("CONF", true) -> "Looks for his own shot, even contested."
+                        role.contains("PASS", true) || role.contains("UNSELF", true) -> "Willing passer who kicks tough looks."
+                        else -> "Takes what the defense gives."
+                    }
+                })
+                assigned++
+            }
+        }
+        if (assigned == 0) {
+            Personality.seedRoster(targets)
+            for (p in targets) {
+                if (p.personalityNote.isBlank()) {
+                    p.personalityNote = when {
+                        p.has(Trait.GUNNER) -> "Confident scorer who hunts his own look."
+                        p.has(Trait.PASS_FIRST) -> "Unselfish — finds the open man on tough possessions."
+                        else -> ""
+                    }
+                }
+            }
+            assigned = targets.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }
+            return@withContext Result.success(PersonalityPass(assigned, false, result.exceptionOrNull()?.message ?: "AI parse empty — used rule-based personalities."))
+        }
+        // Fill anyone the model skipped.
+        for (p in targets) if (!p.has(Trait.GUNNER) && !p.has(Trait.PASS_FIRST)) Personality.seedOnCourtTrait(p)
+        Result.success(PersonalityPass(assigned, result.isSuccess, "Assigned $assigned on-court personalities."))
+    }
 }
