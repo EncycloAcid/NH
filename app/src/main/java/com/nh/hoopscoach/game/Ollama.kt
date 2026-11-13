@@ -765,7 +765,7 @@ object Ollama {
         eventGame: Game? = null,
     ): Result<AiText> {
         val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
-        val subject = lg.teams.filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
+        val subject = LeagueLists.teams(lg).filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
         val fallbackCopy = articleCopy.ifBlank { if (wantsArticle) ArticleWriting.news(lg, News(lg.season, lg.day, "${subject.name}: the latest outlook", teamId = subject.id)) else "" }
         // Game/series reports already carry RESULT/BOX/SERIES in the sheet; skip duplicating the
         // full game-written article into EVENT FACTS so local models stay under the 8192 budget.
@@ -798,47 +798,63 @@ object Ollama {
         news: News,
         angle: String = news.angle.ifEmpty { config.defaultStoryAngle },
     ): Result<AiText> {
-        val team = lg.teams.getOrNull(news.teamId)
-        val player = lg.playerOrNull(news.pid)
-        val game = if (news.gameId >= 0) lg.games.firstOrNull { it.id == news.gameId } else null
-        val opp = if (game != null && team != null) lg.teams.getOrNull(if (game.home == team.id) game.away else game.home) else null
+        return try {
+            val teams = LeagueLists.teams(lg)
+            val team = teams.getOrNull(news.teamId)
+            val player = lg.playerOrNull(news.pid)
+            val game = if (news.gameId >= 0) LeagueLists.games(lg).firstOrNull { it.id == news.gameId } else null
+            val opp = if (game != null && team != null) teams.getOrNull(if (game.home == team.id) game.away else game.home) else null
 
-        val seriesBits = game?.let { ArticleWriting.seriesFacts(lg, it) }.orEmpty()
-        val prompt = buildString {
-            append("Write a complete sports newspaper article for the following basketball news item:\n")
-            append("Headline: ${news.text}\n")
-            append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
-            append("Season: ${news.season}, Day: ${news.day}\n")
-            append("Angle: ${angle.ifEmpty { "balanced" }}\n")
-            if (news.kind == "series") append("Story type: playoff series clincher — lead with the series result, round, and title implications; use the clincher box only as support.\n")
-            if (team != null) append("Team: ${if (lg.pro) team.name else team.school} (${team.w}-${team.l})\n")
-            if (opp != null) append("Opponent: ${if (lg.pro) opp.name else opp.school} (${opp.record})\n")
-            if (game != null) {
-                append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
-                if (game.played) {
-                    val margin = kotlin.math.abs(game.hs - game.aws)
-                    append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
+            val seriesBits = game?.let { ArticleWriting.seriesFacts(lg, it) }.orEmpty()
+            val prompt = buildString {
+                append("Write a complete sports newspaper article for the following basketball news item:\n")
+                append("Headline: ${news.text}\n")
+                append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
+                append("Season: ${news.season}, Day: ${news.day}\n")
+                append("Angle: ${angle.ifEmpty { "balanced" }}\n")
+                if (news.kind == "series") append("Story type: playoff series clincher — lead with the series result, round, and title implications; use the clincher box only as support.\n")
+                if (team != null) append("Team: ${if (lg.pro) team.name else team.school} (${team.w}-${team.l})\n")
+                if (opp != null) append("Opponent: ${if (lg.pro) opp.name else opp.school} (${opp.record})\n")
+                if (game != null) {
+                    append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
+                    if (game.played) {
+                        val margin = kotlin.math.abs(game.hs - game.aws)
+                        append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
+                    }
                 }
+                // Series ledger lives in the fact sheet (and EVENT FACTS); keep the writing prompt short.
+                if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
+                val angleInstruction = when {
+                    news.kind == "series" -> "Stay series-aware: cite the series length, series score, and round from the fact sheet. Do not invent prior game scores."
+                    angle == "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
+                    angle == "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
+                    angle == "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
+                    angle == "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
+                    else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
+                }
+                append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
             }
-            // Series ledger lives in the fact sheet (and EVENT FACTS); keep the writing prompt short.
-            if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
-            val angleInstruction = when {
-                news.kind == "series" -> "Stay series-aware: cite the series length, series score, and round from the fact sheet. Do not invent prior game scores."
-                angle == "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
-                angle == "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
-                angle == "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
-                angle == "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
-                else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
-            }
-            append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
-        }
 
-        val copy = ArticleWriting.news(lg, news)
-        return groundedGenerate(
-            config, lg, prompt, articleCopy = copy, eventGame = game,
-            extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(),
-            extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}; kind ${news.kind}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}\n$seriesBits",
-        )
+            val copy = ArticleWriting.news(lg, news)
+            groundedGenerate(
+                config, lg, prompt, articleCopy = copy, eventGame = game,
+                extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(),
+                extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}; kind ${news.kind}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}\n$seriesBits",
+            )
+        } catch (_: java.util.ConcurrentModificationException) {
+            val body = try {
+                ArticleWriting.news(lg, news)
+            } catch (_: java.util.ConcurrentModificationException) {
+                news.body.ifBlank { news.text }
+            }
+            Result.success(
+                AiText(
+                    body,
+                    isAi = false,
+                    fallbackReason = "Desk raced the sim — used game-written article.",
+                ),
+            )
+        }
     }
 
     /** Generates an epic coronation newspaper feature for the National Champion or NBA Finals winner. */
@@ -1153,7 +1169,11 @@ object Ollama {
     fun maybeAutoGenerate(config: OllamaConfig, lg: League, news: News) {
         if (!config.enabled || !config.autoGenerate) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
+            try {
+                generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Desk raced the sim — leave the game-written body.
+            }
         }
     }
 
@@ -1709,7 +1729,7 @@ object Ollama {
             config, lg, prompt,
             system = "Historic moments desk. Facts only from the brief.",
             numPredict = 360,
-            eventGame = lg.games.firstOrNull { it.id == m.gameId },
+            eventGame = LeagueLists.games(lg).firstOrNull { it.id == m.gameId },
         )
         result.map { draft ->
             val lines = draft.text.lines()
