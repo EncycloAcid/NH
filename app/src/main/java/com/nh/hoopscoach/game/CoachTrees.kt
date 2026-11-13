@@ -25,6 +25,30 @@ object CoachTrees {
         return if (best.second - worst.second >= 8) "$known; ${worst.first} is the question" else "$known with few holes"
     }
 
+    /**
+     * The odds a school fires its coach this offseason, from what has actually happened there: how far
+     * short of expectations this year fell, losing seasons piling up, and his standing, against what he
+     * has won lately. A coach who just won his league is close to untouchable; one with three losing
+     * years in a row at a proud program is very likely gone.
+     */
+    fun fireChance(lg: League, t: Team, c: Coach): Double {
+        val here = c.history.filter { it.teamId == t.id }
+        if (here.size < 2) return 0.0                               // nobody is fired after one year
+        val recent = here.takeLast(3)
+        val losing = recent.count { it.w < it.l }
+        val short = t.expWins - t.w                                 // wins short of what this roster should manage
+        var p = 0.0
+        if (short > 3) p += (short - 3) * 0.05
+        p += when (losing) { 3 -> 0.35; 2 -> 0.15; else -> 0.0 }
+        if (c.security < 35) p += (35 - c.security) * 0.01
+        if (t.prestige >= 75 && losing >= 1) p += 0.08               // proud programs have less patience
+        if (lg.confBrackets.any { it.champion == t.id }) p -= 0.4
+        val round = Awards.tourneyRound(lg, t.id)
+        if (round >= 1) p -= 0.15 + round * 0.05
+        if (recent.any { it.result == "Final Four" || it.result == "Runner-Up" || it.result == "National Champion" }) p -= 0.3
+        return p.coerceIn(0.0, 0.85)
+    }
+
     /** An assistant stepping up: a young coach shaped by the man he worked for. */
     private fun assistantOf(lg: League, t: Team, mentor: Coach): Coach {
         val n = LeagueGen.makeCoach(lg, t.prestige, Rng.range(34, 48), withCareer = false)
@@ -67,6 +91,7 @@ object CoachTrees {
                     body = "${c.name} went ${from.w}-${from.l} at ${from.school} this season and ${c.w}-${c.l} for his career. ${identity(c)}." +
                         (if (c.mentor.isNotBlank()) " He came up as an assistant under ${c.mentor}." else ""),
                     source = "Hoops Wire", teamId = t.id)
+                Timeline.record(lg, "hire", "${t.school} hires ${c.name} from ${from.school}", "${c.name} left ${from.school} after a ${from.w}-${from.l} season to take over at ${t.school}.", t.id, coach = c.name, weight = if (t.prestige >= 80) 3 else 2)
                 // The school he left keeps what he built: one of his assistants takes over.
                 val next = assistantOf(lg, from, c)
                 seat(lg, from, next, c.name)
@@ -85,6 +110,7 @@ object CoachTrees {
                     "${t.school} hires ${n.name}, ${if (mentor === old) "${old.last}'s assistant" else "a ${mentor.last} assistant"}, as head coach", mine, kind = "hire",
                     body = "${n.name}, ${n.age}, comes $from. ${mentor.name} is ${mentor.w}-${mentor.l} with ${mentor.titles} national ${if (mentor.titles == 1) "title" else "titles"}. ${identity(n)}.",
                     source = "Hoops Wire", teamId = t.id)
+                Timeline.record(lg, "hire", "${t.school} hires ${n.name}", "${n.name}, a former assistant to ${mentor.name}, becomes head coach at ${t.school}.", t.id, coach = n.name, weight = if (t.prestige >= 80 || mentor.titles > 0) 2 else 1)
                 treeStory(lg, mentor)
             }
             else -> {
@@ -99,6 +125,7 @@ object CoachTrees {
     private fun treeStory(lg: League, mentor: Coach) {
         val tree = branches(lg, mentor.name)
         if (tree.size != 3) return
+        Timeline.record(lg, "tree", "The ${mentor.last} coaching tree reaches three programs", tree.joinToString(", ") { "${it.name} (${lg.teams.getOrNull(it.teamId)?.school})" } + " all worked for ${mentor.name}.", mentor.teamId, coach = mentor.name, weight = 3)
         val schools = tree.mapNotNull { c -> lg.teams.getOrNull(c.teamId)?.school?.let { "${c.name} at $it" } }
         lg.news += News(lg.season, lg.day, "The ${mentor.last} tree: three of his former assistants now run programs", false, kind = "column",
             body = "${schools.joinToString(", ")}. All three learned the job under ${mentor.name}, who is ${mentor.w}-${mentor.l}" +
@@ -154,6 +181,7 @@ object Turnarounds {
                 low.w * 2 <= low.l -> "The little program that wouldn't quit: ${t.school}'s climb to ${reached(round)}"
                 else -> "From ${low.w}-${low.l} to ${reached(round)}: how ${t.school} turned it around"
             }
+            Timeline.record(lg, "rise", head.substringBefore(':'), "${t.school} reached ${reached(round)} at ${t.w}-${t.l}, ${if (ago == 1) "a year" else "$ago years"} after going ${low.w}-${low.l}.", t.id, star?.id ?: -1, c.name, 3)
             lg.news += News(lg.season, lg.day, head, t.id == lg.userTeamId, kind = "column", body = body,
                 source = "Dana Marsh · Hoops Wire", teamId = t.id, pid = star?.id ?: -1)
         }

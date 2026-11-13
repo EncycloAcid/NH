@@ -367,6 +367,15 @@ private fun LazyListScope.history(vm: GameViewModel, lg: League) {
         Section("Highlight reel · $latest", action = "See all", onAction = { vm.push(Route.History(HistoryKind.MOMENTS)) })
         com.nh.hoopscoach.game.Moments.reel(lg, latest, 3).forEach { m -> MomentCard(vm, lg, m); Spacer(Modifier.height(8.dp)) }
     }
+    val back = com.nh.hoopscoach.game.Timeline.thisWeek(lg)
+    if (back.isNotEmpty()) item {
+        Section("This week in history")
+        TimelineRows(vm, lg, back)
+    }
+    if (lg.timeline.isNotEmpty()) item {
+        Section("Timeline", action = "See all", onAction = { vm.push(Route.History(HistoryKind.TIMELINE)) })
+        TimelineRows(vm, lg, lg.timeline.sortedByDescending { it.season * 10 + it.weight }.take(5))
+    }
     item {
         Section("Champions")
         if (lg.history.isEmpty()) Panel { Text("Finish a season to start the record book.", style = T.body, color = P.sub) }
@@ -400,6 +409,13 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
     LazyColumn(Modifier.fillMaxSize()) {
         item { BackBar(kind.title, kind.sub, onBack = { vm.back() }) }
         when (kind) {
+            HistoryKind.TIMELINE -> {
+                if (lg.timeline.isEmpty()) item { Empty("Nothing yet. Titles, firsts, hires and upsets are written down here as they happen.") }
+                for ((season, events) in lg.timeline.groupBy { it.season }.toSortedMap(compareByDescending { it })) item {
+                    Section("$season")
+                    TimelineRows(vm, lg, events.sortedByDescending { it.weight * 1000 + it.day })
+                }
+            }
             HistoryKind.SEASONS -> {
                 if (lg.history.isEmpty()) item { Empty("Finish a season to start the record.") }
                 for (s in lg.history.reversed()) item {

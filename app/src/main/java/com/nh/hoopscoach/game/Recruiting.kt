@@ -583,6 +583,8 @@ object Recruiting {
         }
         val t = lg.team(tid)
         Memories.committed(lg, r, t)
+        if (!r.transfer && r.p.stars >= 5 && t.prestige < 60) Timeline.record(lg, "commit", "Five-star ${r.p.name} picks ${t.school}",
+            "${r.p.name}, the No. ${r.p.recruitRank} recruit, chose ${t.school} over bigger programs.", t.id, r.p.id, weight = 3)
         if (tid == u || r.p.stars >= 5 || (r.transfer && r.p.ovr >= 80)) {
             val who = if (r.transfer) "Transfer ${r.p.pos} ${r.p.name}" else "${starText(r.p.stars)} ${r.p.pos} ${r.p.name}"
             lg.news += News(lg.season, lg.day, "$who commits to ${t.school}", tid == u)

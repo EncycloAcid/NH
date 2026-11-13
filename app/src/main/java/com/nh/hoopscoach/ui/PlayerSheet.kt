@@ -631,6 +631,10 @@ private fun BioTab(lg: League, p: Player) {
             }
         }
     }
+    com.nh.hoopscoach.game.Timeline.ofPlayer(lg, p.id).takeIf { it.isNotEmpty() }?.let { events ->
+        Section("In the history books")
+        GroupList(events.sortedByDescending { it.season }) { e -> ListRow { Column(Modifier.weight(1f)) { Text("${e.season} · ${e.title}", style = T.bodyB, color = P.ink); Text(e.text, style = T.small, color = P.sub) } } }
+    }
     if (p.memories.isNotEmpty()) {
         // What he carries with him; the ones that tie him to a school, or turn him against it, lean on whether he stays.
         Section("What he remembers")
