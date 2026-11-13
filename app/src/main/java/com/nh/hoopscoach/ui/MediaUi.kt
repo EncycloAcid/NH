@@ -756,6 +756,9 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             if (filter == 0 && (lg.ollama.enabled && lg.ollama.livingCoachingCareers || lg.news.any { it.source.contains("Hoops Wire Sideline", ignoreCase = true) })) {
                 item { CoachingCareersCard(vm, lg) }
             }
+            if (filter == 0 && (lg.ollama.enabled && lg.ollama.playerStorylines || lg.news.any { it.source.contains("Hoops Wire Features", ignoreCase = true) })) {
+                item { PlayerStorylinesCard(vm, lg) }
+            }
             if (top != null) item {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
@@ -870,6 +873,52 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                 TextButton({ showOllamaDialog = false }, enabled = !writingStory) { Text("Cancel", color = P.sub) }
             },
         )
+    }
+}
+
+/** Features desk: bench-to-star, blue-chip heat checks, walk-on heroes. */
+@Composable
+private fun PlayerStorylinesCard(vm: GameViewModel, lg: League) {
+    var writing by remember { mutableStateOf(false) }
+    var lastDetail by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val arcs = remember(vm.rev, lg.day) { com.nh.hoopscoach.game.PlayerStorylines.detectArcs(lg).size }
+    fun runDesk() {
+        writing = true
+        scope.launch {
+            val res = Ollama.generatePlayerStorylines(lg.ollama, lg)
+            writing = false
+            res.onSuccess { pack ->
+                vm.act { it.news.addAll(pack.stories) }
+                lastDetail = pack.detail
+                vm.toast(if (pack.isAi) "Features filed ${pack.stories.size} storylines" else pack.detail)
+            }.onFailure { err ->
+                vm.toast("Features: ${err.message ?: "failed"}")
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Section(
+        "Features desk",
+        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} arcs",
+        onAction = { if (!writing) runDesk() },
+    )
+    Panel {
+        if (writing) {
+            Text("${lg.ollama.providerDisplayName} is filing player arcs from real production…", style = T.small, color = P.accent)
+        } else {
+            Text(
+                "Bench-to-star leaps, five-star heat checks, and walk-on heroes — $arcs qualifying arcs on the board today.",
+                style = T.small,
+                color = P.sub,
+            )
+            if (lastDetail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(lastDetail, style = T.small, color = P.faint)
+            }
+            Spacer(Modifier.height(8.dp))
+            SmallButton(if (lg.ollama.enabled) "File player storylines" else "File game-written arcs", primary = true) { runDesk() }
+        }
     }
 }
 

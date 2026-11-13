@@ -224,6 +224,7 @@ object Ollama {
             is Journalism.Package -> value.isAi
             is CoachCareers.Package -> value.isAi
             is HistoricMoments.Package -> value.isAi
+            is PlayerStorylines.Package -> value.isAi
             else -> true
         }
     }
@@ -1081,6 +1082,93 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
         }
+    }
+
+    /** Fire-and-forget player storyline features from detected arcs. */
+    fun maybeAutoGeneratePlayerStorylines(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.playerStorylines || !config.autoGenerate) return
+        if (lg.day < 8 || lg.day % 7 != 0) return
+        if (PlayerStorylines.detectArcs(lg).isEmpty()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generatePlayerStorylines(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+            }
+        }
+    }
+
+    /** Feature desk: bench-to-star, five-star heat checks, walk-on heroes — facts from [PlayerStorylines.eventBrief]. */
+    suspend fun generatePlayerStorylines(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<PlayerStorylines.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.playerStorylines) {
+            return@withContext Result.success(PlayerStorylines.fallbackPackage(lg))
+        }
+        val brief = PlayerStorylines.eventBrief(lg)
+        val cacheKey = "player_arcs_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<PlayerStorylines.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national basketball features writer. Using ONLY the ARC BRIEF, write up to three features.")
+            appendLine("Only cover arcs listed. Do not invent stats, awards, or quotes.")
+            appendLine("ARC BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that arc kind is absent):")
+            appendLine("BENCH_TO_STAR_HEADLINE: <headline>")
+            appendLine("BENCH_TO_STAR_BODY: <2 short paragraphs>")
+            appendLine("RECRUIT_BUST_HEADLINE: <headline>")
+            appendLine("RECRUIT_BUST_BODY: <2 short paragraphs>")
+            appendLine("WALKON_HERO_HEADLINE: <headline>")
+            appendLine("WALKON_HERO_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Player storylines desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..32) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Features")
+            val arcs = PlayerStorylines.detectArcs(lg)
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                val arc = arcs.firstOrNull { it.kind == kind }
+                val p = arc?.let { lg.playerOrNull(it.pid) }
+                stories += News(
+                    lg.season, lg.day, head,
+                    mine = p?.teamId == lg.userTeamId,
+                    kind = "column", body = body, source = outlet,
+                    teamId = p?.teamId ?: lg.userTeamId, pid = p?.id ?: -1,
+                    aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("BENCH_TO_STAR", "BENCH_TO_STAR_HEADLINE", "BENCH_TO_STAR_BODY")
+            add("RECRUIT_BUST", "RECRUIT_BUST_HEADLINE", "RECRUIT_BUST_BODY")
+            add("WALKON_HERO", "WALKON_HERO_HEADLINE", "WALKON_HERO_BODY")
+            val pack = if (stories.isNotEmpty()) PlayerStorylines.Package(stories, draft.isAi, "Features filed ${stories.size} arcs.")
+            else PlayerStorylines.fallbackPackage(lg).copy(detail = "AI thin — used game-written arcs. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { PlayerStorylines.fallbackPackage(lg) }
     }
 
     /** Fire-and-forget living coaching careers package (hot seats, rivals, legacy). */

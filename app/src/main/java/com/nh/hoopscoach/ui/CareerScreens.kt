@@ -1245,6 +1245,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI player storylines", style = T.bodyB, color = P.ink)
+                            Text("Bench-to-star leaps, blue-chip heat checks, and walk-on heroes from real production.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.playerStorylines, { on -> vm.act { it.ollama.playerStorylines = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
                         }

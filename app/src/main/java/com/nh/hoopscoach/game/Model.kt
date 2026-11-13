@@ -663,6 +663,8 @@ class OllamaConfig(
     var livingCoachingCareers: Boolean = true,
     /** AI court storms & historic moments from upsets, buzzers, rivalries, titles, heartbreaks. */
     var historicMoments: Boolean = true,
+    /** AI player storylines: bench-to-star, blue-chip heat checks, walk-on heroes. */
+    var playerStorylines: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
     var draftScouting: Boolean = true,
