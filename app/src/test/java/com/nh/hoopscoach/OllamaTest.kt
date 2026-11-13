@@ -47,6 +47,7 @@ class OllamaTest {
         lg.ollama.sportsJournalism = false
         lg.ollama.tradeRumors = false
         lg.ollama.scoutingKeys = true
+        lg.ollama.autoPickModel = true
 
         val encoded = SaveIO.encode(lg)
         val decoded = SaveIO.decode(encoded)
@@ -61,6 +62,7 @@ class OllamaTest {
         assertFalse(decoded.ollama.sportsJournalism)
         assertFalse(decoded.ollama.tradeRumors)
         assertTrue(decoded.ollama.scoutingKeys)
+        assertTrue(decoded.ollama.autoPickModel)
     }
 
     @Test

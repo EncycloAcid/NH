@@ -105,6 +105,71 @@ object Ollama {
     }
 
     /**
+     * Best free/cheap model for [provider]. Prefer ids from [available] (provider list / Ollama tags);
+     * otherwise fall back to the curated Settings shortlist.
+     */
+    fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
+        val curated = when (provider.lowercase()) {
+            "google" -> GOOGLE_MODELS.map { it.id }
+            "openai" -> OPENAI_MODELS.map { it.id }
+            else -> RECOMMENDED_MODELS.map { it.id }
+        }
+        val pool = available.map { it.trim().removePrefix("models/") }.filter { it.isNotBlank() }.distinct()
+            .ifEmpty { curated }
+        val ranked = catalogFetchedModels(provider, pool)
+            .sortedWith(
+                compareBy<CatalogEntry> { it.categoryOrder }
+                    .thenBy { modelPreferenceScore(provider, it.id) }
+                    .thenBy { it.id.lowercase() },
+            )
+        val pick = ranked.firstOrNull()?.id ?: curated.first()
+        return when (provider.lowercase()) {
+            "google" -> snapGoogleModel(pick)
+            "openai" -> snapOpenAiModel(pick)
+            else -> snapLocalModel(pick)
+        }
+    }
+
+    /** Lower is better — flash-lite / mini / smol before heavier free options. */
+    internal fun modelPreferenceScore(provider: String, id: String): Int {
+        val key = id.lowercase().removePrefix("models/")
+        return when (provider.lowercase()) {
+            "google" -> when {
+                "flash-lite" in key || (key.contains("flash") && "lite" in key) -> 0
+                "flash" in key -> 1
+                "nano" in key -> 2
+                else -> 8
+            }
+            "openai" -> when {
+                "mini" in key -> 0
+                "3.5" in key -> 1
+                "nano" in key -> 2
+                else -> 8
+            }
+            else -> when {
+                key == "smollm2:135m" || key.startsWith("smollm2:135m") -> 0
+                key == "qwen2.5:0.5b" || key.startsWith("qwen2.5:0.5") -> 1
+                key == "llama3.2:1b" || key.startsWith("llama3.2:1b") -> 2
+                key.startsWith("smol") -> 3
+                key.startsWith("qwen") -> 4
+                key.startsWith("llama") -> 5
+                else -> 8
+            }
+        }
+    }
+
+    /** Writes [pickBestModel] into the active provider's model field on [config]. */
+    fun applyAutoPick(config: OllamaConfig, available: List<String> = emptyList()): String {
+        val pick = pickBestModel(config.provider, available)
+        when (config.provider.lowercase()) {
+            "google" -> config.googleModel = pick
+            "openai" -> config.openAiModel = pick
+            else -> config.model = pick
+        }
+        return pick
+    }
+
+    /**
      * One row in the fetched-model menu: provider id, display title, category header, and a short
      * price tag so long raw lists (especially Gemini) are readable.
      */
@@ -294,17 +359,7 @@ object Ollama {
             val testRes = testConnection(candidate, timeoutMs = 2500)
             if (testRes.isSuccess) {
                 val models = testRes.getOrDefault(emptyList())
-                val chosen = when {
-                    models.contains("smollm2:135m") -> "smollm2:135m"
-                    models.contains("qwen2.5:0.5b") -> "qwen2.5:0.5b"
-                    models.contains("llama3.2:1b") -> "llama3.2:1b"
-                    models.contains("llama3.2") -> "llama3.2"
-                    models.any { it.startsWith("smol") } -> models.first { it.startsWith("smol") }
-                    models.any { it.startsWith("qwen") } -> models.first { it.startsWith("qwen") }
-                    models.any { it.startsWith("llama") } -> models.first { it.startsWith("llama") }
-                    models.isNotEmpty() -> models.first()
-                    else -> "smollm2:135m"
-                }
+                val chosen = pickBestModel("ollama", models)
                 val clean = cleanHost(candidate)
                 val msg = if (models.isNotEmpty()) {
                     "Connected to $clean! Using '$chosen' (${models.size} models installed)."
