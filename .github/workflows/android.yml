@@ -159,13 +159,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p win-dist
-          mapfile -t EXES < <(find app/build/compose/binaries -type f -name '*.exe')
+          # Only the installer: the app folder the Windows test made also has a small HoopsDynasty.exe launcher.
+          mapfile -t EXES < <(find app/build/compose/binaries/main/exe -type f -name '*.exe' 2>/dev/null)
           if [ ${#EXES[@]} -eq 0 ]; then
             echo "Windows EXE missing" >&2
             find app/build/compose -type f | head -100
             exit 1
           fi
           cp "${EXES[0]}" win-dist/HoopsDynasty-windows.exe
+          size=$(stat -c %s win-dist/HoopsDynasty-windows.exe)
+          if [ "$size" -lt 50000000 ]; then echo "Windows installer is only $size bytes; that's not the installer" >&2; exit 1; fi
           ls -la win-dist
 
       - uses: actions/upload-artifact@v4
@@ -211,7 +214,7 @@ jobs:
           for f in *; do
             [ -f "$f" ] || continue
             base="${f%.*}"; ext="${f##*.}"
-            case "$base" in *"$VER"*) continue ;; esac
+            case "$f" in *"$VER"*|*.deb) continue ;; esac   # a .deb already carries its version
             mv -- "$f" "${base}-${VER}.${ext}"
           done
           ls -la
