@@ -84,6 +84,70 @@ object Ollama {
         RECOMMENDED_MODELS.firstOrNull { it.id.equals(id, true) || id.startsWith(it.id.substringBefore(":")) }?.id
             ?: RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id
 
+    /**
+     * One row in the fetched-model menu: provider id, display title, category header, and a short
+     * price tag so long raw lists (especially Gemini) are readable.
+     */
+    data class CatalogEntry(
+        val id: String,
+        val title: String,
+        val category: String,
+        val price: String,
+        val categoryOrder: Int,
+    )
+
+    /** Group + price labels for models returned by a provider's list endpoint. */
+    fun catalogFetchedModels(provider: String, ids: List<String>): List<CatalogEntry> =
+        ids.distinct().map { id -> catalogEntry(provider, id) }
+            .sortedWith(compareBy({ it.categoryOrder }, { it.title.lowercase() }, { it.id.lowercase() }))
+
+    private fun catalogEntry(provider: String, id: String): CatalogEntry {
+        val key = id.lowercase().removePrefix("models/")
+        val title = humanModelTitle(id)
+        return when (provider.lowercase()) {
+            "google" -> googleCatalog(key, id, title)
+            "openai" -> openAiCatalog(key, id, title)
+            else -> CatalogEntry(id, title, "On-device · free", "Free · local", 0)
+        }
+    }
+
+    private fun humanModelTitle(id: String): String {
+        val bare = id.removePrefix("models/").substringAfterLast('/')
+        return bare.split('-', '_', ':').filter { it.isNotBlank() }.joinToString(" ") { part ->
+            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+    }
+
+    private fun googleCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "tts" in key || "transcribe" in key || "speech" in key ->
+            CatalogEntry(id, title, "Speech · TTS / audio", "Paid · audio", 4)
+        "image" in key || "imagen" in key || "banana" in key ->
+            CatalogEntry(id, title, "Image", "Paid · image", 3)
+        "omni" in key ->
+            CatalogEntry(id, title, "Omni · multimodal", "Paid · multimodal", 2)
+        "nano" in key ->
+            CatalogEntry(id, title, "Nano · tiny", "Free · on-device", 0)
+        "flash-lite" in key || key.contains("flash") && "lite" in key ->
+            CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheapest", 0)
+        "flash" in key ->
+            CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheap", 0)
+        "pro" in key || "ultra" in key || "argon" in key || "carbon" in key || "hydrogen" in key ->
+            CatalogEntry(id, title, "Pro / frontier · paid", "Paid · premium", 1)
+        else ->
+            CatalogEntry(id, title, "Other Gemini", "See Google pricing", 5)
+    }
+
+    private fun openAiCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "mini" in key || "3.5" in key || "nano" in key ->
+            CatalogEntry(id, title, "Cheap ChatGPT", "Cheap · text", 0)
+        "o1" in key || "o3" in key || "o4" in key ->
+            CatalogEntry(id, title, "Reasoning · premium", "Paid · premium", 2)
+        "4o" in key || "gpt-4" in key ->
+            CatalogEntry(id, title, "Flagship · paid", "Paid · standard", 1)
+        else ->
+            CatalogEntry(id, title, "Other OpenAI", "See OpenAI pricing", 3)
+    }
+
     data class AutoConfigResult(
         val host: String,
         val models: List<String>,
