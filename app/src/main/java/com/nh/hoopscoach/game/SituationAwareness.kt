@@ -25,6 +25,9 @@ object SituationAwareness {
             if (ts.isEmpty()) "YOUR TITLE HISTORY: ${lg.user.name} has ${NbaHistory.titleWords(0)}."
             else "YOUR TITLE HISTORY: ${lg.user.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
         } else "YOUR TITLE HISTORY: ${CollegeHistory.line(lg, lg.user)}")
+        if (lg.universeSeed != 0) appendLine("UNIVERSE: alternate history seed ${lg.universeSeed}")
+        if (!lg.pro && lg.user.philosophy.isNotBlank()) appendLine("YOUR SYSTEM: ${lg.user.philosophy}")
+        ShadowProWorld.brief(lg).takeIf { it.isNotBlank() }?.let { appendLine(it) }
     }
 
     /**
@@ -61,9 +64,12 @@ object SituationAwareness {
             appendLine("NATIONAL TITLES (all-time in this universe):")
             for ((t, n) in titleLeaders) {
                 val last = TitleDefense.titles(lg, t).lastOrNull()
-                appendLine("- ${t.school}: $n${last?.let { " (last $it)" } ?: ""} · now ${t.w}-${t.l}")
+                val phil = t.philosophy.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+                appendLine("- ${t.school}: $n${last?.let { " (last $it)" } ?: ""}$phil · now ${t.w}-${t.l}")
             }
         }
+        if (lg.universeSeed != 0) appendLine("UNIVERSE: alternate basketball history (seed ${lg.universeSeed})")
+        ShadowProWorld.brief(lg).takeIf { it.isNotBlank() }?.let { appendLine(it) }
         val recent = lg.history.takeLast(if (compact) 3 else 6)
         if (recent.isNotEmpty()) {
             appendLine("RECENT LEAGUE CHAMPIONS:")

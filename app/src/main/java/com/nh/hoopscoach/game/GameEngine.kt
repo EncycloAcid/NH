@@ -1329,6 +1329,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         runCatching { Injuries.afterGame(lg, game, teams, lines) }
         runCatching { Marquee.afterGame(lg, game, teams, lines, score) }
         runCatching { CoachRivals.afterGame(lg, game, score) }
+        runCatching { GenerationalLegacy.sidelineStory(lg, game) }
         if (counts) {
             teams[0].opp.add(lastTotals(1))
             teams[1].opp.add(lastTotals(0))

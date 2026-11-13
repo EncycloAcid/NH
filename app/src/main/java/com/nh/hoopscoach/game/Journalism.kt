@@ -27,7 +27,8 @@ object Journalism {
         append(SituationAwareness.leagueBrief(lg))
         appendLine("YOUR TEAM: ${label(lg, u)} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}")
         appendLine("DESK PRIORITY: Lead with titles, defending champions, droughts, and league-wide races. Results support the title narrative — they are not the only story.")
-        val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
+        // Snapshot: AI desks can run while the sim mutates games/news on another thread.
+        val today = lg.games.toList().filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 40 else 0
         }
         if (today.isNotEmpty()) {
@@ -42,7 +43,7 @@ object Journalism {
             ?: (lg.teams.sortedByDescending { it.elo }.indexOfFirst { it.id == u.id } + 1)
         appendLine("Your board rank: #$userRank")
         if (!lg.pro) {
-            val board = lg.recruits.filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(8)
+            val board = lg.recruits.toList().filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(8)
             if (board.isNotEmpty()) {
                 appendLine("RECRUITING BOARD:")
                 for (r in board) {
@@ -51,13 +52,13 @@ object Journalism {
                 }
             }
         } else {
-            val hot = lg.players.filter { it.teamId >= 0 && it.contractYears <= 1 }.sortedByDescending { it.ovr }.take(6)
+            val hot = lg.players.toList().filter { it.teamId >= 0 && it.contractYears <= 1 }.sortedByDescending { it.ovr }.take(6)
             if (hot.isNotEmpty()) {
                 appendLine("EXPIRING / SHORT CONTRACTS:")
                 for (p in hot) appendLine("- ${p.name} (${lg.team(p.teamId).name}) ovr ${p.ovr}, ${p.contractYears}yr left")
             }
         }
-        val recentNews = lg.news.filter { it.season == lg.season && it.day >= lg.day - 2 }.takeLast(6)
+        val recentNews = lg.news.toList().filter { it.season == lg.season && it.day >= lg.day - 2 }.takeLast(6)
         if (recentNews.isNotEmpty()) {
             appendLine("RECENT HEADLINES (do not contradict):")
             for (n in recentNews) appendLine("- ${n.text}")

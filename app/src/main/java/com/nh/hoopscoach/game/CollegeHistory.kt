@@ -24,21 +24,24 @@ object CollegeHistory {
         2021 to "Baylor", 2022 to "Kansas", 2023 to "UConn", 2024 to "UConn", 2025 to "Florida",
     )
 
-    /** This league's first season of its own; the real titles count up to it. */
+    /** This league's first season of its own; the real (or alternate) titles count up to it. */
     fun firstSeason(lg: League): Int = lg.history.minOfOrNull { it.season } ?: lg.teams.flatMap { it.history }.minOfOrNull { it.season } ?: lg.season
 
-    /** Every national title [t] has won, oldest first: the real ones before this league, then this league's. */
+    /** Pre-league champions for this save: alternate universe map, or the real record book. */
+    fun champions(lg: League): Map<Int, String> = if (lg.altCollegeTitles.isNotEmpty()) lg.altCollegeTitles else CHAMPIONS
+
+    /** Every national title [t] has won, oldest first: the past before this league, then this league's. */
     fun titles(lg: League, t: Team): List<Int> {
         val first = firstSeason(lg)
-        return CHAMPIONS.filter { (y, s) -> y < first && s == t.school }.keys.sorted() +
+        return champions(lg).filter { (y, s) -> y < first && s == t.school }.keys.sorted() +
             t.history.filter { it.result == "National Champion" }.map { it.season }
     }
 
-    /** Last season's national champion: this league's, or the real one in a league's first season. */
+    /** Last season's national champion: this league's, or the past record in a league's first season. */
     fun lastChampion(lg: League): Team? {
         lg.history.firstOrNull { it.season == lg.season - 1 }?.champion?.takeIf { it >= 0 }?.let { return lg.teams.getOrNull(it) }
         if (lg.season - 1 >= firstSeason(lg)) return null
-        val school = CHAMPIONS[lg.season - 1] ?: return null
+        val school = champions(lg)[lg.season - 1] ?: return null
         return lg.teams.firstOrNull { it.school == school }
     }
 

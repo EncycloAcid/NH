@@ -39,6 +39,7 @@ object LeagueGen {
             buildRoster(lg, t)
         }
         lg.reindex()
+        AlternateHistory.seedCollege(lg)
         return lg
     }
 

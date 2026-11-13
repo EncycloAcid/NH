@@ -309,8 +309,20 @@ object Recruiting {
         })
         // Pro pipeline.
         val pipe = ctx.pipes.getOrElse(t.id) { 0 }
-        val bonus = Pipeline.bonus(pipe, Pipeline.isTop(r)) * if (pref == RecruitPref.PROS) 3.0 else 1.0
-        out += Factor("Pro pipeline", 1 + bonus, if (pipe == 0) "No recent draft picks" else "$pipe pipeline points from recent drafts")
+        val shadow = ShadowProWorld.heat(lg, t.id)
+        val bonus = Pipeline.bonus(pipe + shadow / 2, Pipeline.isTop(r)) * if (pref == RecruitPref.PROS) 3.0 else 1.0
+        out += Factor(
+            "Pro pipeline",
+            1 + bonus,
+            when {
+                pipe == 0 && shadow == 0 -> "No recent draft picks"
+                shadow > 0 -> "$pipe pipeline points · $shadow shadow-pro heat"
+                else -> "$pipe pipeline points from recent drafts"
+            },
+        )
+        GenerationalLegacy.recruitFactor(lg, t, r)?.let { (label, mult) ->
+            out += Factor(label, mult, t.philosophy.ifBlank { "Program pedigree" })
+        }
         // Playing time: how many players at his spot are already as good as him.
         val list = ctx.depth[t.id * 5 + r.p.pos.ordinal].orEmpty()
         val ahead = list.count { it >= r.p.ovr }

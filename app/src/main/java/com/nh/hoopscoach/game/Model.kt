@@ -427,6 +427,10 @@ class Team(
     var apparel: String = "",
     /** Seasons left on the school apparel contract. */
     var apparelLeft: Int = 0,
+    /** Program coaching identity for this universe (Pace & Space, Grind It Out, …). */
+    var philosophy: String = "",
+    /** Former player whose pedigree stamped this program's identity, if any. */
+    var legacyCoach: String = "",
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -486,6 +490,10 @@ class Coach(
     var offerSalary: Int = 0,
     var offerEarly: Boolean = false,
     var countered: Boolean = false,
+    /** Schools or franchises he played for — fuels sideline legacy matchups. */
+    var playedAt: MutableList<String> = mutableListOf(),
+    /** Mentor head coach's name when he came off a coaching tree. */
+    var mentor: String = "",
 ) {
     fun has(s: CoachSkill) = s in skills
     val name get() = "$first $last"
@@ -1606,6 +1614,20 @@ class League(
     val myPlays: MutableList<Highlight> = mutableListOf(),
     var usaGolds: Int = 0,
     var ollama: OllamaConfig = OllamaConfig(),
+    /**
+     * This save's pre-league college champions (year → school). When non-empty,
+     * [CollegeHistory] reads these instead of the real record book.
+     */
+    val altCollegeTitles: MutableMap<Int, String> = mutableMapOf(),
+    /**
+     * This save's pre-league NBA champions (year → franchise slot). When non-empty,
+     * [NbaHistory] reads these instead of the real record book.
+     */
+    val altNbaTitles: MutableMap<Int, String> = mutableMapOf(),
+    /** Shadow pro careers for players drafted out of this college world. */
+    val shadowPros: MutableList<ShadowPro> = mutableListOf(),
+    /** Random seed marker for this universe (0 until [AlternateHistory] seeds). */
+    var universeSeed: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()
