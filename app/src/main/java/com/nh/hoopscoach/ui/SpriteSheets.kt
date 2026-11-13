@@ -12,21 +12,45 @@ import java.io.InputStream
  * Call [install] once with the app's [AssetManager]; unit tests can skip it and read from disk.
  */
 object SpriteSheets {
+    /** The neutral jersey a team without art of its own wears in its own colors (see [SpriteCompose.teamJersey]). */
+    const val TEAM_JERSEY = "character/jersey_template.png"
+
     @Volatile private var assets: AssetManager? = null
-    private val cache = object : android.util.LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 12).coerceIn(4L * 1024 * 1024, 16L * 1024 * 1024).toInt()) {
+
+    // Every layer is a 512x512 bitmap (1 MB) and a roster's faces, hair and numbers run to a few dozen,
+    // so the cache keeps 24-48 of them depending on the phone instead of the 4-16 it used to.
+    private val cache = object : android.util.LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 8).coerceIn(24L shl 20, 48L shl 20).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
     }
 
+    /** Paths that aren't in the pack, so asking again (every college key is tried as an NBA one first) costs nothing. */
+    private val missing = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+
     fun install(am: AssetManager) {
+        if (assets === am) return
         assets = am
+        missing.clear()
     }
 
     @Synchronized fun bitmap(path: String): Bitmap? {
         cache[path]?.let { return it }
-        val bmp = open(path)?.use { BitmapFactory.decodeStream(it) } ?: return null
+        if (path in missing) return null
+        val bmp = open(path)?.use { BitmapFactory.decodeStream(it) }
+        if (bmp == null) {
+            missing += path
+            return null
+        }
         val immutable = if (bmp.isMutable) bmp.copy(Bitmap.Config.ARGB_8888, false) else bmp
         cache.put(path, immutable)
         return immutable
+    }
+
+    /** A layer built from others (a team-colored jersey, say), kept in the same cache under [key]. */
+    fun derived(key: String, build: () -> Bitmap?): Bitmap? {
+        synchronized(this) { cache[key]?.let { return it } }
+        val made = build() ?: return null
+        synchronized(this) { cache.put(key, made) }
+        return made
     }
 
     fun body(skin: Int): Bitmap? {
@@ -46,15 +70,18 @@ object SpriteSheets {
         return null
     }
 
-    fun jerseyPath(key: String?): String {
-        if (key != null) {
-            val nba = "character/nba_jerseys/$key.png"
-            if (bitmap(nba) != null) return nba
-            val college = "character/college_jerseys/$key.png"
-            if (bitmap(college) != null) return college
-        }
-        return "character/college_jerseys/01_duke.png"
+    /** The team's own jersey art, or null when it has none; it then wears [TEAM_JERSEY] in its own colors. */
+    fun jerseyArt(key: String?): String? {
+        if (key == null) return null
+        val nba = "character/nba_jerseys/$key.png"
+        if (bitmap(nba) != null) return nba
+        val college = "character/college_jerseys/$key.png"
+        if (bitmap(college) != null) return college
+        return null
     }
+
+    /** A jersey file for [key] whatever it is: its art, or a stock jersey for layer lists that need a path. */
+    fun jerseyPath(key: String?): String = jerseyArt(key) ?: "character/college_jerseys/01_duke.png"
 
     /** Chest number 0–99 (and `00` via [zeroZero]). */
     fun chestNumber(number: Int, zeroZero: Boolean = false): Bitmap? {
@@ -95,7 +122,7 @@ object SpriteSheets {
     /**
      * Jersey file stem for a team.
      * - NBA: [slot] (franchise id) → `lakers`, `celtics`, …
-     * - College: [abbr] → numbered college art (`01_duke`, …); else null (default jersey).
+     * - College: [abbr] → numbered college art (`01_duke`, …); else null (a jersey in the team's colors).
      */
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }

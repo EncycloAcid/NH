@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
 
-/** Full-canvas source-over composition with jersey-specific number clearance. */
+/** Full-canvas source-over composition with jersey-specific number clearance, and a team-colored jersey for teams without art. */
 object SpriteCompose {
     const val N = 512
     private val EMBEDDED_BAND_COLORS = setOf(0xFFAE1C24.toInt(), 0xFFCE3137.toInt(), 0xFF71121A.toInt(), 0xFF301217.toInt())
@@ -24,6 +24,10 @@ object SpriteCompose {
         )
     }
 
+    /**
+     * One portrait. A team with jersey art ([jerseyKey]) wears it; any other team wears a jersey in its own
+     * [primary] and [secondary] colors with [label] (its abbreviation) across the chest.
+     */
     fun render(
         f: Face,
         primary: Int,
@@ -31,6 +35,7 @@ object SpriteCompose {
         number: Int,
         gear: Gear = Gear(),
         jerseyKey: String? = null,
+        label: String? = null,
     ): IntArray {
         val beard = SpriteSheets.beard(f.beard)
         val rawHair = if (f.hair == 1 && f.hairColor >= 4)
@@ -38,11 +43,14 @@ object SpriteCompose {
         val headband = SpriteSheets.headband(if (f.hair == 7 && f.acc == 0) 3 else f.acc)
         val hair = if (f.hair == 7 && rawHair != null) occludeEmbeddedBand(rawHair, headband) else rawHair
         val body = SpriteSheets.body(f.skin)?.let { softenCheekHighlights(it) }
-        val jerseyPath = SpriteSheets.jerseyPath(jerseyKey)
+        val art = SpriteSheets.jerseyArt(jerseyKey)
+        // No art for this team: its own colors, not another school's jersey.
+        val jersey = art?.let { SpriteSheets.bitmap(it) } ?: teamJersey(primary, secondary, label)
+        val jerseyPath = if (art != null) art else if (jersey != null) SpriteSheets.TEAM_JERSEY else SpriteSheets.jerseyPath(null)
         val mouth = SpriteSheets.mouth(f.mouth)?.let { if (body != null) tintMouth(body, it) else it }
         return composite(listOfNotNull(
             body,
-            SpriteSheets.bitmap(jerseyPath),
+            jersey ?: SpriteSheets.bitmap(jerseyPath),
             SpriteSheets.chestNumber(number)?.let { positionNumber(it, jerseyPath) },
             beard,
             mouth,
@@ -51,6 +59,158 @@ object SpriteCompose {
             headband?.let { occludeHeadband(it, rawHair, body) },
             SpriteSheets.eyewear(f.acc),
         ), f.hairColor, setOfNotNull(beard, hair))
+    }
+
+    // ---------- a jersey in the team's own colors ----------
+
+    /** How bright a color looks (0 black to 1 white). */
+    private fun brightness(c: Int): Double {
+        fun channel(v: Int): Double {
+            val x = v / 255.0
+            return if (x <= 0.03928) x / 12.92 else Math.pow((x + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel((c ushr 16) and 255) + 0.7152 * channel((c ushr 8) and 255) + 0.0722 * channel(c and 255)
+    }
+
+    private fun contrast(a: Int, b: Int): Double {
+        val x = brightness(a) + 0.05
+        val y = brightness(b) + 0.05
+        return maxOf(x, y) / minOf(x, y)
+    }
+
+    /** The cloth and trim colors of a team's jersey, as opaque RGB. */
+    internal fun teamColors(primary: Int, secondary: Int): Pair<Int, Int> {
+        var cloth = primary or 0xFF000000.toInt()
+        var trim = secondary or 0xFF000000.toInt()
+        // The chest number is white, so a near-white school color goes on the trim and the other one makes the cloth.
+        if (brightness(cloth) > 0.8 && contrast(cloth, trim) >= 2.0) cloth = trim.also { trim = cloth }
+        // Two colors too alike to tell apart: white piping on a dark jersey, dark piping on a light one.
+        if (contrast(cloth, trim) < 1.6) trim = if (brightness(cloth) < 0.4) 0xFFFFFFFF.toInt() else 0xFF14161C.toInt()
+        return cloth to trim
+    }
+
+    /** One channel of a base color at a template shade: 128 is the color itself, below it folds, above it highlights. */
+    private fun shaded(base: Int, shade: Int): Int =
+        if (shade <= 128) base * shade / 128 else base + (255 - base) * ((shade - 128) * 55 / 100) / 128
+
+    /**
+     * The jersey of a team with no art of its own: the neutral template in the team's colors, with its
+     * abbreviation across the chest in the trim color. Cached per colors and wording.
+     */
+    internal fun teamJersey(primary: Int, secondary: Int, label: String?): Bitmap? {
+        val template = SpriteSheets.bitmap(SpriteSheets.TEAM_JERSEY) ?: return null
+        if (template.width != N || template.height != N) return null
+        val word = label.orEmpty().uppercase().filter { it in LETTERS }.take(5)
+        return SpriteSheets.derived("team:${primary and 0xFFFFFF}:${secondary and 0xFFFFFF}:$word") {
+            val (cloth, trim) = teamColors(primary, secondary)
+            // Black cloth is lifted to charcoal so its folds still show.
+            val clothRgb = intArrayOf(maxOf((cloth ushr 16) and 255, 30), maxOf((cloth ushr 8) and 255, 30), maxOf(cloth and 255, 30))
+            val trimRgb = intArrayOf((trim ushr 16) and 255, (trim ushr 8) and 255, trim and 255)
+            val px = IntArray(N * N)
+            template.getPixels(px, 0, N, 0, 0, N, N)
+            for (i in px.indices) {
+                val t = px[i]
+                if (t ushr 24 == 0) { px[i] = 0; continue }
+                val shade = (t ushr 16) and 255
+                val base = if (((t ushr 8) and 255) > 127) trimRgb else clothRgb
+                px[i] = 0xFF000000.toInt() or (shaded(base[0], shade) shl 16) or (shaded(base[1], shade) shl 8) or shaded(base[2], shade)
+            }
+            if (word.isNotEmpty()) {
+                val scale = if (word.length <= 3) 5 else 4
+                val gap = if (word.length <= 4) scale else 3
+                val width = word.length * 5 * scale + (word.length - 1) * gap
+                val left = N / 2 - width / 2 + 1
+                val top = 332
+                val shadow = 0xFF000000.toInt() or ((clothRgb[0] * 45 / 100) shl 16) or ((clothRgb[1] * 45 / 100) shl 8) or (clothRgb[2] * 45 / 100)
+                val ink = 0xFF000000.toInt() or (trimRgb[0] shl 16) or (trimRgb[1] shl 8) or trimRgb[2]
+                // A drop shadow first, then the letters on top of it.
+                for ((offset, color) in listOf(scale / 2 + 1 to shadow, 0 to ink)) {
+                    var x = left + offset
+                    for (ch in word) {
+                        val rows = LETTERS.getValue(ch)
+                        for (ry in 0 until 7) for (rx in 0 until 5) {
+                            if (rows[ry][rx] != '1') continue
+                            for (dy in 0 until scale) for (dx in 0 until scale) {
+                                val yy = top + offset + ry * scale + dy
+                                val xx = x + rx * scale + dx
+                                if (xx !in 0 until N || yy !in 0 until N) continue
+                                val i = yy * N + xx
+                                if (px[i] ushr 24 != 0) px[i] = color      // never outside the jersey
+                            }
+                        }
+                        x += 5 * scale + gap
+                    }
+                }
+            }
+            Bitmap.createBitmap(px, N, N, Bitmap.Config.ARGB_8888)
+        }
+    }
+
+    /** Block capitals and digits on a 5x7 grid, for the chest of a team-colored jersey. */
+    private val LETTERS: Map<Char, List<String>> = mapOf(
+        'A' to listOf("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
+        'B' to listOf("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
+        'C' to listOf("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
+        'D' to listOf("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
+        'E' to listOf("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+        'F' to listOf("11111", "10000", "10000", "11110", "10000", "10000", "10000"),
+        'G' to listOf("01111", "10000", "10000", "10011", "10001", "10001", "01111"),
+        'H' to listOf("10001", "10001", "10001", "11111", "10001", "10001", "10001"),
+        'I' to listOf("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
+        'J' to listOf("00111", "00010", "00010", "00010", "00010", "10010", "01100"),
+        'K' to listOf("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
+        'L' to listOf("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
+        'M' to listOf("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+        'N' to listOf("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+        'O' to listOf("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
+        'P' to listOf("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+        'Q' to listOf("01110", "10001", "10001", "10001", "10101", "10010", "01101"),
+        'R' to listOf("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
+        'S' to listOf("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
+        'T' to listOf("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+        'U' to listOf("10001", "10001", "10001", "10001", "10001", "10001", "01110"),
+        'V' to listOf("10001", "10001", "10001", "10001", "10001", "01010", "00100"),
+        'W' to listOf("10001", "10001", "10001", "10101", "10101", "11011", "10001"),
+        'X' to listOf("10001", "10001", "01010", "00100", "01010", "10001", "10001"),
+        'Y' to listOf("10001", "10001", "01010", "00100", "00100", "00100", "00100"),
+        'Z' to listOf("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
+        '0' to listOf("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
+        '1' to listOf("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
+        '2' to listOf("01110", "10001", "00001", "00010", "00100", "01000", "11111"),
+        '3' to listOf("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
+        '4' to listOf("00010", "00110", "01010", "10010", "11111", "00010", "00010"),
+        '5' to listOf("11111", "10000", "11110", "00001", "00001", "10001", "01110"),
+        '6' to listOf("00110", "01000", "10000", "11110", "10001", "10001", "01110"),
+        '7' to listOf("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
+        '8' to listOf("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
+        '9' to listOf("01110", "10001", "10001", "01111", "00001", "00010", "01100"),
+    )
+
+    /**
+     * A portrait at half size for rows and cards: each pixel is the average of a 2x2 block, weighted by
+     * alpha so the silhouette's edge doesn't darken. A quarter of the memory of the full picture.
+     */
+    fun half(px: IntArray): IntArray {
+        require(px.size == N * N) { "A portrait is ${N}x$N" }
+        val h = N / 2
+        val out = IntArray(h * h)
+        for (y in 0 until h) for (x in 0 until h) {
+            val i = y * 2 * N + x * 2
+            var a = 0
+            var r = 0
+            var g = 0
+            var b = 0
+            for (k in 0..3) {
+                val c = px[i + (k and 1) + (k shr 1) * N]
+                val alpha = c ushr 24
+                a += alpha
+                r += ((c ushr 16) and 255) * alpha
+                g += ((c ushr 8) and 255) * alpha
+                b += (c and 255) * alpha
+            }
+            out[y * h + x] = if (a == 0) 0 else (((a + 2) / 4) shl 24) or ((r / a) shl 16) or ((g / a) shl 8) or (b / a)
+        }
+        return out
     }
 
     fun renderLook(look: PlayerLook, jerseyKey: String?, number: Int): IntArray {

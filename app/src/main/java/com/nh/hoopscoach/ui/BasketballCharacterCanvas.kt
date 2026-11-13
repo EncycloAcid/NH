@@ -37,11 +37,13 @@ fun BasketballCharacterCanvas(
     number: Int = 0,
     gear: Gear = Gear(),
     corner: androidx.compose.ui.unit.Dp = 16.dp,
+    /** The team's abbreviation, worn across the chest when the team has no jersey art of its own. */
+    label: String? = null,
 ) {
     val context = LocalContext.current
     SpriteSheets.install(context.assets)
-    val image = remember(face.encode(), jerseyKey, primary, secondary, number, gear.encode()) {
-        val px = SpriteCompose.render(face, primary, secondary, number, gear, jerseyKey)
+    val image = remember(face.encode(), jerseyKey, primary, secondary, number, gear.encode(), label) {
+        val px = SpriteCompose.render(face, primary, secondary, number, gear, jerseyKey, label)
         Bitmap.createBitmap(px, SpriteCompose.N, SpriteCompose.N, Bitmap.Config.ARGB_8888).asImageBitmap()
     }
 
