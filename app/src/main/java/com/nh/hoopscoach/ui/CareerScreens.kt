@@ -393,7 +393,16 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Section("AI Dynasty Intelligence")
-            AiDiagnosticsPanel(lg.ollama) { model -> vm.act { l ->
+            AiDiagnosticsPanel(
+                lg.ollama,
+                onAutoPickChanged = { on -> vm.act { l ->
+                    l.ollama.autoPickModel = on
+                    if (on) {
+                        com.nh.hoopscoach.game.Ollama.applyAutoPick(l.ollama)
+                        com.nh.hoopscoach.game.Ollama.Cache.clear()
+                    }
+                } },
+            ) { model -> vm.act { l ->
                 when (l.ollama.provider) { "google" -> l.ollama.googleModel = model; "openai" -> l.ollama.openAiModel = model; else -> l.ollama.model = model }
                 com.nh.hoopscoach.game.Ollama.Cache.clear()
             } }
@@ -408,9 +417,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             it.ollama.enabled = on
                             // Only strip known expensive ids once when turning AI on — never overwrite a custom pick later.
                             if (on) {
-                                it.ollama.googleModel = com.nh.hoopscoach.game.Ollama.snapGoogleModel(it.ollama.googleModel)
-                                it.ollama.openAiModel = com.nh.hoopscoach.game.Ollama.snapOpenAiModel(it.ollama.openAiModel)
-                                it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
+                                if (it.ollama.autoPickModel) com.nh.hoopscoach.game.Ollama.applyAutoPick(it.ollama)
+                                else {
+                                    it.ollama.googleModel = com.nh.hoopscoach.game.Ollama.snapGoogleModel(it.ollama.googleModel)
+                                    it.ollama.openAiModel = com.nh.hoopscoach.game.Ollama.snapOpenAiModel(it.ollama.openAiModel)
+                                    it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
+                                }
                             }
                         }
                     })
@@ -422,7 +434,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     val providerLabels = listOf("Local", "Gemini", "ChatGPT")
                     val providerIdx = providers.indexOfFirst { it.equals(lg.ollama.provider, true) }.coerceAtLeast(0)
                     Segmented(providerLabels, providerIdx, { i ->
-                        vm.act { it.ollama.provider = providers[i] }
+                        vm.act {
+                            it.ollama.provider = providers[i]
+                            if (it.ollama.autoPickModel) com.nh.hoopscoach.game.Ollama.applyAutoPick(it.ollama)
+                        }
                         testStatus = ""
                     })
                     Spacer(Modifier.height(6.dp))
@@ -535,10 +550,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
                             val gIdx = gModels.indexOfFirst { it.id.equals(lg.ollama.googleModel, true) }.coerceAtLeast(0)
                             Picker(
-                                "Gemini model",
-                                "${gModels[gIdx].name} · ${gModels[gIdx].tag}",
+                                if (lg.ollama.autoPickModel) "Gemini model (auto)" else "Gemini model",
+                                "${if (lg.ollama.autoPickModel) "Auto · " else ""}${gModels[gIdx].name} · ${gModels[gIdx].tag}",
                                 gModels.map { it.name to "${it.tag} — ${it.description}" },
-                            ) { i -> vm.act { it.ollama.googleModel = gModels[i].id } }
+                            ) { i -> vm.act {
+                                it.ollama.autoPickModel = false
+                                it.ollama.googleModel = gModels[i].id
+                            } }
 
                             Spacer(Modifier.height(10.dp))
                             // Advanced & developer toggle
@@ -710,10 +728,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
                             val oIdx = oModels.indexOfFirst { it.id.equals(lg.ollama.openAiModel, true) }.coerceAtLeast(0)
                             Picker(
-                                "ChatGPT model",
-                                "${oModels[oIdx].name} · ${oModels[oIdx].tag}",
+                                if (lg.ollama.autoPickModel) "ChatGPT model (auto)" else "ChatGPT model",
+                                "${if (lg.ollama.autoPickModel) "Auto · " else ""}${oModels[oIdx].name} · ${oModels[oIdx].tag}",
                                 oModels.map { it.name to "${it.tag} — ${it.description}" },
-                            ) { i -> vm.act { it.ollama.openAiModel = oModels[i].id } }
+                            ) { i -> vm.act {
+                                it.ollama.autoPickModel = false
+                                it.ollama.openAiModel = oModels[i].id
+                            } }
 
                             Spacer(Modifier.height(10.dp))
                             // Advanced & developer toggle
@@ -816,13 +837,17 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         testSuccess = true
                                         testStatus = cfg.message
                                         availableModels = cfg.models
+                                        var chosen = cfg.selectedModel
                                         vm.act {
                                             it.ollama.enabled = true
                                             it.ollama.provider = "ollama"
                                             it.ollama.host = cfg.host
-                                            it.ollama.model = cfg.selectedModel
+                                            chosen = if (it.ollama.autoPickModel) {
+                                                com.nh.hoopscoach.game.Ollama.pickBestModel("ollama", cfg.models)
+                                            } else cfg.selectedModel
+                                            it.ollama.model = chosen
                                         }
-                                        vm.toast("Configured: using ${cfg.selectedModel}")
+                                        vm.toast("Configured: using $chosen")
                                     }.onFailure { err ->
                                         testSuccess = false
                                         testStatus = err.message ?: "Could not detect Ollama"
@@ -927,6 +952,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                         } else if (isInstalled) {
                                             SmallButton("Select") {
                                                 vm.act {
+                                                    it.ollama.autoPickModel = false
                                                     it.ollama.model = preset.id
                                                     it.ollama.enabled = true
                                                 }
@@ -949,6 +975,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                                                     downloadingModel = null
                                                     res.onSuccess {
                                                         vm.act {
+                                                            it.ollama.autoPickModel = false
                                                             it.ollama.model = preset.id
                                                             it.ollama.enabled = true
                                                         }
