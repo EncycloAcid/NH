@@ -17,7 +17,15 @@ kotlin {
         }
     }
 
-    jvm("desktop")
+    jvm("desktop") {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
+    // Compile against JDK 17 APIs even when the agent/CI host is on a newer JDK,
+    // so calls like SortedSet.reversed() (Java 21) are not linked by mistake.
+    jvmToolchain(17)
 
     sourceSets {
         val commonMain by getting {
