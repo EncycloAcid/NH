@@ -14,8 +14,12 @@ object Business {
     val UPGRADES = listOf(
         Upgrade("board", "Video board", "A new center-hung board: fans +4, a little fuller every night.", 8_000, 2_000),
         Upgrade("seats", "Expanded seating", "6% more seats in the building.", 25_000, 6_000),
+        Upgrade("arena", "Arena renovation", "Full remodel: 8% more seats, fans +3, louder nights.", 40_000, 10_000),
         Upgrade("premium", "Premium seating", "Courtside clubs and suites: the gate is 10% bigger.", 15_000, 4_000),
         Upgrade("practice", "Practice facility", "Better development (coach development +3)" + "; in college, recruits notice too (recruiting +2).", 20_000, 5_000),
+        Upgrade("training", "Training center", "Expanded performance lab: coach development +2 more; players happier (+3).", 28_000, 7_000),
+        Upgrade("recruiting", "Recruiting infrastructure", "Film room, host suites, campus tour hub: coach recruiting +3.", 18_000, 4_500),
+        Upgrade("brand", "National brand campaign", "Marketing push: buzz +8, fans +2, the program looks bigger nationally.", 22_000, 5_500),
         Upgrade("locker", "Locker room", "Players love it: happiness +6.", 6_000, 1_500),
     )
     val PRICES = listOf("Cheap", "Fair", "Standard", "Premium", "Luxury")
@@ -68,10 +72,27 @@ object Business {
         when (id) {
             "board" -> t.fans = (t.fans + 4).coerceAtMost(100.0)
             "seats" -> t.arena = (t.arena * 1.06).roundToInt() / 50 * 50
+            "arena" -> {
+                t.arena = (t.arena * 1.08).roundToInt() / 50 * 50
+                t.fans = (t.fans + 3).coerceAtMost(100.0)
+            }
             "practice" -> runCatching { lg.coachOf(t) }.getOrNull()?.let { c -> c.dev = (c.dev + 3).coerceAtMost(99); if (!lg.pro) c.rec = (c.rec + 2).coerceAtMost(99) }
+            "training" -> {
+                runCatching { lg.coachOf(t) }.getOrNull()?.let { c -> c.dev = (c.dev + 2).coerceAtMost(99) }
+                lg.rosterOf(t).forEach { it.happiness = (it.happiness + 3).coerceAtMost(99) }
+            }
+            "recruiting" -> runCatching { lg.coachOf(t) }.getOrNull()?.let { c -> c.rec = (c.rec + 3).coerceAtMost(99) }
+            "brand" -> {
+                Brand.ensure(lg)
+                t.buzz = (t.buzz.coerceAtLeast(0.0) + 8).coerceAtMost(100.0)
+                t.fans = (t.fans + 2).coerceAtMost(100.0)
+            }
             "locker" -> lg.rosterOf(t).forEach { it.happiness = (it.happiness + 6).coerceAtMost(99) }
         }
-        lg.news += News(lg.season, lg.day, "${if (lg.pro) "The ${t.name}" else t.school} ${if (lg.pro) "unveil" else "unveils"} a new ${u.name.lowercase()}", true, -1, "", u.what, "", t.id)
+        lg.news += News(lg.season, lg.day, "${if (lg.pro) "The ${t.name}" else t.school} ${if (lg.pro) "unveil" else "unveils"} a new ${u.name.lowercase()}", true, -1, "facility", u.what, "Hoops Wire Campus", t.id)
+        if (lg.ollama.enabled && lg.ollama.universityDevelopment && t.id == lg.userTeamId) {
+            Ollama.maybeAutoGenerateUniversityDevelopment(lg.ollama, lg, force = true)
+        }
         return "${u.name} built."
     }
 

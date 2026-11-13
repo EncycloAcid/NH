@@ -765,6 +765,9 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             if (filter == 0 && (lg.ollama.enabled && lg.ollama.historicalRivalries || lg.news.any { it.source.contains("Hoops Wire Rivalries", ignoreCase = true) })) {
                 item { HistoricalRivalriesCard(vm, lg) }
             }
+            if (filter == 0 && (lg.ollama.enabled && lg.ollama.universityDevelopment || lg.news.any { it.source.contains("Hoops Wire Campus", ignoreCase = true) })) {
+                item { UniversityDevelopmentCard(vm, lg) }
+            }
             if (top != null) item {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
@@ -879,6 +882,51 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                 TextButton({ showOllamaDialog = false }, enabled = !writingStory) { Text("Cancel", color = P.sub) }
             },
         )
+    }
+}
+
+/** Campus desk: arenas, facilities, recruiting infrastructure, national brand. */
+@Composable
+private fun UniversityDevelopmentCard(vm: GameViewModel, lg: League) {
+    var writing by remember { mutableStateOf(false) }
+    var lastDetail by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    fun runDesk() {
+        writing = true
+        scope.launch {
+            val res = Ollama.generateUniversityDevelopment(lg.ollama, lg)
+            writing = false
+            res.onSuccess { pack ->
+                vm.act { it.news.addAll(pack.stories) }
+                lastDetail = pack.detail
+                vm.toast(if (pack.isAi) "Campus desk filed ${pack.stories.size} pieces" else pack.detail)
+            }.onFailure { err ->
+                vm.toast("Campus: ${err.message ?: "failed"}")
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Section(
+        "Campus desk",
+        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} campus",
+        onAction = { if (!writing) runDesk() },
+    )
+    Panel {
+        if (writing) {
+            Text("${lg.ollama.providerDisplayName} is filing arena, facility, and brand coverage…", style = T.small, color = P.accent)
+        } else {
+            Text(
+                "Renovations, training centers, recruiting hubs, and national brand campaigns — grounded in your upgrade budget and Program Pull.",
+                style = T.small,
+                color = P.sub,
+            )
+            if (lastDetail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(lastDetail, style = T.small, color = P.faint)
+            }
+            Spacer(Modifier.height(8.dp))
+            SmallButton(if (lg.ollama.enabled) "File campus development package" else "File game-written campus desk", primary = true) { runDesk() }
+        }
     }
 }
 

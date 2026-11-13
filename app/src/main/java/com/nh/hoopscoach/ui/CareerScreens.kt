@@ -1384,6 +1384,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI university development", style = T.bodyB, color = P.ink)
+                            Text("Arenas, training centers, recruiting infrastructure, and national brand — from real budgets and upgrades.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.universityDevelopment, { on -> vm.act { it.ollama.universityDevelopment = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Free agency rumors & contract demands", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops on expiring contracts and max contract pursuits.", style = T.small, color = P.sub)
                         }

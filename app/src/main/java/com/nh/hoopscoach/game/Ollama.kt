@@ -227,6 +227,7 @@ object Ollama {
             is PlayerStorylines.Package -> value.isAi
             is DraftUniverse.Package -> value.isAi
             is HistoricalRivalries.Package -> value.isAi
+            is UniversityDevelopment.Package -> value.isAi
             else -> true
         }
     }
@@ -1084,6 +1085,86 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
         }
+    }
+
+    /** Fire-and-forget campus / franchise development package. */
+    fun maybeAutoGenerateUniversityDevelopment(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
+        if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateUniversityDevelopment(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+            }
+        }
+    }
+
+    /** Campus desk: arenas, facilities, recruiting infrastructure, national brand. */
+    suspend fun generateUniversityDevelopment(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<UniversityDevelopment.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.universityDevelopment) {
+            return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg))
+        }
+        val brief = UniversityDevelopment.campusBrief(lg)
+        val cacheKey = "campus_dev_${lg.season}_${lg.day}_${lg.user.upgrades.size}_${lg.user.cash}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<UniversityDevelopment.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national college athletics business / facilities beat writer. Using ONLY the CAMPUS BRIEF, write up to three pieces.")
+            appendLine("Do not invent budgets, capacities, or projects not listed.")
+            appendLine("CAMPUS BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that topic has no facts):")
+            appendLine("ARENA_HEADLINE: <arena / crowd / renovation headline>")
+            appendLine("ARENA_BODY: <2 short paragraphs>")
+            appendLine("FACILITY_HEADLINE: <practice / training / recruiting infrastructure headline>")
+            appendLine("FACILITY_BODY: <2 short paragraphs>")
+            appendLine("BRAND_HEADLINE: <national brand / Program Pull headline>")
+            appendLine("BRAND_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "University development desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Campus")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = true, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("ARENA_HEADLINE", "ARENA_BODY")
+            add("FACILITY_HEADLINE", "FACILITY_BODY")
+            add("BRAND_HEADLINE", "BRAND_BODY")
+            val pack = if (stories.isNotEmpty()) UniversityDevelopment.Package(stories, draft.isAi, "Campus desk filed ${stories.size} pieces.")
+            else UniversityDevelopment.fallbackPackage(lg).copy(detail = "AI thin — used game-written campus desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { UniversityDevelopment.fallbackPackage(lg) }
     }
 
     /** Fire-and-forget historical rivalries package (programs, coaches, fans, players). */
