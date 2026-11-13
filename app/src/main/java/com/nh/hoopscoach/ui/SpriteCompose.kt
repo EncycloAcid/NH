@@ -34,9 +34,9 @@ object SpriteCompose {
     private const val CUTOUT_MIN_Y = 285
     private const val CUTOUT_RIM = 1
     // How far (sum of RGB deltas) a strap pixel must be from the fabric to count as a printed mark.
-    private const val MARK_DISTANCE = 90
+    private const val MARK_DISTANCE = 70
     // Edge pixels next to a wiped digit that are this far off the fabric get wiped as well.
-    private const val EDGE_DISTANCE = 40
+    private const val EDGE_DISTANCE = 32
     // Patches grow from fabric within this distance of the jersey's main color first.
     private const val FABRIC_DISTANCE = 140
     private const val NUMBER_AREA_X0 = 186
@@ -129,8 +129,8 @@ object SpriteCompose {
         val kill = BooleanArray(w * h)
         val cutout = markEnclosedCutouts(px, w, h, kill)
         markGlyphs(px, w, h, kill, CHEST_NUM_CX, CHEST_NUM_CY, halfW = 70, halfH = 55)
-        markGlyphs(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 5f, halfW = 36, halfH = 35)
-        markIsolatedMarks(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 9f, halfW = 36, halfH = 39)
+        markGlyphs(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 5f, halfW = 42, halfH = 40)
+        markIsolatedMarks(px, w, h, kill, SHOULDER_NUM_CX, SHOULDER_NUM_CY + 9f, halfW = 42, halfH = 44)
         // The cutouts' anti-aliased rims (white edge, dark outline) sit just outside the boxes.
         for (y in 0 until h) for (x in 0 until w) {
             val i = y * w + x
@@ -139,7 +139,74 @@ object SpriteCompose {
         }
         val fabric = dominantColor(px, w, NUMBER_AREA_X0, NUMBER_AREA_X1, NUMBER_AREA_Y0, NUMBER_AREA_Y1)
         inpaint(px, w, h, kill, fabric)
+        // Second pass: faint shoulder-strap ghosts often survive the first fill with a near-fabric
+        // shade. Resample each column from fabric above the strap and wipe leftover marks.
+        scrubShoulderGhost(px, w, h)
         bmp.setPixels(px, 0, w, 0, 0, w, h)
+    }
+
+    /**
+     * Clears residual shoulder-strap digit ghosts after the main inpaint. Samples fabric from the
+     * same column a few rows above the strap hole so the fill matches local shade instead of a
+     * flat average that still reads as a pale "1" at zoom.
+     */
+    private fun scrubShoulderGhost(px: IntArray, w: Int, h: Int) {
+        val x0 = (SHOULDER_NUM_CX - 44f).roundToInt().coerceIn(0, w - 1)
+        val x1 = (SHOULDER_NUM_CX + 44f).roundToInt().coerceIn(0, w)
+        val y0 = (SHOULDER_NUM_CY - 36f).roundToInt().coerceIn(0, h - 1)
+        val y1 = (SHOULDER_NUM_CY + 48f).roundToInt().coerceIn(0, h)
+        val fabric = dominantColor(px, w, x0, x1, (y0 - 28).coerceAtLeast(0), y0) ?: return
+        val kill = BooleanArray(w * h)
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val i = y * w + x
+            val c = px[i]
+            if (c ushr 24 < 32) continue
+            val dist = colorDistance(c, fabric)
+            // Catch both hard glyph tones and soft near-fabric ghosts left by the first fill.
+            if (dist > 22 && (isGlyphTone(c) || dist > 40)) kill[i] = true
+        }
+        // Grow two rings so anti-aliased ghost edges don't remain.
+        repeat(2) {
+            val grow = ArrayList<Int>()
+            for (y in y0 until y1) for (x in x0 until x1) {
+                val i = y * w + x
+                if (kill[i] || px[i] ushr 24 < 32) continue
+                if (colorDistance(px[i], fabric) <= 14) continue
+                if ((x > x0 && kill[i - 1]) || (x < x1 - 1 && kill[i + 1]) ||
+                    (y > y0 && kill[i - w]) || (y < y1 - 1 && kill[i + w])
+                ) grow.add(i)
+            }
+            for (i in grow) kill[i] = true
+        }
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val i = y * w + x
+            if (!kill[i]) continue
+            px[i] = sampleFabricAbove(px, w, h, x, y, fabric)
+        }
+    }
+
+    /** Prefer the nearest opaque fabric pixel above (x,y); fall back to [fabric]. */
+    private fun sampleFabricAbove(px: IntArray, w: Int, h: Int, x: Int, y: Int, fabric: Int): Int {
+        for (yy in (y - 1) downTo (y - 48).coerceAtLeast(0)) {
+            val c = px[yy * w + x]
+            if (c ushr 24 < 200) continue
+            if (isGlyphTone(c)) continue
+            if (colorDistance(c, fabric) > FABRIC_DISTANCE) continue
+            return c
+        }
+        // Blend a little with left/right neighbors at the same row if they look like fabric.
+        var r = (fabric shr 16) and 0xFF
+        var g = (fabric shr 8) and 0xFF
+        var b = fabric and 0xFF
+        var n = 1
+        for (dx in intArrayOf(-1, 1)) {
+            val xx = x + dx
+            if (xx !in 0 until w) continue
+            val c = px[y * w + xx]
+            if (c ushr 24 < 200 || isGlyphTone(c) || colorDistance(c, fabric) > FABRIC_DISTANCE) continue
+            r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+        }
+        return 0xFF000000.toInt() or ((r / n) shl 16) or ((g / n) shl 8) or (b / n)
     }
 
     /**

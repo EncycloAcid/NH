@@ -119,6 +119,44 @@ class AvatarArtTest {
     }
 
     @Test
+    fun shoulderStrapHasNoLeftoverDigitGhost() {
+        // After cleaning, the interior of the right shoulder strap (away from the armhole outline
+        // and trim) should not keep blotches far from the local fabric — leftover baked digits.
+        val n = SpriteCompose.N
+        for (jersey in listOf("timberwolves", "lakers", "celtics", "heat", "warriors", "knicks")) {
+            val px = SpriteCompose.render(Face(1, 0, 1, 0, 0, 0, 0, 0, 0), 0, 0, 3, jerseyKey = jersey)
+            val x0 = 152
+            val x1 = 162
+            val y0 = 142
+            val y1 = 156
+            var sr = 0
+            var sg = 0
+            var sb = 0
+            var sn = 0
+            for (y in y0 until y1) for (x in x0 until x1) {
+                val c = px[y * n + x]
+                if (c ushr 24 < 200) continue
+                sr += (c shr 16) and 0xFF; sg += (c shr 8) and 0xFF; sb += c and 0xFF; sn++
+            }
+            assertTrue("$jersey: empty shoulder sample", sn > 20)
+            val fr = sr / sn
+            val fg = sg / sn
+            val fb = sb / sn
+            var ghosts = 0
+            for (y in y0 until y1) for (x in x0 until x1) {
+                val c = px[y * n + x]
+                if (c ushr 24 < 200) continue
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val dist = kotlin.math.abs(r - fr) + kotlin.math.abs(g - fg) + kotlin.math.abs(b - fb)
+                if (dist > 90) ghosts++
+            }
+            assertTrue("$jersey: $ghosts leftover shoulder digit pixels", ghosts <= 6)
+        }
+    }
+
+    @Test
     fun beardStaysOnTheChin() {
         // A beard layer must never put dark pixels beyond the face's width at mouth height.
         val n = SpriteCompose.N
