@@ -705,7 +705,18 @@ fun NewGameScreen(vm: GameViewModel) {
     }
 
     Column(Modifier.fillMaxSize().background(P.bg).statusBarsPadding()) {
-        if (lg == null) { BusyScreen("Building your league"); return@Column }
+        if (lg == null) {
+            val err = vm.draftError
+            if (err == null) BusyScreen("Building your league")
+            else Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text("The league couldn't be built", style = T.head, color = P.ink, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(err, style = T.small, color = P.sub, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(18.dp))
+                PrimaryButton("Try again", Modifier.fillMaxWidth()) { vm.generateDraft() }
+            }
+            return@Column
+        }
         val header: @Composable () -> Unit = {
             if (vm.saveSlots.isNotEmpty()) {
                 Column(Modifier.padding(top = 10.dp)) {

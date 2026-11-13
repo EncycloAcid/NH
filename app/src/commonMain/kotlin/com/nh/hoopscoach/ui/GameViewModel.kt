@@ -19,6 +19,7 @@ import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.SaveManager
 import com.nh.hoopscoach.game.SaveSlot
 import com.nh.hoopscoach.game.Season
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -102,6 +103,25 @@ class GameViewModel : ViewModel() {
         private set
     var loadError by mutableStateOf<String?>(null)
         private set
+    /** Why the new-career league couldn't be built, shown with a way to try again instead of a spinner that never ends. */
+    var draftError by mutableStateOf<String?>(null)
+
+    /**
+     * Any job that fails, even with an Error that the jobs' own `catch (e: Exception)` misses, clears the
+     * busy screen and says so. Without this a failure left "Building your league" up forever: on Android
+     * the app crashed, but on PC nothing closed the window.
+     */
+    private val failSafe = CoroutineExceptionHandler { _, e ->
+        e.printStackTrace()
+        runCatching { File(filesDir, "last-error.txt").writeText(com.nh.hoopscoach.CrashReporter.redact("${java.util.Date()}\n${busy ?: "background job"}\n${e.stackTraceToString()}")) }
+        val what = busy
+        busy = null
+        progress = null
+        progressNote = ""
+        loading = false
+        if (league == null && draft == null) draftError = "${e.javaClass.simpleName}: ${e.message ?: "no details"}"
+        else message = "${what ?: "That"} failed (${e.javaClass.simpleName}). Details saved to last-error.txt."
+    }
     var rev by mutableIntStateOf(0)
         private set
     var busy by mutableStateOf<String?>(null)
@@ -149,7 +169,7 @@ class GameViewModel : ViewModel() {
     }
 
     init {
-        if (autoLoad) viewModelScope.launch {
+        if (autoLoad) viewModelScope.launch(failSafe) {
             try {
                                 val pair = withContext(Dispatchers.IO) {
                     SaveManager.migrateLegacyIfNeeded(filesDir)
@@ -168,7 +188,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun refreshSaveSlots() {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
                         val slots = try { withContext(Dispatchers.IO) { SaveManager.listSlots(filesDir) } }
                 catch (e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (e: Exception) { emptyList() }
@@ -200,14 +220,14 @@ class GameViewModel : ViewModel() {
     private val saveMutex = Mutex()
     private fun scheduleSave() {
         saveJob?.cancel()
-        saveJob = viewModelScope.launch {
+        saveJob = viewModelScope.launch(failSafe) {
             delay(700)
             saveNow()
         }
     }
 
     fun saveSoon() {
-        viewModelScope.launch { saveNow() }
+        viewModelScope.launch(failSafe) { saveNow() }
     }
 
     private suspend fun saveNow(): Boolean = saveMutex.withLock {
@@ -233,7 +253,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun loadSlot(id: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             try {
                                 if (!saveNow()) return@launch
                 val loaded = withContext(Dispatchers.IO) {
@@ -262,7 +282,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun cloneSlot(id: String, newTitle: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
                         saveNow()
             val created = withContext(Dispatchers.IO) {
                 SaveManager.cloneSlot(filesDir, id, newTitle)
@@ -283,7 +303,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun renameSlot(id: String, newTitle: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
                         val updated = withContext(Dispatchers.IO) {
                 SaveManager.renameSlot(filesDir, id, newTitle)
             }
@@ -295,7 +315,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun deleteSlot(id: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
                         val wasActive = (id == activeSlotId)
             withContext(Dispatchers.IO) {
                 SaveManager.deleteSlot(filesDir, id)
@@ -322,7 +342,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun startNewDynasty() {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             if (!saveNow()) return@launch
             mutex.withLock {
                 league = null
@@ -350,7 +370,7 @@ class GameViewModel : ViewModel() {
     /** Quick change to the league; runs on the main thread. */
     fun act(block: (League) -> Unit) {
         val lg = league ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             mutex.withLock { block(lg); Reactions.pass(lg) }
             bump()
         }
@@ -363,7 +383,7 @@ class GameViewModel : ViewModel() {
         busy = label
         progress = null
         progressNote = ""
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             delay(60) // let the UI leave any screen that reads the league
             mutex.withLock { withContext(Dispatchers.Default) { block(lg); Reactions.pass(lg) } }
             busy = null
@@ -377,13 +397,11 @@ class GameViewModel : ViewModel() {
 
     fun generateDraft(startYear: Int = 2026) {
         busy = "Building your league"
-        viewModelScope.launch {
-            try {
-                val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
-                draft = lg
-                busy = null
-            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) { showLoadError(e) }
+        draftError = null
+        viewModelScope.launch(failSafe) {
+            val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
+            draft = lg
+            busy = null
         }
     }
 
@@ -404,7 +422,7 @@ class GameViewModel : ViewModel() {
         val d0 = draft ?: return
         roadSpec = spec
         busy = "Coaches are calling"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             // A different era needs a college league that starts in that era's season, with its real players.
             val d = if (d0.era == spec.era.name) d0 else withContext(Dispatchers.Default) {
                 if (spec.era == com.nh.hoopscoach.game.Era.TODAY) LeagueGen.newLeague() else com.nh.hoopscoach.game.EraCollege.newLeague(spec.era)
@@ -427,7 +445,7 @@ class GameViewModel : ViewModel() {
         val h = roadHero ?: return
         ensureFreshSlot()
         busy = "Signing your scholarship"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Road.start(d, h, teamId) }
             draft = null
             roadHero = null
@@ -447,7 +465,7 @@ class GameViewModel : ViewModel() {
         val lg = league ?: return
         if (busy != null || !(lg.road?.goingPro ?: false)) return
         busy = "Welcome to the league"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             delay(60)
             val pro = mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.ProLeague.create(lg, era) } }
             stack.clear()
@@ -465,7 +483,7 @@ class GameViewModel : ViewModel() {
         val pro = league ?: return
         if (busy != null || pro.road?.ended != true) return
         busy = "Taking the job at $school"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             delay(60)
             val college = mutex.withLock {
                 withContext(Dispatchers.Default) {
@@ -491,7 +509,7 @@ class GameViewModel : ViewModel() {
         val lg = league ?: return
         if (busy != null || lg.road?.retired != true) return
         busy = "Taking over the ${lg.team(teamId).name}"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             delay(60)
             val ok = runCatching {
                 mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.NbaCoach.fromRetirement(lg, teamId) } }
@@ -510,7 +528,7 @@ class GameViewModel : ViewModel() {
     fun setProfilePhoto(bytes: ByteArray) {
         val lg = league ?: return
         val r = lg.road ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             val name = withContext(Dispatchers.IO) {
                 runCatching {
                     val jpeg = squareJpegThumbnail(bytes) ?: return@runCatching null
@@ -564,7 +582,7 @@ class GameViewModel : ViewModel() {
         val college = league ?: return
         if (busy != null) return
         busy = "Heading to the NBA"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             delay(60)
             val pro = runCatching {
                 mutex.withLock {
@@ -591,7 +609,7 @@ class GameViewModel : ViewModel() {
         if (busy != null) return
         ensureFreshSlot()
         busy = "Building the ${if (year >= 2027) "league" else "${year - 1}-${(year % 100).toString().padStart(2, '0')} league"}"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             val lg = withContext(Dispatchers.Default) {
                 com.nh.hoopscoach.game.ProLeague.coachLeague(year, slot, first, last).also { com.nh.hoopscoach.game.ProCareer.next(it) }
             }
@@ -609,7 +627,7 @@ class GameViewModel : ViewModel() {
         val d = draft ?: return
         ensureFreshSlot()
         busy = "Setting up your first season"
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             withContext(Dispatchers.Default) { Offseason.claimTeam(d, teamId, first, last) }
             draft = null
             league = d
@@ -627,7 +645,7 @@ class GameViewModel : ViewModel() {
 
     /** Replaces or adds dynasty from a backup file into a slot. */
     fun importSave(bytes: ByteArray) {
-        viewModelScope.launch {
+        viewModelScope.launch(failSafe) {
             val imported = runCatching {
                 withContext(Dispatchers.IO) {
                     SaveManager.importSave(filesDir, bytes)
@@ -752,14 +770,14 @@ class GameViewModel : ViewModel() {
         val lv = live ?: return
         val lg = league ?: return
         if (lv.done) return
-        viewModelScope.launch { finishLive(lv, lg) }
+        viewModelScope.launch(failSafe) { finishLive(lv, lg) }
     }
 
     fun closeLive() {
         val lv = live
         val lg = league
         if (lv != null && !lv.done && lg != null) {
-            viewModelScope.launch { finishLive(lv, lg) }
+            viewModelScope.launch(failSafe) { finishLive(lv, lg) }
         }
         stack.removeAll { it is Route.Live }
         live = null

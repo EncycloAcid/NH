@@ -74,7 +74,9 @@ actual fun decodeArgbBitmap(bytes: ByteArray): ArgbBitmap? {
     val skia = org.jetbrains.skia.Bitmap()
     if (!skia.allocPixels(info)) return null
     if (!image.readPixels(skia)) return null
-    val buffer = skia.readPixels(info, 0, 0, 0) ?: return null
+    // Row length is width * 4 bytes; asking with 0 made Skia return nothing, so every sprite (and every
+    // player portrait) came out empty on PC.
+    val buffer = skia.readPixels(info, w * 4, 0, 0) ?: return null
     val pixels = IntArray(w * h)
     var i = 0
     var p = 0

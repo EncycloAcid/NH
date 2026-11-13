@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -101,7 +103,9 @@ fun App(vm: GameViewModel) {
                 when (m) {
                     0 -> BusyScreen("Loading")
                     1 -> BusyScreen(vm.busy ?: "Working", vm.progress, vm.progressNote)
-                    2 -> NewGameScreen(vm)
+                    2 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        Box(Modifier.widthIn(max = BigScreen.FORM).fillMaxHeight()) { NewGameScreen(vm) }
+                    }
                     // A pro league shows ratings on a 2K-style scale.
                     else -> vm.league?.let { l -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (l.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides l.retroAll, LocalPfpSeed provides pfpSeedOf(l)) { Shell(vm, l) } }
                 }
@@ -135,13 +139,31 @@ private fun Shell(vm: GameViewModel, lg: League) {
             vm.push(Route.NbaPreview)
         }
     }
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth >= BigScreen.WIDE) BigScreenShell(vm, lg, wide = maxWidth >= BigScreen.WIDEST)
+        else Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            val route = vm.stack.lastOrNull()
+            Screens(vm, lg, Modifier.weight(1f).fillMaxWidth())
+            if (route == null) {
+                val flowOnScreen = vm.tab == Tab.TODAY && (lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON)
+                if (!flowOnScreen) { if (lg.pro) ProContinueBar(vm, lg) else ContinueBar(vm, lg) }
+                NavBar(vm)
+            } else Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+    vm.sheet?.let { pid -> lg.anyPlayer(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
+    vm.guide?.let { GuideSheet(vm, it) }
+}
+
+/** The open screen: a tab, or the route on top of the stack, sliding and fading between them. */
+@Composable
+internal fun Screens(vm: GameViewModel, lg: League, modifier: Modifier) {
         val route = vm.stack.lastOrNull()
         // Screens slide in when opened and back out when closed; tabs cross-fade.
         val screen = Screen(route, vm.tab, vm.stack.size)
         androidx.compose.animation.AnimatedContent(
             targetState = screen,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = modifier,
             contentKey = { s -> s.route?.let { "${s.depth}:$it" } ?: "tab:${s.tab}" },
             transitionSpec = {
                 val push = targetState.depth > initialState.depth
@@ -192,14 +214,6 @@ private fun Shell(vm: GameViewModel, lg: League) {
             }
             }
         }
-        if (route == null) {
-            val flowOnScreen = vm.tab == Tab.TODAY && (lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON)
-            if (!flowOnScreen) { if (lg.pro) ProContinueBar(vm, lg) else ContinueBar(vm, lg) }
-            NavBar(vm)
-        } else Spacer(Modifier.navigationBarsPadding())
-    }
-    vm.sheet?.let { pid -> lg.anyPlayer(pid)?.let { PlayerSheet(vm, lg, it) } ?: run { vm.sheet = null } }
-    vm.guide?.let { GuideSheet(vm, it) }
 }
 
 /** What's on screen: an open route (or none, for a tab), the tab, and how deep the stack is. */
@@ -241,7 +255,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
 // ---------- continue bar ----------
 
 @Composable
-private fun ContinueBar(vm: GameViewModel, lg: League) {
+internal fun ContinueBar(vm: GameViewModel, lg: League) {
     val u = lg.user
     val game = Season.userGameToday(lg)
     var menu by remember { mutableStateOf(false) }
@@ -310,7 +324,7 @@ private fun ContinueBar(vm: GameViewModel, lg: League) {
 // ---------- bottom navigation ----------
 
 @Composable
-private fun NavBar(vm: GameViewModel) {
+internal fun NavBar(vm: GameViewModel) {
     Column(Modifier.fillMaxWidth().background(P.bg)) {
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 4.dp, bottom = 6.dp)) {
             for (t in Tab.entries) {
