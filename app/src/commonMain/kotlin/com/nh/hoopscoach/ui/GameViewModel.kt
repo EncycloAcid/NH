@@ -119,6 +119,8 @@ class GameViewModel : ViewModel() {
         progress = null
         progressNote = ""
         loading = false
+        errorDetails = "Hoops Dynasty ${com.nh.hoopscoach.PlatformContext.versionName} · ${System.getProperty("os.name")} · Java ${System.getProperty("java.version")}\n" +
+            com.nh.hoopscoach.CrashReporter.redact(e.stackTraceToString()).lines().take(40).joinToString("\n")
         if (league == null && draft == null) draftError = "${e.javaClass.simpleName}: ${e.message ?: "no details"}"
         else message = "${what ?: "That"} failed (${e.javaClass.simpleName}). Details saved to last-error.txt."
     }
@@ -395,11 +397,27 @@ class GameViewModel : ViewModel() {
 
     // ---------- new game ----------
 
+    /**
+     * Runs [work] on its own thread with a 64 MB stack (thread stacks are smaller on some systems than
+     * others), handing back its result or rethrowing what it threw, Errors included.
+     */
+    private suspend fun <T> buildOnBigStack(work: () -> T): T = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        val t = Thread(null, {
+            val r = runCatching(work)
+            r.onSuccess { cont.resumeWith(Result.success(it)) }.onFailure { cont.resumeWith(Result.failure(it)) }
+        }, "league-builder", 64L * 1024 * 1024)
+        t.isDaemon = true
+        t.start()
+    }
+
+    /** The full report of the last failure, for the Copy button on the error screen. */
+    var errorDetails by mutableStateOf("")
+
     fun generateDraft(startYear: Int = 2026) {
         busy = "Building your league"
         draftError = null
         viewModelScope.launch(failSafe) {
-            val lg = withContext(Dispatchers.Default) { LeagueGen.newLeague(startYear) }
+            val lg = buildOnBigStack { LeagueGen.newLeague(startYear) }
             draft = lg
             busy = null
         }

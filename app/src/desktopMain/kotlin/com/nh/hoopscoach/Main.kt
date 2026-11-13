@@ -15,7 +15,7 @@ import java.io.File
 fun main() {
     val home = File(System.getProperty("user.home"), ".hoopsdynasty").apply { mkdirs() }
     PlatformContext.filesDir = home
-    PlatformContext.versionName = "3.4-pro.183"
+    PlatformContext.versionName = "3.4-pro.184"
     // A Windows app has no console, so errors go to a log beside the saves (the previous run's is kept).
     runCatching {
         val log = File(home, "hoops-log.txt")
@@ -26,13 +26,17 @@ fun main() {
     }
     CrashReporter.version = PlatformContext.versionName
     CrashReporter.install(home, "${System.getProperty("os.name")} ${System.getProperty("os.version")}; Java ${System.getProperty("java.version")}")
-    // Made once, before any window: if the window recomposes (a display-scaling change can do that on
-    // Windows), a fresh game must not be created and send it back to "Building your league".
-    val vm = GameViewModel()
-    run(vm)
+    application {
+        // Made once and remembered: if the window recomposes (a display-scaling change can do that on
+        // Windows), a fresh game must not be created and send it back to "Building your league". Made
+        // inside the application so Compose sets up the windowing system first.
+        val vm = androidx.compose.runtime.remember { GameViewModel() }
+        Game(vm)
+    }
 }
 
-private fun run(vm: GameViewModel) = application {
+@androidx.compose.runtime.Composable
+private fun androidx.compose.ui.window.ApplicationScope.Game(vm: GameViewModel) {
     // A desktop-sized window: sidebar, the screen and the league panel side by side. Narrow it and it
     // becomes the phone layout.
     val state = rememberWindowState(width = 1380.dp, height = 880.dp)

@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.nh.hoopscoach.game.CoachSkill
 import com.nh.hoopscoach.game.Coaching
 import com.nh.hoopscoach.game.CollegeEra
@@ -709,11 +711,21 @@ fun NewGameScreen(vm: GameViewModel) {
             val err = vm.draftError
             if (err == null) BusyScreen("Building your league")
             else Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                val clip = LocalClipboardManager.current
                 Text("The league couldn't be built", style = T.head, color = P.ink, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(8.dp))
-                Text(err, style = T.small, color = P.sub, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Text(err, style = T.bodyB, color = P.bad, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Text("Press Copy error and paste it to the developer. It's also saved as last-error.txt in the .hoopsdynasty folder in your user folder.",
+                    style = T.small, color = P.sub, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(18.dp))
-                PrimaryButton("Try again", Modifier.fillMaxWidth()) { vm.generateDraft() }
+                PrimaryButton("Copy error", Modifier.fillMaxWidth()) { clip.setText(AnnotatedString(vm.errorDetails.ifBlank { err })); vm.toast("Error copied") }
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton("Try again", Modifier.fillMaxWidth()) { vm.generateDraft() }
+                Spacer(Modifier.height(14.dp))
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(vm.errorDetails, style = T.small.copy(fontSize = 11.sp), color = P.faint, maxLines = 14)
+                }
             }
             return@Column
         }
