@@ -137,6 +137,11 @@ jobs:
     needs: [build, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app/build.gradle.kts
+          sparse-checkout-cone-mode: false
+
       - uses: actions/download-artifact@v4
         with:
           name: HoopsDynasty-apk
@@ -152,24 +157,34 @@ jobs:
           name: HoopsDynasty-pc-windows
           path: release
 
-      - name: List release files
-        run: ls -la release
-
       - name: Read app version
         id: ver
         run: |
           NAME=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
           echo "name=${NAME:-unknown}" >> "$GITHUB_OUTPUT"
 
+      - name: Put the version at the end of each file name
+        env:
+          VER: ${{ steps.ver.outputs.name }}
+        run: |
+          cd release
+          for f in *; do
+            [ -f "$f" ] || continue
+            base="${f%.*}"; ext="${f##*.}"
+            case "$base" in *"$VER"*) continue ;; esac
+            mv -- "$f" "${base}-${VER}.${ext}"
+          done
+          ls -la
+
       - name: Publish a downloadable release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Hoops Dynasty Pro (build ${{ github.run_number }})
+          name: Hoops Dynasty ${{ steps.ver.outputs.name }} (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           body: |
-            **Android:** download `HoopsDynasty.apk` on your phone, open it, and allow installs from your browser if asked.
-            **Windows:** download `HoopsDynasty-windows.exe` and run the installer (Java is bundled).
-            **Linux / other PC:** download `HoopsDynasty-pc.jar` and run with Java 17+: `java -jar HoopsDynasty-pc.jar` (a `.deb` may also be attached).
+            **Android:** download `HoopsDynasty-${{ steps.ver.outputs.name }}.apk` on your phone, open it, and allow installs from your browser if asked.
+            **Windows:** download `HoopsDynasty-windows-${{ steps.ver.outputs.name }}.exe` and run the installer (Java is bundled).
+            **Linux / other PC:** download `HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` and run with Java 17+: `java -jar HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` (a `.deb` may also be attached).
             Version: ${{ steps.ver.outputs.name }} · Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
           files: release/*
