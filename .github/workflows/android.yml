@@ -83,13 +83,19 @@ jobs:
           java-version: "17"
 
       # The shared Gradle module still configures the Android target, so the SDK is required.
+      # Do not install the obsolete `tools` package (sdkmanager no longer ships it).
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build Windows EXE installer
         shell: bash
         run: ./gradlew :app:packageExe --no-daemon
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: Collect Windows artifacts
         shell: bash
