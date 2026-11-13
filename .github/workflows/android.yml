@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK and PC
 
 on:
   push:
@@ -42,10 +42,35 @@ jobs:
       - name: Name the APK
         run: cp app/build/outputs/apk/release/app-release.apk HoopsDynasty.apk
 
+      - name: Build PC packages
+        run: |
+          ./gradlew :app:packageUberJarForCurrentOS --no-daemon
+          # Best-effort Linux installer; the runnable jar is the required PC artifact.
+          ./gradlew :app:packageDeb --no-daemon || echo "packageDeb skipped"
+
+      - name: Collect PC artifacts
+        run: |
+          mkdir -p pc-dist
+          # Deb installer when packageDeb produced one
+          find app/build/compose/binaries -type f -name '*.deb' -exec cp {} pc-dist/ \; || true
+          # Runnable uber jar for the CI OS (Linux)
+          JAR=$(find app/build/compose/jars -type f -name 'HoopsDynasty-*.jar' | head -1)
+          if [ -z "$JAR" ]; then
+            echo "PC jar missing" >&2
+            exit 1
+          fi
+          cp "$JAR" pc-dist/HoopsDynasty-pc.jar
+          ls -la pc-dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: HoopsDynasty-apk
           path: HoopsDynasty.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HoopsDynasty-pc
+          path: pc-dist/*
 
       - name: Publish a downloadable release
         uses: softprops/action-gh-release@v2
@@ -54,6 +79,9 @@ jobs:
           name: Hoops Dynasty (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           body: |
-            Install on Android: download HoopsDynasty.apk on your phone, open it, and allow installs from your browser if asked.
+            **Android:** download `HoopsDynasty.apk` on your phone, open it, and allow installs from your browser if asked.
+            **PC:** download `HoopsDynasty-pc.jar` (run with Java 17+: `java -jar HoopsDynasty-pc.jar`) or the Linux `.deb` when present.
             Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
-          files: HoopsDynasty.apk
+          files: |
+            HoopsDynasty.apk
+            pc-dist/*

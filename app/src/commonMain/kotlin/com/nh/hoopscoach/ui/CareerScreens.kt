@@ -1,7 +1,5 @@
 package com.nh.hoopscoach.ui
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,8 +44,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nh.hoopscoach.PlatformContext
 import com.nh.hoopscoach.game.CoachSkill
 import com.nh.hoopscoach.game.Coaching
+import com.nh.hoopscoach.rememberSaveExporter
+import com.nh.hoopscoach.rememberSaveImporter
 import com.nh.hoopscoach.game.Gameplan
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Names
@@ -221,20 +222,23 @@ fun fieldColors() = OutlinedTextFieldDefaults.colors(
 fun SettingsScreen(vm: GameViewModel, lg: League) {
     var confirm by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) vm.exportSave(uri) }
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importSave(uri) }
+    val suggested = "HoopsDynasty-${lg.user.abbr}-${lg.season}.hdsave"
+    val export = rememberSaveExporter(suggested, getBytes = { vm.exportBytes() }) { ok ->
+        vm.toast(if (ok) "Save backed up" else "Couldn't write the backup file")
+    }
+    val import = rememberSaveImporter { bytes ->
+        if (bytes != null) vm.importSave(bytes)
+    }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar("Settings", onBack = { vm.back() })
             Section("Save file")
             Panel {
-                Text("Your dynasty saves automatically. Back it up before reinstalling or switching phones.", style = T.small, color = P.sub)
+                Text("Your dynasty saves automatically. Back it up before reinstalling or switching devices.", style = T.small, color = P.sub)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PrimaryButton("Back up", Modifier.weight(1f)) {
-                        runCatching { exporter.launch("HoopsDynasty-${lg.user.abbr}-${lg.season}.hdsave") }.onFailure { vm.toast("No file app available") }
-                    }
-                    SecondaryButton("Restore", Modifier.weight(1f)) { runCatching { importer.launch(arrayOf("*/*")) }.onFailure { vm.toast("No file app available") } }
+                    PrimaryButton("Back up", Modifier.weight(1f)) { export() }
+                    SecondaryButton("Restore", Modifier.weight(1f)) { import() }
                 }
             }
             Section("Schools")
@@ -265,8 +269,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
             Panel {
                 SecondaryButton("Start a new career", Modifier.fillMaxWidth()) { confirm = true }
                 Spacer(Modifier.height(10.dp))
-                val ctx = androidx.compose.ui.platform.LocalContext.current
-                val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
+                val version = PlatformContext.versionName
                 Text("Hoops Dynasty $version · Schools and conferences are real; all players and coaches are fictional. School logos belong to their schools.", style = T.small, color = P.faint)
             }
             Spacer(Modifier.height(24.dp))
@@ -332,7 +335,9 @@ fun EditTeamScreen(vm: GameViewModel, lg: League, teamId: Int) {
 
 @Composable
 fun NewGameScreen(vm: GameViewModel) {
-    val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importSave(uri) }
+    val restore = rememberSaveImporter { bytes ->
+        if (bytes != null) vm.importSave(bytes)
+    }
     val lg = vm.draft
     var first by remember { mutableStateOf("") }
     var last by remember { mutableStateOf("") }
@@ -389,7 +394,7 @@ fun NewGameScreen(vm: GameViewModel) {
                 vm.startCareer(pick, first.trim().ifBlank { "Coach" }, last.trim().ifBlank { "Rookie" })
             }
             Text("Restore a backup", style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().clickable { runCatching { restore.launch(arrayOf("*/*")) } }.padding(top = 10.dp))
+                modifier = Modifier.fillMaxWidth().clickable { restore() }.padding(top = 10.dp))
         }
     }
 }

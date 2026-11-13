@@ -1,6 +1,6 @@
 # Hoops Dynasty
 
-A native Android college basketball coaching game, written in Kotlin with Jetpack Compose.
+A college basketball coaching game for Android and PC, written in Kotlin with Compose Multiplatform.
 
 Pick a school, set your rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, develop players, and chase national titles season after season.
 
@@ -8,13 +8,24 @@ You can coach any of the 364 Division I schools, in their real 2026-27 conferenc
 
 The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
 
-## Install on your phone
+## Install
 
-1. Open the repository's **Releases** page on your Android phone and download `HoopsDynasty.apk` from the newest build. Every push builds a fresh one.
+Every push builds both Android and PC packages and publishes them on the **Releases** page.
+
+### Android phone
+
+1. Download `HoopsDynasty.apk` from the newest release on your phone.
 2. Open the file. If Android asks, allow your browser or file manager to install unknown apps.
 3. Your dynasty saves automatically on the device.
 
 **Keep your save safe:** In **Settings → Back Up Save**, write your dynasty to a file. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), it means the builds were signed with different keys. Back up first, uninstall, install the new build, then use **Restore Save**.
+
+### PC (Windows, macOS, Linux)
+
+1. Download `HoopsDynasty-pc.jar` from the newest release (needs [Java 17+](https://adoptium.net/)).
+2. Run it: `java -jar HoopsDynasty-pc.jar`
+3. On Linux CI also ships a `.deb` when available.
+4. Your dynasty saves under `~/.hoopsdynasty/dynasty.sav`. Use **Settings → Back up / Restore** to move saves between phone and PC — the save format is the same.
 
 ## What's in the game
 
@@ -113,22 +124,28 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Build it yourself
 
-Requirements: JDK 17+ and the Android SDK (Android Studio works out of the box).
+Requirements: JDK 17+. Android builds also need the Android SDK (Android Studio works out of the box). The PC build only needs the JDK.
 
 ```sh
 ./gradlew :app:assembleRelease          # APK at app/build/outputs/apk/release/app-release.apk
+./gradlew :app:run                      # launch the PC app
+./gradlew :app:packageUberJarForCurrentOS   # runnable PC jar
+./gradlew :app:packageDeb               # Linux .deb (on Linux)
 ./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.SimTest   # simulates 3 full seasons
 ```
 
 `ScreenshotTest` renders every main screen on the JVM with Robolectric and writes PNGs to `build/screenshots/`.
 
+Android and PC share the same Compose UI and game code (Compose Multiplatform). When the Android game is updated, the PC build picks up the same changes automatically.
+
 ## Project layout
 
 ```
-app/src/main/java/com/nh/hoopscoach/
-  game/   pure Kotlin game logic: league generation, possession-by-possession game engine,
-          schedule, rankings (Elo-based NET + AP poll), awards, recruiting, finance, offseason
-  ui/     Jetpack Compose screens, theme, drawn team logos and player portraits
+app/src/
+  commonMain/   shared game logic + Compose UI (Android and PC)
+  androidMain/  Android entry point and platform bits (assets, file picker)
+  desktopMain/  PC entry point and platform bits (window, file dialogs)
+  main/         AndroidManifest and Android resources
 ```
 
 ## Signing key

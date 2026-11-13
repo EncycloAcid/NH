@@ -1,11 +1,67 @@
 import java.util.Properties
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 
 plugins {
+    id("org.jetbrains.kotlin.multiplatform")
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+kotlin {
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
+    jvm("desktop")
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+            }
+        }
+        val androidMain by getting {
+            dependencies {
+                implementation("androidx.activity:activity-compose:1.9.3")
+                implementation("androidx.core:core-ktx:1.15.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+            }
+        }
+        val desktopMain by getting {
+            // School logos live in the Android assets folder; reuse them on PC.
+            resources.srcDir("src/main/assets")
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
+            }
+        }
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation("junit:junit:4.13.2")
+                implementation("org.robolectric:robolectric:4.14.1")
+                implementation("androidx.compose.ui:ui-test-junit4:1.7.6")
+                implementation("androidx.compose.ui:ui-test-manifest:1.7.6")
+            }
+        }
+    }
 }
 
 android {
@@ -49,12 +105,22 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
     }
+    // Lifecycle lint detector crashes against Kotlin 2.1 analysis APIs used by CMP.
+    lint {
+        disable += "NullSafeMutableLiveData"
+        checkReleaseBuilds = false
+    }
+    sourceSets["main"].apply {
+        manifest.srcFile("src/main/AndroidManifest.xml")
+        res.srcDirs("src/main/res")
+        resources.srcDirs("src/commonMain/resources")
+        assets.srcDirs("src/main/assets")
+    }
+    // Unit tests stay in the classic AGP location.
+    sourceSets["test"].java.srcDirs("src/test/java")
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -72,25 +138,25 @@ composeCompiler {
     featureFlags = setOf(ComposeFeatureFlag.StrongSkipping.disabled())
 }
 
-dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
-    implementation(composeBom)
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-core")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-
-    testImplementation(composeBom)
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.14.1")
-    testImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+compose.desktop {
+    application {
+        mainClass = "com.nh.hoopscoach.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "HoopsDynasty"
+            packageVersion = "3.4.0"
+            description = "College basketball coaching dynasty"
+            copyright = "Personal use"
+            linux {
+                packageName = "hoops-dynasty"
+            }
+            windows {
+                menuGroup = "Hoops Dynasty"
+                upgradeUuid = "a7c3e9f1-4b2d-4e8a-9c1f-6d5e4b3a2c10"
+            }
+            macOS {
+                bundleID = "com.nh.hoopscoach"
+            }
+        }
+    }
 }

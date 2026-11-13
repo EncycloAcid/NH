@@ -1,13 +1,13 @@
 package com.nh.hoopscoach.ui
 
-import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nh.hoopscoach.PlatformContext
 import com.nh.hoopscoach.game.GameEngine
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.LeagueGen
@@ -61,8 +61,8 @@ class LiveGame(val engine: GameEngine) {
     var done by mutableStateOf(false)
 }
 
-class GameViewModel(app: Application) : AndroidViewModel(app) {
-    private val file = File(app.filesDir, "dynasty.sav")
+class GameViewModel : ViewModel() {
+    private val file: File get() = PlatformContext.saveFile
     private val mutex = Mutex()
 
     var league by mutableStateOf<League?>(null)
@@ -113,6 +113,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             league = lg
             loading = false
             if (lg == null) generateDraft()
+        } else {
+            loading = false
         }
     }
 
@@ -209,28 +211,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Writes the current dynasty to a file the user picked. */
-    fun exportSave(uri: android.net.Uri) {
-        val lg = league ?: return
-        viewModelScope.launch {
-            val ok = runCatching {
-                val bytes = mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
-                withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use { it.write(bytes) }
-                }
-            }.isSuccess
-            toast(if (ok) "Save backed up" else "Couldn't write the backup file")
-        }
+    /** Encodes the current dynasty for a backup file the user picked. */
+    suspend fun exportBytes(): ByteArray? {
+        val lg = league ?: return null
+        return mutex.withLock { withContext(Dispatchers.Default) { SaveIO.encode(lg) } }
     }
 
     /** Replaces the current dynasty with one from a backup file. */
-    fun importSave(uri: android.net.Uri) {
+    fun importSave(bytes: ByteArray) {
         viewModelScope.launch {
             val lg = runCatching {
-                withContext(Dispatchers.IO) {
-                    val bytes = getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                    SaveIO.decode(bytes)
-                }
+                withContext(Dispatchers.Default) { SaveIO.decode(bytes) }
             }.getOrNull()
             if (lg == null) { toast("That file isn't a Hoops Dynasty save"); return@launch }
             mutex.withLock {

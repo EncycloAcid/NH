@@ -288,8 +288,7 @@ fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = 
 /** The school's logo on a light plate, or a monogram in school colors when there's no logo file. */
 @Composable
 fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val logo = remember(t.abbr) { Logos.get(ctx, t.abbr) }
+    val logo = remember(t.abbr) { Logos.get(t.abbr) }
     if (logo != null) {
         // Logos are drawn for light backgrounds, so they sit on a light plate in both themes.
         val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White

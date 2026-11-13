@@ -20,7 +20,6 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.performScrollToIndex
-import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.LeagueGen
 import com.nh.hoopscoach.game.Offseason
@@ -91,7 +90,7 @@ class ScreenshotTest {
     @Test
     fun postseason() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         fun viewAs(id: Int) { lg.userTeamId = id; lg.userCoachId = lg.team(id).coachId; vm.install(lg) }
@@ -134,7 +133,7 @@ class ScreenshotTest {
     @Test
     fun seasonPreview() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         rule.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Read the issue", substring = true))
@@ -162,7 +161,7 @@ class ScreenshotTest {
     @Test
     fun careerPages() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         var pid by mutableIntStateOf(-1)
         rule.setContent {
@@ -196,7 +195,7 @@ class ScreenshotTest {
     @Test
     fun marchMoments() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         val me = lg.userTeamId
@@ -227,7 +226,7 @@ class ScreenshotTest {
     @Test
     fun programLegacy() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         while (lg.phase != Phase.WRAP_UP) Season.playDay(lg)
@@ -261,7 +260,7 @@ class ScreenshotTest {
     @Test
     fun tryouts() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         var pid by mutableIntStateOf(-1)
         rule.setContent {
@@ -326,7 +325,7 @@ class ScreenshotTest {
 
     private fun rivalryShots(tag: String, full: Boolean = true) {
         val lg = league("Duke")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         val duke = lg.userTeamId
         val g = lg.games.filter { it.involves(duke) && lg.rivalry(it) != null }.minBy { it.day }
         while (lg.day < g.day) Season.playDay(lg)
@@ -358,7 +357,7 @@ class ScreenshotTest {
     @Test
     fun programAndRecruiting() {
         val lg = league("Kentucky")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         var guide by mutableIntStateOf(-1)
         rule.setContent {
@@ -401,7 +400,7 @@ class ScreenshotTest {
 
     private fun run(team: String, tag: String, full: Boolean = true) {
         val lg = league(team)
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         var mode by mutableIntStateOf(0)
         rule.setContent {
