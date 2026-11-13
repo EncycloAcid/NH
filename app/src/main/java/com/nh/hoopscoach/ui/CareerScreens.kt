@@ -1253,6 +1253,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI NBA draft universe", style = T.bodyB, color = P.ink)
+                            Text("Prospect stock, workout profiles, draft-night surprises, and former players' pro careers.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.draftUniverse, { on -> vm.act { it.ollama.draftUniverse = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
                         }

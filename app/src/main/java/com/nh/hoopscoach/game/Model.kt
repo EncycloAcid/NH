@@ -665,6 +665,8 @@ class OllamaConfig(
     var historicMoments: Boolean = true,
     /** AI player storylines: bench-to-star, blue-chip heat checks, walk-on heroes. */
     var playerStorylines: Boolean = true,
+    /** AI NBA draft universe: stock, combine profiles, draft-night surprises, pro careers. */
+    var draftUniverse: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
     var draftScouting: Boolean = true,
