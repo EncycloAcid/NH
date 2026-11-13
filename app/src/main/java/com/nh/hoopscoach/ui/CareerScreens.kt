@@ -398,20 +398,22 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 com.nh.hoopscoach.game.Ollama.Cache.clear()
             } }
             Panel {
-                // Drop any saved premium model onto the free/cheap catalog when Settings opens.
-                LaunchedEffect(Unit) {
-                    vm.act {
-                        it.ollama.googleModel = com.nh.hoopscoach.game.Ollama.snapGoogleModel(it.ollama.googleModel)
-                        it.ollama.openAiModel = com.nh.hoopscoach.game.Ollama.snapOpenAiModel(it.ollama.openAiModel)
-                        it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
-                    }
-                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Enable AI Dynasty Intelligence", style = T.bodyB, color = P.ink)
-                        Text("Generate dynamic recaps, coach podium quotes, fan reactions, and storylines — free & cheap models only.", style = T.small, color = P.sub)
+                        Text("Generate dynamic recaps, coach podium quotes, fan reactions, and storylines — free & cheap models preferred.", style = T.small, color = P.sub)
                     }
-                    AppSwitch(lg.ollama.enabled, { on -> vm.act { it.ollama.enabled = on } })
+                    AppSwitch(lg.ollama.enabled, { on ->
+                        vm.act {
+                            it.ollama.enabled = on
+                            // Only strip known expensive ids once when turning AI on — never overwrite a custom pick later.
+                            if (on) {
+                                it.ollama.googleModel = com.nh.hoopscoach.game.Ollama.snapGoogleModel(it.ollama.googleModel)
+                                it.ollama.openAiModel = com.nh.hoopscoach.game.Ollama.snapOpenAiModel(it.ollama.openAiModel)
+                                it.ollama.model = com.nh.hoopscoach.game.Ollama.snapLocalModel(it.ollama.model)
+                            }
+                        }
+                    })
                 }
 
                 if (lg.ollama.enabled) {
@@ -524,7 +526,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            val gModels = com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS
+                            val gModels = buildList {
+                                val cur = lg.ollama.googleModel
+                                if (cur.isNotBlank() && com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS.none { it.id.equals(cur, true) }) {
+                                    add(com.nh.hoopscoach.game.Ollama.CloudModel(cur, cur, "Selected", "From provider list — stays until you change it."))
+                                }
+                                addAll(com.nh.hoopscoach.game.Ollama.GOOGLE_MODELS)
+                            }
                             val gIdx = gModels.indexOfFirst { it.id.equals(lg.ollama.googleModel, true) }.coerceAtLeast(0)
                             Picker(
                                 "Gemini model",
@@ -693,7 +701,13 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            val oModels = com.nh.hoopscoach.game.Ollama.OPENAI_MODELS
+                            val oModels = buildList {
+                                val cur = lg.ollama.openAiModel
+                                if (cur.isNotBlank() && com.nh.hoopscoach.game.Ollama.OPENAI_MODELS.none { it.id.equals(cur, true) }) {
+                                    add(com.nh.hoopscoach.game.Ollama.CloudModel(cur, cur, "Selected", "From provider list — stays until you change it."))
+                                }
+                                addAll(com.nh.hoopscoach.game.Ollama.OPENAI_MODELS)
+                            }
                             val oIdx = oModels.indexOfFirst { it.id.equals(lg.ollama.openAiModel, true) }.coerceAtLeast(0)
                             Picker(
                                 "ChatGPT model",

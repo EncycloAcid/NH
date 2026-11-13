@@ -74,15 +74,35 @@ object Ollama {
         CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
     )
 
-    fun snapGoogleModel(id: String): String =
-        GOOGLE_MODELS.firstOrNull { it.id.equals(id, true) }?.id ?: GOOGLE_MODELS.first().id
+    /**
+     * Only remaps known expensive / blocked ids onto a free/cheap default.
+     * Custom picks from the provider list (e.g. gemini-3.5-flash) must stick —
+     * never force everything onto the curated Settings shortlist.
+     */
+    fun snapGoogleModel(id: String): String {
+        val t = id.trim().removePrefix("models/").ifEmpty { return GOOGLE_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = low == "gemini-1.5-pro" || low == "gemini-1.0-pro" || low == "gemini-pro" ||
+            low == "gemini-ultra" || (low.contains("pro") && !low.contains("flash") && !low.contains("nano"))
+        return if (blocked) GOOGLE_MODELS.first().id else t
+    }
 
-    fun snapOpenAiModel(id: String): String =
-        OPENAI_MODELS.firstOrNull { it.id.equals(id, true) }?.id ?: OPENAI_MODELS.first().id
+    fun snapOpenAiModel(id: String): String {
+        val t = id.trim().ifEmpty { return OPENAI_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = low == "gpt-4o" || low == "gpt-4" || low == "gpt-4-turbo" || low == "gpt-4-turbo-preview" ||
+            low.startsWith("o1") || low.startsWith("o3") || low.startsWith("o4")
+        return if (blocked) OPENAI_MODELS.first().id else t
+    }
 
-    fun snapLocalModel(id: String): String =
-        RECOMMENDED_MODELS.firstOrNull { it.id.equals(id, true) || id.startsWith(it.id.substringBefore(":")) }?.id
-            ?: RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id
+    fun snapLocalModel(id: String): String {
+        val t = id.trim().ifEmpty {
+            return RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id
+        }
+        val low = t.lowercase()
+        val heavy = Regex(""":(3|7|8|13|70)b\b""").containsMatchIn(low) || low.endsWith("3b") || low.contains("3b:")
+        return if (heavy) RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id else t
+    }
 
     /**
      * One row in the fetched-model menu: provider id, display title, category header, and a short

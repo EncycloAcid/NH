@@ -10,6 +10,15 @@ class AiDiagnosticsTest {
         val models = Ollama.googleTextModels("""{"models":[{"name":"models/gemini-current-flash","supportedGenerationMethods":["generateContent","countTokens"]},{"name":"models/gemini-embedding","supportedGenerationMethods":["embedContent"]}]}""")
         assertEquals(listOf("gemini-current-flash"), models)
     }
+    @Test fun snapKeepsProviderPicksAndOnlyBlocksExpensiveDefaults() {
+        assertEquals("gemini-3.5-flash", Ollama.snapGoogleModel("gemini-3.5-flash"))
+        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-3.5-flash-lite"))
+        assertEquals("gemini-1.5-flash", Ollama.snapGoogleModel("gemini-1.5-pro"))
+        assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o"))
+        assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o-mini"))
+        assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))
+        assertEquals("llama3.2:1b", Ollama.snapLocalModel("llama3.2:3b"))
+    }
     @Test fun fetchedModelMenuIsCategorizedWithPrices() {
         val ids = listOf(
             "gemini-3.5-flash",
