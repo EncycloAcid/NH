@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -383,6 +384,22 @@ fun AppMenuItem(title: String, subtitle: String? = null, icon: ImageVector? = nu
 @Composable
 fun AppMenuDivider() = Box(Modifier.padding(horizontal = 18.dp, vertical = 5.dp).fillMaxWidth().height(1.dp).background(P.line))
 
+/** Shared chrome for pickers and text fields so nested controls read on Panels and on the page bg. */
+private val FieldShape = RoundedCornerShape(14.dp)
+
+@Composable
+fun FieldShell(active: Boolean = false, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(FieldShape)
+            .background(if (active) P.accentSoft else P.surface2)
+            .border(if (active) 1.5.dp else 1.dp, if (active) P.accent else P.line, FieldShape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        content = content,
+    )
+}
+
 /**
  * A field-like button that opens a menu of options with descriptions. The menu is at least as wide
  * as the field, checks the current choice, and opens scrolled to it in a long list.
@@ -402,11 +419,11 @@ fun Picker(label: String, current: String, options: List<Pair<String, String>>, 
         }
     }
     Box(modifier) {
-        Column(
-            Modifier.fillMaxWidth().onGloballyPositioned { fieldWidth = with(density) { it.size.width.toDp() } }
-                .clip(RoundedCornerShape(14.dp)).background(if (open) P.accentSoft else P.surface)
-                .border(if (open) 1.5.dp else 1.dp, if (open) P.accent else P.line, RoundedCornerShape(14.dp))
-                .clickable { open = true }.padding(horizontal = 14.dp, vertical = 10.dp),
+        FieldShell(
+            active = open,
+            modifier = Modifier
+                .onGloballyPositioned { fieldWidth = with(density) { it.size.width.toDp() } }
+                .clickable { open = true },
         ) {
             Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = if (open) P.accent else P.sub)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -418,6 +435,79 @@ fun Picker(label: String, current: String, options: List<Pair<String, String>>, 
             options.forEachIndexed { i, (l, b) ->
                 AppMenuItem(l, b.ifEmpty { null }, selected = i == sel) { open = false; onPick(i) }
             }
+        }
+    }
+}
+
+/** Labeled text field with the same shell as [Picker], so settings rows match. */
+@Composable
+fun AppField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    singleLine: Boolean = true,
+) {
+    FieldShell(modifier = modifier) {
+        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub)
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = singleLine,
+            textStyle = T.bodyB.copy(color = P.ink),
+            cursorBrush = SolidColor(P.accent),
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty() && placeholder.isNotEmpty()) {
+                        Text(placeholder, style = T.bodyB, color = P.faint)
+                    }
+                    inner()
+                }
+            },
+        )
+    }
+}
+
+/** Themed switch that matches accent / surface2 instead of stock Material purple. */
+@Composable
+fun AppSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = P.onAccent,
+            checkedTrackColor = P.accent,
+            checkedBorderColor = P.accent,
+            uncheckedThumbColor = P.ink,
+            uncheckedTrackColor = P.surface2,
+            uncheckedBorderColor = P.line,
+            disabledCheckedTrackColor = P.faint,
+            disabledUncheckedTrackColor = P.surface2,
+        ),
+    )
+}
+
+/** Selectable pill chips used for AI topics and similar option rows. */
+@Composable
+fun ChoiceChips(options: List<String>, selected: String?, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { opt ->
+            val on = opt == selected
+            Text(
+                opt,
+                style = T.bodyB.copy(fontSize = 13.sp),
+                color = if (on) P.onAccent else P.ink,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) P.accent else P.surface2)
+                    .border(1.dp, if (on) P.accent else P.line, RoundedCornerShape(50))
+                    .clickable { onSelect(opt) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                maxLines = 1,
+            )
         }
     }
 }

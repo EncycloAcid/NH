@@ -1,6 +1,7 @@
 package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -280,112 +280,149 @@ fun newsClick(vm: GameViewModel, lg: League, n: News): (() -> Unit)? {
     }
 }
 
-/** A short article: the outlet and date, the headline, and the story. */
+/** A short article: outlet, headline, and body in the same chrome as the rest of the app. */
 @Composable
 fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
     val n = lg.news.getOrNull(index) ?: run { vm.back(); return }
     var generating by remember { androidx.compose.runtime.mutableStateOf(false) }
     var ollamaError by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // A newspaper page: paper, serif type, the outlet's nameplate, the headline, then the story.
-    val paper = if (P.dark) Color(0xFF221F1A) else Color(0xFFF6F1E5)
-    val ink = if (P.dark) Color(0xFFEFE8D8) else Color(0xFF1B1915)
-    val faded = ink.copy(alpha = 0.6f)
-    val serif = androidx.compose.ui.text.font.FontFamily.Serif
-    val outlet = n.source.substringAfter(" · ", n.source).ifEmpty { "The Daily" }
+    val outlet = n.source.substringAfter(" · ", n.source).ifEmpty { "Hoops Wire" }
     val byline = n.source.substringBefore(" · ", "").takeIf { it.isNotEmpty() && n.source.contains(" · ") }
+    val kind = when (n.kind) {
+        "column" -> "COLUMN"
+        "quote" -> "INTERVIEW"
+        "trade", "move" -> "TRANSACTIONS"
+        "series" -> "PLAYOFFS"
+        "team" -> "STREAK WATCH"
+        "game" -> "BIG NIGHT"
+        "upset", "buzzer", "moment" -> "MOMENTS"
+        "" -> "NEWS"
+        else -> "GAME STORY"
+    }
     Column(Modifier.fillMaxSize()) {
         BackBar(outlet, "${n.season} season · day ${n.day}", onBack = { vm.back() })
         LazyColumn(Modifier.weight(1f)) {
             item {
-                Column(Modifier.padding(horizontal = Gutter, vertical = 10.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(paper).padding(16.dp)) {
-                    Text(outlet, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 24.sp),
-                        color = ink, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp).background(ink))
-                    Box(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).height(0.75.dp).background(ink))
-                    Text(when (n.kind) { "column" -> "COLUMN"; "quote" -> "INTERVIEW"; "trade", "move" -> "TRANSACTIONS"; "series" -> "PLAYOFFS"; "team" -> "STREAK WATCH"; "game" -> "BIG NIGHT"; "upset", "buzzer", "moment" -> "MOMENTS"; "" -> "NEWS"; else -> "GAME STORY" } + " · ${n.season} · DAY ${n.day}",
-                        style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 11.sp, letterSpacing = 1.5.sp), color = faded)
-                    Text(headline(n.text), style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, fontSize = 26.sp, lineHeight = 30.sp),
-                        color = ink, modifier = Modifier.padding(top = 6.dp))
-                    if (byline != null) Text("By $byline", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 13.sp),
-                        color = faded, modifier = Modifier.padding(top = 6.dp))
-                    // The picture: the player the story is about, or his team.
+                Spacer(Modifier.height(8.dp))
+                Panel {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Tag(kind, P.accent)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${n.season} · DAY ${n.day}", style = T.small, color = P.sub, modifier = Modifier.weight(1f))
+                        Text(outlet.uppercase(), style = T.label, color = P.accent, maxLines = 1)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(headline(n.text), style = T.h2, color = P.ink)
+                    if (byline != null) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("By $byline", style = T.small, color = P.sub)
+                    }
                     val pic = lg.playerOrNull(n.pid)
                     val team = lg.teams.getOrNull(n.teamId)
                     if (pic != null || team != null) {
-                        Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(team?.let { Color(it.primary).copy(alpha = 0.18f) } ?: faded.copy(alpha = 0.1f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 72.dp) else if (team != null) TeamBadge(team, 60.dp)
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(team?.let { Color(it.primary).copy(alpha = 0.16f) } ?: P.surface2)
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (pic != null) PlayerJersey(pic, if (pic.teamId >= 0) lg.team(pic.teamId) else team, 64.dp)
+                            else if (team != null) TeamBadge(team, 52.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(pic?.name ?: team?.name ?: "", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp), color = ink)
-                                Text(if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}" else team?.let { "${it.w}-${it.l}" } ?: "",
-                                    style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 13.sp), color = faded)
+                                Text(pic?.name ?: team?.name ?: "", style = T.bodyB, color = P.ink)
+                                Text(
+                                    if (pic != null) "${pic.posLabel}${if (pic.teamId >= 0) " · ${lg.team(pic.teamId).name}" else ""}"
+                                    else team?.let { "${it.w}-${it.l}" } ?: "",
+                                    style = T.small,
+                                    color = P.sub,
+                                )
                             }
                         }
                     }
                     if (n.body.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(14.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            for (para in n.body.split("\n\n")) Text(para, style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 16.sp, lineHeight = 23.sp), color = ink)
+                            for (para in n.body.split("\n\n")) {
+                                if (para.isNotBlank()) Text(para.trim(), style = T.body, color = P.ink)
+                            }
                         }
                     }
                     if (lg.ollama.enabled) {
                         Spacer(Modifier.height(14.dp))
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(faded.copy(alpha = 0.3f)))
-                        Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("OLLAMA AI STORY · ${lg.ollama.model}", style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp), color = if (P.dark) Color(0xFFE5A823) else Color(0xFFB45309))
-                                Text(
-                                    if (generating) "Writing story with Ollama..."
-                                    else if (n.source.contains("Ollama")) "Generated by Ollama (${lg.ollama.model})"
-                                    else "Have Ollama control and rewrite this article.",
-                                    style = androidx.compose.ui.text.TextStyle(fontFamily = serif, fontSize = 12.sp), color = faded,
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            SmallButton(
-                                if (generating) "Writing..." else if (n.source.contains("Ollama")) "Regenerate" else "Rewrite with Ollama",
-                                enabled = !generating,
-                                primary = true,
-                            ) {
-                                generating = true
-                                ollamaError = null
-                                scope.launch {
-                                    val res = Ollama.generateArticle(lg.ollama, lg, n)
-                                    generating = false
-                                    res.onSuccess { text ->
-                                        vm.act {
-                                            val target = it.news.getOrNull(index) ?: return@act
-                                            target.body = text
-                                            if (!target.source.contains("Ollama")) {
-                                                target.source = "${target.source} · Ollama ${lg.ollama.model}".trim(' ', '·')
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(P.surface2)
+                                .border(1.dp, P.line, RoundedCornerShape(14.dp))
+                                .padding(12.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("REWRITE WITH AI", style = T.label, color = P.accent)
+                                    Text(
+                                        when {
+                                            generating -> "Writing with ${lg.ollama.model}..."
+                                            n.source.contains("Ollama") -> "Last pass · ${lg.ollama.model}"
+                                            else -> "Polish this piece with your free local model"
+                                        },
+                                        style = T.small,
+                                        color = P.sub,
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                SmallButton(
+                                    if (generating) "Writing..." else if (n.source.contains("Ollama")) "Regenerate" else "Rewrite",
+                                    enabled = !generating,
+                                    primary = true,
+                                ) {
+                                    generating = true
+                                    ollamaError = null
+                                    scope.launch {
+                                        val res = Ollama.generateArticle(lg.ollama, lg, n)
+                                        generating = false
+                                        res.onSuccess { text ->
+                                            vm.act {
+                                                val target = it.news.getOrNull(index) ?: return@act
+                                                target.body = text
+                                                if (!target.source.contains("Ollama")) {
+                                                    target.source = "${target.source} · Ollama ${lg.ollama.model}".trim(' ', '·')
+                                                }
                                             }
+                                        }.onFailure { err ->
+                                            ollamaError = err.message ?: "Failed"
+                                            vm.toast("AI: ${err.message ?: "Connection failed"}")
                                         }
-                                    }.onFailure { err ->
-                                        ollamaError = err.message ?: "Failed"
-                                        vm.toast("Ollama: ${err.message ?: "Connection failed"}")
                                     }
                                 }
                             }
-                        }
-                        if (ollamaError != null) {
-                            Spacer(Modifier.height(6.dp))
-                            Text("Ollama error: $ollamaError", style = T.small, color = P.bad)
+                            if (ollamaError != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Text("AI error: $ollamaError", style = T.small, color = P.bad)
+                            }
                         }
                     }
                 }
-                // What people said: the players, coaches, analysts and fans, most liked first.
                 if (n.reactions.isNotEmpty()) {
                     Section("Reactions · ${n.reactions.size}")
                     GroupList(n.reactions.sortedByDescending { it.likes }, inset = 60.dp) { r -> ReactionRow(r, lg) }
                 }
                 Column(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(Modifier.height(8.dp))
-                    if (n.gameId >= 0 && lg.games.any { it.id == n.gameId && it.box != null }) SecondaryButton("Box score", Modifier.fillMaxWidth()) { vm.push(Route.Box(n.gameId)) }
-                    lg.playerOrNull(n.pid)?.let { pl -> SecondaryButton("${pl.name}'s page", Modifier.fillMaxWidth()) { vm.openPlayer(pl.id) } }
-                    lg.teams.getOrNull(n.teamId)?.let { tm -> SecondaryButton("${tm.name} team page", Modifier.fillMaxWidth()) { vm.push(Route.TeamPage(tm.id)) } }
+                    if (n.gameId >= 0 && lg.games.any { it.id == n.gameId && it.box != null }) {
+                        SecondaryButton("Box score", Modifier.fillMaxWidth()) { vm.push(Route.Box(n.gameId)) }
+                    }
+                    lg.playerOrNull(n.pid)?.let { pl ->
+                        SecondaryButton("${pl.name}'s page", Modifier.fillMaxWidth()) { vm.openPlayer(pl.id) }
+                    }
+                    lg.teams.getOrNull(n.teamId)?.let { tm ->
+                        SecondaryButton("${tm.name} team page", Modifier.fillMaxWidth()) { vm.push(Route.TeamPage(tm.id)) }
+                    }
                     SecondaryButton("All news", Modifier.fillMaxWidth()) { vm.push(Route.News) }
                 }
                 Spacer(Modifier.height(24.dp))
@@ -491,7 +528,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
     Column(Modifier.fillMaxSize()) {
         BackBar("News", "${lg.season} season · ${all.size} stories", onBack = { vm.back() }, actions = {
             if (lg.ollama.enabled) {
-                SmallButton("Ollama story") { showOllamaDialog = true }
+                SmallButton("AI story") { showOllamaDialog = true }
             }
         })
         LazyColumn(Modifier.weight(1f)) {
@@ -518,44 +555,33 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
 
     if (showOllamaDialog) {
         val topics = listOf(
-            "Locker room pulse & team chemistry",
+            "Locker room pulse",
             "Coach on the hot seat",
-            "Rivalry tension & bad blood",
-            "Breakout star feature",
-            "Conference title race breakdown",
+            "Rivalry tension",
+            "Breakout star",
+            "Title race",
         )
         AlertDialog(
             onDismissRequest = { if (!writingStory) showOllamaDialog = false },
             containerColor = P.surface,
-            title = { Text("Generate story with Ollama", style = T.head, color = P.ink) },
+            title = { Text("Hoops Wire story", style = T.head, color = P.ink) },
             text = {
                 Column {
-                    Text("Ollama (${lg.ollama.model}) will write a breaking article for today's news.", style = T.small, color = P.sub)
-                    Spacer(Modifier.height(10.dp))
-                    Text("SUGGESTED BEATS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    topics.forEach { t ->
-                        Text(
-                            "• $t",
-                            style = T.body,
-                            color = P.accent,
-                            modifier = Modifier.fillMaxWidth().clickable { customTopic = t }.padding(vertical = 3.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Text("OR CUSTOM TOPIC", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(
+                    Text("${lg.ollama.model} writes a breaking piece for today's news.", style = T.small, color = P.sub)
+                    Spacer(Modifier.height(12.dp))
+                    Text("BEAT", style = T.label, color = P.accent)
+                    Spacer(Modifier.height(8.dp))
+                    ChoiceChips(topics, customTopic.takeIf { it in topics }, onSelect = { customTopic = it })
+                    Spacer(Modifier.height(14.dp))
+                    AppField(
+                        label = "Custom topic",
                         value = customTopic,
                         onValueChange = { customTopic = it },
-                        singleLine = true,
-                        placeholder = { Text("e.g. Recruiting drama, injury impact...", color = P.faint) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(),
+                        placeholder = "Recruiting drama, injury impact…",
                     )
                     if (writingStory) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("Writing article with Ollama... please wait.", style = T.small, color = P.accent)
+                        Spacer(Modifier.height(10.dp))
+                        Text("Writing…", style = T.small, color = P.accent)
                     }
                 }
             },
@@ -573,7 +599,7 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                                 vm.act { it.news.add(story) }
                                 vm.push(Route.Article(lg.news.lastIndex))
                             }.onFailure { err ->
-                                vm.toast("Ollama: ${err.message ?: "Failed"}")
+                                vm.toast("AI: ${err.message ?: "Failed"}")
                             }
                         }
                     },

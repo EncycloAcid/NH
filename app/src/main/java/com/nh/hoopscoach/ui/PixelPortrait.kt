@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.nh.hoopscoach.game.Face
 import com.nh.hoopscoach.game.Gear
 import com.nh.hoopscoach.game.Player
@@ -44,10 +45,19 @@ val LocalRetroAll = compositionLocalOf { false }
 /** Layered sprite portraits from the user's body/jersey/hair packs, cached once drawn. */
 object Pixels {
     const val N = SpriteCompose.N
-    private val cache = android.util.LruCache<String, ImageBitmap>(120)
+    /** Half-res thumbs for roster rows — ~4× less memory than full 256 canvases. */
+    const val THUMB = N / 2
+    private val cache = android.util.LruCache<String, ImageBitmap>(160)
 
-    fun key(f: Face, primary: Long, secondary: Long, number: Int, gear: Gear = Gear(), jersey: String? = null) =
-        "v13|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
+    fun key(
+        f: Face,
+        primary: Long,
+        secondary: Long,
+        number: Int,
+        gear: Gear = Gear(),
+        jersey: String? = null,
+        thumb: Boolean = true,
+    ) = "v17|${if (thumb) "t" else "f"}|${f.encode()}|$primary|$secondary|$number|${gear.encode()}|${jersey ?: ""}"
 
     fun cached(key: String): ImageBitmap? = cache.get(key)
 
@@ -61,11 +71,18 @@ object Pixels {
         number: Int,
         gear: Gear = Gear(),
         jersey: String? = null,
+        thumb: Boolean = true,
     ): ImageBitmap {
-        val key = key(f, primary, secondary, number, gear, jersey)
+        val key = key(f, primary, secondary, number, gear, jersey, thumb)
         cache.get(key)?.let { return it }
         val px = SpriteCompose.render(f, primary.toInt(), secondary.toInt(), number, gear, jersey)
-        val bmp = android.graphics.Bitmap.createBitmap(px, N, N, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+        val full = android.graphics.Bitmap.createBitmap(px, N, N, android.graphics.Bitmap.Config.ARGB_8888)
+        val out = if (thumb) {
+            android.graphics.Bitmap.createScaledBitmap(full, THUMB, THUMB, false).also {
+                if (it !== full) full.recycle()
+            }
+        } else full
+        val bmp = out.asImageBitmap()
         cache.put(key, bmp)
         return bmp
     }
@@ -89,10 +106,12 @@ fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: 
     val primary = t?.primary ?: 0xFF5C6B7AL
     val secondary = t?.secondary ?: 0xFFFFFFFFL
     val jersey = SpriteSheets.jerseyKey(t?.abbr, t?.slot, t?.name)
-    val key = Pixels.key(face, primary, secondary, p.number, gear, jersey)
+    // Roster / card faces use half-res thumbs; the customizer passes a big size and gets full res.
+    val thumb = size < 140.dp
+    val key = Pixels.key(face, primary, secondary, p.number, gear, jersey, thumb)
     val bmp by produceState(Pixels.cached(key), key) {
         if (value == null) value = withContext(Dispatchers.Default) {
-            Pixels.bitmap(face, primary, secondary, p.number, gear, jersey)
+            Pixels.bitmap(face, primary, secondary, p.number, gear, jersey, thumb)
         }
     }
     val shape = RoundedCornerShape(size * 0.2f)
