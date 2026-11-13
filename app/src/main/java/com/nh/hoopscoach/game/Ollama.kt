@@ -226,6 +226,7 @@ object Ollama {
             is HistoricMoments.Package -> value.isAi
             is PlayerStorylines.Package -> value.isAi
             is DraftUniverse.Package -> value.isAi
+            is HistoricalRivalries.Package -> value.isAi
             else -> true
         }
     }
@@ -1083,6 +1084,87 @@ object Ollama {
         CoroutineScope(Dispatchers.IO).launch {
             generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
         }
+    }
+
+    /** Fire-and-forget historical rivalries package (programs, coaches, fans, players). */
+    fun maybeAutoGenerateHistoricalRivalries(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.historicalRivalries || !config.autoGenerate) return
+        if (!force && (lg.day < 6 || lg.day % 6 != 0)) return
+        if (lg.rivals.isEmpty() && CoachRivals.rivals(lg).isEmpty()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateHistoricalRivalries(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+            }
+        }
+    }
+
+    /** Rivalry history desk: series ledgers, coaching grudges, fan pulse, organic rivalries. */
+    suspend fun generateHistoricalRivalries(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<HistoricalRivalries.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.historicalRivalries) {
+            return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg))
+        }
+        val brief = HistoricalRivalries.historyBrief(lg)
+        val cacheKey = "hist_rivals_${lg.season}_${lg.day}_${lg.rivals.size}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<HistoricalRivalries.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national basketball historian covering rivalries. Using ONLY the HISTORY BRIEF, write up to three pieces.")
+            appendLine("Do not invent series records, quotes, or fights.")
+            appendLine("HISTORY BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that topic has no facts):")
+            appendLine("PROGRAM_HEADLINE: <program series / accumulated history headline>")
+            appendLine("PROGRAM_BODY: <2 short paragraphs>")
+            appendLine("COACH_OR_PLAYER_HEADLINE: <coaching grudge or player/fan pulse headline>")
+            appendLine("COACH_OR_PLAYER_BODY: <2 short paragraphs>")
+            appendLine("ORGANIC_HEADLINE: <emerging rivalry or next chapter headline>")
+            appendLine("ORGANIC_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Historical rivalries desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..32) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Rivalries")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String, mine: Boolean = true) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("PROGRAM_HEADLINE", "PROGRAM_BODY")
+            add("COACH_OR_PLAYER_HEADLINE", "COACH_OR_PLAYER_BODY")
+            add("ORGANIC_HEADLINE", "ORGANIC_BODY", mine = false)
+            val pack = if (stories.isNotEmpty()) HistoricalRivalries.Package(stories, draft.isAi, "Rivalries desk filed ${stories.size} pieces.")
+            else HistoricalRivalries.fallbackPackage(lg).copy(detail = "AI thin — used game-written rivalries desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { HistoricalRivalries.fallbackPackage(lg) }
     }
 
     /** Fire-and-forget draft universe package (stock, combine profiles, surprises, alumni). */

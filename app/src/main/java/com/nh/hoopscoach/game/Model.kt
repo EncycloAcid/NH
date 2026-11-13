@@ -676,6 +676,8 @@ class OllamaConfig(
     var playerDevelopment: Boolean = true,
     var recruitingPitches: Boolean = true,
     var pregameRivalries: Boolean = true,
+    /** AI historical rivalries: programs, coaches, players, fans accumulate history. */
+    var historicalRivalries: Boolean = true,
     var championshipCelebrations: Boolean = true,
     var freeAgencyBuzz: Boolean = true,
     /** AI assigns on-court personalities (confident scorer / unselfish) and scout notes. */

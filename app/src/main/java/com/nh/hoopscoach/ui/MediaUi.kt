@@ -762,6 +762,9 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
             if (filter == 0 && (lg.ollama.enabled && lg.ollama.draftUniverse || lg.news.any { it.source.contains("Hoops Wire Draft", ignoreCase = true) })) {
                 item { DraftUniverseCard(vm, lg) }
             }
+            if (filter == 0 && (lg.ollama.enabled && lg.ollama.historicalRivalries || lg.news.any { it.source.contains("Hoops Wire Rivalries", ignoreCase = true) })) {
+                item { HistoricalRivalriesCard(vm, lg) }
+            }
             if (top != null) item {
                 Spacer(Modifier.height(10.dp))
                 TopStory(vm, lg, top)
@@ -876,6 +879,51 @@ fun NewsScreen(vm: GameViewModel, lg: League) {
                 TextButton({ showOllamaDialog = false }, enabled = !writingStory) { Text("Cancel", color = P.sub) }
             },
         )
+    }
+}
+
+/** Rivalries desk: program series, coaching grudges, fan pulse, organic rivalries. */
+@Composable
+private fun HistoricalRivalriesCard(vm: GameViewModel, lg: League) {
+    var writing by remember { mutableStateOf(false) }
+    var lastDetail by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    fun runDesk() {
+        writing = true
+        scope.launch {
+            val res = Ollama.generateHistoricalRivalries(lg.ollama, lg)
+            writing = false
+            res.onSuccess { pack ->
+                vm.act { it.news.addAll(pack.stories) }
+                lastDetail = pack.detail
+                vm.toast(if (pack.isAi) "Rivalries desk filed ${pack.stories.size} pieces" else pack.detail)
+            }.onFailure { err ->
+                vm.toast("Rivalries: ${err.message ?: "failed"}")
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Section(
+        "Rivalries desk",
+        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} history",
+        onAction = { if (!writing) runDesk() },
+    )
+    Panel {
+        if (writing) {
+            Text("${lg.ollama.providerDisplayName} is filing accumulated rivalry history…", style = T.small, color = P.accent)
+        } else {
+            Text(
+                "Series ledgers, coaching heat, fan mood, and rivalries that grow from repeated close games — grounded in recorded history.",
+                style = T.small,
+                color = P.sub,
+            )
+            if (lastDetail.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(lastDetail, style = T.small, color = P.faint)
+            }
+            Spacer(Modifier.height(8.dp))
+            SmallButton(if (lg.ollama.enabled) "File rivalry history package" else "File game-written rivalries", primary = true) { runDesk() }
+        }
     }
 }
 
