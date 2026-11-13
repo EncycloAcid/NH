@@ -10,6 +10,39 @@ class AiDiagnosticsTest {
         val models = Ollama.googleTextModels("""{"models":[{"name":"models/gemini-current-flash","supportedGenerationMethods":["generateContent","countTokens"]},{"name":"models/gemini-embedding","supportedGenerationMethods":["embedContent"]}]}""")
         assertEquals(listOf("gemini-current-flash"), models)
     }
+    @Test fun snapKeepsProviderPicksAndOnlyBlocksExpensiveDefaults() {
+        assertEquals("gemini-3.5-flash", Ollama.snapGoogleModel("gemini-3.5-flash"))
+        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-3.5-flash-lite"))
+        assertEquals("gemini-1.5-flash", Ollama.snapGoogleModel("gemini-1.5-pro"))
+        assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o"))
+        assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o-mini"))
+        assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))
+        assertEquals("llama3.2:1b", Ollama.snapLocalModel("llama3.2:3b"))
+    }
+    @Test fun fetchedModelMenuIsCategorizedWithPrices() {
+        val ids = listOf(
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-omni-1.1-flash",
+            "gemini-3.1-flash-lite-image",
+            "gemini-3.8-flash-tts",
+            "gemini-3.5-transcribe",
+            "gemini-4-argon",
+            "gemini-nano-banana-2.1",
+        )
+        val catalog = Ollama.catalogFetchedModels("google", ids)
+        assertEquals(ids.size, catalog.size)
+        assertTrue(catalog.any { it.category.startsWith("Flash") && it.price.contains("Free", ignoreCase = true) })
+        assertTrue(catalog.any { it.category.startsWith("Omni") && it.price.contains("Paid") })
+        assertTrue(catalog.any { it.category.startsWith("Image") })
+        assertTrue(catalog.any { it.category.startsWith("Speech") })
+        assertTrue(catalog.any { it.category.startsWith("Pro") })
+        // Flash / nano cheap buckets come before paid specialty / frontier.
+        assertTrue(catalog.first().categoryOrder <= catalog.last().categoryOrder)
+        val openai = Ollama.catalogFetchedModels("openai", listOf("gpt-4o-mini", "gpt-4o", "o1-mini"))
+        assertEquals("Cheap · text", openai.first { it.id == "gpt-4o-mini" }.price)
+        assertTrue(openai.first { it.id == "gpt-4o" }.price.contains("Paid"))
+    }
     @Test fun emptyModelListNeverInventsAvailableModels() {
         assertTrue(Ollama.googleTextModels("""{"models":[]}""").isEmpty())
         assertTrue(Ollama.googleTextModels("{}").isEmpty())

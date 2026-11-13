@@ -78,6 +78,9 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "• Gym Rat: develops faster.",
             "• Clutch: better with the game on the line.",
             "• Late Bloomer: earned, never rolled. A walk-on whose game took off; develops faster.",
+            "• Confident Scorer: hunts his own look and takes tough contested shots.",
+            "• Unselfish: kicks tough looks to open teammates instead of forcing it.",
+            "Turn on AI player personalities in Settings to have your AI assign styles and scout notes to the roster.",
         ),
         sec(
             "Mood",

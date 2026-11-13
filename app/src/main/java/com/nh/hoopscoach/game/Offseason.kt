@@ -213,6 +213,8 @@ object Offseason {
                 lg.news += News(lg.season, lg.day, "${p.name} goes No. $pickNum to the $nba$shoeBit", true)
             }
         }
+        ShadowProWorld.afterDraft(lg, picks.map { byId.getValue(it.id) })
+        ShadowProWorld.advance(lg)
         val drafted = picks.map { it.id }.toSet()
         // Seniors graduate, draftees leave, undrafted underclassmen return.
         // Medical redshirts keep their eligibility and stay on the roster.
@@ -499,6 +501,7 @@ object Coaching {
                 val n = LeagueGen.makeCoach(lg, t.prestige, Rng.range(34, 55), withCareer = true)
                 n.teamId = t.id
                 t.coachId = n.id
+                GenerationalLegacy.inheritProgram(lg, t, n)
                 if (t.prestige >= 80) lg.news += News(lg.season, lg.day, "${t.school} hires ${n.name} as head coach", false)
             }
         }
@@ -524,6 +527,7 @@ object Coaching {
                 .sortedByDescending { it.prestige }
                 .forEach { os.offers += JobOffer(it.id, if (it.prestige > u.prestige) "Wants you to lead a bigger program" else "Interested in your rebuild skills") }
         }
+        Ollama.maybeAutoGenerateCoachingCareers(lg.ollama, lg)
     }
 
     /** Out of a job (fired, not brought back, or walked away): programs with openings call; a coach who left on his own terms hears from better ones. */

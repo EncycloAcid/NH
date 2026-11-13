@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,11 +31,14 @@ import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Moment
 import com.nh.hoopscoach.game.MomentKind
 import com.nh.hoopscoach.game.News
+import com.nh.hoopscoach.game.Ollama
+import kotlinx.coroutines.launch
 
 @Composable
 fun momentColor(kind: MomentKind): Color = when (kind) {
     MomentKind.BUZZER, MomentKind.TITLE -> P.gold
-    MomentKind.UPSET -> P.bad
+    MomentKind.UPSET, MomentKind.COURT_STORM -> P.bad
+    MomentKind.HEARTBREAK -> P.sub
     MomentKind.CINDERELLA -> P.accent
     MomentKind.FORCED_OT, MomentKind.CLASSIC -> P.warn
 }
@@ -40,9 +48,9 @@ fun momentColor(kind: MomentKind): Color = when (kind) {
 fun NewsTag(n: News, modifier: Modifier = Modifier) {
     val regularTag = when {
         n.rivalry -> "RIVALRY" to P.bad
-        n.kind == "upset" -> "UPSET ALERT" to P.bad
+        n.kind == "upset" -> if (n.text.contains("Court storm", ignoreCase = true)) "COURT STORM" to P.bad else "UPSET ALERT" to P.bad
         n.kind == "buzzer" -> "BUZZER-BEATER" to P.gold
-        n.kind == "moment" -> "MARCH MOMENT" to P.accent
+        n.kind == "moment" -> if (n.text.contains("Heartbreak", ignoreCase = true)) "HEARTBREAK" to P.sub else "MARCH MOMENT" to P.accent
         n.kind == "game" -> "BIG NIGHT" to P.gold
         n.kind == "recap" -> "GAME STORY" to P.accent
         n.kind == "series" -> "PLAYOFFS" to P.bad
@@ -73,7 +81,7 @@ fun MomentCard(vm: GameViewModel, lg: League, m: Moment, showSeason: Boolean = f
         Box(Modifier.width(5.dp).fillMaxHeight().background(color))
         Column(Modifier.weight(1f).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Tag(m.kind.tag.uppercase(), color, filled = m.kind == MomentKind.BUZZER || m.kind == MomentKind.UPSET || m.kind == MomentKind.TITLE)
+                Tag(m.kind.tag.uppercase(), color, filled = m.kind == MomentKind.BUZZER || m.kind == MomentKind.UPSET || m.kind == MomentKind.TITLE || m.kind == MomentKind.COURT_STORM)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     (if (showSeason) "${m.season} · " else "") + m.stage.removePrefix("NCAA ").removePrefix("· "),
@@ -88,6 +96,35 @@ fun MomentCard(vm: GameViewModel, lg: League, m: Moment, showSeason: Boolean = f
             ScoreLine(lg, m.winner, m.wSeed, m.wScore, true)
             Spacer(Modifier.height(4.dp))
             ScoreLine(lg, m.loser, m.lSeed, m.lScore, false)
+            if (lg.ollama.enabled && lg.ollama.historicMoments) {
+                var writing by remember(m.gameId, m.kind) { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+                Spacer(Modifier.height(8.dp))
+                SmallButton(if (writing) "Writing…" else "${lg.ollama.shortActionName} feature", primary = false, enabled = !writing) {
+                    writing = true
+                    scope.launch {
+                        val res = Ollama.generateHistoricMoment(lg.ollama, lg, m)
+                        writing = false
+                        res.onSuccess { pack ->
+                            vm.act { league ->
+                                val match = league.news.indexOfLast { it.gameId == m.gameId && it.season == m.season && (it.text == m.headline || it.text == pack.stories.firstOrNull()?.text) }
+                                if (match >= 0 && pack.stories.isNotEmpty()) {
+                                    val s = pack.stories.first()
+                                    league.news[match].body = s.body
+                                    league.news[match].source = s.source
+                                    league.news[match].text = s.text
+                                    league.news[match].aiLabeled = s.aiLabeled
+                                    league.news[match].aiFallbackReason = s.aiFallbackReason
+                                    league.news[match].approved = false
+                                } else {
+                                    league.news.addAll(pack.stories)
+                                }
+                            }
+                            vm.toast(if (pack.isAi) "Historic feature filed" else pack.detail)
+                        }.onFailure { err -> vm.toast(err.message ?: "Feature failed") }
+                    }
+                }
+            }
         }
     }
 }

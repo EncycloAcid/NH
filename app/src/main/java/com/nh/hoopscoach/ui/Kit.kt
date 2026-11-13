@@ -420,7 +420,7 @@ fun Picker(label: String, current: String, options: List<Pair<String, String>>, 
     Box(modifier) {
         Column(
             Modifier.fillMaxWidth().onGloballyPositioned { fieldWidth = with(density) { it.size.width.toDp() } }
-                .clip(RoundedCornerShape(14.dp)).background(if (open) P.accentSoft else P.surface)
+                .clip(RoundedCornerShape(14.dp)).background(if (open) P.accentSoft else P.surface2)
                 .border(if (open) 1.5.dp else 1.dp, if (open) P.accent else P.line, RoundedCornerShape(14.dp))
                 .clickable { open = true }.padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
@@ -436,6 +436,26 @@ fun Picker(label: String, current: String, options: List<Pair<String, String>>, 
             }
         }
     }
+}
+
+/** Themed switch matching accent / surface2 instead of stock Material purple. */
+@Composable
+fun AppSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = P.onAccent,
+            checkedTrackColor = P.accent,
+            checkedBorderColor = P.accent,
+            uncheckedThumbColor = P.ink,
+            uncheckedTrackColor = P.surface2,
+            uncheckedBorderColor = P.line,
+            disabledCheckedTrackColor = P.faint,
+            disabledUncheckedTrackColor = P.surface2,
+        ),
+    )
 }
 
 @Composable

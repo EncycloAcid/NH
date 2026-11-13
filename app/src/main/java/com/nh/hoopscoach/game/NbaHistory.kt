@@ -47,15 +47,27 @@ object NbaHistory {
     /** The real champion of [season], by franchise slot. */
     fun realChampion(season: Int): String? = data.years[season]?.champion?.takeIf { it.isNotEmpty() } ?: data.early[season]
 
-    /** This league's first season of its own; everything before it is the real past. */
+    /** Champion slot for [season] in this save: alternate universe map, or the real record. */
+    fun championSlot(lg: League, season: Int): String? =
+        lg.altNbaTitles[season]?.takeIf { it.isNotEmpty() } ?: realChampion(season)
+
+    /** This league's first season of its own; everything before it is the (real or alternate) past. */
     fun firstSeason(lg: League): Int = lg.proState?.history?.minOfOrNull { it.season } ?: lg.season
 
     private fun played(lg: League, season: Int) = lg.proState?.history?.firstOrNull { it.season == season }
 
-    /** How [t]'s season ending in [season] went: this league's if it was played here, otherwise the real one. */
+    /** How [t]'s season ending in [season] went: this league's if it was played here, otherwise the past record. */
     fun season(lg: League, t: Team, season: Int): TeamYear? {
         if (played(lg, season) != null) return t.history.firstOrNull { it.season == season }?.let { TeamYear(season, it.w, it.l, it.result) }
         if (season >= firstSeason(lg)) return null
+        if (lg.altNbaTitles.isNotEmpty()) {
+            val champ = lg.altNbaTitles[season]
+            return when {
+                champ == t.slot -> TeamYear(season, 55, 27, "Champion")
+                champ != null -> TeamYear(season, 42, 40, "Missed playoffs")
+                else -> null
+            }
+        }
         return real(season, t.slot)
     }
 
@@ -67,7 +79,8 @@ object NbaHistory {
         if (season >= firstSeason(lg)) return null to null
         val y = data.years[season]
         fun bySlot(s: String?) = s?.takeIf { it.isNotEmpty() }?.let { slot -> lg.teams.firstOrNull { it.slot == slot } }
-        return bySlot(realChampion(season)) to bySlot(y?.runnerUp)
+        val champ = championSlot(lg, season)
+        return bySlot(champ) to bySlot(y?.runnerUp?.takeIf { lg.altNbaTitles.isEmpty() || it != champ })
     }
 
     /** Last season's MVP: this league's, or the real one. */
@@ -77,9 +90,9 @@ object NbaHistory {
     /** Every title the franchise in [t]'s place has won, oldest first: the real ones before this league, then this league's. */
     fun titles(lg: League, t: Team): List<Int> {
         val first = firstSeason(lg)
-        val real = (1947 until first).filter { realChampion(it) == t.slot }
+        val past = (1947 until first).filter { championSlot(lg, it) == t.slot }
         val ours = lg.proState?.history?.filter { it.champion == t.id }?.map { it.season }.orEmpty()
-        return real + ours
+        return past + ours
     }
 
     /** Seasons in a row, up to last season, that [t] made the playoffs. */

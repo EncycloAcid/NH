@@ -133,7 +133,86 @@ object ArticleWriting {
         return noRepeat(paragraphs)
     }
 
+    /** Playoff series that contains [g], if any. */
+    fun seriesOf(lg: League, g: Game): Series? =
+        lg.proState?.series?.firstOrNull { g.id in it.gameIds }
+
+    /** Compact series ledger for fact sheets (games played, score, round, clinch). */
+    fun seriesFacts(lg: League, g: Game): String {
+        val s = seriesOf(lg, g) ?: return ""
+        val w = if (s.done) lg.team(s.winner) else null
+        val l = if (s.done) lg.team(s.loser) else null
+        val games = s.hiWins + s.loWins
+        val round = ProSeason.roundName(s)
+        return buildString {
+            appendLine("SERIES: ${round}; best of ${s.bestOf}; series score ${maxOf(s.hiWins, s.loWins)}-${minOf(s.hiWins, s.loWins)}; games played $games.")
+            if (w != null && l != null) {
+                appendLine("SERIES RESULT: ${w.name} beat ${l.name} in $games to win the $round.")
+                appendLine("SERIES WINNER: ${w.name} (${w.record}); SERIES LOSER: ${l.name} (${l.record}).")
+            }
+            val totals = HashMap<Int, Int>()
+            for (id in s.gameIds) {
+                val sg = lg.game(id)
+                val side = if (w != null && sg.home == w.id) sg.box?.home else if (w != null) sg.box?.away else null
+                side?.forEach { totals[it.pid] = (totals[it.pid] ?: 0) + it.s.pts }
+            }
+            totals.entries.sortedByDescending { it.value }.take(3).forEach { (pid, pts) ->
+                val p = lg.playerOrNull(pid) ?: return@forEach
+                val avg = String.format(java.util.Locale.US, "%.1f", pts.toDouble() / games.coerceAtLeast(1))
+                appendLine("SERIES LINE ${p.name}: $pts PTS in $games games; $avg points a game in the series.")
+            }
+        }.trim()
+    }
+
+    /** Full series clincher article — title/round aware, not a single-game box dump. */
+    fun series(lg: League, n: News): String {
+        val last = lg.games.firstOrNull { it.id == n.gameId && it.played }
+        val s = last?.let { seriesOf(lg, it) }
+        if (s == null || !s.done) {
+            return n.body.ifBlank { last?.let { game(lg, it) } ?: n.text }
+        }
+        val w = lg.team(s.winner); val l = lg.team(s.loser)
+        val games = s.hiWins + s.loWins
+        val round = ProSeason.roundName(s)
+        val seriesScore = "${maxOf(s.hiWins, s.loWins)}-${minOf(s.hiWins, s.loWins)}"
+        val paragraphs = mutableListOf<String>()
+        paragraphs += if (s.round == 4) {
+            "The ${w.name} are champions of ${lg.season}. They beat the ${l.name} $seriesScore in the $round, closing the series in $games games."
+        } else {
+            "The ${w.name} beat the ${l.name} in $games to win the $round. The series finished $seriesScore."
+        }
+        val totals = HashMap<Int, Int>()
+        for (id in s.gameIds) {
+            val sg = lg.game(id)
+            val side = if (sg.home == w.id) sg.box?.home else sg.box?.away
+            side?.forEach { totals[it.pid] = (totals[it.pid] ?: 0) + it.s.pts }
+        }
+        totals.maxByOrNull { it.value }?.let { (pid, pts) ->
+            val p = lg.playerOrNull(pid) ?: return@let
+            val avg = String.format(java.util.Locale.US, "%.1f", pts.toDouble() / games.coerceAtLeast(1))
+            paragraphs += "${p.name} led the way with $avg points a game in the series ($pts PTS across $games games)."
+        }
+        last?.let { g ->
+            paragraphs += "The clincher on day ${g.day} ended ${g.scoreFor(w.id)}-${g.scoreFor(l.id)}. ${w.name}'s record is ${w.record}; ${l.name} finished the series at ${l.record}."
+        }
+        if (s.round == 4) {
+            val ts = NbaHistory.titles(lg, w)
+            paragraphs += when {
+                ts.isEmpty() -> "${w.name} won four playoff series on the way to the ${lg.season} title."
+                else -> "${w.name} won four playoff series on the way to the title and now owns ${NbaHistory.titleWords(ts.size)}, the latest in ${ts.last()}."
+            }
+        } else {
+            val next = if (s.round == 3) "the Finals" else ProLeague.ROUND_NAMES.getOrElse(s.round) { "the next round" }
+            paragraphs += "Next for the ${w.name}: $next. ${w.name} is ${w.record} after winning the $round."
+        }
+        if (paragraphs.size < 4) {
+            paragraphs += "The ${lg.season} ${round} series between ${w.name} and ${l.name} required $games games."
+        }
+        return noRepeat(paragraphs)
+    }
+
     fun news(lg: League, n: News, includeForecast: Boolean = true): String {
+        if (n.kind == "series") return series(lg, n)
         lg.games.firstOrNull { it.id == n.gameId && it.played }?.let { return game(lg, it) }
         val t = lg.teams.getOrNull(n.teamId) ?: lg.teams.firstOrNull { n.text.contains(it.name) || n.text.contains(it.school) } ?: lg.user
         val name = short(lg, t)
@@ -161,5 +240,29 @@ object ArticleWriting {
         return noRepeat(paragraphs)
     }
 
-    fun boxFacts(g: Game) = g.box?.let { b -> (b.home.sortedByDescending { it.s.pts }.take(3) + b.away.sortedByDescending { it.s.pts }.take(3)).joinToString("\n") { "BOX ${it.name}: ${it.s.pts} PTS, ${it.s.reb} REB, ${it.s.ast} AST, ${it.s.stl} STL, ${it.s.blk} BLK, ${it.s.tov} TOV." } }.orEmpty()
+    fun boxFacts(g: Game): String {
+        val b = g.box ?: return "FINAL SCORE: ${g.hs}-${g.aws}."
+        val lines = (b.home.sortedByDescending { it.s.pts }.take(4) + b.away.sortedByDescending { it.s.pts }.take(4)).joinToString("\n") {
+            "BOX ${it.name}: ${it.s.pts} PTS, ${it.s.reb} REB, ${it.s.ast} AST, ${it.s.stl} STL, ${it.s.blk} BLK, ${it.s.tov} TOV, ${it.s.fgm} FGM, ${it.s.fga} FGA, ${it.s.ftm} FTM, ${it.s.fta} FTA."
+        }
+        val periods = b.halves.mapIndexedNotNull { i, scores ->
+            if (scores.size < 2) null else "PERIOD ${i + 1}: ${scores[0]}-${scores[1]}"
+        }
+        val half = if (b.quarters) b.halves.take(2).takeIf { it.size == 2 }?.let { p -> intArrayOf(p.sumOf { it[0] }, p.sumOf { it[1] }) }
+            else b.halves.firstOrNull()
+        val margin = kotlin.math.abs(g.hs - g.aws)
+        val halfLine = half?.let {
+            val cushion = kotlin.math.abs(it[0] - it[1])
+            "HALFTIME: ${it[0]}-${it[1]}; cushion $cushion; after break ${g.hs - it[0]}-${g.aws - it[1]}."
+        }.orEmpty()
+        val homeTop = b.home.sortedByDescending { it.s.pts }.take(3).sumOf { it.s.pts }
+        val awayTop = b.away.sortedByDescending { it.s.pts }.take(3).sumOf { it.s.pts }
+        return buildString {
+            appendLine("FINAL SCORE: ${g.hs}-${g.aws}; margin $margin.")
+            if (halfLine.isNotBlank()) appendLine(halfLine)
+            periods.forEach { appendLine(it) }
+            appendLine("LEADING TRIO: home $homeTop of ${g.hs}; away $awayTop of ${g.aws}.")
+            append(lines)
+        }.trim()
+    }
 }

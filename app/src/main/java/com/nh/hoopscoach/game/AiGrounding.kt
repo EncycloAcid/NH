@@ -28,12 +28,29 @@ object AiFacts {
         val population = (lg.players + lg.alumni + lg.recruits.map { it.p } + players).distinctBy { it.id }
         val context = request + "\n" + extra
         val namedPlayers = population.filter { mentioned(context, it.name) }
-        val teams = (lg.teams.filter { t -> aliases(t).any { mentioned(context, it) } } +
-            namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } } + lg.user).distinctBy { it.id }.take(8)
-        val featured = (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
-            teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } + teams.mapNotNull { AiTemplates.departure(lg, it) }).distinctBy { it.id }
+        val gameReport = eventGame != null && !preview && !upcoming
+        // Game/series sheets stay under the local 8192 context budget: only the two clubs,
+        // box principals, and a micro title brief — no abbr/surname false-positives or desk fluff.
+        val eventTeams = eventGame?.let { listOf(lg.team(it.home), lg.team(it.away)) }.orEmpty()
+        val situationTeams = if (gameReport) emptyList() else SituationAwareness.namedTeams(lg).take(3)
+        val mentionedTeams = if (gameReport) emptyList() else lg.teams.filter { t -> aliases(t).any { mentioned(context, it) } }
+        val teams = (eventTeams + mentionedTeams + (if (gameReport) emptyList() else namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } }) +
+            (if (gameReport) emptyList() else listOf(lg.user)) + situationTeams)
+            .distinctBy { it.id }.take(if (gameReport) 2 else 8)
+        val eventPlayerIds = eventGame?.box?.let { b -> (b.home + b.away).map { it.pid }.toSet() }.orEmpty()
+        val featured = if (gameReport) {
+            // Only box principals / named players who actually played this game — not same-name
+            // collisions elsewhere in the league population.
+            (players + namedPlayers.filter { it.id in eventPlayerIds || teams.any { t -> it.teamId == t.id } } +
+                teams.flatMap { t -> lg.rosterOf(t).filter { it.out } }).distinctBy { it.id }
+        } else {
+            (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
+                teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } +
+                teams.mapNotNull { AiTemplates.departure(lg, it) }).distinctBy { it.id }
+        }
         val names = (teams.flatMap { aliases(it) } + featured.map { it.name } + teams.map { lg.coachOf(it).name } +
-            teams.map { lg.conf(it.confId).name } + lg.rivals.map { it.name } + featured.flatMap { listOf(it.hometown, it.highSchool, it.injury) }.filter { it.isNotBlank() }).toMutableSet()
+            teams.map { lg.conf(it.confId).name } + (if (gameReport) emptyList() else lg.rivals.map { it.name }) +
+            featured.flatMap { listOf(it.hometown, it.highSchool, it.injury) }.filter { it.isNotBlank() }).toMutableSet()
         val allNames = (lg.teams.flatMap { aliases(it) } + population.map { it.name } + lg.coaches.map { it.name }).toSet()
         val records = mutableMapOf<String, Set<String>>()
         val preseason = lg.phase == Phase.REGULAR && lg.teams.all { it.gp == 0 }
@@ -42,56 +59,81 @@ object AiFacts {
             appendLine("League: ${if (lg.pro) "NBA" else "college basketball"}. Forecasts are simulation probabilities, not results. Missing facts are unknown.")
             if (preview) appendLine("PURPOSE: preseason magazine. Discuss forecasts and last season; do not claim this season has been played.")
             if (upcoming) appendLine("PURPOSE: upcoming matchup. Do not announce a result or postgame reaction.")
+            appendLine(SituationAwareness.microBrief(lg).trimEnd())
             teams.forEach { t ->
                 val order = lg.teams.filter { it.confId == t.confId }.sortedWith(compareByDescending<Team> {
                     if (lg.pro) it.winPct else if (it.cw + it.cl > 0) it.cw.toDouble() / (it.cw + it.cl) else 0.0
                 }.thenByDescending { it.elo }.thenBy { it.id })
                 val rank = if (t.gp == 0) "standings not established" else "conference standing ${order.indexOf(t) + 1} of ${order.size} (ties ordered by Elo)"
-                appendLine("TEAM ${t.name} (${t.abbr}); current record ${t.record}; conference ${lg.conf(t.confId).name}, ${t.confRecord}; $rank; AP ${t.ap.takeIf { it > 0 } ?: "unranked"}; NET ${t.net.takeIf { it > 0 } ?: "unranked"}; prestige ${t.prestige}/100; titles ${t.titles}.")
+                val bannerYears = TitleDefense.titles(lg, t)
+                appendLine("TEAM ${t.name} (${t.abbr}); current record ${t.record}; conference ${lg.conf(t.confId).name}, ${t.confRecord}; $rank; AP ${t.ap.takeIf { it > 0 } ?: "unranked"}; NET ${t.net.takeIf { it > 0 } ?: "unranked"}; prestige ${t.prestige}/100; program titles ${t.titles}; national titles ${bannerYears.size}${bannerYears.lastOrNull()?.let { " (last $it)" } ?: ""}.")
                 val c = lg.coachOf(t)
                 appendLine("COACH ${c.name}; job security ${c.security}/100; titles ${c.titles}; recorded seasons at this team ${c.history.count { it.teamId == t.id }}.")
-                t.history.lastOrNull { it.season == lg.season - 1 }?.let { h ->
+                if (!lg.pro && t.id == lg.userTeamId) appendLine("TITLE HISTORY ${t.school}: ${CollegeHistory.line(lg, t)}")
+                if (!gameReport) t.history.lastOrNull { it.season == lg.season - 1 }?.let { h ->
                     appendLine("TEAM last season ${h.season}: ${h.w}-${h.l}; ${h.result}.")
                 }
-                if (lg.pro) lg.proState?.preview?.takeIf { it.season == lg.season }?.proj?.get(t.id)?.let { p ->
-                    appendLine("FORECAST ${t.name}: ${p.w}-${p.l}; win percentiles ${p.lo}/${p.median ?: "unknown"}/${p.hi}; playoffs ${PreviewWriting.percent(p.playoffs)}; Finals ${PreviewWriting.percent(p.finals)}; title ${PreviewWriting.percent(p.title)}.")
-                } else lg.preview?.takeIf { it.season == lg.season }?.let { pv ->
-                    pv.proj[t.id]?.let { p -> appendLine("FORECAST ${t.name}: rank ${p.nat}; ${p.w}-${p.l}.") }
-                    pv.odds[t.id]?.let { o -> appendLine("ODDS ${t.name}: NCAA ${PreviewWriting.percent(o.ncaa)}; conference ${PreviewWriting.percent(o.conf)}; Final Four ${PreviewWriting.percent(o.f4)}; title ${PreviewWriting.percent(o.title)}; win percentiles ${o.lo}/${o.median ?: "unknown"}/${o.hi}.") }
+                if (!gameReport) {
+                    if (lg.pro) lg.proState?.preview?.takeIf { it.season == lg.season }?.proj?.get(t.id)?.let { p ->
+                        appendLine("FORECAST ${t.name}: ${p.w}-${p.l}; win percentiles ${p.lo}/${p.median ?: "unknown"}/${p.hi}; playoffs ${PreviewWriting.percent(p.playoffs)}; Finals ${PreviewWriting.percent(p.finals)}; title ${PreviewWriting.percent(p.title)}.")
+                    } else lg.preview?.takeIf { it.season == lg.season }?.let { pv ->
+                        pv.proj[t.id]?.let { p -> appendLine("FORECAST ${t.name}: rank ${p.nat}; ${p.w}-${p.l}.") }
+                        pv.odds[t.id]?.let { o -> appendLine("ODDS ${t.name}: NCAA ${PreviewWriting.percent(o.ncaa)}; conference ${PreviewWriting.percent(o.conf)}; Final Four ${PreviewWriting.percent(o.f4)}; title ${PreviewWriting.percent(o.title)}; win percentiles ${o.lo}/${o.median ?: "unknown"}/${o.hi}.") }
+                    }
+                    appendLine("EDITORIAL ${if (lg.pro) t.name else t.school}: ${AiTemplates.previewCopy(lg, t)}")
                 }
                 aliases(t).forEach { records[it] = setOf(t.record) }
-                appendLine("EDITORIAL ${if (lg.pro) t.name else t.school}: ${AiTemplates.previewCopy(lg, t)}")
             }
             val results = (eventGame?.let { listOf(it) } ?: lg.games).filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
-                .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(6)
+                .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(if (gameReport) 1 else 6)
             results.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
                 names += aliases(h); names += aliases(a)
                 appendLine("RESULT day ${g.day}: ${h.name} ${g.hs}-${g.aws} ${a.name}; winner ${lg.team(g.winner()).name}; ${g.type.name} ${g.label}.")
                 g.box?.let { b -> (b.home + b.away).filter { line -> featured.any { it.id == line.pid } }.forEach { line ->
-                    appendLine("BOX ${line.name}: ${line.s.pts} PTS, ${line.s.reb} REB, ${line.s.ast} AST, ${line.s.stl} STL, ${line.s.blk} BLK, ${line.s.tov} TOV, ${line.s.fgm} FGM, ${line.s.fga} FGA.")
+                    appendLine("BOX ${line.name}: ${line.s.pts} PTS, ${line.s.reb} REB, ${line.s.ast} AST, ${line.s.stl} STL, ${line.s.blk} BLK, ${line.s.tov} TOV, ${line.s.fgm} FGM, ${line.s.fga} FGA, ${line.s.ftm} FTM, ${line.s.fta} FTA.")
                 } }
                 g.box?.let { b ->
                     listOf(h to b.home, a to b.away).forEach { (team, lines) ->
-                        appendLine("TEAM BOX ${team.name}: ${lines.sumOf { it.s.fgm }} FGM, ${lines.sumOf { it.s.fga }} FGA, ${lines.sumOf { it.s.ast }} AST.")
+                        val top3 = lines.sortedByDescending { it.s.pts }.take(3).sumOf { it.s.pts }
+                        val teamPts = if (team.id == g.home) g.hs else g.aws
+                        appendLine("TEAM BOX ${team.name}: ${lines.sumOf { it.s.fgm }} FGM, ${lines.sumOf { it.s.fga }} FGA, ${lines.sumOf { it.s.ftm }} FTM, ${lines.sumOf { it.s.fta }} FTA, ${lines.sumOf { it.s.ast }} AST; leading trio $top3 of $teamPts.")
                     }
-                    b.halves.forEachIndexed { index, scores -> if (scores.size >= 2) appendLine("PERIOD ${index + 1}: ${h.name} ${scores[0]}, ${a.name} ${scores[1]}.") }
+                    b.halves.forEachIndexed { index, scores -> if (scores.size >= 2) appendLine("PERIOD ${index + 1}: ${h.name} ${scores[0]}, ${a.name} ${scores[1]}; score pair ${scores[0]}-${scores[1]}.") }
+                    val half = if (b.quarters) b.halves.take(2).takeIf { it.size == 2 }?.let { p -> intArrayOf(p.sumOf { it[0] }, p.sumOf { it[1] }) }
+                        else b.halves.firstOrNull()
+                    if (half != null) {
+                        val cushion = kotlin.math.abs(half[0] - half[1])
+                        appendLine("HALFTIME: ${h.name} ${half[0]}, ${a.name} ${half[1]}; pair ${half[0]}-${half[1]}; cushion $cushion; after break ${g.hs - half[0]}-${g.aws - half[1]}.")
+                    }
+                    appendLine("MARGIN: ${kotlin.math.abs(g.hs - g.aws)}.")
+                }
+                if (g.type == GameType.PLAYOFF || g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY) {
+                    val sf = ArticleWriting.seriesFacts(lg, g)
+                    if (sf.isNotBlank()) appendLine(sf)
                 }
                 featured.forEach { p -> p.log.lastOrNull { it.gameId == g.id }?.let { l ->
                     appendLine("GAME LINE ${p.name}: ${l.pts} PTS, ${l.reb} REB, ${l.ast} AST, ${l.stl} STL, ${l.blk} BLK, ${l.tov} TOV, ${l.min} MIN.")
                 } }
             }
             featured.forEach { p ->
-                if (p in namedPlayers) lg.teams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
+                if (!gameReport && p in namedPlayers) lg.teams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
                 appendLine("PLAYER ${p.name}; ${p.posLabel}; class ${p.cls}; team ${lg.teams.firstOrNull { it.id == p.teamId }?.name ?: "unattached"}; age ${p.age}; height ${p.height} in; weight ${p.weight} lb; recruit rank ${p.recruitRank}; rating ${p.ovr}; potential ${p.pot}.")
-                val best = Attr.entries.maxBy { p[it] }; val worst = Attr.entries.minBy { p[it] }
-                appendLine("SCOUT ${p.name}: strongest ${best.label} ${p[best]}; weakest ${worst.label} ${p[worst]}.")
+                if (!gameReport) {
+                    val best = Attr.entries.maxBy { p[it] }; val worst = Attr.entries.minBy { p[it] }
+                    appendLine("SCOUT ${p.name}: strongest ${best.label} ${p[best]}; weakest ${worst.label} ${p[worst]}.")
+                }
                 if (p.stats.gp > 0) appendLine("CURRENT ${p.name}: ${stats(p.stats)}.") else appendLine("CURRENT ${p.name}: no appearances; no current per-game production established.")
-                p.career.lastOrNull { it.season == lg.season - 1 }?.let { s -> appendLine("LAST SEASON ${p.name}, ${s.season}, ${s.team}: ${stats(s.s)}.") }
+                if (!gameReport) p.career.lastOrNull { it.season == lg.season - 1 }?.let { s -> appendLine("LAST SEASON ${p.name}, ${s.season}, ${s.team}: ${stats(s.s)}.") }
                 appendLine("AVAILABILITY ${p.name}: ${if (p.out) "out: ${p.injury.ifBlank { "injury" }}; ${if (p.injGames >= Injuries.SEASON_OUT) "season-ending" else "${p.injGames} team games remaining"}" else "no current injury absence"}.")
-                if (lg.pro) appendLine("CONTRACT ${p.name}: salary ${p.salary} thousand dollars (${Road.dollars(p.salary)}); years remaining ${p.contractYears}.")
+                if (lg.pro && !gameReport) appendLine("CONTRACT ${p.name}: salary ${p.salary} thousand dollars (${Road.dollars(p.salary)}); years remaining ${p.contractYears}.")
             }
-            (lg.games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it) }).distinctBy { it.id }.forEach { g ->
+            val scheduleGames = if (gameReport) {
+                lg.games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(2)
+            } else {
+                (lg.games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it) }).distinctBy { it.id }
+            }
+            scheduleGames.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
                 names += aliases(h); names += aliases(a)
                 appendLine("SCHEDULE day ${g.day}: ${a.name} at ${h.name}${if (g.neutral) " (neutral)" else ""}${lg.rivalry(g)?.let { "; rivalry ${it.name}" } ?: ""}; not played.")
@@ -102,7 +144,11 @@ object AiFacts {
         teams.filter { t -> t.mascot.length > 2 && teams.count { it.mascot.equals(t.mascot, true) } == 1 }.forEach { shortNames[it.mascot] = it.name }
         featured.forEach { p ->
             val last = p.name.substringAfterLast(' ')
-            if (last.length > 2 && featured.count { it.name.substringAfterLast(' ').equals(last, true) } == 1 && teams.none { lg.coachOf(it).name.substringAfterLast(' ').equals(last, true) } && names.none { it.equals(last, true) }) shortNames[last] = p.name
+            if (last.length > 2 && featured.count { it.name.substringAfterLast(' ').equals(last, true) } == 1 && teams.none { lg.coachOf(it).name.substringAfterLast(' ').equals(last, true) } && names.none { it.equals(last, true) }) {
+                shortNames[last] = p.name
+                val initial = p.name.firstOrNull()?.uppercaseChar()
+                if (initial != null) shortNames["$initial. $last"] = p.name
+            }
         }
         val properNames = lg.teams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + lg.coaches.map { it.name }
         val acronyms = lg.teams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
@@ -111,8 +157,10 @@ object AiFacts {
 
     fun version(lg: League): String {
         val snapshot = buildString {
-            append("grounded2/${lg.season}/${lg.day}/${lg.phase}/${lg.userTeamId}/${lg.pro}")
-            lg.teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}") }
+            append("grounded3/${lg.season}/${lg.day}/${lg.phase}/${lg.userTeamId}/${lg.pro}")
+            lg.teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}:${it.titles}:${it.streak}") }
+            TitleDefense.champion(lg)?.let { append("|champ:${it.id}") }
+            lg.history.takeLast(3).forEach { append("|hist:${it.season}:${it.champion}") }
             (lg.players + lg.alumni).forEach { append("|${it.id}:${it.name}:${it.teamId}:${it.ovr}:${it.injGames}:${it.injury}:${it.salary}:${it.contractYears}:${it.stats.pts}:${it.stats.gp}:${it.stats.reb}:${it.stats.ast}:${it.attrs.contentHashCode()}") }
             lg.coaches.forEach { append("|${it.name}:${it.teamId}:${it.security}:${it.titles}") }
             lg.games.filter { it.played }.forEach { append("|${it.id}:${it.hs}:${it.aws}") }
@@ -169,21 +217,34 @@ object AiGrounding {
                 Regex(Regex.escape(name), RegexOption.IGNORE_CASE).findAll(prefix).lastOrNull()?.let { name to it.range.first }
             }.filter { (name, _) -> facts.text.lines().any { it.startsWith("PLAYER $name;") } }.maxByOrNull { it.second }?.first
             if (player != null) {
-                val perGame = Regex("averag", RegexOption.IGNORE_CASE).containsMatchIn(prefix) || content.substring(m.range.last + 1).trimStart().startsWith("per game", true)
+                val after = content.substring(m.range.last + 1).trimStart()
+                val perGame = Regex("averag", RegexOption.IGNORE_CASE).containsMatchIn(prefix) ||
+                    after.startsWith("per game", true) || after.startsWith("a game", true)
+                val seriesStat = Regex("(?i)series").containsMatchIn(prefix) || Regex("(?i)in the series").containsMatchIn(after)
                 val metric = when (m.groupValues[2].uppercase(Locale.US)) {
                     "POINTS" -> if (perGame) "PPG" else "PTS"
                     "REBOUNDS" -> if (perGame) "RPG" else "REB"
                     "ASSISTS" -> if (perGame) "APG" else "AST"
                     else -> m.groupValues[2].uppercase(Locale.US)
                 }
-                val expected = facts.text.lines().filter { if (metric in setOf("PPG", "RPG", "APG"))
-                    it.startsWith("CURRENT $player:") || it.startsWith("LAST SEASON $player,")
-                    else it.startsWith("BOX $player:") || it.startsWith("GAME LINE $player:") }
-                    .flatMap { Regex("(\\d+(?:\\.\\d+)?) $metric\\b", RegexOption.IGNORE_CASE).findAll(it).map { match -> match.groupValues[1] }.toList() }.toSet()
-                if (expected.none { if (metric in setOf("PPG", "RPG", "APG")) equivalent(m.groupValues[1], it) else normalized(m.groupValues[1]) == normalized(it) }) errors += "statistic belongs to another player"
+                val expected = facts.text.lines().filter {
+                    when {
+                        seriesStat -> it.startsWith("SERIES LINE $player:") || it.startsWith("BOX $player:") || it.startsWith("GAME LINE $player:")
+                        metric in setOf("PPG", "RPG", "APG") -> it.startsWith("CURRENT $player:") || it.startsWith("LAST SEASON $player,") || it.startsWith("SERIES LINE $player:")
+                        else -> it.startsWith("BOX $player:") || it.startsWith("GAME LINE $player:") || it.startsWith("SERIES LINE $player:")
+                    }
+                }.flatMap { line ->
+                    val fromMetric = Regex("(\\d+(?:\\.\\d+)?) $metric\\b", RegexOption.IGNORE_CASE).findAll(line).map { it.groupValues[1] }
+                    val fromSeries = if (seriesStat || perGame) Regex("(\\d+(?:\\.\\d+)?) points a game", RegexOption.IGNORE_CASE).findAll(line).map { it.groupValues[1] } else emptySequence()
+                    (fromMetric + fromSeries).toList()
+                }.toSet()
+                if (expected.none { if (metric in setOf("PPG", "RPG", "APG") || perGame) equivalent(m.groupValues[1], it) else normalized(m.groupValues[1]) == normalized(it) }) errors += "statistic belongs to another player"
             }
         }
-        val scores = facts.text.lines().filter { it.startsWith("RESULT") || it.startsWith("EVENT FACTS") }.flatMap { canonicalPairs(it) }
+        val scores = facts.text.lines().filter {
+            it.startsWith("RESULT") || it.startsWith("EVENT FACTS") || it.startsWith("PERIOD") ||
+                it.startsWith("HALFTIME") || it.startsWith("FINAL SCORE") || it.startsWith("SERIES")
+        }.flatMap { canonicalPairs(it) }
         val allowedPairs = canonicalPairs(facts.text) + scores.map { p -> p.split('-').let { v -> "${v[1]}-${v[0]}" } }
         pair.findAll(content).forEach { m ->
             val value = "${m.groupValues[1].toInt()}-${m.groupValues[2].toInt()}"
@@ -202,7 +263,12 @@ object AiGrounding {
             val caseFlag = if (name in facts.acronyms) "" else "(?i)"
             if (Regex("$caseFlag(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(residue)) errors += "entity outside fact sheet: ${entityLabel(name)}"
         }
-        val common = setOf("Final Four", "Sweet Sixteen", "Sweet Sixteen", "Elite Eight", "Head Coach", "Coach", "Game Winner", "The Favorite", "New Era", "Courtside Report", "National Championship", "March Madness", "All America", "Most Valuable Player", "First Team", "Second Team", "Third Team", "Staff", "Hot Seat")
+        val common = setOf(
+            "Final Four", "Sweet Sixteen", "Elite Eight", "Head Coach", "Coach", "Game Winner", "The Favorite", "New Era",
+            "Courtside Report", "National Championship", "March Madness", "All America", "Most Valuable Player",
+            "First Team", "Second Team", "Third Team", "Staff", "Hot Seat", "Baseline Sports", "Hoops Wire",
+            "First Round", "Conference Semifinals", "Conference Finals", "Finals", "Play-In", "NBA Cup",
+        )
         common.sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
         val prose = residue.lines().filterNot { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
         val headers = residue.lines().filter { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")

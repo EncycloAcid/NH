@@ -54,9 +54,16 @@ object Moments {
         fun add(kind: MomentKind, headline: String, detail: String, weight: Int) {
             lg.moments += Moment(lg.season, lg.day, kind, stage(g), headline, detail, w.id, l.id, ws, ls, g.scoreFor(w.id), g.scoreFor(l.id), g.ot, mine, weight + base, g.id)
             if (lg.moments.size > KEEP) lg.moments.removeAt(0)
-            val tag = when (kind) { MomentKind.UPSET -> "upset"; MomentKind.BUZZER -> "buzzer"; else -> "moment" }
+            val tag = when (kind) {
+                MomentKind.UPSET, MomentKind.COURT_STORM -> "upset"
+                MomentKind.BUZZER -> "buzzer"
+                else -> "moment"
+            }
             lg.news += News(lg.season, lg.day, headline, mine, g.id, tag)
         }
+        val storm = HistoricMoments.isCourtStormCandidate(lg, g)
+        val rivalryWin = lg.rivalry(g) != null && mine && g.winner() == lg.userTeamId
+        val heartbreak = ncaa && mine && g.loser() == lg.userTeamId && round >= 2
         when {
             buzzer != null -> add(
                 MomentKind.BUZZER,
@@ -73,14 +80,42 @@ object Moments {
                     30,
                 )
             }
+            storm -> add(
+                MomentKind.COURT_STORM,
+                "Court storm! ${w.school} knocks off ${seeded(ls, l).ifBlank { l.school }}",
+                "Fans rushed the floor after ${final(w, l, g)}. ${if (upset) "Seed gap: No.$ws over No.$ls. " else ""}Home underdog win on the recorded box score.",
+                55 + if (upset) (ws - ls) * 2 else 0,
+            )
             upset -> add(
                 MomentKind.UPSET,
                 if (ws - ls >= 13) "Historic upset: ${seeded(ws, w)} takes down ${seeded(ls, l)}" else "${seeded(ws, w)} stuns ${seeded(ls, l)}",
                 topScorer(g, w)?.let { (name, pts) -> "$name scored $pts to lead ${w.school}${if (Moments.margin(g) >= 15) " in a ${Moments.margin(g)}-point rout" else ""}." } ?: "${final(w, l, g)}.",
                 40 + (ws - ls) * 3,
             )
+            heartbreak -> add(
+                MomentKind.HEARTBREAK,
+                "Heartbreak: ${l.school}'s run ends against ${w.school}",
+                "${final(w, l, g)}. Tournament exit on the bracket — no invented injuries or quotes.",
+                35 + round * 4,
+            )
+            rivalryWin -> add(
+                MomentKind.CLASSIC,
+                "Rivalry night: ${w.school} takes down ${l.school}",
+                "${final(w, l, g)}. ${lg.rivalry(g)?.name?.takeIf { it.isNotBlank() }?.let { "$it — " } ?: ""}Series update from the rivalry ledger.",
+                25,
+            )
             ncaa && g.ot >= 2 -> add(MomentKind.CLASSIC, "${g.ot}OT classic: ${w.school} outlasts ${l.school}", "${final(w, l, g)}.", 30)
             mine && g.ot >= 2 -> add(MomentKind.CLASSIC, "${g.ot}OT classic: ${w.school} outlasts ${l.school}", "${final(w, l, g)}.", 10)
+        }
+        // AI historic coverage for the freshest qualifying moment from this game.
+        if (lg.ollama.enabled && lg.ollama.historicMoments) {
+            lg.moments.lastOrNull { it.gameId == g.id && it.season == lg.season }?.let { m ->
+                if (m.kind in setOf(MomentKind.COURT_STORM, MomentKind.BUZZER, MomentKind.UPSET, MomentKind.HEARTBREAK, MomentKind.TITLE, MomentKind.CINDERELLA) ||
+                    (m.kind == MomentKind.CLASSIC && m.weight >= 25)
+                ) {
+                    Ollama.maybeAutoGenerateHistoricMoment(lg.ollama, lg, m)
+                }
+            }
         }
     }
 

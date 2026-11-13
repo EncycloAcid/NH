@@ -288,7 +288,8 @@ class SimTest {
     private fun checkRivalries(lg: League) {
         val names = lg.teams.map { it.school }.toSet()
         assertTrue("rivalry schools exist: ${Rivalries.schools - names}", names.containsAll(Rivalries.schools))
-        assertEquals(45, lg.rivals.size)
+        // Traditional list seeds 45; emergent rivalries from close/postseason meetings may add more.
+        assertTrue("traditional rivalries present (${lg.rivals.size})", lg.rivals.size >= 45)
         val regular = lg.games.filter { it.played && it.day <= Schedule.REG_DAYS }
         var twice = 0
         for (r in lg.rivals) {
@@ -299,9 +300,13 @@ class SimTest {
                 twice++
                 assertTrue("home-and-home", conf.map { it.home }.toSet().size == 2)
             }
+            // Emerging rivalries are minted after prior meetings; only traditional ones always sold out.
+            val traditional = !r.name.equals("Emerging rivalry", ignoreCase = true)
             for (g in meetings) {
-                assertTrue("rivalry sells out", g.att == (if (g.neutral) g.att else lg.team(g.home).arena))
-                assertTrue("prestige swing", g.swing in 1..2)
+                if (traditional) {
+                    assertTrue("rivalry sells out", g.att == (if (g.neutral) g.att else lg.team(g.home).arena))
+                    assertTrue("prestige swing", g.swing in 1..2)
+                }
             }
         }
         val duke = lg.teams.first { it.school == "Duke" }.id

@@ -27,38 +27,31 @@ object Ollama {
         val speedRating: String = "Fast",
     )
 
+    /** Free / cheap on-device presets only — no large "pro" phone models. */
     val RECOMMENDED_MODELS = listOf(
         ModelPreset(
             id = "smollm2:135m",
             name = "SmolLM2 135M",
             size = "270 MB",
-            tag = "⚡⚡⚡ Instant Nano (Fastest)",
+            tag = "Fastest · free",
             speedRating = "40–60 tok/s",
-            description = "Fastest on-device model (~270MB). Instant recaps, press quotes, and takes with minimal RAM and battery impact.",
+            description = "Fastest on-device model (~270MB). Instant recaps and quotes with minimal RAM.",
         ),
         ModelPreset(
             id = "qwen2.5:0.5b",
             name = "Qwen 2.5 0.5B",
             size = "398 MB",
-            tag = "⚡⚡ Ultra Fast",
+            tag = "Ultra fast · free",
             speedRating = "35–45 tok/s",
-            description = "Extremely lightweight (~400MB). High-speed generation with sharp basketball intelligence.",
+            description = "Lightweight (~400MB). High-speed generation with sharp basketball context.",
         ),
         ModelPreset(
             id = "llama3.2:1b",
             name = "Llama 3.2 1B",
             size = "1.3 GB",
-            tag = "Recommended · Balanced",
+            tag = "Recommended · free",
             speedRating = "15–20 tok/s",
-            description = "Meta's mobile LLM (~15-20 tok/s). Fast, witty game recaps and realistic player quotes with low RAM usage.",
-        ),
-        ModelPreset(
-            id = "llama3.2:3b",
-            name = "Llama 3.2 3B",
-            size = "2.0 GB",
-            tag = "Pro Quality",
-            speedRating = "5–8 tok/s",
-            description = "Full-length sports journalism, colorful columns, and rich storylines for mid-to-high end phones.",
+            description = "Meta's mobile LLM. Fast, witty recaps and realistic quotes with low RAM.",
         ),
     )
 
@@ -69,17 +62,111 @@ object Ollama {
         val description: String,
     )
 
+    /** Free / cheap Gemini tags only — Pro is hidden from Settings. */
     val GOOGLE_MODELS = listOf(
-        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · Free & Fast", "Ultra-fast multimodal reasoning with a generous free tier. Ideal for instant recaps."),
-        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Next-Gen Speed", "Google's newest flash model with sub-second generation and real-time responsiveness."),
-        CloudModel("gemini-1.5-pro", "Gemini 1.5 Pro", "Deep Journalism", "Full-length investigative columns, rich prose, and deep storylines."),
+        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · free", "Fast free-tier model. Ideal for instant recaps."),
+        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Free · next-gen", "Newest flash model with sub-second generation."),
     )
 
+    /** Cheap OpenAI tags only — flagship gpt-4o is hidden from Settings. */
     val OPENAI_MODELS = listOf(
-        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · Smart & Fast", "Affordable and remarkably fast. Exceptional basketball context and quote realism."),
-        CloudModel("gpt-4o", "GPT-4o", "Flagship Intelligence", "OpenAI's premier reasoning model for deep columns and sports commentary."),
-        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Legacy", "Classic ChatGPT model for basic headlines and recaps."),
+        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · cheap", "Affordable and fast. Strong basketball context."),
+        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
     )
+
+    /**
+     * Only remaps known expensive / blocked ids onto a free/cheap default.
+     * Custom picks from the provider list (e.g. gemini-3.5-flash) must stick —
+     * never force everything onto the curated Settings shortlist.
+     */
+    fun snapGoogleModel(id: String): String {
+        val t = id.trim().removePrefix("models/").ifEmpty { return GOOGLE_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = low == "gemini-1.5-pro" || low == "gemini-1.0-pro" || low == "gemini-pro" ||
+            low == "gemini-ultra" || (low.contains("pro") && !low.contains("flash") && !low.contains("nano"))
+        return if (blocked) GOOGLE_MODELS.first().id else t
+    }
+
+    fun snapOpenAiModel(id: String): String {
+        val t = id.trim().ifEmpty { return OPENAI_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = low == "gpt-4o" || low == "gpt-4" || low == "gpt-4-turbo" || low == "gpt-4-turbo-preview" ||
+            low.startsWith("o1") || low.startsWith("o3") || low.startsWith("o4")
+        return if (blocked) OPENAI_MODELS.first().id else t
+    }
+
+    fun snapLocalModel(id: String): String {
+        val t = id.trim().ifEmpty {
+            return RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id
+        }
+        val low = t.lowercase()
+        val heavy = Regex(""":(3|7|8|13|70)b\b""").containsMatchIn(low) || low.endsWith("3b") || low.contains("3b:")
+        return if (heavy) RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id else t
+    }
+
+    /**
+     * One row in the fetched-model menu: provider id, display title, category header, and a short
+     * price tag so long raw lists (especially Gemini) are readable.
+     */
+    data class CatalogEntry(
+        val id: String,
+        val title: String,
+        val category: String,
+        val price: String,
+        val categoryOrder: Int,
+    )
+
+    /** Group + price labels for models returned by a provider's list endpoint. */
+    fun catalogFetchedModels(provider: String, ids: List<String>): List<CatalogEntry> =
+        ids.distinct().map { id -> catalogEntry(provider, id) }
+            .sortedWith(compareBy({ it.categoryOrder }, { it.title.lowercase() }, { it.id.lowercase() }))
+
+    private fun catalogEntry(provider: String, id: String): CatalogEntry {
+        val key = id.lowercase().removePrefix("models/")
+        val title = humanModelTitle(id)
+        return when (provider.lowercase()) {
+            "google" -> googleCatalog(key, id, title)
+            "openai" -> openAiCatalog(key, id, title)
+            else -> CatalogEntry(id, title, "On-device · free", "Free · local", 0)
+        }
+    }
+
+    private fun humanModelTitle(id: String): String {
+        val bare = id.removePrefix("models/").substringAfterLast('/')
+        return bare.split('-', '_', ':').filter { it.isNotBlank() }.joinToString(" ") { part ->
+            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+    }
+
+    private fun googleCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "tts" in key || "transcribe" in key || "speech" in key ->
+            CatalogEntry(id, title, "Speech · TTS / audio", "Paid · audio", 4)
+        "image" in key || "imagen" in key || "banana" in key ->
+            CatalogEntry(id, title, "Image", "Paid · image", 3)
+        "omni" in key ->
+            CatalogEntry(id, title, "Omni · multimodal", "Paid · multimodal", 2)
+        "nano" in key ->
+            CatalogEntry(id, title, "Nano · tiny", "Free · on-device", 0)
+        "flash-lite" in key || key.contains("flash") && "lite" in key ->
+            CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheapest", 0)
+        "flash" in key ->
+            CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheap", 0)
+        "pro" in key || "ultra" in key || "argon" in key || "carbon" in key || "hydrogen" in key ->
+            CatalogEntry(id, title, "Pro / frontier · paid", "Paid · premium", 1)
+        else ->
+            CatalogEntry(id, title, "Other Gemini", "See Google pricing", 5)
+    }
+
+    private fun openAiCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "mini" in key || "3.5" in key || "nano" in key ->
+            CatalogEntry(id, title, "Cheap ChatGPT", "Cheap · text", 0)
+        "o1" in key || "o3" in key || "o4" in key ->
+            CatalogEntry(id, title, "Reasoning · premium", "Paid · premium", 2)
+        "4o" in key || "gpt-4" in key ->
+            CatalogEntry(id, title, "Flagship · paid", "Paid · standard", 1)
+        else ->
+            CatalogEntry(id, title, "Other OpenAI", "See OpenAI pricing", 3)
+    }
 
     data class AutoConfigResult(
         val host: String,
@@ -133,6 +220,14 @@ object Ollama {
             is AwardSpeech -> value.isAi
             is HalftimeSpeech -> value.isAi
             is TrainingCampReport -> value.isAi
+            is PlayerInterview -> value.isAi
+            is Journalism.Package -> value.isAi
+            is CoachCareers.Package -> value.isAi
+            is HistoricMoments.Package -> value.isAi
+            is PlayerStorylines.Package -> value.isAi
+            is DraftUniverse.Package -> value.isAi
+            is HistoricalRivalries.Package -> value.isAi
+            is UniversityDevelopment.Package -> value.isAi
             else -> true
         }
     }
@@ -617,7 +712,14 @@ object Ollama {
         val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
         val subject = lg.teams.filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
         val fallbackCopy = articleCopy.ifBlank { if (wantsArticle) ArticleWriting.news(lg, News(lg.season, lg.day, "${subject.name}: the latest outlook", teamId = subject.id)) else "" }
-        val facts = AiFacts.build(lg, prompt, extraFacts + if (wantsArticle) "\nARTICLE CONTEXT:\n$fallbackCopy" else "", extraPlayers, preview, upcoming, eventGame)
+        // Game/series reports already carry RESULT/BOX/SERIES in the sheet; skip duplicating the
+        // full game-written article into EVENT FACTS so local models stay under the 8192 budget.
+        val articleExtra = when {
+            !wantsArticle -> ""
+            eventGame != null -> ""
+            else -> "\nARTICLE CONTEXT:\n$fallbackCopy"
+        }
+        val facts = AiFacts.build(lg, prompt, extraFacts + articleExtra, extraPlayers, preview, upcoming, eventGame)
         val requestId = AiDiagnostics.begin(config, if (prompt.contains("KEY 1:")) "Scouting report" else if (prompt.contains("KICKER:")) "Preview stories" else "Game report")
         var providerError: Throwable? = null
         var gotResponse = false
@@ -646,14 +748,16 @@ object Ollama {
         val game = if (news.gameId >= 0) lg.games.firstOrNull { it.id == news.gameId } else null
         val opp = if (game != null && team != null) lg.teams.getOrNull(if (game.home == team.id) game.away else game.home) else null
 
+        val seriesBits = game?.let { ArticleWriting.seriesFacts(lg, it) }.orEmpty()
         val prompt = buildString {
             append("Write a complete sports newspaper article for the following basketball news item:\n")
             append("Headline: ${news.text}\n")
             append("Outlet / Publication: ${news.source.ifEmpty { "Courtside Report" }}\n")
             append("Season: ${news.season}, Day: ${news.day}\n")
             append("Angle: ${angle.ifEmpty { "balanced" }}\n")
-            if (team != null) append("Team: ${team.school} (${team.w}-${team.l})\n")
-            if (opp != null) append("Opponent: ${opp.school} (${opp.record})\n")
+            if (news.kind == "series") append("Story type: playoff series clincher — lead with the series result, round, and title implications; use the clincher box only as support.\n")
+            if (team != null) append("Team: ${if (lg.pro) team.name else team.school} (${team.w}-${team.l})\n")
+            if (opp != null) append("Opponent: ${if (lg.pro) opp.name else opp.school} (${opp.record})\n")
             if (game != null) {
                 append("Game Score: ${if (game.played) "${game.hs}-${game.aws}" else "Upcoming"}\n")
                 if (game.played) {
@@ -661,19 +765,25 @@ object Ollama {
                     append("Clutch context: ${if (margin <= 3) "Down-to-the-wire one possession finish" else if (margin >= 20) "Decisive blowout" else "Competitive double-digit battle"}\n")
                 }
             }
+            // Series ledger lives in the fact sheet (and EVENT FACTS); keep the writing prompt short.
             if (player != null) append("Featured Player: ${player.name} (${player.posLabel}, averaging ${"%.1f".format(player.stats.ppg)} ppg, ${"%.1f".format(player.stats.rpg)} rpg)\n")
-            val angleInstruction = when (angle) {
-                "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
-                "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
-                "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
-                "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
+            val angleInstruction = when {
+                news.kind == "series" -> "Stay series-aware: cite the series length, series score, and round from the fact sheet. Do not invent prior game scores."
+                angle == "tactical" -> "Explain the supplied statistical strengths and weaknesses; do not invent film, possessions or lineup efficiency."
+                angle == "beat" -> "Write with a hometown voice about the actual stakes and roster, without inventing crowd or locker room reactions."
+                angle == "skeptic" -> "Question sustainability using supplied results and probabilities; do not invent turnover or shooting problems."
+                angle == "dual" -> "Discuss both teams using their actual records, available players and result. No invented quotations."
                 else -> "Use the supplied event and statistical context; no invented quotations or play-by-play."
             }
             append("\n${ArticleWriting.instruction(config)} $angleInstruction Do not write a title or headline, just the article body paragraphs separated by blank lines.")
         }
 
         val copy = ArticleWriting.news(lg, news)
-        return groundedGenerate(config, lg, prompt, articleCopy = copy, eventGame = game, extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(), extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}")
+        return groundedGenerate(
+            config, lg, prompt, articleCopy = copy, eventGame = game,
+            extraPlayers = game?.box?.let { (it.home.sortedByDescending { it.s.pts }.take(3) + it.away.sortedByDescending { it.s.pts }.take(3)).mapNotNull { lg.playerOrNull(it.pid) } }.orEmpty(),
+            extraFacts = "Event: ${news.text}; season ${news.season}, day ${news.day}; kind ${news.kind}\n${game?.let { ArticleWriting.boxFacts(it) }.orEmpty()}\n$seriesBits",
+        )
     }
 
     /** Generates an epic coronation newspaper feature for the National Champion or NBA Finals winner. */
@@ -992,6 +1102,702 @@ object Ollama {
         }
     }
 
+    /** Fire-and-forget living media ecosystem package (breaking + debates + social + polls). */
+    fun maybeAutoGenerateMediaEcosystem(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
+        if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateMediaEcosystem(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /** Living media ecosystem desk grounded in [MediaEcosystem.ecosystemBrief]. */
+    suspend fun generateMediaEcosystem(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<MediaEcosystem.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.mediaEcosystem) {
+            return@withContext Result.success(MediaEcosystem.fallbackPackage(lg))
+        }
+        MediaEcosystem.publishSocialBeats(lg)
+        val brief = MediaEcosystem.ecosystemBrief(lg)
+        val cacheKey = "media_eco_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<MediaEcosystem.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are Hoops Wire Network — a living basketball media desk obsessed with titles and the whole league.")
+            appendLine("Using ONLY the ECOSYSTEM BRIEF, write up to six short beats. Prefer banner/title and league-wide angles.")
+            appendLine("Do not invent scores, commits, firings, poll voters, or quotes not supported by the brief.")
+            appendLine("ECOSYSTEM BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that beat has no facts):")
+            appendLine("TITLE_HEADLINE: <defending champ / title drought / banner ledger>")
+            appendLine("TITLE_BODY: <2 short paragraphs from title facts>")
+            appendLine("BREAKING_HEADLINE: <breaking news from today's real results, framed vs the title picture>")
+            appendLine("BREAKING_BODY: <2 short paragraphs>")
+            appendLine("ANALYST_HEADLINE: <analysts debating title/tournament chances>")
+            appendLine("ANALYST_BODY: <2 short paragraphs citing records/AP/Elo/titles from the brief>")
+            appendLine("FAN_HEADLINE: <fans arguing about coaching decisions vs the program's banner standard>")
+            appendLine("FAN_BODY: <2 short paragraphs grounded in security/record/titles>")
+            appendLine("RECRUIT_HEADLINE: <recruiting insider / commitment rumor (college) or trade buzz (pro)>")
+            appendLine("RECRUIT_BODY: <conditional only — no fake commits>")
+            appendLine("POLL_HEADLINE: <national poll / league-pulse reaction>")
+            appendLine("POLL_BODY: <2 short paragraphs from AP board / league situation>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Hoops Wire Network. Titles and league situation first. Facts only from the brief. Speculation must be labeled as rumor.",
+            numPredict = 560,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Network")
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String, mine: Boolean = true, teamId: Int = lg.userTeamId) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = kind, body = body, source = outlet,
+                    teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            val champId = TitleDefense.champion(lg)?.id ?: lg.userTeamId
+            add("column", "TITLE_HEADLINE", "TITLE_BODY", mine = champId == lg.userTeamId, teamId = champId)
+            add("article", "BREAKING_HEADLINE", "BREAKING_BODY", mine = false)
+            add("column", "ANALYST_HEADLINE", "ANALYST_BODY")
+            add("column", "FAN_HEADLINE", "FAN_BODY")
+            add("column", "RECRUIT_HEADLINE", "RECRUIT_BODY", mine = false)
+            add("column", "POLL_HEADLINE", "POLL_BODY", mine = false)
+            val pack = if (stories.size >= 2) MediaEcosystem.Package(stories, draft.isAi, "Network filed ${stories.size} beats + social.")
+            else MediaEcosystem.fallbackPackage(lg).copy(detail = "AI thin — used game-written media ecosystem. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { MediaEcosystem.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget campus / franchise development package. */
+    fun maybeAutoGenerateUniversityDevelopment(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
+        if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateUniversityDevelopment(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /** Campus desk: arenas, facilities, recruiting infrastructure, national brand. */
+    suspend fun generateUniversityDevelopment(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<UniversityDevelopment.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.universityDevelopment) {
+            return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg))
+        }
+        val brief = UniversityDevelopment.campusBrief(lg)
+        val cacheKey = "campus_dev_${lg.season}_${lg.day}_${lg.user.upgrades.size}_${lg.user.cash}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<UniversityDevelopment.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national college athletics business / facilities beat writer. Using ONLY the CAMPUS BRIEF, write up to three pieces.")
+            appendLine("Do not invent budgets, capacities, or projects not listed.")
+            appendLine("CAMPUS BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that topic has no facts):")
+            appendLine("ARENA_HEADLINE: <arena / crowd / renovation headline>")
+            appendLine("ARENA_BODY: <2 short paragraphs>")
+            appendLine("FACILITY_HEADLINE: <practice / training / recruiting infrastructure headline>")
+            appendLine("FACILITY_BODY: <2 short paragraphs>")
+            appendLine("BRAND_HEADLINE: <national brand / Program Pull headline>")
+            appendLine("BRAND_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "University development desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Campus")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = true, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("ARENA_HEADLINE", "ARENA_BODY")
+            add("FACILITY_HEADLINE", "FACILITY_BODY")
+            add("BRAND_HEADLINE", "BRAND_BODY")
+            val pack = if (stories.isNotEmpty()) UniversityDevelopment.Package(stories, draft.isAi, "Campus desk filed ${stories.size} pieces.")
+            else UniversityDevelopment.fallbackPackage(lg).copy(detail = "AI thin — used game-written campus desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { UniversityDevelopment.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget historical rivalries package (programs, coaches, fans, players). */
+    fun maybeAutoGenerateHistoricalRivalries(config: OllamaConfig, lg: League, force: Boolean = false) {
+        if (!config.enabled || !config.historicalRivalries || !config.autoGenerate) return
+        if (!force && (lg.day < 6 || lg.day % 6 != 0)) return
+        if (lg.rivals.isEmpty() && CoachRivals.rivals(lg).isEmpty()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateHistoricalRivalries(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /** Rivalry history desk: series ledgers, coaching grudges, fan pulse, organic rivalries. */
+    suspend fun generateHistoricalRivalries(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<HistoricalRivalries.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.historicalRivalries) {
+            return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg))
+        }
+        val brief = HistoricalRivalries.historyBrief(lg)
+        val cacheKey = "hist_rivals_${lg.season}_${lg.day}_${lg.rivals.size}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<HistoricalRivalries.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national basketball historian covering rivalries. Using ONLY the HISTORY BRIEF, write up to three pieces.")
+            appendLine("Do not invent series records, quotes, or fights.")
+            appendLine("HISTORY BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that topic has no facts):")
+            appendLine("PROGRAM_HEADLINE: <program series / accumulated history headline>")
+            appendLine("PROGRAM_BODY: <2 short paragraphs>")
+            appendLine("COACH_OR_PLAYER_HEADLINE: <coaching grudge or player/fan pulse headline>")
+            appendLine("COACH_OR_PLAYER_BODY: <2 short paragraphs>")
+            appendLine("ORGANIC_HEADLINE: <emerging rivalry or next chapter headline>")
+            appendLine("ORGANIC_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Historical rivalries desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..32) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Rivalries")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String, mine: Boolean = true) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("PROGRAM_HEADLINE", "PROGRAM_BODY")
+            add("COACH_OR_PLAYER_HEADLINE", "COACH_OR_PLAYER_BODY")
+            add("ORGANIC_HEADLINE", "ORGANIC_BODY", mine = false)
+            val pack = if (stories.isNotEmpty()) HistoricalRivalries.Package(stories, draft.isAi, "Rivalries desk filed ${stories.size} pieces.")
+            else HistoricalRivalries.fallbackPackage(lg).copy(detail = "AI thin — used game-written rivalries desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { HistoricalRivalries.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget draft universe package (stock, combine profiles, surprises, alumni). */
+    fun maybeAutoGenerateDraftUniverse(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.draftUniverse || !config.autoGenerate) return
+        val dn = lg.proState?.draftNight
+        val draftNightPulse = dn != null && (dn.log.isNotEmpty() || !dn.done)
+        if (!draftNightPulse && (lg.day < 12 || lg.day % 8 != 0)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateDraftUniverse(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /** Draft desk: prospects, stock, workout profiles, draft-night surprises, pro careers. */
+    suspend fun generateDraftUniverse(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<DraftUniverse.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.draftUniverse) {
+            return@withContext Result.success(DraftUniverse.fallbackPackage(lg))
+        }
+        val brief = DraftUniverse.eventBrief(lg)
+        val cacheKey = "draft_universe_${lg.season}_${lg.day}_${lg.proState?.draftNight?.at ?: -1}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<DraftUniverse.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national NBA draft insider. Using ONLY the DRAFT BRIEF, write up to three pieces.")
+            appendLine("Do not invent combine numbers, medicals, commits, or picks not listed.")
+            appendLine("DRAFT BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that topic has no facts):")
+            appendLine("STOCK_HEADLINE: <draft stock / board mover headline>")
+            appendLine("STOCK_BODY: <2 short paragraphs>")
+            appendLine("COMBINE_OR_NIGHT_HEADLINE: <workout profile or draft-night surprise headline>")
+            appendLine("COMBINE_OR_NIGHT_BODY: <2 short paragraphs from listed size/tools or logged picks>")
+            appendLine("PRO_CAREER_HEADLINE: <former player / where are they now headline>")
+            appendLine("PRO_CAREER_BODY: <2 short paragraphs from alumni destinations>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "NBA draft universe desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..32) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Draft")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String, mine: Boolean = false) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("STOCK_HEADLINE", "STOCK_BODY", mine = true)
+            add("COMBINE_OR_NIGHT_HEADLINE", "COMBINE_OR_NIGHT_BODY")
+            add("PRO_CAREER_HEADLINE", "PRO_CAREER_BODY")
+            val pack = if (stories.isNotEmpty()) DraftUniverse.Package(stories, draft.isAi, "Draft desk filed ${stories.size} pieces.")
+            else DraftUniverse.fallbackPackage(lg).copy(detail = "AI thin — used game-written draft desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { DraftUniverse.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget player storyline features from detected arcs. */
+    fun maybeAutoGeneratePlayerStorylines(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.playerStorylines || !config.autoGenerate) return
+        if (lg.day < 8 || lg.day % 7 != 0) return
+        if (PlayerStorylines.detectArcs(lg).isEmpty()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generatePlayerStorylines(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /** Feature desk: bench-to-star, five-star heat checks, walk-on heroes — facts from [PlayerStorylines.eventBrief]. */
+    suspend fun generatePlayerStorylines(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<PlayerStorylines.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.playerStorylines) {
+            return@withContext Result.success(PlayerStorylines.fallbackPackage(lg))
+        }
+        val brief = PlayerStorylines.eventBrief(lg)
+        val cacheKey = "player_arcs_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<PlayerStorylines.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national basketball features writer. Using ONLY the ARC BRIEF, write up to three features.")
+            appendLine("Only cover arcs listed. Do not invent stats, awards, or quotes.")
+            appendLine("ARC BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY (omit a block if that arc kind is absent):")
+            appendLine("BENCH_TO_STAR_HEADLINE: <headline>")
+            appendLine("BENCH_TO_STAR_BODY: <2 short paragraphs>")
+            appendLine("RECRUIT_BUST_HEADLINE: <headline>")
+            appendLine("RECRUIT_BUST_BODY: <2 short paragraphs>")
+            appendLine("WALKON_HERO_HEADLINE: <headline>")
+            appendLine("WALKON_HERO_BODY: <2 short paragraphs>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Player storylines desk. Facts only from the brief.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..32) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Features")
+            val arcs = PlayerStorylines.detectArcs(lg)
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                val arc = arcs.firstOrNull { it.kind == kind }
+                val p = arc?.let { lg.playerOrNull(it.pid) }
+                stories += News(
+                    lg.season, lg.day, head,
+                    mine = p?.teamId == lg.userTeamId,
+                    kind = "column", body = body, source = outlet,
+                    teamId = p?.teamId ?: lg.userTeamId, pid = p?.id ?: -1,
+                    aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("BENCH_TO_STAR", "BENCH_TO_STAR_HEADLINE", "BENCH_TO_STAR_BODY")
+            add("RECRUIT_BUST", "RECRUIT_BUST_HEADLINE", "RECRUIT_BUST_BODY")
+            add("WALKON_HERO", "WALKON_HERO_HEADLINE", "WALKON_HERO_BODY")
+            val pack = if (stories.isNotEmpty()) PlayerStorylines.Package(stories, draft.isAi, "Features filed ${stories.size} arcs.")
+            else PlayerStorylines.fallbackPackage(lg).copy(detail = "AI thin — used game-written arcs. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { PlayerStorylines.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget living coaching careers package (hot seats, rivals, legacy). */
+    fun maybeAutoGenerateCoachingCareers(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.livingCoachingCareers || !config.autoGenerate) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateLivingCoachingCareers(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /**
+     * Coaching careers desk: reputation, firings/offers context, rivalries, multi-school legacy.
+     * Grounded in [CoachCareers.careerBrief].
+     */
+    suspend fun generateLivingCoachingCareers(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<CoachCareers.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.livingCoachingCareers) {
+            return@withContext Result.success(CoachCareers.fallbackPackage(lg))
+        }
+        val brief = CoachCareers.careerBrief(lg)
+        val cacheKey = "coach_careers_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<CoachCareers.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national college/NBA coaching beat writer. Using ONLY the CAREER BRIEF, write three pieces.")
+            appendLine("Do not invent firings, hires, quotes, or records.")
+            appendLine("CAREER BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY:")
+            appendLine("REPUTATION_HEADLINE: <job-security / hot-seat headline from real security scores>")
+            appendLine("REPUTATION_BODY: <2 short paragraphs>")
+            appendLine("CAROUSEL_HEADLINE: <firing, hiring, or job-offer speculation labeled as speculation>")
+            appendLine("CAROUSEL_BODY: <conditional analysis from brief only>")
+            appendLine("RIVALRY_OR_LEGACY_HEADLINE: <coaching rivalry or multi-school legacy headline>")
+            appendLine("RIVALRY_OR_LEGACY_BODY: <facts from head-to-head / prior stops>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Coaching careers desk. Facts only from the brief. Label speculation clearly.",
+            numPredict = 420,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Sideline")
+            val stories = mutableListOf<News>()
+            fun add(headKey: String, bodyKey: String, mine: Boolean = true) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = "column", body = body, source = outlet,
+                    teamId = lg.userTeamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("REPUTATION_HEADLINE", "REPUTATION_BODY")
+            add("CAROUSEL_HEADLINE", "CAROUSEL_BODY", mine = false)
+            add("RIVALRY_OR_LEGACY_HEADLINE", "RIVALRY_OR_LEGACY_BODY")
+            val pack = if (stories.size >= 2) CoachCareers.Package(stories, draft.isAi, "Sideline filed ${stories.size} pieces.")
+            else CoachCareers.fallbackPackage(lg).copy(detail = "AI thin — used game-written careers desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { CoachCareers.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget historic moment feature for a recorded highlight. */
+    fun maybeAutoGenerateHistoricMoment(config: OllamaConfig, lg: League, m: Moment) {
+        if (!config.enabled || !config.historicMoments || !config.autoGenerate) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateHistoricMoment(config, lg, m).onSuccess { pack ->
+                // Prefer fleshing the matching news row; otherwise append.
+                val match = lg.news.indexOfLast { it.gameId == m.gameId && it.season == m.season && it.text == m.headline }
+                if (match >= 0 && pack.stories.isNotEmpty()) {
+                    val s = pack.stories.first()
+                    lg.news[match].body = s.body
+                    lg.news[match].source = s.source
+                    lg.news[match].aiLabeled = s.aiLabeled
+                    lg.news[match].aiFallbackReason = s.aiFallbackReason
+                    lg.news[match].approved = false
+                } else if (pack.stories.isNotEmpty()) {
+                    LeagueLists.appendNews(lg, pack.stories)
+                }
+            }
+        }
+    }
+
+    /** Long-form coverage of a court storm / upset / buzzer / heartbreak / title moment. */
+    suspend fun generateHistoricMoment(
+        config: OllamaConfig,
+        lg: League,
+        m: Moment,
+    ): Result<HistoricMoments.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.historicMoments) {
+            return@withContext Result.success(HistoricMoments.fallbackPackage(lg, m))
+        }
+        val brief = HistoricMoments.momentBrief(lg, m)
+        val cacheKey = "historic_${m.season}_${m.day}_${m.gameId}_${m.kind}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
+        if (config.cacheResponses) {
+            Cache.get<HistoricMoments.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val prompt = buildString {
+            appendLine("You are a national basketball features desk. Using ONLY the MOMENT BRIEF, write one historic feature.")
+            appendLine("Do not invent scores, shooters, quotes, or crowd size numbers.")
+            appendLine("MOMENT BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY:")
+            appendLine("HEADLINE: <punchy feature headline matching the kind>")
+            appendLine("BODY: <2-3 short paragraphs; court storms / buzzers / heartbreaks stay inside the brief>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Historic moments desk. Facts only from the brief.",
+            numPredict = 360,
+            eventGame = lg.games.firstOrNull { it.id == m.gameId },
+        )
+        result.map { draft ->
+            val lines = draft.text.lines()
+            var headline = ""
+            val body = mutableListOf<String>()
+            var inBody = false
+            for (l in lines) {
+                when {
+                    l.startsWith("HEADLINE:", ignoreCase = true) -> headline = l.substringAfter(':').trim()
+                    l.startsWith("BODY:", ignoreCase = true) -> {
+                        inBody = true
+                        l.substringAfter(':').trim().takeIf { it.isNotEmpty() }?.let { body += it }
+                    }
+                    inBody -> if (l.isNotBlank()) body += l
+                    headline.isEmpty() && l.isNotBlank() -> headline = l.trim()
+                }
+            }
+            val head = headline.ifBlank { m.headline }
+            val text = body.joinToString("\n").trim().ifBlank { draft.text.trim() }
+            if (text.length < 40) return@map HistoricMoments.fallbackPackage(lg, m).copy(detail = "AI thin — ${draft.fallbackReason}")
+            val story = News(
+                m.season, m.day, head, mine = m.mine, gameId = m.gameId,
+                kind = when (m.kind) {
+                    MomentKind.UPSET, MomentKind.COURT_STORM -> "upset"
+                    MomentKind.BUZZER -> "buzzer"
+                    else -> "moment"
+                },
+                body = text, source = draft.source("Hoops Wire Moments"),
+                teamId = m.winner, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+            )
+            val pack = HistoricMoments.Package(listOf(story), draft.isAi, "Historic feature filed.")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { HistoricMoments.fallbackPackage(lg, m) }
+    }
+
+    /** Fire-and-forget national sports desk package after a day of games. */
+    fun maybeAutoGenerateJournalism(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.sportsJournalism || !config.autoGenerate) return
+        if (lg.day < 3 || lg.day % 3 != 0) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generateSportsJournalism(config, lg).onSuccess { pack ->
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            }
+        }
+    }
+
+    /**
+     * National sports journalism package grounded in [Journalism.eventBrief]:
+     * headlines, a controversial column, rankings debate, and recruiting/trade rumor.
+     */
+    suspend fun generateSportsJournalism(
+        config: OllamaConfig,
+        lg: League,
+    ): Result<Journalism.Package> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.sportsJournalism) {
+            return@withContext Result.success(Journalism.fallbackPackage(lg))
+        }
+        val brief = try {
+            Journalism.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(Journalism.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written package."))
+        }
+        val cacheKey = "journalism_${lg.season}_${lg.day}_${config.activeModelName}" + "_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<Journalism.Package>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+        val rumorLabel = if (lg.pro) "TRADE_RUMOR" else "RECRUITING_RUMOR"
+        val champId = TitleDefense.champion(lg)?.id ?: lg.teams.maxByOrNull { TitleDefense.titles(lg, it).size }?.id ?: lg.userTeamId
+        val prompt = buildString {
+            appendLine("You are Hoops Wire, a national basketball desk obsessed with titles and the whole league.")
+            appendLine("Using ONLY the EVENT BRIEF, write four pieces. Lead with banners, defending champions, droughts, and league-wide races.")
+            appendLine("Do not invent scores, commits, trades, injuries, banners, or quotes.")
+            appendLine("EVENT BRIEF:")
+            appendLine(brief)
+            appendLine("Format EXACTLY:")
+            appendLine("TITLE_WATCH_HEADLINE: <defending champ / banner ledger / title drought headline>")
+            appendLine("TITLE_WATCH_BODY: <2 short paragraphs citing title facts from the brief>")
+            appendLine("LEAGUE_PULSE_HEADLINE: <AP/Elo board, conference races, or hot seats>")
+            appendLine("LEAGUE_PULSE_BODY: <2 paragraphs of league-wide situation>")
+            appendLine("NATIONAL_HEADLINE: <today's results framed against the title/league picture>")
+            appendLine("NATIONAL_BODY: <2 short paragraphs>")
+            appendLine("${rumorLabel}_HEADLINE: <${if (lg.pro) "trade/FA" else "recruiting"} speculation tied to programs with history when possible>")
+            appendLine("${rumorLabel}_BODY: <conditional analysis only — no confirmed deals>")
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "Hoops Wire national desk. Titles and league situation first. Facts only from the brief. Speculation must be labeled as such.",
+            numPredict = 560,
+        )
+        result.map { draft ->
+            fun field(key: String): String {
+                val lines = draft.text.lines()
+                val start = lines.indexOfFirst { it.trim().startsWith("$key:", ignoreCase = true) }
+                if (start < 0) return ""
+                val first = lines[start].substringAfter(':').trim()
+                val rest = mutableListOf<String>()
+                if (first.isNotEmpty()) rest += first
+                var i = start + 1
+                while (i < lines.size) {
+                    val t = lines[i].trim()
+                    if (t.contains(':') && t.substringBefore(':').all { it.isUpperCase() || it == '_' } && t.substringBefore(':').length in 4..28) break
+                    if (t.isNotEmpty()) rest += t
+                    i++
+                }
+                return rest.joinToString("\n").trim()
+            }
+            val outlet = draft.source("Hoops Wire Desk")
+            val stories = mutableListOf<News>()
+            fun add(kind: String, headKey: String, bodyKey: String, teamId: Int = lg.userTeamId, mine: Boolean = true) {
+                val head = field(headKey)
+                val body = field(bodyKey)
+                if (head.isBlank() || body.isBlank()) return
+                stories += News(
+                    lg.season, lg.day, head, mine = mine, kind = kind, body = body, source = outlet,
+                    teamId = teamId, aiLabeled = draft.isAi, aiFallbackReason = draft.fallbackReason, approved = false,
+                )
+            }
+            add("column", "TITLE_WATCH_HEADLINE", "TITLE_WATCH_BODY", teamId = champId, mine = champId == lg.userTeamId)
+            add("column", "LEAGUE_PULSE_HEADLINE", "LEAGUE_PULSE_BODY", teamId = lg.teams.filter { it.ap in 1..25 }.minByOrNull { it.ap }?.id ?: lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
+            add("article", "NATIONAL_HEADLINE", "NATIONAL_BODY", teamId = lg.teams.maxByOrNull { it.elo }?.id ?: lg.userTeamId, mine = false)
+            add("column", "${rumorLabel}_HEADLINE", "${rumorLabel}_BODY", mine = false)
+            val pack = if (stories.size >= 2) Journalism.Package(stories, draft.isAi, "Desk filed ${stories.size} pieces.")
+            else Journalism.fallbackPackage(lg).copy(detail = "AI thin — used game-written desk. ${draft.fallbackReason}")
+            if (config.cacheResponses && pack.isAi) Cache.put(cacheKey, pack)
+            pack
+        }.recover { Journalism.fallbackPackage(lg) }
+    }
+
+    /** Fire-and-forget postgame player interviews for the user's game. */
+    fun maybeAutoGenerateInterviews(config: OllamaConfig, lg: League, g: Game) {
+        if (!config.enabled || !config.playerInterviews || !config.autoGenerate) return
+        if (!g.involves(lg.userTeamId) || g.box == null) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generatePlayerInterviews(config, lg, g).onSuccess { list ->
+                if (list.isNotEmpty()) {
+                    g.interviews.clear()
+                    g.interviews.addAll(list)
+                }
+            }
+        }
+    }
+
     /** Fire-and-forget postgame press question generation if auto-generate is enabled. */
     fun maybeAutoGeneratePress(
         config: OllamaConfig,
@@ -1099,6 +1905,96 @@ object Ollama {
         val fallbackReason: String = "",
     )
 
+    /** Parse AI interview lines: `PID|TONE|QUESTION|ANSWER`. */
+    internal fun parseInterviewLines(raw: String, byId: Map<Int, Player>, reporter: String, isAi: Boolean, fallbackReason: String = ""): List<PlayerInterview> {
+        val out = mutableListOf<PlayerInterview>()
+        for (rawLine in raw.lines()) {
+            val line = rawLine.trim().trimStart('-', '*', ' ')
+            if (line.isEmpty() || !line.contains('|')) continue
+            val parts = line.split('|').map { it.trim() }
+            if (parts.size < 4) continue
+            val id = parts[0].filter { it.isDigit() }.toIntOrNull() ?: continue
+            val p = byId[id] ?: continue
+            val tone = parts[1].lowercase().ifBlank { "measured" }
+            val question = parts[2].trim('"')
+            val answer = parts[3].trim('"')
+            if (question.isBlank() || answer.isBlank()) continue
+            out += PlayerInterview(p.id, p.name, question, answer, reporter, tone, isAi, fallbackReason)
+        }
+        return out
+    }
+
+    /**
+     * Postgame interviews for standout players on the user's team.
+     * Answers reflect personality, tonight's performance, confidence, and coach relationship.
+     */
+    suspend fun generatePlayerInterviews(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+    ): Result<List<PlayerInterview>> = withContext(Dispatchers.IO) {
+        val box = g.box ?: return@withContext Result.success(emptyList())
+        val userSide = if (g.home == lg.userTeamId) box.home else if (g.away == lg.userTeamId) box.away else return@withContext Result.success(emptyList())
+        val t = lg.user
+        val opp = lg.team(g.opp(t.id))
+        val won = g.winner() == t.id
+        val reporter = Press.beat(lg, t)
+        val candidates = userSide
+            .mapNotNull { pl -> lg.playerOrNull(pl.pid)?.let { it to pl.s } }
+            .filter { (_, s) -> s.sec >= 8 * 60 || s.pts + s.reb + s.ast >= 8 }
+            .sortedByDescending { (_, s) -> s.pts * 2 + s.reb + s.ast * 2 + s.stl + s.blk }
+            .take(3)
+        if (candidates.isEmpty()) return@withContext Result.success(emptyList())
+
+        fun toLog(p: Player, s: StatLine) = GameLogEntry(
+            g.id, opp.id, g.site(t.id), won, "${g.scoreFor(t.id)}-${g.scoreAgainst(t.id)}",
+            s.pts, s.reb, s.ast, s.stl, s.blk, s.tov, (s.sec / 60.0).toInt(),
+        )
+
+        if (!config.enabled || !config.playerInterviews) {
+            return@withContext Result.success(candidates.map { (p, s) -> Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter) })
+        }
+
+        val cacheKey = "interview_${g.id}_${candidates.joinToString("-") { it.first.id.toString() }}_${config.activeModelName}" +
+            "_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<List<PlayerInterview>>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val rosterBlock = candidates.joinToString("\n") { (p, s) ->
+            "- ${Personality.interviewContext(lg, p, toLog(p, s))} id=${p.id} name=${p.name}"
+        }
+        val prompt = buildString {
+            appendLine("Write short postgame media interviews for these basketball players.")
+            appendLine("Game: ${t.school} ${g.scoreFor(t.id)}, ${opp.school} ${g.scoreAgainst(t.id)} (${if (won) "WIN" else "LOSS"}).")
+            appendLine("Each answer MUST match that player's personality, tonight's stats, confidence, and relationship with the coach.")
+            appendLine("Do not invent stats. One question and one answer per player.")
+            appendLine("Format EXACTLY one line per player:")
+            appendLine("PID|TONE|QUESTION|ANSWER")
+            appendLine("TONE is one of: confident, humble, frustrated, measured")
+            appendLine("Players:")
+            appendLine(rosterBlock)
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "You are a beat writer. Reply only with PID|TONE|QUESTION|ANSWER lines. Stay in character for each player.",
+            numPredict = 320,
+            eventGame = g,
+            extraPlayers = candidates.map { it.first },
+        )
+        val byId = candidates.associate { it.first.id to it.first }
+        result.map { draft ->
+            val parsed = parseInterviewLines(draft.text, byId, if (draft.isAi) "$reporter · ${draft.provider}" else reporter, draft.isAi, draft.fallbackReason)
+            val filled = candidates.map { (p, s) ->
+                parsed.firstOrNull { it.pid == p.id } ?: Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter)
+            }
+            if (config.cacheResponses && filled.any { it.isAi }) Cache.put(cacheKey, filled)
+            filled
+        }.recover {
+            candidates.map { (p, s) -> Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter) }
+        }
+    }
+
     /** Generates a dynamic postgame press conference question & answers tailored to the exact game stats. */
     suspend fun generatePressConference(
         config: OllamaConfig,
@@ -1130,17 +2026,18 @@ object Ollama {
             append("Opponent: ${opp.school} (${opp.record})\n")
             append("Final Score: ${t.school} $us, ${opp.school} $them (${if (won) "WIN" else "LOSS"})\n")
             append("Tonight's Stats: $statLineStr in ${line.min} minutes\n")
+            append("${Personality.interviewContext(lg, player, line)}\n")
             if (winner) append("Highlight: Sunk the game-winning clutch shot!\n")
             if (rivalry) append("Context: Heated rivalry matchup\n")
             append("\nStrictly use the exact score and stats. Do not change or invent different numbers.\n")
-            append("Generate 1 beat reporter question and 3 distinct player answers:\n")
+            append("Generate 1 beat reporter question and 3 distinct player answers that could come from THIS player's personality:\n")
             append("Format your response EXACTLY as:\n")
             append("TOPIC: <1-3 words topic>\n")
             append("REPORTER: <Reporter Name · Outlet>\n")
             append("QUESTION: <Direct question addressing tonight's game and performance>\n")
-            append("HUMBLE: <Modest, team-first answer>\n")
-            append("BRASH: <Confident, swaggering answer>\n")
-            append("ANALYTICAL: <Tactical, measured answer>\n")
+            append("HUMBLE: <Modest, team-first answer in his voice>\n")
+            append("BRASH: <Confident, swaggering answer in his voice>\n")
+            append("ANALYTICAL: <Tactical, measured answer in his voice>\n")
         }
 
         return groundedGenerate(
@@ -1349,7 +2246,7 @@ object Ollama {
             onToken = onToken,
             articleCopy = ArticleWriting.game(lg, g),
             eventGame = g,
-            extraFacts = ArticleWriting.boxFacts(g) + "\n" + ArticleWriting.game(lg, g),
+            extraFacts = ArticleWriting.boxFacts(g) + "\n" + ArticleWriting.seriesFacts(lg, g),
         ).map { draft ->
             val raw = draft.text
             var headline = "${winner.school} Defeats ${loser.school} $winScore-$loseScore"
@@ -1728,5 +2625,76 @@ object Ollama {
             if (config.cacheResponses) Cache.put(cacheKey, report)
             report
         }
+    }
+
+    data class PersonalityPass(val assigned: Int, val isAi: Boolean, val detail: String)
+
+    /**
+     * Assign on-court personalities (Confident Scorer / Unselfish) for [players].
+     * Uses AI when enabled; otherwise seeds from ratings. Safe for empty lists.
+     */
+    suspend fun assignPlayerPersonalities(
+        config: OllamaConfig,
+        lg: League,
+        players: List<Player>,
+    ): Result<PersonalityPass> = withContext(Dispatchers.IO) {
+        if (!config.enabled || !config.playerPersonalities) {
+            Personality.seedRoster(players)
+            return@withContext Result.success(PersonalityPass(players.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }, false, "Rule-based seeding (AI personalities off)."))
+        }
+        val targets = players.filter { it.teamId >= 0 }.sortedByDescending { it.ovr }.take(12)
+        if (targets.isEmpty()) return@withContext Result.success(PersonalityPass(0, false, "No roster players."))
+
+        val rosterLines = targets.joinToString("\n") { p ->
+            "- id=${p.id} ${p.name} ${p.posLabel} ovr=${p.ovr} INS=${p[Attr.INS]} MID=${p[Attr.MID]} OUT=${p[Attr.OUT]} PAS=${p[Attr.PAS]} style=${p.style.label}"
+        }
+        val prompt = buildString {
+            appendLine("You are a basketball scout. Assign ONE on-court personality to each player.")
+            appendLine("Roles: GUNNER (confident scorer who takes tough shots), PASS_FIRST (unselfish, looks for teammates), or BALANCED.")
+            appendLine("Format EXACTLY one line per player:")
+            appendLine("ID|ROLE|Short scout note (max 18 words)")
+            appendLine("Roster:")
+            appendLine(rosterLines)
+        }
+        val system = "Reply with only the ID|ROLE|note lines. No markdown."
+        val result = generate(config, prompt, system, temperature = 0.4, numPredict = 420)
+        var assigned = 0
+        result.onSuccess { text ->
+            for (raw in text.lines()) {
+                val line = raw.trim().trimStart('-', '*', ' ')
+                if (line.isEmpty() || !line.contains('|')) continue
+                val parts = line.split('|').map { it.trim() }
+                if (parts.size < 2) continue
+                val id = parts[0].filter { it.isDigit() }.toIntOrNull() ?: continue
+                val p = targets.firstOrNull { it.id == id } ?: continue
+                val role = parts[1]
+                val note = parts.getOrNull(2).orEmpty()
+                Personality.applyAssignment(p, role, note.ifBlank {
+                    when {
+                        role.contains("GUN", true) || role.contains("CONF", true) -> "Looks for his own shot, even contested."
+                        role.contains("PASS", true) || role.contains("UNSELF", true) -> "Willing passer who kicks tough looks."
+                        else -> "Takes what the defense gives."
+                    }
+                })
+                assigned++
+            }
+        }
+        if (assigned == 0) {
+            Personality.seedRoster(targets)
+            for (p in targets) {
+                if (p.personalityNote.isBlank()) {
+                    p.personalityNote = when {
+                        p.has(Trait.GUNNER) -> "Confident scorer who hunts his own look."
+                        p.has(Trait.PASS_FIRST) -> "Unselfish — finds the open man on tough possessions."
+                        else -> ""
+                    }
+                }
+            }
+            assigned = targets.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }
+            return@withContext Result.success(PersonalityPass(assigned, false, result.exceptionOrNull()?.message ?: "AI parse empty — used rule-based personalities."))
+        }
+        // Fill anyone the model skipped.
+        for (p in targets) if (!p.has(Trait.GUNNER) && !p.has(Trait.PASS_FIRST)) Personality.seedOnCourtTrait(p)
+        Result.success(PersonalityPass(assigned, result.isSuccess, "Assigned $assigned on-court personalities."))
     }
 }

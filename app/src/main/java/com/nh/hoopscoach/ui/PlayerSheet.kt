@@ -84,6 +84,8 @@ private fun traitBlurb(t: Trait) = when (t) {
     Trait.GYM_RAT -> "Lives in the gym. Develops faster."
     Trait.CLUTCH -> "Shoots better with the game on the line."
     Trait.LATE_BLOOMER -> "A walk-on whose game suddenly took off. Develops faster."
+    Trait.GUNNER -> "Confident scorer — hunts his own look and takes tough contested shots."
+    Trait.PASS_FIRST -> "Unselfish — kicks tough looks to open teammates instead of forcing it."
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -609,13 +611,22 @@ private fun BioTab(lg: League, p: Player) {
             Text(v, style = T.bodyB, color = P.ink)
         }
     }
-    if (p.traits.isNotEmpty()) {
+    if (p.traits.isNotEmpty() || p.personalityNote.isNotBlank()) {
         Section("Personality")
-        GroupList(p.traits) { t ->
-            ListRow {
-                Column {
-                    Text(t.label, style = T.bodyB, color = traitColor(t))
-                    Text(traitBlurb(t), style = T.small, color = P.sub)
+        if (p.personalityNote.isNotBlank()) {
+            Panel {
+                Text(com.nh.hoopscoach.game.Personality.onCourtLabel(p) ?: "Scout note", style = T.label, color = P.accent)
+                Spacer(Modifier.height(4.dp))
+                Text(p.personalityNote, style = T.body, color = P.ink)
+            }
+        }
+        if (p.traits.isNotEmpty()) {
+            GroupList(p.traits) { t ->
+                ListRow {
+                    Column {
+                        Text(t.label, style = T.bodyB, color = traitColor(t))
+                        Text(traitBlurb(t), style = T.small, color = P.sub)
+                    }
                 }
             }
         }

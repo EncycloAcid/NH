@@ -115,8 +115,42 @@ object Rivalries {
     /** Upsets swing prestige twice as hard. */
     private fun swingFor(w: Team, l: Team) = if (w.prestige + 5 < l.prestige) 2 else 1
 
+    /**
+     * Rivalries that grow from the schedule: enough meetings with close finishes or postseason
+     * heat turns a regular pairing into an organic rivalry (series seeded from past results).
+     */
+    fun maybeEmergent(lg: League, g: Game) {
+        if (lg.rivalry(g) != null || !g.played) return
+        val x = minOf(g.home, g.away)
+        val y = maxOf(g.home, g.away)
+        val meetings = lg.games.filter { it.played && it.involves(x) && it.involves(y) }
+        if (meetings.size < 4) return
+        val close = meetings.count { abs(it.hs - it.aws) <= 5 || it.ot > 0 }
+        val post = meetings.count { it.type == GameType.PLAYOFF || it.type == GameType.NCAA || it.type == GameType.CONF_TOURNEY || it.type == GameType.NIT }
+        if (close < 2 && post < 2) return
+        if (close + post < 3) return
+        var aWins = 0; var bWins = 0
+        for (m in meetings) {
+            if (m.winner() == x) aWins++ else bWins++
+        }
+        // Don't double-count tonight — afterGame will add the latest win.
+        if (g.winner() == x) aWins-- else bWins--
+        aWins = aWins.coerceAtLeast(0); bWins = bWins.coerceAtLeast(0)
+        lg.rivals += Rivalry(x, y, "Emerging rivalry", aWins = aWins, bWins = bWins)
+        val a = lg.team(x); val b = lg.team(y)
+        val mine = g.involves(lg.userTeamId)
+        lg.news += News(
+            lg.season, lg.day,
+            "Emerging rivalry: ${a.school}–${b.school} forged by ${meetings.size} meetings",
+            mine, g.id, "rivalry",
+            body = "Close games ($close) and postseason heat ($post) turned a schedule pairing into a lasting rivalry. Series opens at ${aWins}-${bWins} before tonight's result.",
+            source = "Hoops Wire Rivalries", teamId = if (mine) lg.userTeamId else x,
+        )
+    }
+
     /** After a rivalry game: series record, prestige swing, locker-room mood, job security and the headline. */
     fun afterGame(lg: League, g: Game) {
+        maybeEmergent(lg, g)
         val r = lg.rivalry(g) ?: return
         val w = lg.team(g.winner())
         val l = lg.team(g.loser())
@@ -134,7 +168,12 @@ object Rivalries {
         val user = lg.userTeamId
         val mine = g.involves(user)
         if (mine) lg.userCoach.security = (lg.userCoach.security + if (w.id == user) 2 else -2).coerceIn(0, 100)
-        if (mine || w.ap > 0 || l.ap > 0) lg.news += News(lg.season, lg.day, "${r.title}: ${headline(lg, g)}", mine, g.id, "rivalry")
+        if (mine || w.ap > 0 || l.ap > 0 || r.name.equals("Emerging rivalry", ignoreCase = true)) {
+            lg.news += News(lg.season, lg.day, "${r.title}: ${headline(lg, g)}", mine, g.id, "rivalry")
+        }
+        if (lg.ollama.enabled && lg.ollama.historicalRivalries && r.name.equals("Emerging rivalry", ignoreCase = true)) {
+            Ollama.maybeAutoGenerateHistoricalRivalries(lg.ollama, lg, force = true)
+        }
     }
 
     /** Newspaper headline for a finished rivalry game. */

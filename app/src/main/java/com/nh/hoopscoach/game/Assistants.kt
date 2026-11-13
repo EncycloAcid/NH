@@ -91,6 +91,7 @@ object Assistants {
             val c = Coach(lg.nextCoachId++, a.first, a.last, a.age, opening.id, o.coerceIn(40, 95), d.coerceIn(40, 95), r.coerceIn(40, 95), v.coerceIn(40, 95), Rng.int(0, 1_000_000))
             lg.coaches += c
             opening.coachId = c.id
+            GenerationalLegacy.inheritProgram(lg, opening, c, mentor = lg.userCoach.name)
             Gameplan.autoAllocate(lg, opening)
             lg.staff.remove(a)
             val where = if (lg.pro) "the ${opening.name}" else opening.school

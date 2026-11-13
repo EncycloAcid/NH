@@ -128,6 +128,10 @@ enum class Trait(val label: String, val good: Boolean) {
     CLUTCH("Clutch", true),
     /** Earned, never rolled: a walk-on whose game suddenly took off. Develops faster. */
     LATE_BLOOMER("Late Bloomer", true),
+    /** On-court: hunts his own look, takes tough contested shots. */
+    GUNNER("Confident Scorer", false),
+    /** On-court: looks for the open teammate instead of forcing a tough shot. */
+    PASS_FIRST("Unselfish", true),
 }
 
 enum class Offense(val label: String, val blurb: String) {
@@ -324,6 +328,8 @@ class Player(
     var shoeOffer: String = "",
     var shoeOfferPay: Int = 0,
     var shoeOfferYears: Int = 0,
+    /** Short scout note on how he plays (rule-based or AI personality). */
+    var personalityNote: String = "",
 ) {
     /** Out injured. */
     val out get() = injGames > 0
@@ -421,6 +427,10 @@ class Team(
     var apparel: String = "",
     /** Seasons left on the school apparel contract. */
     var apparelLeft: Int = 0,
+    /** Program coaching identity for this universe (Pace & Space, Grind It Out, …). */
+    var philosophy: String = "",
+    /** Former player whose pedigree stamped this program's identity, if any. */
+    var legacyCoach: String = "",
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -480,6 +490,10 @@ class Coach(
     var offerSalary: Int = 0,
     var offerEarly: Boolean = false,
     var countered: Boolean = false,
+    /** Schools or franchises he played for — fuels sideline legacy matchups. */
+    var playedAt: MutableList<String> = mutableListOf(),
+    /** Mentor head coach's name when he came off a coaching tree. */
+    var mentor: String = "",
 ) {
     fun has(s: CoachSkill) = s in skills
     val name get() = "$first $last"
@@ -515,6 +529,8 @@ class Game(
     var swing: Int = 0,
     /** The user's games: every shot, packed (see [ShotChart]). */
     var shots: MutableList<Long> = mutableListOf(),
+    /** Postgame player interviews (AI or rule-based). */
+    var interviews: MutableList<PlayerInterview> = mutableListOf(),
 ) {
     val played get() = hs >= 0
     fun winner() = if (hs > aws) home else away
@@ -645,8 +661,20 @@ class OllamaConfig(
     var model: String = "llama3.2:1b",
     var autoGenerate: Boolean = true,
     var pressConference: Boolean = true,
+    /** AI postgame player interviews reflecting personality, performance, confidence, and coach bond. */
+    var playerInterviews: Boolean = true,
     var socialFeed: Boolean = true,
     var gameRecaps: Boolean = true,
+    /** AI sports desk: headlines, debates, rumors, national coverage from real events. */
+    var sportsJournalism: Boolean = true,
+    /** AI living coaching careers: reputation, firings, offers, rivals, multi-school legacy. */
+    var livingCoachingCareers: Boolean = true,
+    /** AI court storms & historic moments from upsets, buzzers, rivalries, titles, heartbreaks. */
+    var historicMoments: Boolean = true,
+    /** AI player storylines: bench-to-star, blue-chip heat checks, walk-on heroes. */
+    var playerStorylines: Boolean = true,
+    /** AI NBA draft universe: stock, combine profiles, draft-night surprises, pro careers. */
+    var draftUniverse: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
     var draftScouting: Boolean = true,
@@ -656,8 +684,16 @@ class OllamaConfig(
     var playerDevelopment: Boolean = true,
     var recruitingPitches: Boolean = true,
     var pregameRivalries: Boolean = true,
+    /** AI historical rivalries: programs, coaches, players, fans accumulate history. */
+    var historicalRivalries: Boolean = true,
+    /** AI university/franchise development: arenas, facilities, recruiting infra, brand. */
+    var universityDevelopment: Boolean = true,
+    /** AI living media ecosystem: breaking news, debates, fans, recruiting, coach barbs, social, polls. */
+    var mediaEcosystem: Boolean = true,
     var championshipCelebrations: Boolean = true,
     var freeAgencyBuzz: Boolean = true,
+    /** AI assigns on-court personalities (confident scorer / unselfish) and scout notes. */
+    var playerPersonalities: Boolean = true,
     var defaultStoryAngle: String = "balanced", // "tactical", "beat", "skeptic", "dual", "balanced"
     // Speed & Performance Optimizations
     var speedMode: String = "turbo", // "turbo", "balanced", "quality"
@@ -725,6 +761,7 @@ class OllamaConfig(
 enum class MomentKind(val tag: String) {
     BUZZER("Buzzer-beater"), FORCED_OT("Forces overtime"), UPSET("Upset alert"), CLASSIC("Instant classic"),
     CINDERELLA("Cinderella"), TITLE("Champions"),
+    COURT_STORM("Court storm"), HEARTBREAK("Heartbreak"),
 }
 
 /** A big moment for the highlight reel. Self-contained: it outlives the season's games and box scores. */
@@ -1405,6 +1442,20 @@ class PressAnswer(
 @Serializable
 class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "", val isAi: Boolean = false, val fallbackReason: String = "")
 
+/** One postgame interview: a reporter question and a player's in-character answer. */
+@Serializable
+class PlayerInterview(
+    val pid: Int,
+    val name: String,
+    val question: String,
+    val answer: String,
+    val reporter: String = "",
+    /** confident / humble / frustrated / measured */
+    val tone: String = "",
+    val isAi: Boolean = false,
+    val fallbackReason: String = "",
+)
+
 /** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
 /** One reaction to a story: who said it (and in what role), what they said, and how many liked it. */
 @Serializable
@@ -1563,6 +1614,20 @@ class League(
     val myPlays: MutableList<Highlight> = mutableListOf(),
     var usaGolds: Int = 0,
     var ollama: OllamaConfig = OllamaConfig(),
+    /**
+     * This save's pre-league college champions (year → school). When non-empty,
+     * [CollegeHistory] reads these instead of the real record book.
+     */
+    val altCollegeTitles: MutableMap<Int, String> = mutableMapOf(),
+    /**
+     * This save's pre-league NBA champions (year → franchise slot). When non-empty,
+     * [NbaHistory] reads these instead of the real record book.
+     */
+    val altNbaTitles: MutableMap<Int, String> = mutableMapOf(),
+    /** Shadow pro careers for players drafted out of this college world. */
+    val shadowPros: MutableList<ShadowPro> = mutableListOf(),
+    /** Random seed marker for this universe (0 until [AlternateHistory] seeds). */
+    var universeSeed: Int = 0,
 ) {
     @Transient private var playerIndex: HashMap<Int, Player> = HashMap()
     @Transient private var gameIndex: HashMap<Int, Game> = HashMap()

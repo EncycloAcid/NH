@@ -212,6 +212,7 @@ object ProLeague {
         Payroll.sign(lg)
         Picks.ensure(lg)
         Longevity.assignReal(lg)
+        AlternateHistory.seedNba(lg)
         return lg
     }
 

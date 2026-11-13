@@ -44,6 +44,7 @@ class OllamaTest {
         lg.ollama.pressConference = false
         lg.ollama.socialFeed = true
         lg.ollama.gameRecaps = true
+        lg.ollama.sportsJournalism = false
         lg.ollama.tradeRumors = false
         lg.ollama.scoutingKeys = true
 
@@ -57,6 +58,7 @@ class OllamaTest {
         assertFalse(decoded.ollama.pressConference)
         assertTrue(decoded.ollama.socialFeed)
         assertTrue(decoded.ollama.gameRecaps)
+        assertFalse(decoded.ollama.sportsJournalism)
         assertFalse(decoded.ollama.tradeRumors)
         assertTrue(decoded.ollama.scoutingKeys)
     }
@@ -91,6 +93,10 @@ class OllamaTest {
 
         val rumorRes = Ollama.generateTradeRumors(config, lg)
         assertTrue(rumorRes.getOrThrow().all { !it.isAi })
+
+        val deskRes = Ollama.generateSportsJournalism(config, lg)
+        assertFalse(deskRes.getOrThrow().isAi)
+        assertTrue(deskRes.getOrThrow().stories.size >= 2)
     }
 
     @Test

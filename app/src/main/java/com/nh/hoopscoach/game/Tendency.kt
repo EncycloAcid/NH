@@ -14,7 +14,7 @@ object Tendency {
     fun three(p: Player) = if (has(p, Attr.OUT)) 1.6 else 1.0
     fun inside(p: Player) = if (has(p, Attr.INS)) 1.4 else 1.0
     fun mid(p: Player) = if (has(p, Attr.MID)) 1.6 else 1.0
-    fun pass(p: Player) = (if (has(p, Attr.PAS)) 1.8 else 1.0) * (if (has(p, Attr.HND)) 1.15 else 1.0)
+    fun pass(p: Player) = (if (has(p, Attr.PAS)) 1.8 else 1.0) * (if (has(p, Attr.HND)) 1.15 else 1.0) * Personality.passMod(p)
     /** Rebounders crash the glass; defenders (interior and perimeter: two-way and lockdown players) box out and finish the stop. */
     fun reb(p: Player) = (if (has(p, Attr.REB)) 1.7 else 1.0) * (if (has(p, Attr.IDF)) 1.15 else 1.0) * (if (has(p, Attr.PER)) 1.2 else 1.0) *
         (if (p.style == Arch.TWO_WAY_GUARD || p.style == Arch.TWO_WAY_WING || p.style == Arch.TWO_WAY_POINT) 1.25 else 1.0)
@@ -26,6 +26,6 @@ object Tendency {
         val b = p.style.boosts
         val scoring = b.count { it == Attr.INS || it == Attr.MID || it == Attr.OUT } + 0.5 * b.count { it == Attr.HND }
         val defense = b.count { it == Attr.PER || it == Attr.STL || it == Attr.BLK || it == Attr.IDF || it == Attr.REB }
-        return (1.0 + 0.08 * scoring - 0.07 * defense).coerceIn(0.78, 1.25)
+        return ((1.0 + 0.08 * scoring - 0.07 * defense) * Personality.usageMod(p)).coerceIn(0.72, 1.38)
     }
 }

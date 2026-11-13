@@ -173,7 +173,10 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
 @Composable
 fun traitColor(t: Trait): Color = when (t) {
     Trait.AMBITIOUS -> P.warn; Trait.BAG_CHASER -> P.gold; Trait.DISLOYAL -> P.bad
-    Trait.LOYAL, Trait.TEAM_PLAYER -> P.good; Trait.GYM_RAT, Trait.CLUTCH -> P.accent; Trait.LATE_BLOOMER -> P.gold
+    Trait.LOYAL, Trait.TEAM_PLAYER, Trait.PASS_FIRST -> P.good
+    Trait.GYM_RAT, Trait.CLUTCH -> P.accent
+    Trait.LATE_BLOOMER -> P.gold
+    Trait.GUNNER -> P.warn
 }
 
 // ---------- lineup ----------
