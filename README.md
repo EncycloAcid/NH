@@ -1,20 +1,51 @@
 # Hoops Dynasty
 
-A native Android college basketball coaching game, written in Kotlin with Jetpack Compose.
+A college basketball coaching game for **Android and PC**, written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both targets — update the game once and Android and PC ship the same changes.
 
 Pick a school, set your rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, develop players, and chase national titles season after season.
 
-You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Every school shows its own logo (the logo files you supplied, in `app/src/main/assets/logos`, one per team named by its abbreviation). A school without a logo file falls back to a drawn monogram in its colors. The logos are the schools' trademarks, so keep this build for personal use and don't publish it to an app store. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
+You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Every school shows its own logo (`app/src/main/assets/logos`, one file per team named by its abbreviation). A school without a logo file falls back to a drawn monogram in its colors. The logos are the schools' trademarks, so keep this build for personal use and don't publish it to an app store. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
 
-The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach.
+The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach. The PC window uses the same phone-sized layout as Android.
 
-## Install on your phone
+## Install
 
-1. Open the repository's **Releases** page on your Android phone and download `HoopsDynasty.apk` from the newest build. Every push builds a fresh one.
+Every push builds Android and PC packages and publishes them on the **Releases** page:
+
+| Platform | Artifact | Needs |
+| --- | --- | --- |
+| Android | `HoopsDynasty.apk` | Android device (sideload) |
+| Windows | `HoopsDynasty-windows.exe` | Windows 10+ (installer; Java is bundled) |
+| PC (jar) | `HoopsDynasty-pc.jar` | [Java 17+](https://adoptium.net/) |
+| Linux (optional) | `.deb` | when packaging succeeds on CI |
+
+### Android
+
+1. Download `HoopsDynasty.apk` from the newest release on your phone.
 2. Open the file. If Android asks, allow your browser or file manager to install unknown apps.
 3. Your dynasty saves automatically on the device.
 
-**Keep your save safe:** In **Settings → Back Up Save**, write your dynasty to a file. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), it means the builds were signed with different keys. Back up first, uninstall, install the new build, then use **Restore Save**.
+**Keep your save safe:** In **Career → Settings**, use **Back up** / **Restore**. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), the builds were signed with different keys. Back up first, uninstall, install the new build, then restore.
+
+### Windows
+
+1. Download `HoopsDynasty-windows.exe` from the newest release.
+2. Run the installer and open **Hoops Dynasty** from the Start menu / desktop shortcut.
+3. No separate Java install is required — the EXE bundles a runtime.
+
+### Other PC (macOS / Linux / jar)
+
+1. Install [Java 17+](https://adoptium.net/) if you don't already have it.
+2. Download `HoopsDynasty-pc.jar` from the newest release.
+3. Run: `java -jar HoopsDynasty-pc.jar`
+4. Linux releases may also include a `.deb` when packaging succeeds.
+
+**PC notes**
+
+- The window is phone-sized on purpose (same layout and UI as Android).
+- **Escape** goes back (same as the on-screen back control).
+- Saves live at `~/.hoopsdynasty/dynasty.sav` (on Windows: `%USERPROFILE%\.hoopsdynasty\dynasty.sav`).
+- Phone and PC use the same `.hdsave` backup format. In **Career → Settings**, use **Back up** / **Restore** to move a dynasty between them.
 
 ## What's in the game
 
@@ -113,27 +144,35 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Build it yourself
 
-Requirements: JDK 17+ and the Android SDK (Android Studio works out of the box).
+Requirements: **JDK 17+**. Android builds also need the Android SDK (Android Studio works out of the box). The PC build only needs the JDK.
 
 ```sh
-./gradlew :app:assembleRelease          # APK at app/build/outputs/apk/release/app-release.apk
-./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.SimTest   # simulates 3 full seasons
+./gradlew :app:assembleRelease                # Android APK → app/build/outputs/apk/release/app-release.apk
+./gradlew :app:run                            # launch the PC app
+./gradlew :app:packageUberJarForCurrentOS     # runnable PC jar → app/build/compose/jars/
+./gradlew :app:packageExe                     # Windows installer .exe (Windows hosts only)
+./gradlew :app:packageDeb                     # Linux .deb (Linux hosts only)
+./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.SimTest
 ```
 
 `ScreenshotTest` renders every main screen on the JVM with Robolectric and writes PNGs to `build/screenshots/`.
 
+**Shared code:** Android and PC share one Compose Multiplatform codebase under `commonMain`. Edit the shared UI or game logic once; both targets pick it up. School logos stay in `app/src/main/assets/logos` and are packaged into the PC jar automatically.
+
 ## Project layout
 
 ```
-app/src/main/java/com/nh/hoopscoach/
-  game/   pure Kotlin game logic: league generation, possession-by-possession game engine,
-          schedule, rankings (Elo-based NET + AP poll), awards, recruiting, finance, offseason
-  ui/     Jetpack Compose screens, theme, drawn team logos and player portraits
+app/src/
+  commonMain/     shared game logic + Compose UI (Android and PC)
+  androidMain/    Android entry (MainActivity) + file picker / assets helpers
+  desktopMain/    PC entry (window, Escape-to-back) + file dialogs
+  main/           AndroidManifest, res/, and assets/logos
+  test/           JVM unit tests (SimTest, ScreenshotTest, …)
 ```
 
-## Signing key
+## Signing key (Android APK)
 
-The signing key is never committed. Local builds read it from `keystore.properties` in the project root (git-ignored):
+The signing key is never committed. Local Android release builds read it from `keystore.properties` in the project root (git-ignored):
 
 ```properties
 storeFile=/path/to/your.keystore

@@ -1,6 +1,5 @@
 package com.nh.hoopscoach.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -52,6 +51,7 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nh.hoopscoach.PlatformBackHandler
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Phase
 import com.nh.hoopscoach.game.Schedule
@@ -92,7 +92,7 @@ fun App(vm: GameViewModel) {
 @Composable
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
-    BackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
+    PlatformBackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
     // The preseason magazine opens by itself once, before the first game of every season.
     LaunchedEffect(lg, lg.season, lg.phase) {
         val pv = lg.preview

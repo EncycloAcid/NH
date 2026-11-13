@@ -12,14 +12,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.nh.hoopscoach.R
+import com.nh.hoopscoach.hoopsBodyFont
+import com.nh.hoopscoach.hoopsDisplayFont
 import kotlin.math.max
 import kotlin.math.min
 
@@ -140,14 +138,11 @@ fun palette(dark: Boolean, primary: Color?, secondary: Color?): Palette {
 
 // ---------- type ----------
 
-@OptIn(ExperimentalTextApi::class)
-private fun varFont(res: Int, w: Int) = Font(res, weight = FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
-
 /** Condensed arena-style face for scores, ratings and titles. */
-val Display = FontFamily(varFont(R.font.big_shoulders, 600), varFont(R.font.big_shoulders, 700), varFont(R.font.big_shoulders, 800), varFont(R.font.big_shoulders, 900))
+val Display: FontFamily by lazy { hoopsDisplayFont() }
 
 /** Clean geometric sans for everything you read. */
-val Body = FontFamily(varFont(R.font.manrope, 400), varFont(R.font.manrope, 500), varFont(R.font.manrope, 600), varFont(R.font.manrope, 700), varFont(R.font.manrope, 800))
+val Body: FontFamily by lazy { hoopsBodyFont() }
 
 object T {
     val hero = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, lineHeight = 40.sp, letterSpacing = 0.3.sp)
