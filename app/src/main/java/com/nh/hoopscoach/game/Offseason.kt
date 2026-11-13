@@ -524,6 +524,7 @@ object Coaching {
                 .sortedByDescending { it.prestige }
                 .forEach { os.offers += JobOffer(it.id, if (it.prestige > u.prestige) "Wants you to lead a bigger program" else "Interested in your rebuild skills") }
         }
+        Ollama.maybeAutoGenerateCoachingCareers(lg.ollama, lg)
     }
 
     /** Out of a job (fired, not brought back, or walked away): programs with openings call; a coach who left on his own terms hears from better ones. */

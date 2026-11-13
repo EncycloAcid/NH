@@ -62,6 +62,7 @@ object Staffing {
             queue += oldTeam
         }
         while (queue.isNotEmpty()) newCoach(lg, queue.removeFirst())
+        Ollama.maybeAutoGenerateCoachingCareers(lg.ollama, lg)
     }
 
     /** Puts [coach] on [t]'s bench and resets the system to his strengths. [poachedFrom] is the team he left, if any. */

@@ -83,6 +83,7 @@ object NewsDesk {
         if (lg.pro && lg.phase == Phase.PLAYOFFS) seriesStories(lg)
         runCatching { Columns.notebook(lg) }
         Ollama.maybeAutoGenerateJournalism(lg.ollama, lg)
+        if (lg.day >= 10 && lg.day % 10 == 0) Ollama.maybeAutoGenerateCoachingCareers(lg.ollama, lg)
     }
 
     /** The best line around the league tonight, if it's a big one (the user's own player has his own coverage). */

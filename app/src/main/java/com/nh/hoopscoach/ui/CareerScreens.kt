@@ -1229,6 +1229,22 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI living coaching careers", style = T.bodyB, color = P.ink)
+                            Text("Reputations, hot seats, job offers, coaching rivalries, and multi-school legacies from real results.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.livingCoachingCareers, { on -> vm.act { it.ollama.livingCoachingCareers = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("AI court storms & historic moments", style = T.bodyB, color = P.ink)
+                            Text("Upsets, buzzer-beaters, rivalry wins, championships, and heartbreaking exits from real games.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.historicMoments, { on -> vm.act { it.ollama.historicMoments = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
                             Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
                         }

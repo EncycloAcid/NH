@@ -659,6 +659,10 @@ class OllamaConfig(
     var gameRecaps: Boolean = true,
     /** AI sports desk: headlines, debates, rumors, national coverage from real events. */
     var sportsJournalism: Boolean = true,
+    /** AI living coaching careers: reputation, firings, offers, rivals, multi-school legacy. */
+    var livingCoachingCareers: Boolean = true,
+    /** AI court storms & historic moments from upsets, buzzers, rivalries, titles, heartbreaks. */
+    var historicMoments: Boolean = true,
     var tradeRumors: Boolean = true,
     var scoutingKeys: Boolean = true,
     var draftScouting: Boolean = true,
@@ -739,6 +743,7 @@ class OllamaConfig(
 enum class MomentKind(val tag: String) {
     BUZZER("Buzzer-beater"), FORCED_OT("Forces overtime"), UPSET("Upset alert"), CLASSIC("Instant classic"),
     CINDERELLA("Cinderella"), TITLE("Champions"),
+    COURT_STORM("Court storm"), HEARTBREAK("Heartbreak"),
 }
 
 /** A big moment for the highlight reel. Self-contained: it outlives the season's games and box scores. */
