@@ -47,7 +47,8 @@ object ArticleWriting {
     private fun possessive(name: String) = name + if (name.endsWith("s", true)) "'" else "'s"
 
     private fun nextGames(lg: League, teams: List<Team>, day: Int): String {
-        val games = teams.mapNotNull { t -> lg.games.filter { !it.played && it.day >= maxOf(day, lg.day) && it.involves(t.id) }.minByOrNull { it.day } }.distinctBy { it.id }
+        val schedule = LeagueLists.games(lg)
+        val games = teams.mapNotNull { t -> schedule.filter { !it.played && it.day >= maxOf(day, lg.day) && it.involves(t.id) }.minByOrNull { it.day } }.distinctBy { it.id }
         if (games.isEmpty()) return "Neither team has another game on the published schedule."
         return games.joinToString(" ") { n ->
             val home = lg.team(n.home); val away = lg.team(n.away)
@@ -96,7 +97,7 @@ object ArticleWriting {
                 else -> "The teams were level at ${half[0]} at halftime. $w scored ${after[wi]} after the break to $l's ${after[1 - wi]}${if (g.ot > 0) ", including overtime" else ""}."
             }
         }
-        lg.moments.firstOrNull { it.gameId == g.id && it.detail.isNotBlank() }?.let { moment ->
+        LeagueLists.moments(lg).firstOrNull { it.gameId == g.id && it.detail.isNotBlank() }?.let { moment ->
             val detail = (winners + losers).fold(moment.detail) { text, p -> text.replace(p.name, surname(p)) }.replace(win.name, w).replace(lose.name, l)
             paragraphs[paragraphs.lastIndex] += " ${detail.trimEnd('.', '!', '?')}."
         }
@@ -166,7 +167,7 @@ object ArticleWriting {
 
     /** Full series clincher article — title/round aware, not a single-game box dump. */
     fun series(lg: League, n: News): String {
-        val last = lg.games.firstOrNull { it.id == n.gameId && it.played }
+        val last = LeagueLists.games(lg).firstOrNull { it.id == n.gameId && it.played }
         val s = last?.let { seriesOf(lg, it) }
         if (s == null || !s.done) {
             return n.body.ifBlank { last?.let { game(lg, it) } ?: n.text }
@@ -213,8 +214,10 @@ object ArticleWriting {
 
     fun news(lg: League, n: News, includeForecast: Boolean = true): String {
         if (n.kind == "series") return series(lg, n)
-        lg.games.firstOrNull { it.id == n.gameId && it.played }?.let { return game(lg, it) }
-        val t = lg.teams.getOrNull(n.teamId) ?: lg.teams.firstOrNull { n.text.contains(it.name) || n.text.contains(it.school) } ?: lg.user
+        val games = LeagueLists.games(lg)
+        games.firstOrNull { it.id == n.gameId && it.played }?.let { return game(lg, it) }
+        val teams = LeagueLists.teams(lg)
+        val t = teams.getOrNull(n.teamId) ?: teams.firstOrNull { n.text.contains(it.name) || n.text.contains(it.school) } ?: lg.user
         val name = short(lg, t)
         val roster = lg.rosterOf(t)
         val p = lg.playerOrNull(n.pid) ?: roster.maxByOrNull { it.ovr }
@@ -232,8 +235,8 @@ object ArticleWriting {
             "${player.name} plays ${player.posLabel}${if (!lg.pro) " as a ${player.cls}" else ""}${if (s != null) ", coming off ${f1(s.ppg)} points per game last season" else ""}."
         }
         paragraphs += outlook.joinToString(" ").ifBlank { colleagues }
-        val next = lg.games.filter { !it.played && it.day >= lg.day && it.involves(t.id) }.minByOrNull { it.day }
-        val recent = lg.games.filter { it.played && it.day <= lg.day && it.involves(t.id) }.sortedByDescending { it.day }.take(2).joinToString(" ") {
+        val next = games.filter { !it.played && it.day >= lg.day && it.involves(t.id) }.minByOrNull { it.day }
+        val recent = games.filter { it.played && it.day <= lg.day && it.involves(t.id) }.sortedByDescending { it.day }.take(2).joinToString(" ") {
             "$name ${if (it.winner() == t.id) "beat" else "lost to"} ${short(lg, lg.team(it.opp(t.id)))} ${it.scoreFor(t.id)}-${it.scoreAgainst(t.id)} on day ${it.day}."
         }
         paragraphs += listOf(recent, next?.let { "$name ${if (it.neutral) "meets" else if (it.home == t.id) "hosts" else "visits"} ${short(lg, lg.team(it.opp(t.id)))} on day ${it.day}${if (it.neutral) " at a neutral site" else ""}." } ?: "$name has no further game on the published schedule.").filter { it.isNotBlank() }.joinToString(" ")

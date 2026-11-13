@@ -18,8 +18,8 @@ data class AiText(val text: String, val isAi: Boolean = false, val provider: Str
 object AiTemplates {
     private fun f1(n: Double) = String.format(Locale.US, "%.1f", n)
 
-    fun notableGame(lg: League, t: Team): Game? {
-        val games = lg.games.filter { !it.played && it.involves(t.id) && PreviewAvailability.regular(it) }.sortedBy { it.day }
+    fun notableGame(lg: League, t: Team, schedule: List<Game> = LeagueLists.games(lg)): Game? {
+        val games = schedule.filter { !it.played && it.involves(t.id) && PreviewAvailability.regular(it) }.sortedBy { it.day }
         return games.firstOrNull { lg.rivalry(it) != null || lg.team(it.opp(t.id)).ap in 1..25 } ?: games.firstOrNull()
     }
 
@@ -27,7 +27,12 @@ object AiTemplates {
         (!lg.pro && p.year == 1) || p.career.lastOrNull { it.season == lg.season - 1 }?.let { it.teamId >= 0 && it.teamId != t.id } == true
     }.maxByOrNull { it.ovr }
 
-    fun departure(lg: League, t: Team): Player? = (lg.players + lg.alumni).filter { p ->
+    fun departure(
+        lg: League,
+        t: Team,
+        players: List<Player> = LeagueLists.players(lg),
+        alumni: List<Player> = LeagueLists.alumni(lg),
+    ): Player? = (players + alumni).filter { p ->
         p.teamId != t.id && p.career.any { it.season == lg.season - 1 && it.teamId == t.id }
     }.maxByOrNull { it.career.last { it.season == lg.season - 1 && it.teamId == t.id }.s.ppg }
 
