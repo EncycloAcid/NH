@@ -28,8 +28,10 @@ object AiFacts {
         val population = (lg.players + lg.alumni + lg.recruits.map { it.p } + players).distinctBy { it.id }
         val context = request + "\n" + extra
         val namedPlayers = population.filter { mentioned(context, it.name) }
+        val situationTeams = SituationAwareness.namedTeams(lg).take(6)
         val teams = (lg.teams.filter { t -> aliases(t).any { mentioned(context, it) } } +
-            namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } } + lg.user).distinctBy { it.id }.take(8)
+            namedPlayers.mapNotNull { p -> lg.teams.firstOrNull { it.id == p.teamId } } + lg.user + situationTeams)
+            .distinctBy { it.id }.take(10)
         val featured = (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
             teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } + teams.mapNotNull { AiTemplates.departure(lg, it) }).distinctBy { it.id }
         val names = (teams.flatMap { aliases(it) } + featured.map { it.name } + teams.map { lg.coachOf(it).name } +
@@ -42,14 +44,19 @@ object AiFacts {
             appendLine("League: ${if (lg.pro) "NBA" else "college basketball"}. Forecasts are simulation probabilities, not results. Missing facts are unknown.")
             if (preview) appendLine("PURPOSE: preseason magazine. Discuss forecasts and last season; do not claim this season has been played.")
             if (upcoming) appendLine("PURPOSE: upcoming matchup. Do not announce a result or postgame reaction.")
+            appendLine(SituationAwareness.leagueBrief(lg, compact = true).trimEnd())
             teams.forEach { t ->
                 val order = lg.teams.filter { it.confId == t.confId }.sortedWith(compareByDescending<Team> {
                     if (lg.pro) it.winPct else if (it.cw + it.cl > 0) it.cw.toDouble() / (it.cw + it.cl) else 0.0
                 }.thenByDescending { it.elo }.thenBy { it.id })
                 val rank = if (t.gp == 0) "standings not established" else "conference standing ${order.indexOf(t) + 1} of ${order.size} (ties ordered by Elo)"
-                appendLine("TEAM ${t.name} (${t.abbr}); current record ${t.record}; conference ${lg.conf(t.confId).name}, ${t.confRecord}; $rank; AP ${t.ap.takeIf { it > 0 } ?: "unranked"}; NET ${t.net.takeIf { it > 0 } ?: "unranked"}; prestige ${t.prestige}/100; titles ${t.titles}.")
+                val bannerYears = TitleDefense.titles(lg, t)
+                appendLine("TEAM ${t.name} (${t.abbr}); current record ${t.record}; conference ${lg.conf(t.confId).name}, ${t.confRecord}; $rank; AP ${t.ap.takeIf { it > 0 } ?: "unranked"}; NET ${t.net.takeIf { it > 0 } ?: "unranked"}; prestige ${t.prestige}/100; program titles ${t.titles}; national titles ${bannerYears.size}${bannerYears.lastOrNull()?.let { " (last $it)" } ?: ""}.")
                 val c = lg.coachOf(t)
                 appendLine("COACH ${c.name}; job security ${c.security}/100; titles ${c.titles}; recorded seasons at this team ${c.history.count { it.teamId == t.id }}.")
+                if (!lg.pro && (t.id == lg.userTeamId || t.id == TitleDefense.champion(lg)?.id || bannerYears.isNotEmpty())) {
+                    appendLine("TITLE HISTORY ${t.school}: ${CollegeHistory.line(lg, t)}")
+                }
                 t.history.lastOrNull { it.season == lg.season - 1 }?.let { h ->
                     appendLine("TEAM last season ${h.season}: ${h.w}-${h.l}; ${h.result}.")
                 }
@@ -111,8 +118,10 @@ object AiFacts {
 
     fun version(lg: League): String {
         val snapshot = buildString {
-            append("grounded2/${lg.season}/${lg.day}/${lg.phase}/${lg.userTeamId}/${lg.pro}")
-            lg.teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}") }
+            append("grounded3/${lg.season}/${lg.day}/${lg.phase}/${lg.userTeamId}/${lg.pro}")
+            lg.teams.forEach { append("|${it.id}:${it.name}:${it.record}:${it.confRecord}:${it.ap}:${it.net}:${it.elo}:${it.titles}:${it.streak}") }
+            TitleDefense.champion(lg)?.let { append("|champ:${it.id}") }
+            lg.history.takeLast(3).forEach { append("|hist:${it.season}:${it.champion}") }
             (lg.players + lg.alumni).forEach { append("|${it.id}:${it.name}:${it.teamId}:${it.ovr}:${it.injGames}:${it.injury}:${it.salary}:${it.contractYears}:${it.stats.pts}:${it.stats.gp}:${it.stats.reb}:${it.stats.ast}:${it.attrs.contentHashCode()}") }
             lg.coaches.forEach { append("|${it.name}:${it.teamId}:${it.security}:${it.titles}") }
             lg.games.filter { it.played }.forEach { append("|${it.id}:${it.hs}:${it.aws}") }

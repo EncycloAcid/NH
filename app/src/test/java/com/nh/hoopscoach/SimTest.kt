@@ -288,7 +288,8 @@ class SimTest {
     private fun checkRivalries(lg: League) {
         val names = lg.teams.map { it.school }.toSet()
         assertTrue("rivalry schools exist: ${Rivalries.schools - names}", names.containsAll(Rivalries.schools))
-        assertEquals(45, lg.rivals.size)
+        // Traditional list seeds 45; emergent rivalries from close/postseason meetings may add more.
+        assertTrue("traditional rivalries present (${lg.rivals.size})", lg.rivals.size >= 45)
         val regular = lg.games.filter { it.played && it.day <= Schedule.REG_DAYS }
         var twice = 0
         for (r in lg.rivals) {

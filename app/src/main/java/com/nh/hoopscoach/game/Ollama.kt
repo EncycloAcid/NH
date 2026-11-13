@@ -1703,24 +1703,25 @@ object Ollama {
         }
         val rumorLabel = if (lg.pro) "TRADE_RUMOR" else "RECRUITING_RUMOR"
         val prompt = buildString {
-            appendLine("You are a national basketball desk. Using ONLY the EVENT BRIEF, write four pieces.")
-            appendLine("Do not invent scores, commits, trades, injuries, or quotes.")
+            appendLine("You are a national basketball desk (Hoops Wire). Using ONLY the EVENT BRIEF, write four pieces.")
+            appendLine("Stay league-aware: titles, defending champions, polls, conference races, and hot seats from the brief.")
+            appendLine("Do not invent scores, commits, trades, injuries, banners, or quotes.")
             appendLine("EVENT BRIEF:")
             appendLine(brief)
             appendLine("Format EXACTLY:")
-            appendLine("NATIONAL_HEADLINE: <punchy headline from today's real results>")
-            appendLine("NATIONAL_BODY: <2 short paragraphs>")
-            appendLine("HOT_TAKE_HEADLINE: <controversial but fact-based column headline>")
+            appendLine("NATIONAL_HEADLINE: <punchy headline from today's real results or title/poll situation>")
+            appendLine("NATIONAL_BODY: <2 short paragraphs grounded in league situation>")
+            appendLine("HOT_TAKE_HEADLINE: <controversial but fact-based column — prefer title defense, droughts, or hot seats when present>")
             appendLine("HOT_TAKE_BODY: <2 paragraphs arguing from the brief>")
-            appendLine("RANKINGS_HEADLINE: <rankings / power-board debate headline>")
-            appendLine("RANKINGS_BODY: <debate the top of the Elo board with records>")
+            appendLine("RANKINGS_HEADLINE: <rankings / power-board / title-watch debate headline>")
+            appendLine("RANKINGS_BODY: <debate the board with records and banner context from the brief>")
             appendLine("${rumorLabel}_HEADLINE: <${if (lg.pro) "trade/FA" else "recruiting"} speculation headline>")
             appendLine("${rumorLabel}_BODY: <conditional analysis only — no confirmed deals>")
         }
         val result = groundedGenerate(
             config, lg, prompt,
-            system = "National sports desk. Facts only from the brief. Speculation must be labeled as such.",
-            numPredict = 480,
+            system = "National sports desk. Facts only from the brief. Prefer title and league-situation angles when present. Speculation must be labeled as such.",
+            numPredict = 520,
         )
         result.map { draft ->
             fun field(key: String): String {

@@ -12,18 +12,10 @@ object MediaEcosystem {
     fun ecosystemBrief(lg: League): String = buildString {
         Brand.ensure(lg)
         val u = lg.user
-        appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
+        append(SituationAwareness.leagueBrief(lg))
         val coach = runCatching { lg.userCoach }.getOrNull()
         appendLine("YOUR PROGRAM: ${if (lg.pro) u.name else u.school} (${u.w}-${u.l}) · AP ${if (u.ap > 0) "#${u.ap}" else "NR"} · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}" +
             (coach?.let { " · titles ${it.titles} (coach ${it.name}, security ${it.security})" } ?: ""))
-        val champs = lg.history.takeLast(5)
-        if (champs.isNotEmpty()) {
-            appendLine("RECENT CHAMPIONS / LEAGUE MEMORY:")
-            for (h in champs) {
-                val c = lg.teams.getOrNull(h.champion)
-                appendLine("- ${h.season}: ${c?.school ?: "?"} champion · runner-up ${lg.teams.getOrNull(h.runnerUp)?.school ?: "?"}")
-            }
-        }
         val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 50 else 0 + if (lg.rivalry(it) != null) 20 else 0
         }

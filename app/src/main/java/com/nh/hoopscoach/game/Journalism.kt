@@ -14,8 +14,8 @@ object Journalism {
     /** Compact event brief used by [Ollama.generateSportsJournalism]. */
     fun eventBrief(lg: League): String = buildString {
         val u = lg.user
-        appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
-        appendLine("YOUR TEAM: ${u.school} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)}")
+        append(SituationAwareness.leagueBrief(lg))
+        appendLine("YOUR TEAM: ${u.school} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}")
         val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 40 else 0
         }
@@ -27,9 +27,8 @@ object Journalism {
             }
         }
         val top = lg.teams.sortedByDescending { it.elo }.take(10)
-        appendLine("POWER BOARD (Elo):")
-        top.forEachIndexed { i, t -> appendLine("${i + 1}. ${t.school} (${t.w}-${t.l})") }
-        val userRank = lg.teams.sortedByDescending { it.elo }.indexOfFirst { it.id == u.id } + 1
+        val userRank = top.indices.firstOrNull { top[it].id == u.id }?.plus(1)
+            ?: (lg.teams.sortedByDescending { it.elo }.indexOfFirst { it.id == u.id } + 1)
         appendLine("Your board rank: #$userRank")
         if (!lg.pro) {
             val board = lg.recruits.filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(8)
@@ -74,6 +73,38 @@ object Journalism {
         }
         val board = lg.teams.sortedByDescending { it.elo }
         val top = board.take(5)
+        val defending = TitleDefense.champion(lg)
+        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(5)
+        if (defending != null || titleLeaders.isNotEmpty()) {
+            fun titleLine(t: Team): String = if (lg.pro) {
+                val ts = NbaHistory.titles(lg, t)
+                when {
+                    ts.isEmpty() -> "${t.name} has ${NbaHistory.titleWords(0)}."
+                    else -> "${t.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
+                }
+            } else CollegeHistory.line(lg, t)
+            val body = buildString {
+                if (defending != null) {
+                    val label = if (lg.pro) defending.name else defending.school
+                    append("Defending champion $label sits ${defending.w}-${defending.l}")
+                    if (defending.ap > 0) append(" (AP #${defending.ap})")
+                    append(". ${titleLine(defending)}\n\n")
+                }
+                if (titleLeaders.isNotEmpty()) {
+                    append("Banner count across the league:\n")
+                    for ((t, n) in titleLeaders) append("- ${if (lg.pro) t.name else t.school}: $n · now ${t.w}-${t.l}\n")
+                }
+                append("\n${titleLine(u)}")
+            }
+            stories += News(
+                lg.season, lg.day,
+                if (defending != null) "Title watch: Can ${if (lg.pro) defending.name else defending.school} stay on the mountain?"
+                else "Title ledger: who owns the banners in this league?",
+                mine = defending?.id == u.id || titleLeaders.any { it.first.id == u.id },
+                kind = "column", body = body, source = "Staff · $outlet",
+                teamId = defending?.id ?: titleLeaders.firstOrNull()?.first?.id ?: u.id,
+            )
+        }
         val debate = buildString {
             append("National debate — who sits atop the board after day ${lg.day}?\n\n")
             top.forEachIndexed { i, t -> append("${i + 1}. ${t.school} (${t.w}-${t.l})\n") }
