@@ -205,13 +205,25 @@ fun Segmented(
     val widths = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
     val density = LocalDensity.current
     val edge = if (inset) Gutter else 0.dp
-    val pillX by androidx.compose.animation.core.animateIntAsState(starts[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillX")
-    val pillW by androidx.compose.animation.core.animateIntAsState(widths[selected] ?: 0, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 520f), label = "pillW")
+    val pillX by androidx.compose.animation.core.animateIntAsState(
+        starts[selected] ?: 0,
+        androidx.compose.animation.core.spring(dampingRatio = 0.84f, stiffness = 460f),
+        label = "pillX",
+    )
+    val pillW by androidx.compose.animation.core.animateIntAsState(
+        widths[selected] ?: 0,
+        androidx.compose.animation.core.spring(dampingRatio = 0.84f, stiffness = 460f),
+        label = "pillW",
+    )
     val pillColor = if (P.dark) P.surface2 else Color.White
     @Composable
     fun chip(i: Int, label: String, m: Modifier) {
         val sel = i == selected
-        val fg by androidx.compose.animation.animateColorAsState(if (sel) P.ink else P.sub, tween(220), label = "tab")
+        val fg by androidx.compose.animation.animateColorAsState(
+            if (sel) P.ink else P.sub,
+            tween(240, easing = Motion.Emphasized),
+            label = "tab",
+        )
         Box(
             // Until the pill has measured itself, the selected tab draws its own background.
             m.clip(RoundedCornerShape(11.dp)).background(if (sel && pillW == 0) pillColor else Color.Transparent)
@@ -263,13 +275,21 @@ fun Chips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifie
     }
 }
 
-/** Buttons give a little as you press them. */
+/** Buttons give a little as you press them — snappy down, springy release. */
 @Composable
 private fun Modifier.pressable(enabled: Boolean, onClick: () -> Unit): Modifier {
     val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.96f else 1f, androidx.compose.animation.core.tween(90), label = "press")
-    return this.graphicsLayer { scaleX = scale; scaleY = scale }
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed) 0.97f else 1f,
+        if (pressed) androidx.compose.animation.core.tween(70) else Motion.Press,
+        label = "press",
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        alpha = if (enabled) 1f else 0.55f
+    }
         .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
 }
 

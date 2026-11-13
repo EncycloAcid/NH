@@ -319,9 +319,22 @@ private fun NavBar(vm: GameViewModel) {
                 val sel = vm.tab == t
                 val label = if (t == Tab.RECRUIT && vm.league?.let { com.nh.hoopscoach.game.NbaCoach.active(it) } == true) "Trades"
                     else if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
-                // The selected tab's pill grows in from the middle and its icon gives a little bounce.
-                val pill by androidx.compose.animation.core.animateFloatAsState(if (sel) 1f else 0f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "navPill")
-                val tint by androidx.compose.animation.animateColorAsState(if (sel) P.accent else P.sub, tween(200), label = "navTint")
+                // Selected tab pill grows from the middle; icon gets a soft pulse, label settles in.
+                val pill by androidx.compose.animation.core.animateFloatAsState(
+                    if (sel) 1f else 0f,
+                    Motion.Settle,
+                    label = "navPill",
+                )
+                val tint by androidx.compose.animation.animateColorAsState(
+                    if (sel) P.accent else P.sub,
+                    tween(240, easing = Motion.Emphasized),
+                    label = "navTint",
+                )
+                val labelAlpha by androidx.compose.animation.core.animateFloatAsState(
+                    if (sel) 1f else 0.72f,
+                    tween(220, easing = Motion.Emphasized),
+                    label = "navLabel",
+                )
                 val soft = P.accentSoft
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { vm.select(t) }.padding(vertical = 4.dp),
@@ -330,16 +343,24 @@ private fun NavBar(vm: GameViewModel) {
                     Box(
                         Modifier.drawBehind {
                             if (pill > 0.01f) {
-                                val w = size.width * (0.45f + 0.55f * pill)
-                                drawRoundRect(soft.copy(alpha = pill.coerceIn(0f, 1f)), topLeft = androidx.compose.ui.geometry.Offset((size.width - w) / 2, 0f),
-                                    size = androidx.compose.ui.geometry.Size(w, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
+                                val w = size.width * (0.42f + 0.58f * pill)
+                                drawRoundRect(
+                                    soft.copy(alpha = (0.55f + 0.45f * pill).coerceIn(0f, 1f)),
+                                    topLeft = androidx.compose.ui.geometry.Offset((size.width - w) / 2, 0f),
+                                    size = androidx.compose.ui.geometry.Size(w, size.height),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
+                                )
                             }
                         }.padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
-                        Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp).pulseOn(sel.takeIf { it }, 0.18f))
+                        Icon(icon, label, tint = tint, modifier = Modifier.size(22.dp).pulseOn(sel.takeIf { it }, 0.1f))
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(label, style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp), color = if (sel) P.ink else P.sub)
+                    Text(
+                        label,
+                        style = T.label.copy(fontSize = 11.sp, letterSpacing = 0.3.sp),
+                        color = (if (sel) P.ink else P.sub).copy(alpha = labelAlpha),
+                    )
                 }
             }
         }
@@ -411,12 +432,15 @@ private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
     androidx.compose.ui.window.Dialog(onDismissRequest = { dismiss() }) {
         // The card springs up into place; each new alert gets its own entrance.
         val enter = remember(a) { androidx.compose.animation.core.Animatable(0f) }
-        LaunchedEffect(a) { enter.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.68f, stiffness = 340f)) }
+        LaunchedEffect(a) { enter.animateTo(1f, Motion.Pop) }
         val glow = breathe()
         Column(
             Modifier.graphicsLayer {
                 val v = enter.value
-                alpha = v.coerceIn(0f, 1f); scaleX = 0.86f + 0.14f * v; scaleY = 0.86f + 0.14f * v; translationY = (1f - v) * 60f
+                alpha = v.coerceIn(0f, 1f)
+                scaleX = 0.92f + 0.08f * v
+                scaleY = 0.92f + 0.08f * v
+                translationY = (1f - v) * 36f
             }.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(P.surface).padding(22.dp),
         ) {
             Box(Modifier.size(48.dp).graphicsLayer { scaleX = glow; scaleY = glow }.clip(RoundedCornerShape(14.dp)).background(tone.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {

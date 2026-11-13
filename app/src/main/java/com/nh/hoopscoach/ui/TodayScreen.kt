@@ -300,7 +300,11 @@ fun WinChance(p: Double, opp: Team) {
     // The bar starts at even and swings to the real odds.
     var shown by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
-    val f by androidx.compose.animation.core.animateFloatAsState(if (shown) p.toFloat() else 0.5f, androidx.compose.animation.core.tween(800, 150, easing = Motion.Emphasized), label = "win")
+    val f by androidx.compose.animation.core.animateFloatAsState(
+        if (shown) p.toFloat() else 0.5f,
+        androidx.compose.animation.core.tween(720, 120, easing = Motion.EmphasizedDecel),
+        label = "win",
+    )
     Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
         Box(Modifier.weight(f.coerceIn(0.02f, 0.98f)).height(8.dp).background(mine))
         Spacer(Modifier.width(3.dp))
