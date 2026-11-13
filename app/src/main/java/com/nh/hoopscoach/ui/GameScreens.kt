@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.LaunchedEffect
@@ -346,6 +347,10 @@ fun BoxScoreScreen(vm: GameViewModel, lg: League, gameId: Int) {
                 Spacer(Modifier.height(10.dp))
                 OllamaGameReportCard(vm, lg, g)
             }
+            if (g.played && g.involves(lg.userTeamId) && (lg.ollama.enabled && lg.ollama.playerInterviews || g.interviews.isNotEmpty())) {
+                Spacer(Modifier.height(10.dp))
+                PlayerInterviewCard(vm, lg, g)
+            }
             val b = g.box
             if (b != null) {
                 Spacer(Modifier.height(10.dp))
@@ -592,6 +597,87 @@ private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.Mome
         contentAlignment = Alignment.Center,
     ) { Text(if (drive) "FINISH" else "RELEASE", style = T.head, color = P.ink) }
     Text("Stop the marker in the green. The middle is perfect.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
+}
+
+/** Postgame player interviews — answers reflect personality, performance, confidence, and coach bond. */
+@Composable
+fun PlayerInterviewCard(vm: GameViewModel, lg: League, g: Game) {
+    var interviews by remember(g.id, vm.rev) { mutableStateOf(g.interviews.toList()) }
+    var writing by remember(g.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun refresh() {
+        writing = true
+        scope.launch {
+            val res = Ollama.generatePlayerInterviews(lg.ollama, lg, g)
+            writing = false
+            res.onSuccess { list ->
+                vm.act {
+                    val target = it.games.firstOrNull { game -> game.id == g.id } ?: return@act
+                    target.interviews.clear()
+                    target.interviews.addAll(list)
+                }
+                interviews = list
+                vm.toast(if (list.any { it.isAi }) "Player interviews ready" else "Game-written interviews ready")
+            }.onFailure { err ->
+                vm.toast("Interviews: ${err.message ?: "failed"}")
+            }
+        }
+    }
+    Section(
+        "Player interviews",
+        action = when {
+            writing -> "Interviewing…"
+            interviews.isEmpty() -> "${lg.ollama.shortActionName} Interview"
+            else -> "Re-interview"
+        },
+        onAction = { if (!writing) refresh() },
+    )
+    Panel {
+        if (writing) {
+            Text("${lg.ollama.providerDisplayName} is interviewing your players…", style = T.small, color = P.accent)
+        } else if (interviews.isEmpty()) {
+            Text("Hear your players after the game — answers follow personality, tonight's line, confidence, and how they feel about the coach.", style = T.small, color = P.sub)
+            Spacer(Modifier.height(8.dp))
+            SmallButton("Run interviews", primary = true) { refresh() }
+        } else {
+            interviews.forEachIndexed { i, iv ->
+                if (i > 0) {
+                    Spacer(Modifier.height(10.dp))
+                    Hairline()
+                    Spacer(Modifier.height(10.dp))
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(iv.name.uppercase(), style = T.label, color = P.accent, modifier = Modifier.weight(1f))
+                    if (iv.tone.isNotBlank()) Tag(iv.tone.uppercase(), when (iv.tone.lowercase()) {
+                        "confident" -> P.warn
+                        "humble" -> P.good
+                        "frustrated" -> P.bad
+                        else -> P.sub
+                    })
+                    Spacer(Modifier.width(6.dp))
+                    AiBadge(iv.isAi, iv.reporter.substringAfterLast(" · ", lg.ollama.shortActionName), fallbackReason = iv.fallbackReason)
+                }
+                if (iv.reporter.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(iv.reporter, style = T.small, color = P.faint)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text("\u201c${iv.question}\u201d", style = T.bodyB, color = P.ink)
+                Spacer(Modifier.height(6.dp))
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(P.surface2).padding(10.dp),
+                ) {
+                    Text("\u201c${iv.answer}\u201d", style = T.body.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.ink)
+                }
+                lg.playerOrNull(iv.pid)?.let { p ->
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { vm.openPlayer(p.id) }) {
+                        Text("Open ${p.short}'s page", color = P.accent)
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** Beat writer postgame report and quotes generated from simulated stats. */

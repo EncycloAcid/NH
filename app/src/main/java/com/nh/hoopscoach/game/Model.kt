@@ -521,6 +521,8 @@ class Game(
     var swing: Int = 0,
     /** The user's games: every shot, packed (see [ShotChart]). */
     var shots: MutableList<Long> = mutableListOf(),
+    /** Postgame player interviews (AI or rule-based). */
+    var interviews: MutableList<PlayerInterview> = mutableListOf(),
 ) {
     val played get() = hs >= 0
     fun winner() = if (hs > aws) home else away
@@ -651,6 +653,8 @@ class OllamaConfig(
     var model: String = "llama3.2:1b",
     var autoGenerate: Boolean = true,
     var pressConference: Boolean = true,
+    /** AI postgame player interviews reflecting personality, performance, confidence, and coach bond. */
+    var playerInterviews: Boolean = true,
     var socialFeed: Boolean = true,
     var gameRecaps: Boolean = true,
     var tradeRumors: Boolean = true,
@@ -1412,6 +1416,20 @@ class PressAnswer(
 
 @Serializable
 class PressQuestion(val season: Int, val gameId: Int, val topic: String, val prompt: String, val answers: List<PressAnswer>, val reporter: String = "", val isAi: Boolean = false, val fallbackReason: String = "")
+
+/** One postgame interview: a reporter question and a player's in-character answer. */
+@Serializable
+class PlayerInterview(
+    val pid: Int,
+    val name: String,
+    val question: String,
+    val answer: String,
+    val reporter: String = "",
+    /** confident / humble / frustrated / measured */
+    val tone: String = "",
+    val isAi: Boolean = false,
+    val fallbackReason: String = "",
+)
 
 /** A social post about the user's player: the team account, fans, doubters, analysts, highlight accounts, teammates, the rival. */
 /** One reaction to a story: who said it (and in what role), what they said, and how many liked it. */

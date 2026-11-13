@@ -78,6 +78,77 @@ object Personality {
         for (p in players) seedOnCourtTrait(p)
     }
 
+    /** How he feels about the coaching staff right now. */
+    fun coachBond(p: Player): String = when {
+        p.happiness >= 82 -> "trusts the coaching staff"
+        p.happiness >= 65 -> "respectful but measured with the coach"
+        p.happiness >= 48 -> "frustrated with his role under this coach"
+        else -> "openly cool on the coaching staff"
+    }
+
+    /** Confidence after tonight's line vs his season form. */
+    fun confidence(p: Player, line: GameLogEntry): String {
+        val avg = p.stats.ppg.coerceAtLeast(1.0)
+        return when {
+            line.pts >= avg * 1.45 || (line.pts >= 20 && line.ast + line.reb >= 10) -> "riding high"
+            line.min >= 15 && line.pts <= avg * 0.45 -> "shaken after a quiet night"
+            line.tov >= 5 && line.pts < avg -> "second-guessing himself"
+            else -> "even-keeled"
+        }
+    }
+
+    /** Compact scout card for interview prompts. */
+    fun interviewContext(lg: League, p: Player, line: GameLogEntry): String {
+        val traits = p.traits.joinToString(", ") { it.label }.ifEmpty { "no standout traits" }
+        val note = p.personalityNote.ifBlank { onCourtLabel(p) ?: "standard competitor" }
+        return buildString {
+            append("Personality: $traits. Scout: $note. ")
+            append("Mood/coach bond: ${coachBond(p)} (happiness ${p.happiness}). ")
+            append("Confidence tonight: ${confidence(p, line)}. ")
+            append("Line: ${line.pts} PTS / ${line.reb} REB / ${line.ast} AST in ${line.min} min")
+            if (line.tov >= 4) append(", ${line.tov} TOV")
+            append(".")
+        }
+    }
+
+    /** Rule-based interview when AI is off or fails. */
+    fun fallbackInterview(lg: League, g: Game, p: Player, line: GameLogEntry, reporter: String): PlayerInterview {
+        val t = lg.team(p.teamId)
+        val opp = lg.team(g.opp(t.id))
+        val won = g.winner() == t.id
+        val gunner = p.has(Trait.GUNNER)
+        val passer = p.has(Trait.PASS_FIRST) || p.has(Trait.TEAM_PLAYER)
+        val conf = confidence(p, line)
+        val bond = coachBond(p)
+        val q = when {
+            line.pts >= 25 -> "You dropped ${line.pts} on ${opp.school}. Walk us through your night."
+            !won && line.min >= 20 -> "Tough loss to ${opp.school}. What was the difference?"
+            line.ast >= 8 -> "You piled up ${line.ast} assists. How did the ball move tonight?"
+            else -> "What stood out for you in the ${if (won) "win" else "loss"} against ${opp.school}?"
+        }
+        val answer = when {
+            gunner && conf.startsWith("riding") ->
+                "I wanted those looks. Coach put the ball in my hands and I attacked — that's my game."
+            passer && won ->
+                "Credit the guys making shots. I just tried to find the open man and trust what coach drew up."
+            bond.contains("frustrated") || bond.contains("cool") ->
+                "We've got work to do. I'll keep competing, but some of this has to get sorted upstairs too."
+            conf.contains("shaken") || conf.contains("second-guessing") ->
+                "Not my night. I'll watch the film, talk with coach, and be better next time."
+            p.has(Trait.CLUTCH) && won ->
+                "Big moments don't scare me. We stuck together and closed it out."
+            else ->
+                "We ${if (won) "executed enough to win" else "didn't get enough stops"}. Next one's what matters."
+        }
+        val tone = when {
+            gunner && conf.startsWith("riding") -> "confident"
+            passer -> "humble"
+            bond.contains("frustrated") || bond.contains("cool") -> "frustrated"
+            else -> "measured"
+        }
+        return PlayerInterview(p.id, p.name, q, answer, reporter, tone, isAi = false, fallbackReason = "Game-written interview")
+    }
+
     /** Apply AI (or rule) assignment: role is GUNNER, PASS_FIRST, or BALANCED. */
     fun applyAssignment(p: Player, role: String, note: String) {
         p.traits.removeAll { it == Trait.GUNNER || it == Trait.PASS_FIRST }

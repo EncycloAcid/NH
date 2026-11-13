@@ -220,6 +220,7 @@ object Ollama {
             is AwardSpeech -> value.isAi
             is HalftimeSpeech -> value.isAi
             is TrainingCampReport -> value.isAi
+            is PlayerInterview -> value.isAi
             else -> true
         }
     }
@@ -1079,6 +1080,20 @@ object Ollama {
         }
     }
 
+    /** Fire-and-forget postgame player interviews for the user's game. */
+    fun maybeAutoGenerateInterviews(config: OllamaConfig, lg: League, g: Game) {
+        if (!config.enabled || !config.playerInterviews || !config.autoGenerate) return
+        if (!g.involves(lg.userTeamId) || g.box == null) return
+        CoroutineScope(Dispatchers.IO).launch {
+            generatePlayerInterviews(config, lg, g).onSuccess { list ->
+                if (list.isNotEmpty()) {
+                    g.interviews.clear()
+                    g.interviews.addAll(list)
+                }
+            }
+        }
+    }
+
     /** Fire-and-forget postgame press question generation if auto-generate is enabled. */
     fun maybeAutoGeneratePress(
         config: OllamaConfig,
@@ -1186,6 +1201,96 @@ object Ollama {
         val fallbackReason: String = "",
     )
 
+    /** Parse AI interview lines: `PID|TONE|QUESTION|ANSWER`. */
+    internal fun parseInterviewLines(raw: String, byId: Map<Int, Player>, reporter: String, isAi: Boolean, fallbackReason: String = ""): List<PlayerInterview> {
+        val out = mutableListOf<PlayerInterview>()
+        for (rawLine in raw.lines()) {
+            val line = rawLine.trim().trimStart('-', '*', ' ')
+            if (line.isEmpty() || !line.contains('|')) continue
+            val parts = line.split('|').map { it.trim() }
+            if (parts.size < 4) continue
+            val id = parts[0].filter { it.isDigit() }.toIntOrNull() ?: continue
+            val p = byId[id] ?: continue
+            val tone = parts[1].lowercase().ifBlank { "measured" }
+            val question = parts[2].trim('"')
+            val answer = parts[3].trim('"')
+            if (question.isBlank() || answer.isBlank()) continue
+            out += PlayerInterview(p.id, p.name, question, answer, reporter, tone, isAi, fallbackReason)
+        }
+        return out
+    }
+
+    /**
+     * Postgame interviews for standout players on the user's team.
+     * Answers reflect personality, tonight's performance, confidence, and coach relationship.
+     */
+    suspend fun generatePlayerInterviews(
+        config: OllamaConfig,
+        lg: League,
+        g: Game,
+    ): Result<List<PlayerInterview>> = withContext(Dispatchers.IO) {
+        val box = g.box ?: return@withContext Result.success(emptyList())
+        val userSide = if (g.home == lg.userTeamId) box.home else if (g.away == lg.userTeamId) box.away else return@withContext Result.success(emptyList())
+        val t = lg.user
+        val opp = lg.team(g.opp(t.id))
+        val won = g.winner() == t.id
+        val reporter = Press.beat(lg, t)
+        val candidates = userSide
+            .mapNotNull { pl -> lg.playerOrNull(pl.pid)?.let { it to pl.s } }
+            .filter { (_, s) -> s.sec >= 8 * 60 || s.pts + s.reb + s.ast >= 8 }
+            .sortedByDescending { (_, s) -> s.pts * 2 + s.reb + s.ast * 2 + s.stl + s.blk }
+            .take(3)
+        if (candidates.isEmpty()) return@withContext Result.success(emptyList())
+
+        fun toLog(p: Player, s: StatLine) = GameLogEntry(
+            g.id, opp.id, g.site(t.id), won, "${g.scoreFor(t.id)}-${g.scoreAgainst(t.id)}",
+            s.pts, s.reb, s.ast, s.stl, s.blk, s.tov, (s.sec / 60.0).toInt(),
+        )
+
+        if (!config.enabled || !config.playerInterviews) {
+            return@withContext Result.success(candidates.map { (p, s) -> Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter) })
+        }
+
+        val cacheKey = "interview_${g.id}_${candidates.joinToString("-") { it.first.id.toString() }}_${config.activeModelName}" +
+            "_facts_${AiFacts.version(lg)}_${config.provider}"
+        if (config.cacheResponses) {
+            Cache.get<List<PlayerInterview>>(cacheKey)?.let { return@withContext Result.success(it) }
+        }
+
+        val rosterBlock = candidates.joinToString("\n") { (p, s) ->
+            "- ${Personality.interviewContext(lg, p, toLog(p, s))} id=${p.id} name=${p.name}"
+        }
+        val prompt = buildString {
+            appendLine("Write short postgame media interviews for these basketball players.")
+            appendLine("Game: ${t.school} ${g.scoreFor(t.id)}, ${opp.school} ${g.scoreAgainst(t.id)} (${if (won) "WIN" else "LOSS"}).")
+            appendLine("Each answer MUST match that player's personality, tonight's stats, confidence, and relationship with the coach.")
+            appendLine("Do not invent stats. One question and one answer per player.")
+            appendLine("Format EXACTLY one line per player:")
+            appendLine("PID|TONE|QUESTION|ANSWER")
+            appendLine("TONE is one of: confident, humble, frustrated, measured")
+            appendLine("Players:")
+            appendLine(rosterBlock)
+        }
+        val result = groundedGenerate(
+            config, lg, prompt,
+            system = "You are a beat writer. Reply only with PID|TONE|QUESTION|ANSWER lines. Stay in character for each player.",
+            numPredict = 320,
+            eventGame = g,
+            extraPlayers = candidates.map { it.first },
+        )
+        val byId = candidates.associate { it.first.id to it.first }
+        result.map { draft ->
+            val parsed = parseInterviewLines(draft.text, byId, if (draft.isAi) "$reporter · ${draft.provider}" else reporter, draft.isAi, draft.fallbackReason)
+            val filled = candidates.map { (p, s) ->
+                parsed.firstOrNull { it.pid == p.id } ?: Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter)
+            }
+            if (config.cacheResponses && filled.any { it.isAi }) Cache.put(cacheKey, filled)
+            filled
+        }.recover {
+            candidates.map { (p, s) -> Personality.fallbackInterview(lg, g, p, toLog(p, s), reporter) }
+        }
+    }
+
     /** Generates a dynamic postgame press conference question & answers tailored to the exact game stats. */
     suspend fun generatePressConference(
         config: OllamaConfig,
@@ -1217,17 +1322,18 @@ object Ollama {
             append("Opponent: ${opp.school} (${opp.record})\n")
             append("Final Score: ${t.school} $us, ${opp.school} $them (${if (won) "WIN" else "LOSS"})\n")
             append("Tonight's Stats: $statLineStr in ${line.min} minutes\n")
+            append("${Personality.interviewContext(lg, player, line)}\n")
             if (winner) append("Highlight: Sunk the game-winning clutch shot!\n")
             if (rivalry) append("Context: Heated rivalry matchup\n")
             append("\nStrictly use the exact score and stats. Do not change or invent different numbers.\n")
-            append("Generate 1 beat reporter question and 3 distinct player answers:\n")
+            append("Generate 1 beat reporter question and 3 distinct player answers that could come from THIS player's personality:\n")
             append("Format your response EXACTLY as:\n")
             append("TOPIC: <1-3 words topic>\n")
             append("REPORTER: <Reporter Name · Outlet>\n")
             append("QUESTION: <Direct question addressing tonight's game and performance>\n")
-            append("HUMBLE: <Modest, team-first answer>\n")
-            append("BRASH: <Confident, swaggering answer>\n")
-            append("ANALYTICAL: <Tactical, measured answer>\n")
+            append("HUMBLE: <Modest, team-first answer in his voice>\n")
+            append("BRASH: <Confident, swaggering answer in his voice>\n")
+            append("ANALYTICAL: <Tactical, measured answer in his voice>\n")
         }
 
         return groundedGenerate(

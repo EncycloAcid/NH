@@ -1343,6 +1343,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         if (lg.pro) RecordBook.afterGame(lg, lines)
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
+        if (userInvolved) Ollama.maybeAutoGenerateInterviews(lg.ollama, lg, game)
     }
 
     private fun lastTotals(side: Int): StatLine {

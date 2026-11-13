@@ -1197,6 +1197,14 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
+                            Text("AI player interviews", style = T.bodyB, color = P.ink)
+                            Text("After games, players answer in character — personality, performance, confidence, and coach bond.", style = T.small, color = P.sub)
+                        }
+                        AppSwitch(lg.ollama.playerInterviews, { on -> vm.act { it.ollama.playerInterviews = on } })
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text("Social media hot takes", style = T.bodyB, color = P.ink)
                             Text("AI generates analyst, fan, and hater takes on your feed.", style = T.small, color = P.sub)
                         }

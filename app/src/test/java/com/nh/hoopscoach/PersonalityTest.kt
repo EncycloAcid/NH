@@ -47,4 +47,14 @@ class PersonalityTest {
         Personality.seedOnCourtTrait(p)
         assertEquals(first, p.traits.toList())
     }
+
+    @Test fun interviewParseKeepsPersonalityLines() {
+        val gunner = player(60, 85, 85, traits = listOf(Trait.GUNNER))
+        val byId = mapOf(1 to gunner)
+        val raw = "1|confident|How did you get going tonight?|I hunted my shot. Coach trusted me late."
+        val parsed = Ollama.parseInterviewLines(raw, byId, "Beat · Daily", true)
+        assertEquals(1, parsed.size)
+        assertEquals("confident", parsed[0].tone)
+        assertTrue(parsed[0].answer.contains("hunted", ignoreCase = true))
+    }
 }
