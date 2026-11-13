@@ -80,7 +80,11 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "• Late Bloomer: earned, never rolled. A walk-on whose game took off; develops faster.",
             "• Confident Scorer: hunts his own look and takes tough contested shots.",
             "• Unselfish: kicks tough looks to open teammates instead of forcing it.",
-            "Turn on AI player personalities in Settings to have your AI assign styles and scout notes to the roster.",
+            "• Showboat: more isolations and contested highlight looks.",
+            "• Hothead: forces more when trailing; fewer kick-outs under pressure.",
+            "• Coachable: stays in the scheme and takes what coach draws up.",
+            "• Steady: even-keeled shot selection and willing kick-outs.",
+            "Decision-making always uses these rule-based styles. Turn on AI player personalities in Settings for AI scout notes (optional; never required for sim).",
         ),
         sec(
             "Mood",

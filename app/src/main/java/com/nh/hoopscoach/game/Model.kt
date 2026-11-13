@@ -132,6 +132,14 @@ enum class Trait(val label: String, val good: Boolean) {
     GUNNER("Confident Scorer", false),
     /** On-court: looks for the open teammate instead of forcing a tough shot. */
     PASS_FIRST("Unselfish", true),
+    /** On-court: hunts highlight plays — more iso, tougher looks, fewer kicks. */
+    SHOWBOAT("Showboat", false),
+    /** On-court: forces more when trailing or shaken; fewer kick-outs under pressure. */
+    HOTHEAD("Hothead", false),
+    /** On-court: stays within the scheme — fewer freelance tough shots. */
+    COACHABLE("Coachable", true),
+    /** On-court: even-keeled — takes good shots, dishes when the look is bad. */
+    STEADY("Steady", true),
 }
 
 enum class Offense(val label: String, val blurb: String) {
@@ -692,7 +700,7 @@ class OllamaConfig(
     var mediaEcosystem: Boolean = true,
     var championshipCelebrations: Boolean = true,
     var freeAgencyBuzz: Boolean = true,
-    /** AI assigns on-court personalities (confident scorer / unselfish) and scout notes. */
+    /** AI assigns on-court personalities (scorer / unselfish / showboat / etc.) and scout notes. */
     var playerPersonalities: Boolean = true,
     var defaultStoryAngle: String = "balanced", // "tactical", "beat", "skeptic", "dual", "balanced"
     // Speed & Performance Optimizations

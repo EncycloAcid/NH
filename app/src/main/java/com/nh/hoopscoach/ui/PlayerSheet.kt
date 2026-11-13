@@ -86,6 +86,10 @@ private fun traitBlurb(t: Trait) = when (t) {
     Trait.LATE_BLOOMER -> "A walk-on whose game suddenly took off. Develops faster."
     Trait.GUNNER -> "Confident scorer — hunts his own look and takes tough contested shots."
     Trait.PASS_FIRST -> "Unselfish — kicks tough looks to open teammates instead of forcing it."
+    Trait.SHOWBOAT -> "Highlight hunter — more isolations and contested step-backs."
+    Trait.HOTHEAD -> "Forces more when trailing or frustrated; fewer kick-outs under pressure."
+    Trait.COACHABLE -> "Stays in the scheme — takes what coach draws up."
+    Trait.STEADY -> "Even-keeled — good shot selection and willing kick-outs."
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -579,6 +583,7 @@ private fun Sparkline(values: List<Int>, pot: Int, modifier: Modifier) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BioTab(lg: League, p: Player) {
     Section("Background")
@@ -613,15 +618,27 @@ private fun BioTab(lg: League, p: Player) {
     }
     if (p.traits.isNotEmpty() || p.personalityNote.isNotBlank()) {
         Section("Personality")
-        if (p.personalityNote.isNotBlank()) {
+        val court = com.nh.hoopscoach.game.Personality.onCourtTrait(p)
+        if (court != null || p.personalityNote.isNotBlank()) {
             Panel {
-                Text(com.nh.hoopscoach.game.Personality.onCourtLabel(p) ?: "Scout note", style = T.label, color = P.accent)
-                Spacer(Modifier.height(4.dp))
-                Text(p.personalityNote, style = T.body, color = P.ink)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (court != null) Tag(court.label.uppercase(), traitColor(court), filled = true)
+                    com.nh.hoopscoach.game.Personality.onCourtLabel(p)?.let { label ->
+                        if (court == null) Tag(label.uppercase(), P.accent)
+                    }
+                }
+                if (p.personalityNote.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(p.personalityNote, style = T.body, color = P.ink)
+                } else if (court != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(traitBlurb(court), style = T.small, color = P.sub)
+                }
             }
         }
-        if (p.traits.isNotEmpty()) {
-            GroupList(p.traits) { t ->
+        val other = p.traits.filter { it !in com.nh.hoopscoach.game.Personality.ON_COURT }
+        if (other.isNotEmpty()) {
+            GroupList(other) { t ->
                 ListRow {
                     Column {
                         Text(t.label, style = T.bodyB, color = traitColor(t))

@@ -540,8 +540,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
      */
     private fun pickShooter(o: Int, offense: List<Player>): Player {
         val w = offense.map {
-            if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / skillScale).pow(0.6) * proShotPos(it.pos)
-            else usage(o, it).pow(1.1) * (Ratings.offense(it) / skillScale).pow(1.25)
+            val iso = Personality.isoMod(it)
+            if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / skillScale).pow(0.6) * proShotPos(it.pos) * iso
+            else usage(o, it).pow(1.1) * (Ratings.offense(it) / skillScale).pow(1.25) * iso
         }.toMutableList()
         if (lg.pro && w.size > 1) {
             val top = w.indices.maxBy { w[it] }
@@ -974,8 +975,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
 
-            // Unselfish players kick tough looks; confident scorers usually fire anyway.
-            if (putback == null && attempts < 5 && clock > 2.0 && Rng.chance(Personality.kickOutChance(shooter, pMake))) {
+            // Unselfish / steady kick tough looks; gunners & showboats usually fire; hotheads force when trailing.
+            if (putback == null && attempts < 5 && clock > 2.0 && Rng.chance(Personality.kickOutChance(shooter, pMake, trail))) {
                 val mates = offense.filter { it.id != shooter.id }
                 val target = if (mates.isNotEmpty()) Rng.weighted(mates) { Tendency.pass(it) * (Ratings.offense(it) / skillScale) } else null
                 if (target != null) {

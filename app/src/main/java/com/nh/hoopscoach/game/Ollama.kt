@@ -2630,7 +2630,24 @@ object Ollama {
     data class PersonalityPass(val assigned: Int, val isAi: Boolean, val detail: String)
 
     /**
-     * Assign on-court personalities (Confident Scorer / Unselfish) for [players].
+     * Fire-and-forget: enrich user roster scout notes / styles via AI when configured.
+     * Never blocks sim — rule-based seeding already covers decisions in [GameEngine].
+     */
+    fun maybeAutoGeneratePersonalities(config: OllamaConfig, lg: League) {
+        if (!config.enabled || !config.playerPersonalities || !config.autoGenerate) return
+        // Early season + occasional mid-season refresh for new transfers / call-ups.
+        if (lg.day != 3 && !(lg.day >= 40 && lg.day % 28 == 0)) return
+        val roster = lg.rosterOf(lg.user)
+        if (roster.isEmpty()) return
+        val needFlavor = roster.count { it.personalityNote.isBlank() || Personality.onCourtTrait(it) == null }
+        if (needFlavor == 0 && lg.day != 3) return
+        CoroutineScope(Dispatchers.IO).launch {
+            assignPlayerPersonalities(config, lg, roster)
+        }
+    }
+
+    /**
+     * Assign on-court personalities for [players].
      * Uses AI when enabled; otherwise seeds from ratings. Safe for empty lists.
      */
     suspend fun assignPlayerPersonalities(
@@ -2640,7 +2657,9 @@ object Ollama {
     ): Result<PersonalityPass> = withContext(Dispatchers.IO) {
         if (!config.enabled || !config.playerPersonalities) {
             Personality.seedRoster(players)
-            return@withContext Result.success(PersonalityPass(players.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }, false, "Rule-based seeding (AI personalities off)."))
+            return@withContext Result.success(
+                PersonalityPass(Personality.countOnCourt(players), false, "Rule-based seeding (AI personalities off)."),
+            )
         }
         val targets = players.filter { it.teamId >= 0 }.sortedByDescending { it.ovr }.take(12)
         if (targets.isEmpty()) return@withContext Result.success(PersonalityPass(0, false, "No roster players."))
@@ -2650,14 +2669,21 @@ object Ollama {
         }
         val prompt = buildString {
             appendLine("You are a basketball scout. Assign ONE on-court personality to each player.")
-            appendLine("Roles: GUNNER (confident scorer who takes tough shots), PASS_FIRST (unselfish, looks for teammates), or BALANCED.")
+            appendLine("Roles:")
+            appendLine("GUNNER — confident scorer who takes tough shots")
+            appendLine("PASS_FIRST — unselfish, looks for teammates")
+            appendLine("SHOWBOAT — highlight hunter, isolations and contested looks")
+            appendLine("HOTHEAD — forces more when trailing or frustrated")
+            appendLine("COACHABLE — stays in the scheme")
+            appendLine("STEADY — even-keeled shot selection and kick-outs")
+            appendLine("BALANCED — no strong bias")
             appendLine("Format EXACTLY one line per player:")
             appendLine("ID|ROLE|Short scout note (max 18 words)")
             appendLine("Roster:")
             appendLine(rosterLines)
         }
         val system = "Reply with only the ID|ROLE|note lines. No markdown."
-        val result = generate(config, prompt, system, temperature = 0.4, numPredict = 420)
+        val result = generate(config, prompt, system, temperature = 0.4, numPredict = 480)
         var assigned = 0
         result.onSuccess { text ->
             for (raw in text.lines()) {
@@ -2671,6 +2697,10 @@ object Ollama {
                 val note = parts.getOrNull(2).orEmpty()
                 Personality.applyAssignment(p, role, note.ifBlank {
                     when {
+                        role.contains("SHOW", true) || role.contains("ISO", true) -> "Loves the highlight — isolations and tough step-backs."
+                        role.contains("HOT", true) || role.contains("FIER", true) -> "Gets aggressive when the game gets chippy."
+                        role.contains("COACH", true) || role.contains("SYSTEM", true) -> "Stays within the scheme."
+                        role.contains("STEAD", true) -> "Even-keeled — good shots, willing kick-outs."
                         role.contains("GUN", true) || role.contains("CONF", true) -> "Looks for his own shot, even contested."
                         role.contains("PASS", true) || role.contains("UNSELF", true) -> "Willing passer who kicks tough looks."
                         else -> "Takes what the defense gives."
@@ -2683,18 +2713,17 @@ object Ollama {
             Personality.seedRoster(targets)
             for (p in targets) {
                 if (p.personalityNote.isBlank()) {
-                    p.personalityNote = when {
-                        p.has(Trait.GUNNER) -> "Confident scorer who hunts his own look."
-                        p.has(Trait.PASS_FIRST) -> "Unselfish — finds the open man on tough possessions."
-                        else -> ""
-                    }
+                    val n = Personality.defaultNote(p)
+                    if (n.isNotBlank()) p.personalityNote = n
                 }
             }
-            assigned = targets.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }
-            return@withContext Result.success(PersonalityPass(assigned, false, result.exceptionOrNull()?.message ?: "AI parse empty — used rule-based personalities."))
+            assigned = Personality.countOnCourt(targets)
+            return@withContext Result.success(
+                PersonalityPass(assigned, false, result.exceptionOrNull()?.message ?: "AI parse empty — used rule-based personalities."),
+            )
         }
         // Fill anyone the model skipped.
-        for (p in targets) if (!p.has(Trait.GUNNER) && !p.has(Trait.PASS_FIRST)) Personality.seedOnCourtTrait(p)
+        for (p in targets) if (Personality.onCourtTrait(p) == null) Personality.seedOnCourtTrait(p)
         Result.success(PersonalityPass(assigned, result.isSuccess, "Assigned $assigned on-court personalities."))
     }
 }

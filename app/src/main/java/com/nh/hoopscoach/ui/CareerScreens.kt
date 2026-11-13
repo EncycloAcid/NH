@@ -1318,7 +1318,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("AI player personalities", style = T.bodyB, color = P.ink)
-                            Text("Confident scorers hunt tough shots; unselfish players kick to open teammates. AI assigns styles + scout notes.", style = T.small, color = P.sub)
+                            Text("On-court styles drive shot/pass/iso choices (rule-based always). When on, AI assigns styles + scout notes in the background.", style = T.small, color = P.sub)
                         }
                         AppSwitch(lg.ollama.playerPersonalities, { on -> vm.act { it.ollama.playerPersonalities = on } })
                     }

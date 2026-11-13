@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.nh.hoopscoach.game.Ollama
+import com.nh.hoopscoach.game.Personality
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -229,6 +232,7 @@ private fun factorWord(v: Double) = when {
     else -> "Big minus"
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
     val r = lg.recruits.firstOrNull { it.p.id == playerId }
@@ -256,7 +260,18 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                         if (!r.transfer) Stars(p.stars, 18.sp)
                         Text("${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.bodyB, color = P.ink)
                         Text(if (r.transfer && p.transferFrom >= 0) "Leaving ${lg.team(p.transferFrom).school}" else "${p.hometown} · ${p.highSchool}", style = T.small, color = P.sub)
-                        if (p.traits.isNotEmpty()) Text(p.traits.joinToString(" · ") { it.label }, style = T.small, color = P.sub)
+                        if (p.traits.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                p.traits.forEach { t ->
+                                    Tag(t.label.uppercase(), traitColor(t), filled = t in Personality.ON_COURT)
+                                }
+                            }
+                        }
+                        if (p.personalityNote.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(p.personalityNote, style = T.small, color = P.accent, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                     Ring(fog.midOvr, 52.dp, label = if (fog.known) "OVR" else "EST", textSize = 18.sp)
                     Spacer(Modifier.width(8.dp))
