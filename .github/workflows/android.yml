@@ -150,6 +150,12 @@ jobs:
       - name: List release files
         run: ls -la release
 
+      - name: Read app version
+        id: ver
+        run: |
+          NAME=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          echo "name=${NAME:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Publish a downloadable release
         uses: softprops/action-gh-release@v2
         with:
@@ -160,5 +166,5 @@ jobs:
             **Android:** download `HoopsDynasty.apk` on your phone, open it, and allow installs from your browser if asked.
             **Windows:** download `HoopsDynasty-windows.exe` and run the installer (Java is bundled).
             **Linux / other PC:** download `HoopsDynasty-pc.jar` and run with Java 17+: `java -jar HoopsDynasty-pc.jar` (a `.deb` may also be attached).
-            Version: 3.4-pro.182 · Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
+            Version: ${{ steps.ver.outputs.name }} · Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
           files: release/*
