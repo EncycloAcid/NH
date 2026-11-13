@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Collections
 
 /**
  * Client for interacting with local Ollama instances to control and generate stories,
@@ -63,14 +64,35 @@ object Ollama {
     )
 
     /**
-     * Free Gemini text models known to work for new API keys (Nov 2026).
+     * Free Gemini text models for new API keys (Nov 2026).
+     * Order is probe preference — generate falls through this list when one 404s / is blocked.
      * Shut-down 1.5 / 2.0 ids are intentionally absent — see [snapGoogleModel].
      */
     val GOOGLE_MODELS = listOf(
-        CloudModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "Recommended · free", "Current free-tier default. Fast recaps with low cost."),
-        CloudModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "Free · cheap", "Stable free flash-lite fallback when 3.5 is unavailable."),
-        CloudModel("gemini-3.8-flash", "Gemini 3.8 Flash", "Free · next-gen", "Full flash free tier — use when lite models fail."),
+        CloudModel("gemini-3.8-flash", "Gemini 3.8 Flash", "Recommended · free", "Current free-tier flash. Reliable for recaps and quotes."),
+        CloudModel("gemini-3.6-flash", "Gemini 3.6 Flash", "Free · stable", "Prior free flash — strong fallback when 3.8 is unavailable."),
+        CloudModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "Free · cheapest", "Cheapest free flash-lite when full flash is rate-limited."),
+        CloudModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "Free · cheap", "Older free flash-lite fallback."),
     )
+
+    /** Session denylist of model ids that returned not-found / not-allowed for this process. */
+    private val failedModelIds: MutableSet<String> = Collections.synchronizedSet(linkedSetOf())
+
+    fun rememberFailedModel(id: String) {
+        val key = id.trim().removePrefix("models/").lowercase()
+        if (key.isNotBlank()) failedModelIds += key
+    }
+
+    fun forgetFailedModel(id: String) {
+        failedModelIds -= id.trim().removePrefix("models/").lowercase()
+    }
+
+    fun clearFailedModels() {
+        failedModelIds.clear()
+    }
+
+    fun isFailedModel(id: String): Boolean =
+        failedModelIds.contains(id.trim().removePrefix("models/").lowercase())
 
     /** Cheap OpenAI tags only — flagship gpt-4o is hidden from Settings. */
     val OPENAI_MODELS = listOf(
@@ -137,11 +159,10 @@ object Ollama {
     }
 
     /**
-     * Best free/cheap text model for [provider].
-     * Prefer curated ids that appear in [available]; skip specialty / preview / retired junk;
-     * otherwise fall back to the curated Settings shortlist (never invent unavailable GA aliases).
+     * Ordered free/cheap candidates for [provider]. Prefer curated ids in [available];
+     * skip specialty / preview / retired / previously-failed ids.
      */
-    fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
+    fun rankedAutoPickCandidates(provider: String, available: List<String> = emptyList()): List<String> {
         val curated = when (provider.lowercase()) {
             "google" -> GOOGLE_MODELS.map { it.id }
             "openai" -> OPENAI_MODELS.map { it.id }
@@ -183,12 +204,30 @@ object Ollama {
                     .thenByDescending { googleVersionScore(it.id) }
                     .thenBy { it.id.lowercase() },
             )
-        val pick = ranked.firstOrNull()?.id ?: curated.first()
-        return when (provider.lowercase()) {
-            "google" -> snapGoogleModel(pick)
-            "openai" -> snapOpenAiModel(pick)
-            else -> snapLocalModel(pick)
+            .map {
+                when (provider.lowercase()) {
+                    "google" -> snapGoogleModel(it.id)
+                    "openai" -> snapOpenAiModel(it.id)
+                    else -> snapLocalModel(it.id)
+                }
+            }
+            .distinct()
+        val live = ranked.filterNot { isFailedModel(it) }
+        return live.ifEmpty { ranked.ifEmpty { curated } }
+    }
+
+    /**
+     * Best free/cheap text model for [provider].
+     * Prefer curated ids that appear in [available]; skip specialty / preview / retired / failed junk;
+     * otherwise fall back to the curated Settings shortlist (never invent unavailable GA aliases).
+     */
+    fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
+        val curated = when (provider.lowercase()) {
+            "google" -> GOOGLE_MODELS.map { it.id }
+            "openai" -> OPENAI_MODELS.map { it.id }
+            else -> RECOMMENDED_MODELS.map { it.id }
         }
+        return rankedAutoPickCandidates(provider, available).firstOrNull() ?: curated.first()
     }
 
     /** Curated shortlist order — lower is better; unknown ids sort after. */
@@ -251,23 +290,58 @@ object Ollama {
         return pick
     }
 
+    /**
+     * Rank → set → short generate probe. Walks provider fallbacks, denylists models that
+     * 404 / are blocked for this key, and sticks the first id that actually returns text.
+     */
+    suspend fun applyAutoPickVerified(
+        config: OllamaConfig,
+        available: List<String> = emptyList(),
+    ): Result<String> = withContext(Dispatchers.IO) {
+        applyAutoPick(config, available)
+        val before = config.activeModelName
+        val probe = generate(
+            config,
+            prompt = "Reply with exactly OK.",
+            system = "Connection test. Reply OK only.",
+            temperature = 0.0,
+            numPredict = 32,
+        )
+        if (probe.isSuccess) {
+            val used = config.activeModelName
+            forgetFailedModel(used)
+            Result.success(used)
+        } else {
+            val err = probe.exceptionOrNull()
+            if (isModelAccessError(err?.message)) rememberFailedModel(before)
+            Result.failure(err ?: Exception("No working free/cheap model found for this API key."))
+        }
+    }
+
     /** Ordered generate fallbacks for Google when the selected id 404s / is retired. */
     fun googleGenerateCandidates(config: OllamaConfig): List<String> {
         val primary = snapGoogleModel(config.googleModel.ifBlank { GOOGLE_MODELS.first().id })
-        return (listOf(primary) + GOOGLE_MODELS.map { it.id } + listOf("gemini-3.6-flash")).distinct()
+        val all = (listOf(primary) + GOOGLE_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
     }
 
     fun openAiGenerateCandidates(config: OllamaConfig): List<String> {
         val primary = snapOpenAiModel(config.openAiModel.ifBlank { OPENAI_MODELS.first().id })
-        return (listOf(primary) + OPENAI_MODELS.map { it.id }).distinct()
+        val all = (listOf(primary) + OPENAI_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
     }
 
-    /** True when the provider error looks like a bad / missing model id (safe to try the next candidate). */
+    /** True when the provider error looks like a bad / missing / blocked model id (safe to try the next candidate). */
     internal fun isModelAccessError(message: String?): Boolean {
         val m = message?.lowercase().orEmpty()
-        return "404" in m || "not found" in m || "not supported" in m || "is not found" in m ||
+        if ("429" in m || "rate limit" in m || "resource_exhausted" in m) return false
+        return "404" in m || "403" in m || "not found" in m || "not supported" in m || "is not found" in m ||
             "does not exist" in m || "invalid model" in m || "model_not_found" in m ||
-            "no longer available" in m || "has been shut down" in m || "deprecated" in m
+            "no longer available" in m || "has been shut down" in m || "deprecated" in m ||
+            "not available" in m || "not enabled" in m || "permission" in m || "not allowed" in m ||
+            "does not have access" in m || "not eligible" in m || "unsupported" in m
     }
 
     /**
@@ -656,22 +730,30 @@ object Ollama {
                                     json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                                 }.getOrNull() ?: err
                                 lastErr = Exception("Google AI Error ($code): $errMsg")
-                                if (!isModelAccessError("$code $errMsg")) {
+                                if (isModelAccessError("$code $errMsg")) {
+                                    rememberFailedModel(cand)
+                                } else {
                                     throw lastErr!!
                                 }
                             }
                         } catch (e: Exception) {
                             lastErr = e
-                            if (!isModelAccessError(e.message)) throw e
+                            if (isModelAccessError(e.message)) {
+                                rememberFailedModel(cand)
+                            } else {
+                                throw e
+                            }
                         }
                     }
                     if (text != null) break
                 }
-                if (text != null && used != null &&
-                    (config.autoPickModel || isRetiredGoogleModel(config.googleModel) || config.googleModel.isBlank()) &&
-                    !used.equals(config.googleModel, true)
-                ) {
-                    config.googleModel = used
+                if (text != null && used != null) {
+                    forgetFailedModel(used)
+                    if ((config.autoPickModel || isRetiredGoogleModel(config.googleModel) || config.googleModel.isBlank() || isFailedModel(config.googleModel)) &&
+                        !used.equals(config.googleModel, true)
+                    ) {
+                        config.googleModel = used
+                    }
                 }
                 text ?: throw (lastErr ?: Exception("Google AI request failed"))
             }
@@ -741,18 +823,28 @@ object Ollama {
                                 json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                             }.getOrNull() ?: err
                             lastErr = Exception("ChatGPT Error ($code): $errMsg")
-                            if (!isModelAccessError("$code $errMsg")) throw lastErr!!
+                            if (isModelAccessError("$code $errMsg")) {
+                                rememberFailedModel(model)
+                            } else {
+                                throw lastErr!!
+                            }
                         }
                     } catch (e: Exception) {
                         lastErr = e
-                        if (!isModelAccessError(e.message)) throw e
+                        if (isModelAccessError(e.message)) {
+                            rememberFailedModel(model)
+                        } else {
+                            throw e
+                        }
                     }
                 }
-                if (text != null && used != null &&
-                    (config.autoPickModel || config.openAiModel.isBlank()) &&
-                    !used.equals(config.openAiModel, true)
-                ) {
-                    config.openAiModel = used
+                if (text != null && used != null) {
+                    forgetFailedModel(used)
+                    if ((config.autoPickModel || config.openAiModel.isBlank() || isFailedModel(config.openAiModel)) &&
+                        !used.equals(config.openAiModel, true)
+                    ) {
+                        config.openAiModel = used
+                    }
                 }
                 text ?: throw (lastErr ?: Exception("ChatGPT request failed"))
             }

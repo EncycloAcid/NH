@@ -13,21 +13,22 @@ class AiDiagnosticsTest {
     @Test fun snapKeepsProviderPicksAndOnlyBlocksExpensiveDefaults() {
         assertEquals("gemini-3.5-flash", Ollama.snapGoogleModel("gemini-3.5-flash"))
         assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-3.5-flash-lite"))
-        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-1.5-pro"))
-        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-1.5-flash"))
-        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-2.0-flash"))
-        assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-3.1-flash-lite-image"))
+        assertEquals("gemini-3.8-flash", Ollama.snapGoogleModel("gemini-1.5-pro"))
+        assertEquals("gemini-3.8-flash", Ollama.snapGoogleModel("gemini-1.5-flash"))
+        assertEquals("gemini-3.8-flash", Ollama.snapGoogleModel("gemini-2.0-flash"))
+        assertEquals("gemini-3.8-flash", Ollama.snapGoogleModel("gemini-3.1-flash-lite-image"))
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o"))
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o-mini"))
         assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))
         assertEquals("llama3.2:1b", Ollama.snapLocalModel("llama3.2:3b"))
     }
     @Test fun autoPickPrefersFreeCheapModelsFromProviderList() {
+        Ollama.clearFailedModels()
         assertEquals(
-            "gemini-3.5-flash-lite",
+            "gemini-3.8-flash",
             Ollama.pickBestModel(
                 "google",
-                listOf("gemini-1.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-4-argon", "gemini-3.8-flash-tts"),
+                listOf("gemini-1.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon", "gemini-3.8-flash-tts"),
             ),
         )
         assertEquals(
@@ -36,17 +37,30 @@ class AiDiagnosticsTest {
         )
         assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai", listOf("gpt-4o", "o1-mini", "gpt-4o-mini")))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama", listOf("llama3.2:1b", "smollm2:135m", "qwen2.5:0.5b")))
-        assertEquals("gemini-3.5-flash-lite", Ollama.pickBestModel("google"))
+        assertEquals("gemini-3.8-flash", Ollama.pickBestModel("google"))
         assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai"))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama"))
         val cfg = OllamaConfig(provider = "google", googleModel = "gemini-1.5-pro", autoPickModel = true)
         assertEquals("gemini-3.1-flash-lite", Ollama.applyAutoPick(cfg, listOf("gemini-3.1-flash-lite", "gemini-1.5-pro", "gemini-2.0-flash")))
         assertEquals("gemini-3.1-flash-lite", cfg.googleModel)
         assertTrue(Ollama.isModelAccessError("Google AI Error (404): models/gemini-1.5-flash is not found"))
+        assertFalse(Ollama.isModelAccessError("Google AI Error (429): Resource exhausted"))
         assertEquals(
-            listOf("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"),
+            listOf("gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
             Ollama.googleGenerateCandidates(OllamaConfig(googleModel = "gemini-1.5-flash")),
         )
+    }
+    @Test fun autoPickSkipsModelsThatAlreadyFailedForThisKey() {
+        Ollama.clearFailedModels()
+        Ollama.rememberFailedModel("gemini-3.8-flash")
+        Ollama.rememberFailedModel("gemini-3.6-flash")
+        assertEquals("gemini-3.5-flash-lite", Ollama.pickBestModel("google"))
+        assertEquals(
+            listOf("gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
+            Ollama.googleGenerateCandidates(OllamaConfig(googleModel = "gemini-3.8-flash")),
+        )
+        Ollama.clearFailedModels()
+        assertEquals("gemini-3.8-flash", Ollama.pickBestModel("google"))
     }
     @Test fun fetchedModelMenuIsCategorizedWithPrices() {
         val ids = listOf(
