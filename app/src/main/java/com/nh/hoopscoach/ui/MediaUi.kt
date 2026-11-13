@@ -398,8 +398,8 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                     articleGame?.let { g ->
                         Column(Modifier.fillMaxWidth().padding(top = 12.dp).border(0.75.dp, faded.copy(alpha = 0.3f)).padding(12.dp)) {
                             Text("FINAL${if (g.ot > 0) " · OT" else ""} · Current records", style = T.small, color = faded)
-                            Text("${lg.team(g.away).name} (${lg.team(g.away).record})  ${g.aws}", style = T.bodyB, color = ink)
-                            Text("${lg.team(g.home).name} (${lg.team(g.home).record})  ${g.hs}", style = T.bodyB, color = ink)
+                            Text("AWAY · ${lg.team(g.away).name} (${lg.team(g.away).record})  ${g.aws}", style = if (g.aws > g.hs) T.bodyB else T.body, color = ink)
+                            Text("HOME · ${lg.team(g.home).name} (${lg.team(g.home).record})  ${g.hs}", style = if (g.hs > g.aws) T.bodyB else T.body, color = ink)
                         }
                     }
                     if (articleBody.isNotEmpty()) {

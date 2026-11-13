@@ -64,12 +64,11 @@ class AiBadgeTest {
 
     @Test fun previewStoryUsesItsOwnAiFlagNotEnabledProvider() {
         GameViewModel.autoLoad = false
-        Rng.r = Random(41)
-        val lg = Offseason.newGame(5, "Test", "Coach")
+        val (lg, article) = ArticleFixture.league()
         lg.ollama.enabled = true
         val vm = GameViewModel(ApplicationProvider.getApplicationContext())
         vm.install(lg)
-        val story = Story("Forecast", "A verified subject", com.nh.hoopscoach.game.ArticleWriting.news(lg, News(lg.season, lg.day, "${lg.user.name}: the outlook", teamId = lg.userTeamId)), lg.userTeamId, aiProvider = "Google Gemini")
+        val story = Story("Game story", article.text, ArticleFixture.aiStory(), lg.userTeamId, aiProvider = "Google Gemini")
         rule.activity.setContent { HoopsTheme { StoryCard(vm, lg, story, 0, false) } }
         rule.onNodeWithContentDescription("AI-generated").assertIsDisplayed()
     }

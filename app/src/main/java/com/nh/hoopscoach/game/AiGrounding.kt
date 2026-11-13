@@ -15,6 +15,7 @@ data class AiFactSheet(
     val preview: Boolean = false,
     val upcoming: Boolean = false,
     val entityAliases: Map<String, String> = emptyMap(),
+    val acronyms: Set<String> = emptySet(),
 )
 
 object AiFacts {
@@ -68,8 +69,14 @@ object AiFacts {
                 names += aliases(h); names += aliases(a)
                 appendLine("RESULT day ${g.day}: ${h.name} ${g.hs}-${g.aws} ${a.name}; winner ${lg.team(g.winner()).name}; ${g.type.name} ${g.label}.")
                 g.box?.let { b -> (b.home + b.away).filter { line -> featured.any { it.id == line.pid } }.forEach { line ->
-                    appendLine("BOX ${line.name}: ${line.s.pts} PTS, ${line.s.reb} REB, ${line.s.ast} AST, ${line.s.stl} STL, ${line.s.blk} BLK, ${line.s.tov} TOV.")
+                    appendLine("BOX ${line.name}: ${line.s.pts} PTS, ${line.s.reb} REB, ${line.s.ast} AST, ${line.s.stl} STL, ${line.s.blk} BLK, ${line.s.tov} TOV, ${line.s.fgm} FGM, ${line.s.fga} FGA.")
                 } }
+                g.box?.let { b ->
+                    listOf(h to b.home, a to b.away).forEach { (team, lines) ->
+                        appendLine("TEAM BOX ${team.name}: ${lines.sumOf { it.s.fgm }} FGM, ${lines.sumOf { it.s.fga }} FGA, ${lines.sumOf { it.s.ast }} AST.")
+                    }
+                    b.halves.forEachIndexed { index, scores -> if (scores.size >= 2) appendLine("PERIOD ${index + 1}: ${h.name} ${scores[0]}, ${a.name} ${scores[1]}.") }
+                }
                 featured.forEach { p -> p.log.lastOrNull { it.gameId == g.id }?.let { l ->
                     appendLine("GAME LINE ${p.name}: ${l.pts} PTS, ${l.reb} REB, ${l.ast} AST, ${l.stl} STL, ${l.blk} BLK, ${l.tov} TOV, ${l.min} MIN.")
                 } }
@@ -92,12 +99,14 @@ object AiFacts {
             if (extra.isNotBlank()) appendLine("EVENT FACTS: $extra")
         }
         val shortNames = mutableMapOf<String, String>()
-        teams.filter { t -> t.mascot.length > 2 && lg.teams.count { it.mascot.equals(t.mascot, true) } == 1 }.forEach { shortNames[it.mascot] = it.name }
+        teams.filter { t -> t.mascot.length > 2 && teams.count { it.mascot.equals(t.mascot, true) } == 1 }.forEach { shortNames[it.mascot] = it.name }
         featured.forEach { p ->
             val last = p.name.substringAfterLast(' ')
-            if (last.length > 2 && population.count { it.name.substringAfterLast(' ').equals(last, true) } == 1 && lg.coaches.none { it.name.substringAfterLast(' ').equals(last, true) }) shortNames[last] = p.name
+            if (last.length > 2 && featured.count { it.name.substringAfterLast(' ').equals(last, true) } == 1 && teams.none { lg.coachOf(it).name.substringAfterLast(' ').equals(last, true) } && names.none { it.equals(last, true) }) shortNames[last] = p.name
         }
-        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames)
+        val properNames = lg.teams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + lg.coaches.map { it.name }
+        val acronyms = lg.teams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
+        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms)
     }
 
     fun version(lg: League): String {
@@ -113,6 +122,8 @@ object AiFacts {
 }
 
 object AiGrounding {
+    private fun entityLabel(name: String) = com.nh.hoopscoach.CrashReporter.redact(name)
+        .replace(Regex("[\\p{Cntrl}\\p{Cf}]"), " ").replace(Regex("\\s+"), " ").trim().take(80)
     val instructions = """Use ONLY the fact sheet for names, statistics, records, scores, injuries, history and events. Do not invent play sequences, quotes, reactions, medical advice, contract demands or transactions. Missing information is unknown: omit it. Distinguish previous-season statistics, current records and simulated forecasts. Never present forecasts as results or certainties. Use the stated phase, not a real-world calendar assumption. Use sentence case, full supplied player/team names, digits for numbers and exact supplied numeric formatting. Do not introduce other named people or teams (including player comparisons). Use Staff for a reporter and Courtside Report for an outlet. Keep the requested output fields. Fictional player/coach dialogue may express opinions or intentions, but must not invent factual events. Never mention simulations, assumptions or rosters in the copy; describe players, projections and games directly."""
     private val number = Regex("(?<![\\p{L}\\d])\\d+(?:\\.\\d+)?%?")
     private val pair = Regex("\\b(\\d{1,3})\\s*[-–—]\\s*(\\d{1,3})\\b")
@@ -187,8 +198,9 @@ object AiGrounding {
         val known = facts.names.sortedByDescending { it.length }
         var residue = content
         known.forEach { name -> residue = residue.replace(Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])"), "entity") }
-        facts.allNames.filter { it !in facts.names && it.length > 3 && residue.contains(it, ignoreCase = true) }.forEach { name ->
-            if (Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(residue)) errors += "entity outside fact sheet"
+        facts.allNames.filter { it !in facts.names && it.length > 3 && residue.contains(it, ignoreCase = it !in facts.acronyms) }.forEach { name ->
+            val caseFlag = if (name in facts.acronyms) "" else "(?i)"
+            if (Regex("$caseFlag(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(residue)) errors += "entity outside fact sheet: ${entityLabel(name)}"
         }
         val common = setOf("Final Four", "Sweet Sixteen", "Sweet Sixteen", "Elite Eight", "Head Coach", "Coach", "Game Winner", "The Favorite", "New Era", "Courtside Report", "National Championship", "March Madness", "All America", "Most Valuable Player", "First Team", "Second Team", "Third Team", "Staff", "Hot Seat")
         common.sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
@@ -196,9 +208,9 @@ object AiGrounding {
         val headers = residue.lines().filter { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
         val firstNames = facts.allNames.map { it.substringBefore(' ') }.toSet()
         val properName = Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b")
-        if (properName.containsMatchIn(prose) || properName.findAll(headers).any { it.value.substringBefore(' ') in firstNames }) errors += "unknown proper name"
+        (properName.findAll(prose) + properName.findAll(headers).filter { it.value.substringBefore(' ') in firstNames }).take(3).forEach { errors += "unknown proper name: ${entityLabel(it.value)}" }
         val subjects = setOf("He", "She", "It", "This", "That", "There", "They", "We", "What", "Who", "Basketball", "March", "April", "Defense", "Offense", "Depth", "Availability", "Continuity", "Nothing", "Everyone", "Nobody", "Something")
-        if (Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).any { it.groupValues[1] !in subjects }) errors += "unknown named subject"
+        Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).filter { it.groupValues[1] !in subjects }.take(3).forEach { errors += "unknown named subject: ${entityLabel(it.groupValues[1])}" }
         val lower = content.lowercase(Locale.US)
         if ((facts.preseason || facts.preview || facts.upcoming) && Regex("\\b(tonight's win|tonight's loss|won tonight|lost tonight|just defeated|clinched|eliminated|advanced to|celebrated the win)\\b").containsMatchIn(lower)) errors += "result claimed before event"
         if (facts.phase == Phase.OFFSEASON && Regex("\\b(tonight's game|tonight's win|tonight's loss|tomorrow's game)\\b").containsMatchIn(lower)) errors += "wrong season phase"

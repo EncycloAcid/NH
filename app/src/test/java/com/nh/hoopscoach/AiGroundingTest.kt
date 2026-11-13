@@ -23,6 +23,25 @@ import java.util.zip.GZIPOutputStream
 import kotlin.random.Random
 
 class AiGroundingTest {
+    @Test fun ordinaryWordsAreNotForeignAcronymsButActualTeamsStillFail() {
+        val (lg, n) = ArticleFixture.league()
+        val g = lg.games.first()
+        val facts = AiFacts.build(lg, "${lg.user.name} ${lg.team(g.away).name}", com.nh.hoopscoach.game.ArticleWriting.game(lg, g), eventGame = g)
+        assertFalse(facts.names.contains("LONG"))
+        assertTrue(AiGrounding.validate("Duke will not have long to wait.", facts).isEmpty())
+        assertTrue(AiGrounding.validate("LONG will not have long to wait.", facts).any { it == "entity outside fact sheet: LONG" })
+        assertTrue(AiGrounding.validate("longwood will not have long to wait.", facts).any { it == "entity outside fact sheet: Longwood" })
+    }
+
+    @Test fun offendingEntityDiagnosticsRedactSecretsAndControlCharacters() {
+        val lg = league()
+        val secret = "sk-fakecredentialabcdefghijk"
+        val entity = "Other Club\n$secret"
+        val facts = AiFacts.build(lg, lg.user.name).copy(allNames = setOf(entity))
+        val errors = AiGrounding.validate("$entity plays basketball.", facts)
+        assertTrue(errors.any { it.contains("entity outside fact sheet: Other Club [redacted]") })
+        assertTrue(errors.none { it.contains(secret) || it.contains('\n') })
+    }
     private fun league() = LeagueGen.newLeague().also { lg ->
         lg.day = 10
         lg.user.w = 7; lg.user.l = 3

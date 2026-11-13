@@ -48,7 +48,7 @@ class AiProviderGroundingTest {
                     while (offset < length) { val n = input.read(body, offset, length - offset); check(n > 0); offset += n }
                     requests += body.toString(Charsets.UTF_8)
                     val call = calls.incrementAndGet()
-                    val text = if (validSecond && call == 2) ArticleWriting.news(lg, news) else "Unknown Person scored 999 points."
+                    val text = if (validSecond && call == 2) ArticleFixture.aiStory() else "Unknown Person scored 999 points."
                     val payload = JsonObject(mapOf("response" to JsonPrimitive(text), "done" to JsonPrimitive(true))).toString().toByteArray()
                     socket.getOutputStream().apply {
                         write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n".toByteArray())
@@ -60,8 +60,8 @@ class AiProviderGroundingTest {
         try {
             val config = OllamaConfig(enabled = true, host = "http://127.0.0.1:${server.localPort}", model = "test-small", cacheResponses = false)
             val result = Ollama.generateArticle(config, lg, news)
-            assertEquals(ArticleWriting.news(lg, news), result.getOrThrow().text)
             assertTrue(result.getOrThrow().fallbackReason, result.getOrThrow().isAi)
+            assertEquals(ArticleFixture.aiStory(), result.getOrThrow().text)
             assertEquals(2, calls.get())
             assertTrue(requests.all { it.contains("FACT SHEET") && it.contains("current record 7-3") })
             assertTrue(requests.last().contains("previous draft was rejected"))

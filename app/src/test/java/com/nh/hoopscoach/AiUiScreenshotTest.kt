@@ -86,7 +86,7 @@ class AiUiScreenshotTest {
         star.career.removeAll { it.season == lg.season - 1 }
         star.career += SeasonLine(lg.season - 1, lg.user.school, lg.conf(lg.user.confId).name, 3, star.ovr,
             StatLine(gp = 30, pts = 510, orb = 18, drb = 114, ast = 138), teamId = lg.userTeamId)
-        val fullStory = ArticleWriting.news(lg, article)
+        val fullStory = if (isAi) ArticleFixture.aiStory() else ArticleWriting.news(lg, article)
         lg.news += News(lg.season, lg.day, article.text, gameId = article.gameId,
             source = if (isAi) "Baseline Sports · Google Gemini" else "Game-written · Baseline Sports", teamId = lg.userTeamId, pid = star.id, kind = "article", aiLabeled = isAi,
             body = fullStory, aiFallbackReason = if (isAi) "" else "Gemini requires an API key. Configure it in AI settings.")
@@ -95,6 +95,8 @@ class AiUiScreenshotTest {
         rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, lg.news.lastIndex) } }
         rule.onNodeWithText(lg.news.last().text).assertIsDisplayed()
         rule.onAllNodesWithContentDescription("AI-generated").assertCountEquals(if (isAi) 1 else 0)
+        rule.onNodeWithText("AWAY · ${lg.team(lg.games.first().away).name} (6-4)  86").assertIsDisplayed()
+        rule.onNodeWithText("HOME · ${lg.user.name} (7-3)  90").assertIsDisplayed()
         shot("article-$mode")
         rule.onNodeWithText(fullStory.split("\n\n")[2]).performScrollTo().assertIsDisplayed()
         shot("story-middle-$mode")

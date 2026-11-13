@@ -39,7 +39,9 @@ object AiTemplates {
             val year = when (p.year) { 1 -> "freshman"; 2 -> "sophomore"; 3 -> "junior"; else -> "senior" }
             append(if (lg.pro) "${p.name}, ${p.age}, plays $position for $name. " else "${p.name}, a ${if (p.cls.startsWith("RS")) "redshirt " else ""}$year $position, heads into ${lg.season} with $name. ")
             p.career.lastOrNull { it.season == lg.season - 1 && it.s.gp > 0 }?.let { y ->
-                append("Last season, ${p.name} averaged ${f1(y.s.ppg)} points, ${f1(y.s.rpg)} rebounds and ${f1(y.s.apg)} assists in ${y.s.gp} games. ")
+                val production = listOfNotNull(y.s.ppg.takeIf { it > 0 }?.let { "${f1(it)} points" }, y.s.rpg.takeIf { it > 0 }?.let { "${f1(it)} rebounds" }, y.s.apg.takeIf { it > 0 }?.let { "${f1(it)} assists" })
+                val line = if (production.size > 1) production.dropLast(1).joinToString(", ") + " and " + production.last() else production.firstOrNull().orEmpty()
+                append(if (production.isEmpty()) "Last season, ${p.last} appeared in ${y.s.gp} games. " else "Last season, ${p.last} averaged $line in ${y.s.gp} games. ")
             }
         }
         if (lg.pro) lg.proState?.preview?.takeIf { it.season == lg.season }?.proj?.get(t.id)?.let { p ->
@@ -49,7 +51,7 @@ object AiTemplates {
             pv.odds[t.id]?.let { o -> append("The win range is ${o.lo}-${o.hi}, with a ${PreviewWriting.percent(o.ncaa)} chance of an NCAA bid and a ${PreviewWriting.percent(o.title)} title chance. ") }
         }
         newcomer(lg, t)?.takeIf { it.id != star?.id }?.let { p ->
-            append("${p.name} joins the group at ${p.posLabel}${if (p.recruitRank > 0) " as the No. ${p.recruitRank} recruit" else ""}. ")
+            append("${p.name} joins $name at ${p.posLabel}${if (p.recruitRank > 0) " as the No. ${p.recruitRank} recruit" else ""}. ")
         }
         if (newcomer(lg, t) == null) departure(lg, t)?.let { p ->
             val s = p.career.last { it.season == lg.season - 1 && it.teamId == t.id }.s
