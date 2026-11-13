@@ -36,13 +36,24 @@ object AiDiagnostics {
     fun setupHint(config: OllamaConfig): String = when (config.provider.lowercase()) {
         "google" -> if (config.googleApiKey.isBlank()) "Gemini requires an API key. Email/password or browser sign-in cannot authorize this app." else "Gemini uses your API key and selected model; API access and quota are separate from a Google account."
         "openai" -> if (config.openAiApiKey.isBlank()) "OpenAI requires an API key. A ChatGPT login or subscription does not authorize API requests." else "OpenAI uses your API key; API billing and quota are separate from ChatGPT."
+        "anthropic" -> if (config.anthropicApiKey.isBlank()) "Claude requires an Anthropic API key from console.anthropic.com. Account login does not authorize this app." else "Claude uses your Anthropic API key; billing and quota are separate from claude.ai chat."
+        "groq" -> if (config.groqApiKey.isBlank()) "Groq requires an API key from console.groq.com." else "Groq uses your API key with a generous free tier for Llama and Gemma models."
+        "deepseek" -> if (config.deepseekApiKey.isBlank()) "DeepSeek requires an API key from platform.deepseek.com." else "DeepSeek uses your API key; chat is cheap for dynasty copy."
         else -> "Ollama must run separately. Localhost means this phone, not your computer. Use the computer's LAN IP and port 11434 on the same network; bind Ollama to that LAN address and allow the port through its firewall. 10.0.2.2 is emulator-only."
     }
     fun networkReason(error: Throwable?, config: OllamaConfig): String {
         if (listOf("token limit", "Incomplete model stream", "incomplete or filtered").any { error?.message?.contains(it, true) == true }) return "Model response was cut off or blocked before completion. Used complete game-written coverage."
         if (error?.message?.contains("no compatible text models", true) == true) return "Provider lists no compatible text models. Check API access or enter a supported model ID manually."
         if (error?.message?.contains("fact sheet exceeds", true) == true) return "The report exceeds the local model context budget. Use a cloud model or a smaller report."
-        if ((config.provider == "google" && config.googleApiKey.isBlank()) || (config.provider == "openai" && config.openAiApiKey.isBlank())) return setupHint(config)
+        val missingKey = when (config.provider.lowercase()) {
+            "google" -> config.googleApiKey.isBlank()
+            "openai" -> config.openAiApiKey.isBlank()
+            "anthropic" -> config.anthropicApiKey.isBlank()
+            "groq" -> config.groqApiKey.isBlank()
+            "deepseek" -> config.deepseekApiKey.isBlank()
+            else -> false
+        }
+        if (missingKey) return setupHint(config)
         val code = Regex("\\b(400|401|403|404|408|429|500|502|503|504)\\b").find(error?.message.orEmpty())?.value
         return when (code) {
             "401", "403" -> "Provider rejected API access (HTTP $code). Check the API key and permissions."
