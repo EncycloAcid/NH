@@ -1721,7 +1721,8 @@ fun AiNarrativeControlsA(
     onTestStatus: (String) -> Unit,
     onTestSuccess: (Boolean) -> Unit,
 ) {
-
+        val cfg = lg.ollama
+        val showEta = cfg.showAiWriteEta
         Spacer(Modifier.height(14.dp))
         Text("FINE NARRATIVE CONTROLS", style = T.label.copy(fontSize = 10.sp), color = P.accent)
         Spacer(Modifier.height(4.dp))
@@ -1730,100 +1731,70 @@ fun AiNarrativeControlsA(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Postgame press conferences", style = T.bodyB, color = P.ink)
-                Text("AI writes contextual podium questions & player quotes.", style = T.small, color = P.sub)
+                Text("Show write-time estimates", style = T.bodyB, color = P.ink)
+                Text(
+                    "Show how long each AI writing desk usually takes with ${cfg.providerDisplayName}.",
+                    style = T.small,
+                    color = P.sub,
+                )
             }
-            AppSwitch(lg.ollama.pressConference, { on -> vm.act { it.ollama.pressConference = on } })
+            AppSwitch(showEta, { on -> vm.act { it.ollama.showAiWriteEta = on } })
         }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI player interviews", style = T.bodyB, color = P.ink)
-                Text("After games, players answer in character — personality, performance, confidence, and coach bond.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.playerInterviews, { on -> vm.act { it.ollama.playerInterviews = on } })
+        if (showEta) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                AiWriteEta.totalLabel(
+                    cfg,
+                    listOf(
+                        AiWriteEta.Desk(cfg.pressConference, AiWriteSize.SHORT),
+                        AiWriteEta.Desk(cfg.playerInterviews, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.socialFeed, AiWriteSize.SHORT),
+                        AiWriteEta.Desk(cfg.gameRecaps, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.sportsJournalism, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.livingCoachingCareers, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.historicMoments, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.playerStorylines, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.draftUniverse, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.tradeRumors, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.scoutingKeys, AiWriteSize.SHORT),
+                        AiWriteEta.Desk(cfg.draftScouting, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.injuryReports, AiWriteSize.SHORT),
+                        AiWriteEta.Desk(cfg.awardCeremonies, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.halftimeSpeeches, AiWriteSize.SHORT),
+                        AiWriteEta.Desk(cfg.playerDevelopment, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.playerPersonalities, AiWriteSize.HEAVY),
+                        AiWriteEta.Desk(cfg.championshipCelebrations, AiWriteSize.LONG),
+                        AiWriteEta.Desk(!lg.pro && cfg.recruitingPitches, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.pregameRivalries, AiWriteSize.MEDIUM),
+                        AiWriteEta.Desk(cfg.historicalRivalries, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.universityDevelopment, AiWriteSize.LONG),
+                        AiWriteEta.Desk(cfg.mediaEcosystem, AiWriteSize.HEAVY),
+                        AiWriteEta.Desk(cfg.freeAgencyBuzz, AiWriteSize.MEDIUM),
+                    ),
+                ),
+                style = T.small.copy(fontSize = 11.sp),
+                color = P.accent,
+            )
+            Text(
+                "Estimates assume one desk at a time. Cached reloads are instant.",
+                style = T.small.copy(fontSize = 10.sp),
+                color = P.sub,
+            )
         }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Social media hot takes", style = T.bodyB, color = P.ink)
-                Text("AI generates analyst, fan, and hater takes on your feed.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.socialFeed, { on -> vm.act { it.ollama.socialFeed = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Beat writer recaps & coach quotes", style = T.bodyB, color = P.ink)
-                Text("AI writes game reports and postgame locker room quotes.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.gameRecaps, { on -> vm.act { it.ollama.gameRecaps = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI sports journalism desk", style = T.bodyB, color = P.ink)
-                Text("Headlines, hot takes, rankings debates, and recruiting/trade rumors from real results.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.sportsJournalism, { on -> vm.act { it.ollama.sportsJournalism = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI living coaching careers", style = T.bodyB, color = P.ink)
-                Text("Reputations, hot seats, job offers, coaching rivalries, and multi-school legacies from real results.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.livingCoachingCareers, { on -> vm.act { it.ollama.livingCoachingCareers = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI court storms & historic moments", style = T.bodyB, color = P.ink)
-                Text("Upsets, buzzer-beaters, rivalry wins, championships, and heartbreaking exits from real games.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.historicMoments, { on -> vm.act { it.ollama.historicMoments = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI player storylines", style = T.bodyB, color = P.ink)
-                Text("Bench-to-star leaps, blue-chip heat checks, and walk-on heroes from real production.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.playerStorylines, { on -> vm.act { it.ollama.playerStorylines = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI NBA draft universe", style = T.bodyB, color = P.ink)
-                Text("Prospect stock, workout profiles, draft-night surprises, and former players' pro careers.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.draftUniverse, { on -> vm.act { it.ollama.draftUniverse = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Trade deadline rumors & grades", style = T.bodyB, color = P.ink)
-                Text("AI writes insider scoops and grades completed trades.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.tradeRumors, { on -> vm.act { it.ollama.tradeRumors = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Tactical pregame scouting keys", style = T.bodyB, color = P.ink)
-                Text("AI writes keys to victory based on opponent matchups.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Draft prospect scouting & pro comparisons", style = T.bodyB, color = P.ink)
-                Text("AI scouts draft prospects with player grades and pro comparisons.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.draftScouting, { on -> vm.act { it.ollama.draftScouting = on } })
-        }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
+
+        AiWriteOptionRow("Postgame press conferences", "AI writes contextual podium questions & player quotes.", cfg.pressConference, { on -> vm.act { it.ollama.pressConference = on } }, showEta, cfg, AiWriteSize.SHORT)
+        AiWriteOptionRow("AI player interviews", "After games, players answer in character — personality, performance, confidence, and coach bond.", cfg.playerInterviews, { on -> vm.act { it.ollama.playerInterviews = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("Social media hot takes", "AI generates analyst, fan, and hater takes on your feed.", cfg.socialFeed, { on -> vm.act { it.ollama.socialFeed = on } }, showEta, cfg, AiWriteSize.SHORT)
+        AiWriteOptionRow("Beat writer recaps & coach quotes", "AI writes game reports and postgame locker room quotes.", cfg.gameRecaps, { on -> vm.act { it.ollama.gameRecaps = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI sports journalism desk", "Headlines, hot takes, rankings debates, and recruiting/trade rumors from real results.", cfg.sportsJournalism, { on -> vm.act { it.ollama.sportsJournalism = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI living coaching careers", "Reputations, hot seats, job offers, coaching rivalries, and multi-school legacies from real results.", cfg.livingCoachingCareers, { on -> vm.act { it.ollama.livingCoachingCareers = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI court storms & historic moments", "Upsets, buzzer-beaters, rivalry wins, championships, and heartbreaking exits from real games.", cfg.historicMoments, { on -> vm.act { it.ollama.historicMoments = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("AI player storylines", "Bench-to-star leaps, blue-chip heat checks, and walk-on heroes from real production.", cfg.playerStorylines, { on -> vm.act { it.ollama.playerStorylines = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI NBA draft universe", "Prospect stock, workout profiles, draft-night surprises, and former players' pro careers.", cfg.draftUniverse, { on -> vm.act { it.ollama.draftUniverse = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("Trade deadline rumors & grades", "AI writes insider scoops and grades completed trades.", cfg.tradeRumors, { on -> vm.act { it.ollama.tradeRumors = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("Tactical pregame scouting keys", "AI writes keys to victory based on opponent matchups.", cfg.scoutingKeys, { on -> vm.act { it.ollama.scoutingKeys = on } }, showEta, cfg, AiWriteSize.SHORT)
+        AiWriteOptionRow("Draft prospect scouting & pro comparisons", "AI scouts draft prospects with player grades and pro comparisons.", cfg.draftScouting, { on -> vm.act { it.ollama.draftScouting = on } }, showEta, cfg, AiWriteSize.LONG)
 }
 
 @Composable
@@ -1836,51 +1807,19 @@ fun AiNarrativeControlsB(
     onTestStatus: (String) -> Unit,
     onTestSuccess: (Boolean) -> Unit,
 ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Injury medical outlooks & recovery", style = T.bodyB, color = P.ink)
-                Text("AI medical staff evaluates injury severity and next-man-up tactical outlooks.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.injuryReports, { on -> vm.act { it.ollama.injuryReports = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Award ceremony speeches & tributes", style = T.bodyB, color = P.ink)
-                Text("AI writes acceptance speeches and columnist tributes for major award winners.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.awardCeremonies, { on -> vm.act { it.ollama.awardCeremonies = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Halftime locker room speeches", style = T.bodyB, color = P.ink)
-                Text("AI delivers locker room addresses and second-half tactical adjustments.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.halftimeSpeeches, { on -> vm.act { it.ollama.halftimeSpeeches = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Training camp player progression", style = T.bodyB, color = P.ink)
-                Text("AI breaks down camp standouts and season team projections.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI player personalities", style = T.bodyB, color = P.ink)
-                Text("Confident scorers hunt tough shots; unselfish players kick to open teammates. AI assigns styles + scout notes.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.playerPersonalities, { on -> vm.act { it.ollama.playerPersonalities = on } })
-        }
-        if (lg.ollama.playerPersonalities) {
-            Spacer(Modifier.height(8.dp))
+        val cfg = lg.ollama
+        val showEta = cfg.showAiWriteEta
+        AiWriteOptionRow("Injury medical outlooks & recovery", "AI medical staff evaluates injury severity and next-man-up tactical outlooks.", cfg.injuryReports, { on -> vm.act { it.ollama.injuryReports = on } }, showEta, cfg, AiWriteSize.SHORT)
+        AiWriteOptionRow("Award ceremony speeches & tributes", "AI writes acceptance speeches and columnist tributes for major award winners.", cfg.awardCeremonies, { on -> vm.act { it.ollama.awardCeremonies = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("Halftime locker room speeches", "AI delivers locker room addresses and second-half tactical adjustments.", cfg.halftimeSpeeches, { on -> vm.act { it.ollama.halftimeSpeeches = on } }, showEta, cfg, AiWriteSize.SHORT)
+        AiWriteOptionRow("Training camp player progression", "AI breaks down camp standouts and season team projections.", cfg.playerDevelopment, { on -> vm.act { it.ollama.playerDevelopment = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("AI player personalities", "Confident scorers hunt tough shots; unselfish players kick to open teammates. AI assigns styles + scout notes.", cfg.playerPersonalities, { on -> vm.act { it.ollama.playerPersonalities = on } }, showEta, cfg, AiWriteSize.HEAVY)
+        if (cfg.playerPersonalities) {
             SecondaryButton(
-                if (testing) "Assigning personalities…" else "Assign AI personalities to my roster",
+                if (testing) "Assigning personalities…" else "Assign AI personalities to my roster" +
+                    if (showEta) "  ·  ${AiWriteEta.chip(cfg, AiWriteSize.HEAVY)}" else "",
                 Modifier.fillMaxWidth(),
-                enabled = !testing && lg.ollama.enabled,
+                enabled = !testing && cfg.enabled,
             ) {
                 onTesting(true)
                 onTestStatus("Scouting on-court personalities…")
@@ -1899,70 +1838,22 @@ fun AiNarrativeControlsB(
                     }
                 }
             }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Championship celebrations & Finals MVP", style = T.bodyB, color = P.ink)
-                Text("AI writes champagne celebrations, trophy ceremonies, and Finals MVP speeches.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.championshipCelebrations, { on -> vm.act { it.ollama.championshipCelebrations = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        if (!lg.pro) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("College recruiting pitch letters", style = T.bodyB, color = P.ink)
-                    Text("AI drafts custom coach pitch letters targeting recruits' specific priorities.", style = T.small, color = P.sub)
-                }
-                AppSwitch(lg.ollama.recruitingPitches, { on -> vm.act { it.ollama.recruitingPitches = on } })
-            }
             Spacer(Modifier.height(8.dp))
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Pregame rivalry previews & bad blood", style = T.bodyB, color = P.ink)
-                Text("AI writes high-stakes pregame buildup and bulletin-board quotes.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.pregameRivalries, { on -> vm.act { it.ollama.pregameRivalries = on } })
+        AiWriteOptionRow("Championship celebrations & Finals MVP", "AI writes champagne celebrations, trophy ceremonies, and Finals MVP speeches.", cfg.championshipCelebrations, { on -> vm.act { it.ollama.championshipCelebrations = on } }, showEta, cfg, AiWriteSize.LONG)
+        if (!lg.pro) {
+            AiWriteOptionRow("College recruiting pitch letters", "AI drafts custom coach pitch letters targeting recruits' specific priorities.", cfg.recruitingPitches, { on -> vm.act { it.ollama.recruitingPitches = on } }, showEta, cfg, AiWriteSize.MEDIUM)
         }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI historical rivalries", style = T.bodyB, color = P.ink)
-                Text("Programs, coaches, players, and fans accumulate history — including rivalries that emerge from the schedule.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.historicalRivalries, { on -> vm.act { it.ollama.historicalRivalries = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI university development", style = T.bodyB, color = P.ink)
-                Text("Arenas, training centers, recruiting infrastructure, and national brand — from real budgets and upgrades.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.universityDevelopment, { on -> vm.act { it.ollama.universityDevelopment = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("AI living media ecosystem", style = T.bodyB, color = P.ink)
-                Text("Breaking news, analyst debates, fan arguments, recruiting rumors, coach barbs, player social posts, and poll reactions — from real events.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.mediaEcosystem, { on -> vm.act { it.ollama.mediaEcosystem = on } })
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Free agency rumors & contract demands", style = T.bodyB, color = P.ink)
-                Text("AI writes insider scoops on expiring contracts and max contract pursuits.", style = T.small, color = P.sub)
-            }
-            AppSwitch(lg.ollama.freeAgencyBuzz, { on -> vm.act { it.ollama.freeAgencyBuzz = on } })
-        }
-        Spacer(Modifier.height(12.dp))
+        AiWriteOptionRow("Pregame rivalry previews & bad blood", "AI writes high-stakes pregame buildup and bulletin-board quotes.", cfg.pregameRivalries, { on -> vm.act { it.ollama.pregameRivalries = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        AiWriteOptionRow("AI historical rivalries", "Programs, coaches, players, and fans accumulate history — including rivalries that emerge from the schedule.", cfg.historicalRivalries, { on -> vm.act { it.ollama.historicalRivalries = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI university development", "Arenas, training centers, recruiting infrastructure, and national brand — from real budgets and upgrades.", cfg.universityDevelopment, { on -> vm.act { it.ollama.universityDevelopment = on } }, showEta, cfg, AiWriteSize.LONG)
+        AiWriteOptionRow("AI living media ecosystem", "Breaking news, analyst debates, fan arguments, recruiting rumors, coach barbs, player social posts, and poll reactions — from real events.", cfg.mediaEcosystem, { on -> vm.act { it.ollama.mediaEcosystem = on } }, showEta, cfg, AiWriteSize.HEAVY)
+        AiWriteOptionRow("Free agency rumors & contract demands", "AI writes insider scoops on expiring contracts and max contract pursuits.", cfg.freeAgencyBuzz, { on -> vm.act { it.ollama.freeAgencyBuzz = on } }, showEta, cfg, AiWriteSize.MEDIUM)
+        Spacer(Modifier.height(4.dp))
         Text("DEFAULT BEAT WRITER ANGLE", style = T.label.copy(fontSize = 10.sp), color = P.accent)
         Spacer(Modifier.height(4.dp))
         val angleOptions = listOf("balanced" to "Balanced", "tactical" to "Tactical", "beat" to "Beat", "skeptic" to "Skeptic", "dual" to "Dual")
-        val curAngleIdx = angleOptions.indexOfFirst { it.first == lg.ollama.defaultStoryAngle }.coerceAtLeast(0)
+        val curAngleIdx = angleOptions.indexOfFirst { it.first == cfg.defaultStoryAngle }.coerceAtLeast(0)
         Segmented(angleOptions.map { it.second }, curAngleIdx, { idx ->
             vm.act { it.ollama.defaultStoryAngle = angleOptions[idx].first }
         }, scroll = true, inset = false)
