@@ -214,20 +214,22 @@ class OllamaTest {
     @Test
     fun testCloudModelPresets() {
         assertTrue("Google models list should not be empty", Ollama.GOOGLE_MODELS.isNotEmpty())
-        val flash15 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-1.5-flash" }
-        assertTrue("Gemini 1.5 Flash exists", flash15 != null)
-        assertTrue("Has recommended tag", flash15!!.tag.contains("Recommended"))
+        val lite35 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.5-flash-lite" }
+        assertTrue("Gemini 3.5 Flash-Lite exists", lite35 != null)
+        assertTrue("Has recommended tag", lite35!!.tag.contains("Recommended"))
 
-        val flash20 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-2.0-flash" }
-        assertTrue("Gemini 2.0 Flash exists", flash20 != null)
+        val flash38 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.8-flash" }
+        assertTrue("Gemini 3.8 Flash exists", flash38 != null)
+        assertTrue("Retired Gemini 1.5/2.0 must not be curated", Ollama.GOOGLE_MODELS.none { it.id.startsWith("gemini-1.") || it.id.startsWith("gemini-2.0") })
 
         assertTrue("OpenAI models list should not be empty", Ollama.OPENAI_MODELS.isNotEmpty())
         val gpt4oMini = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-4o-mini" }
         assertTrue("GPT-4o mini exists", gpt4oMini != null)
         assertTrue("Has recommended tag", gpt4oMini!!.tag.contains("Recommended"))
 
-        val gpt4o = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-4o" }
-        assertTrue("GPT-4o exists", gpt4o != null)
+        val gpt35 = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-3.5-turbo" }
+        assertTrue("GPT-3.5 Turbo exists", gpt35 != null)
+        assertTrue("Flagship gpt-4o stays out of cheap Settings shortlist", Ollama.OPENAI_MODELS.none { it.id == "gpt-4o" })
     }
 
     @Test
@@ -235,7 +237,7 @@ class OllamaTest {
         val lg = LeagueGen.newLeague()
         assertEquals("ollama", lg.ollama.provider)
         assertEquals("", lg.ollama.googleApiKey)
-        assertEquals("gemini-1.5-flash", lg.ollama.googleModel)
+        assertEquals("gemini-3.5-flash-lite", lg.ollama.googleModel)
         assertEquals("", lg.ollama.googleAccountEmail)
         assertFalse(lg.ollama.googleSignedIn)
         assertEquals("", lg.ollama.openAiApiKey)
@@ -280,10 +282,10 @@ class OllamaTest {
     fun testMultiProviderDisplayNames() {
         val cfg = OllamaConfig()
         cfg.provider = "google"
-        cfg.googleModel = "gemini-1.5-flash"
+        cfg.googleModel = "gemini-3.5-flash-lite"
         assertEquals("Google Gemini", cfg.providerDisplayName)
-        assertEquals("gemini-1.5-flash", cfg.activeModelName)
-        assertEquals("Google gemini-1.5-flash", cfg.fullModelDisplayName)
+        assertEquals("gemini-3.5-flash-lite", cfg.activeModelName)
+        assertEquals("Google gemini-3.5-flash-lite", cfg.fullModelDisplayName)
         assertEquals("Gemini", cfg.shortActionName)
 
         cfg.googleAccountEmail = "coach.hoops@gmail.com"

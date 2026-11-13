@@ -62,10 +62,14 @@ object Ollama {
         val description: String,
     )
 
-    /** Free / cheap Gemini tags only — Pro is hidden from Settings. */
+    /**
+     * Free Gemini text models known to work for new API keys (Nov 2026).
+     * Shut-down 1.5 / 2.0 ids are intentionally absent — see [snapGoogleModel].
+     */
     val GOOGLE_MODELS = listOf(
-        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · free", "Fast free-tier model. Ideal for instant recaps."),
-        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Free · next-gen", "Newest flash model with sub-second generation."),
+        CloudModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "Recommended · free", "Current free-tier default. Fast recaps with low cost."),
+        CloudModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "Free · cheap", "Stable free flash-lite fallback when 3.5 is unavailable."),
+        CloudModel("gemini-3.8-flash", "Gemini 3.8 Flash", "Free · next-gen", "Full flash free tier — use when lite models fail."),
     )
 
     /** Cheap OpenAI tags only — flagship gpt-4o is hidden from Settings. */
@@ -74,17 +78,14 @@ object Ollama {
         CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
     )
 
-    /**
-     * Only remaps known expensive / blocked ids onto a free/cheap default.
-     * Custom picks from the provider list (e.g. gemini-3.5-flash) must stick —
-     * never force everything onto the curated Settings shortlist.
-     */
+    /** Remaps retired / expensive / specialty ids onto the free curated default. Live flash picks stick. */
     fun snapGoogleModel(id: String): String {
         val t = id.trim().removePrefix("models/").ifEmpty { return GOOGLE_MODELS.first().id }
         val low = t.lowercase()
-        val blocked = low == "gemini-1.5-pro" || low == "gemini-1.0-pro" || low == "gemini-pro" ||
-            low == "gemini-ultra" || (low.contains("pro") && !low.contains("flash") && !low.contains("nano"))
-        return if (blocked) GOOGLE_MODELS.first().id else t
+        if (!eligibleGoogleTextModel(low) || isRetiredGoogleModel(low) || isExpensiveGoogleModel(low)) {
+            return GOOGLE_MODELS.first().id
+        }
+        return t
     }
 
     fun snapOpenAiModel(id: String): String {
@@ -104,9 +105,41 @@ object Ollama {
         return if (heavy) RECOMMENDED_MODELS.first { it.tag.contains("Recommended", true) }.id else t
     }
 
+    /** Shut-down Gemini families that still appear in old saves / menus. */
+    internal fun isRetiredGoogleModel(id: String): Boolean {
+        val key = id.lowercase().removePrefix("models/")
+        return key.startsWith("gemini-1.") || key.startsWith("gemini-2.0") ||
+            key == "gemini-pro" || key == "gemini-ultra" || key == "gemini-1.0-pro"
+    }
+
+    internal fun isExpensiveGoogleModel(id: String): Boolean {
+        val key = id.lowercase().removePrefix("models/")
+        return (key.contains("pro") && !key.contains("flash") && !key.contains("nano")) ||
+            "argon" in key || "carbon" in key || "hydrogen" in key || "ultra" in key
+    }
+
+    /** Image / audio / omni endpoints are listed by Google but fail for text desks. */
+    internal fun isSpecialtyGoogleModel(id: String): Boolean {
+        val key = id.lowercase().removePrefix("models/")
+        return "tts" in key || "transcribe" in key || "speech" in key || "image" in key ||
+            "imagen" in key || "banana" in key || "omni" in key || "embed" in key
+    }
+
+    internal fun isUnstableGoogleModel(id: String): Boolean {
+        val key = id.lowercase().removePrefix("models/")
+        return "preview" in key || "experimental" in key || "exp" in key.split('-') ||
+            key.endsWith("-latest") || key.contains("latest")
+    }
+
+    internal fun eligibleGoogleTextModel(id: String): Boolean {
+        val key = id.lowercase().removePrefix("models/")
+        return key.contains("gemini") && !isSpecialtyGoogleModel(key)
+    }
+
     /**
-     * Best free/cheap model for [provider]. Prefer ids from [available] (provider list / Ollama tags);
-     * otherwise fall back to the curated Settings shortlist.
+     * Best free/cheap text model for [provider].
+     * Prefer curated ids that appear in [available]; skip specialty / preview / retired junk;
+     * otherwise fall back to the curated Settings shortlist (never invent unavailable GA aliases).
      */
     fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
         val curated = when (provider.lowercase()) {
@@ -114,12 +147,40 @@ object Ollama {
             "openai" -> OPENAI_MODELS.map { it.id }
             else -> RECOMMENDED_MODELS.map { it.id }
         }
-        val pool = available.map { it.trim().removePrefix("models/") }.filter { it.isNotBlank() }.distinct()
-            .ifEmpty { curated }
+        val raw = available.map { it.trim().removePrefix("models/") }.filter { it.isNotBlank() }.distinct()
+        val pool = when (provider.lowercase()) {
+            "google" -> {
+                val eligible = raw.filter { eligibleGoogleTextModel(it) && !isRetiredGoogleModel(it) && !isExpensiveGoogleModel(it) }
+                val stable = eligible.filterNot { isUnstableGoogleModel(it) }.ifEmpty { eligible }
+                val curatedHits = curated.filter { c -> stable.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    stable.isNotEmpty() -> stable
+                    else -> curated
+                }
+            }
+            "openai" -> {
+                val cheap = raw.filter {
+                    val k = it.lowercase()
+                    ("mini" in k || "3.5" in k || "nano" in k) && !k.startsWith("o1") && !k.startsWith("o3") && !k.startsWith("o4")
+                }
+                val curatedHits = curated.filter { c -> raw.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    cheap.isNotEmpty() -> cheap
+                    raw.isNotEmpty() -> raw
+                    else -> curated
+                }
+            }
+            else -> raw.ifEmpty { curated }
+        }
         val ranked = catalogFetchedModels(provider, pool)
             .sortedWith(
-                compareBy<CatalogEntry> { it.categoryOrder }
+                compareBy<CatalogEntry> { curatedIndex(provider, it.id) }
+                    .thenBy { it.categoryOrder }
                     .thenBy { modelPreferenceScore(provider, it.id) }
+                    .thenBy { if (provider.equals("google", true) && isUnstableGoogleModel(it.id)) 1 else 0 }
+                    .thenByDescending { googleVersionScore(it.id) }
                     .thenBy { it.id.lowercase() },
             )
         val pick = ranked.firstOrNull()?.id ?: curated.first()
@@ -128,6 +189,27 @@ object Ollama {
             "openai" -> snapOpenAiModel(pick)
             else -> snapLocalModel(pick)
         }
+    }
+
+    /** Curated shortlist order — lower is better; unknown ids sort after. */
+    private fun curatedIndex(provider: String, id: String): Int {
+        val curated = when (provider.lowercase()) {
+            "google" -> GOOGLE_MODELS.map { it.id }
+            "openai" -> OPENAI_MODELS.map { it.id }
+            else -> RECOMMENDED_MODELS.map { it.id }
+        }
+        val idx = curated.indexOfFirst { it.equals(id, true) }
+        return if (idx >= 0) idx else curated.size + 1
+    }
+
+    /** Prefer newer Gemini generations when ranking non-curated flash ids. */
+    internal fun googleVersionScore(id: String): Int {
+        val key = id.lowercase().removePrefix("models/")
+        val m = Regex("""gemini-(\d+(?:\.\d+)?)""").find(key) ?: return 0
+        val parts = m.groupValues[1].split('.')
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return major * 100 + minor
     }
 
     /** Lower is better — flash-lite / mini / smol before heavier free options. */
@@ -167,6 +249,25 @@ object Ollama {
             else -> config.model = pick
         }
         return pick
+    }
+
+    /** Ordered generate fallbacks for Google when the selected id 404s / is retired. */
+    fun googleGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapGoogleModel(config.googleModel.ifBlank { GOOGLE_MODELS.first().id })
+        return (listOf(primary) + GOOGLE_MODELS.map { it.id } + listOf("gemini-3.6-flash")).distinct()
+    }
+
+    fun openAiGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapOpenAiModel(config.openAiModel.ifBlank { OPENAI_MODELS.first().id })
+        return (listOf(primary) + OPENAI_MODELS.map { it.id }).distinct()
+    }
+
+    /** True when the provider error looks like a bad / missing model id (safe to try the next candidate). */
+    internal fun isModelAccessError(message: String?): Boolean {
+        val m = message?.lowercase().orEmpty()
+        return "404" in m || "not found" in m || "not supported" in m || "is not found" in m ||
+            "does not exist" in m || "invalid model" in m || "model_not_found" in m ||
+            "no longer available" in m || "has been shut down" in m || "deprecated" in m
     }
 
     /**
@@ -507,10 +608,10 @@ object Ollama {
         val apiKey = config.googleApiKey.trim()
         if (apiKey.isNotEmpty()) {
             val remoteResult = runCatching {
-                val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
-                val candidates = listOf(model)
+                val candidates = googleGenerateCandidates(config)
                 var lastErr: Exception? = null
                 var text: String? = null
+                var used: String? = null
 
                 for (cand in candidates) {
                     for (apiVersion in listOf("v1beta")) {
@@ -546,6 +647,7 @@ object Ollama {
                                 if (content.isNotEmpty()) {
                                     onToken?.invoke(content)
                                     text = content
+                                    used = cand
                                     break
                                 }
                             } else {
@@ -554,12 +656,22 @@ object Ollama {
                                     json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                                 }.getOrNull() ?: err
                                 lastErr = Exception("Google AI Error ($code): $errMsg")
+                                if (!isModelAccessError("$code $errMsg")) {
+                                    throw lastErr!!
+                                }
                             }
                         } catch (e: Exception) {
                             lastErr = e
+                            if (!isModelAccessError(e.message)) throw e
                         }
                     }
                     if (text != null) break
+                }
+                if (text != null && used != null &&
+                    (config.autoPickModel || isRetiredGoogleModel(config.googleModel) || config.googleModel.isBlank()) &&
+                    !used.equals(config.googleModel, true)
+                ) {
+                    config.googleModel = used
                 }
                 text ?: throw (lastErr ?: Exception("Google AI request failed"))
             }
@@ -585,44 +697,64 @@ object Ollama {
         val apiKey = config.openAiApiKey.trim()
         if (apiKey.isNotEmpty()) {
             val remoteResult = runCatching {
-                val model = config.openAiModel.ifBlank { "gpt-4o-mini" }
+                val candidates = openAiGenerateCandidates(config)
                 val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
                 val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
-                val url = URL(endpoint)
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 10000
-                    readTimeout = 90000
-                    doOutput = true
-                    setRequestProperty("Authorization", "Bearer $apiKey")
-                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                    setRequestProperty("Accept", "application/json")
-                }
+                var lastErr: Exception? = null
+                var text: String? = null
+                var used: String? = null
+                for (model in candidates) {
+                    try {
+                        val url = URL(endpoint)
+                        val conn = (url.openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 10000
+                            readTimeout = 90000
+                            doOutput = true
+                            setRequestProperty("Authorization", "Bearer $apiKey")
+                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            setRequestProperty("Accept", "application/json")
+                        }
 
-                val payload = buildString {
-                    append("{\"model\":").append(jsonString(model))
-                    append(",\"messages\":[")
-                    append("{\"role\":\"system\",\"content\":").append(jsonString(system)).append("},")
-                    append("{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}")
-                    append("],\"temperature\":$temperature,\"max_tokens\":$numPredict}")
-                }
+                        val payload = buildString {
+                            append("{\"model\":").append(jsonString(model))
+                            append(",\"messages\":[")
+                            append("{\"role\":\"system\",\"content\":").append(jsonString(system)).append("},")
+                            append("{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}")
+                            append("],\"temperature\":$temperature,\"max_tokens\":$numPredict}")
+                        }
 
-                conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+                        conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
 
-                val code = conn.responseCode
-                if (code in 200..299) {
-                    val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val text = openAiResponse(body)
-                    if (text.isEmpty()) throw Exception("Empty response from ChatGPT")
-                    onToken?.invoke(text)
-                    text
-                } else {
-                    val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                    val errMsg = runCatching {
-                        json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull() ?: err
-                    throw Exception("ChatGPT Error ($code): $errMsg")
+                        val code = conn.responseCode
+                        if (code in 200..299) {
+                            val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                            val content = openAiResponse(body)
+                            if (content.isEmpty()) throw Exception("Empty response from ChatGPT")
+                            onToken?.invoke(content)
+                            text = content
+                            used = model
+                            break
+                        } else {
+                            val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                            val errMsg = runCatching {
+                                json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                            }.getOrNull() ?: err
+                            lastErr = Exception("ChatGPT Error ($code): $errMsg")
+                            if (!isModelAccessError("$code $errMsg")) throw lastErr!!
+                        }
+                    } catch (e: Exception) {
+                        lastErr = e
+                        if (!isModelAccessError(e.message)) throw e
+                    }
                 }
+                if (text != null && used != null &&
+                    (config.autoPickModel || config.openAiModel.isBlank()) &&
+                    !used.equals(config.openAiModel, true)
+                ) {
+                    config.openAiModel = used
+                }
+                text ?: throw (lastErr ?: Exception("ChatGPT request failed"))
             }
 
             remoteResult

@@ -57,7 +57,7 @@ fun AiDiagnosticsPanel(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Auto-pick model", style = T.bodyB, color = P.ink)
-                    Text("Keep the free/cheap recommended model for ${config.shortActionName}. Re-applies when you fetch the provider list.", style = T.small, color = P.sub)
+                    Text("Keep a proven free/cheap text model for ${config.shortActionName}. Skips retired, preview, image, and audio ids. Re-applies when you fetch the provider list.", style = T.small, color = P.sub)
                 }
                 AppSwitch(config.autoPickModel, { on ->
                     onAutoPickChanged(on)
