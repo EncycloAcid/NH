@@ -701,6 +701,8 @@ class OllamaConfig(
     var contextSize: Int = 512, // 512 tokens for rapid mobile prefill & low KV cache memory
     var keepAliveMinutes: Int = 30, // keep warm in RAM to avoid cold reload delays
     var cacheResponses: Boolean = true, // instant 0ms load for identical queries
+    /** Show rough write-time estimates next to each AI writing desk in Settings. */
+    var showAiWriteEta: Boolean = false,
     // Multi-Provider AI (Local, Gemini, ChatGPT, Claude, Groq, DeepSeek, OpenRouter, Cerebras, Mistral)
     var provider: String = "ollama", // "ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral"
     /** When on, keep the free/cheap recommended model for the active provider (re-applied on enable, provider change, and model fetch). */
