@@ -701,8 +701,8 @@ class OllamaConfig(
     var contextSize: Int = 512, // 512 tokens for rapid mobile prefill & low KV cache memory
     var keepAliveMinutes: Int = 30, // keep warm in RAM to avoid cold reload delays
     var cacheResponses: Boolean = true, // instant 0ms load for identical queries
-    // Multi-Provider AI (Google Gemini, OpenAI ChatGPT, Local Ollama)
-    var provider: String = "ollama", // "ollama", "google", "openai"
+    // Multi-Provider AI (Local, Gemini, ChatGPT, Claude, Groq, DeepSeek, OpenRouter, Cerebras, Mistral)
+    var provider: String = "ollama", // "ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral"
     /** When on, keep the free/cheap recommended model for the active provider (re-applied on enable, provider change, and model fetch). */
     var autoPickModel: Boolean = false,
     var googleApiKey: String = "",
@@ -718,6 +718,24 @@ class OllamaConfig(
     var openAiAccountPassword: String = "",
     var openAiSignedIn: Boolean = false,
     var customEndpoint: String = "",
+    var anthropicApiKey: String = "",
+    var anthropicModel: String = "claude-haiku-4-5",
+    var anthropicAccountEmail: String = "",
+    var groqApiKey: String = "",
+    var groqModel: String = "llama-3.1-8b-instant",
+    var groqAccountEmail: String = "",
+    var deepseekApiKey: String = "",
+    var deepseekModel: String = "deepseek-chat",
+    var deepseekAccountEmail: String = "",
+    var openRouterApiKey: String = "",
+    var openRouterModel: String = "meta-llama/llama-3.3-70b-instruct:free",
+    var openRouterAccountEmail: String = "",
+    var cerebrasApiKey: String = "",
+    var cerebrasModel: String = "llama3.1-8b",
+    var cerebrasAccountEmail: String = "",
+    var mistralApiKey: String = "",
+    var mistralModel: String = "mistral-small-latest",
+    var mistralAccountEmail: String = "",
 ) {
     val isGoogleSignedIn: Boolean
         get() = googleApiKey.isNotBlank()
@@ -725,16 +743,58 @@ class OllamaConfig(
     val isOpenAiSignedIn: Boolean
         get() = openAiApiKey.isNotBlank()
 
+    val isAnthropicSignedIn: Boolean
+        get() = anthropicApiKey.isNotBlank()
+
+    val isGroqSignedIn: Boolean
+        get() = groqApiKey.isNotBlank()
+
+    val isDeepseekSignedIn: Boolean
+        get() = deepseekApiKey.isNotBlank()
+
+    val isOpenRouterSignedIn: Boolean
+        get() = openRouterApiKey.isNotBlank()
+
+    val isCerebrasSignedIn: Boolean
+        get() = cerebrasApiKey.isNotBlank()
+
+    val isMistralSignedIn: Boolean
+        get() = mistralApiKey.isNotBlank()
+
     val googleDisplayEmail: String
         get() = googleAccountEmail.ifBlank { if (googleApiKey.isNotBlank()) "Connected Google Account" else "Not Signed In" }
 
     val openAiDisplayEmail: String
         get() = openAiAccountEmail.ifBlank { if (openAiApiKey.isNotBlank()) "Connected ChatGPT Account" else "Not Signed In" }
 
+    val anthropicDisplayEmail: String
+        get() = anthropicAccountEmail.ifBlank { if (anthropicApiKey.isNotBlank()) "Connected Anthropic Account" else "Not Signed In" }
+
+    val groqDisplayEmail: String
+        get() = groqAccountEmail.ifBlank { if (groqApiKey.isNotBlank()) "Connected Groq Account" else "Not Signed In" }
+
+    val deepseekDisplayEmail: String
+        get() = deepseekAccountEmail.ifBlank { if (deepseekApiKey.isNotBlank()) "Connected DeepSeek Account" else "Not Signed In" }
+
+    val openRouterDisplayEmail: String
+        get() = openRouterAccountEmail.ifBlank { if (openRouterApiKey.isNotBlank()) "Connected OpenRouter Account" else "Not Signed In" }
+
+    val cerebrasDisplayEmail: String
+        get() = cerebrasAccountEmail.ifBlank { if (cerebrasApiKey.isNotBlank()) "Connected Cerebras Account" else "Not Signed In" }
+
+    val mistralDisplayEmail: String
+        get() = mistralAccountEmail.ifBlank { if (mistralApiKey.isNotBlank()) "Connected Mistral Account" else "Not Signed In" }
+
     val activeModelName: String
         get() = when (provider.lowercase()) {
             "google" -> googleModel.ifBlank { "gemini-3.8-flash" }
             "openai" -> openAiModel.ifBlank { "gpt-4o-mini" }
+            "anthropic" -> anthropicModel.ifBlank { "claude-haiku-4-5" }
+            "groq" -> groqModel.ifBlank { "llama-3.1-8b-instant" }
+            "deepseek" -> deepseekModel.ifBlank { "deepseek-chat" }
+            "openrouter" -> openRouterModel.ifBlank { "meta-llama/llama-3.3-70b-instruct:free" }
+            "cerebras" -> cerebrasModel.ifBlank { "llama3.1-8b" }
+            "mistral" -> mistralModel.ifBlank { "mistral-small-latest" }
             else -> model.ifBlank { "llama3.2:1b" }
         }
 
@@ -742,6 +802,12 @@ class OllamaConfig(
         get() = when (provider.lowercase()) {
             "google" -> if (isGoogleSignedIn && googleAccountEmail.isNotBlank()) "Google Gemini (${googleAccountEmail.substringBefore("@")})" else "Google Gemini"
             "openai" -> if (isOpenAiSignedIn && openAiAccountEmail.isNotBlank()) "ChatGPT (${openAiAccountEmail.substringBefore("@")})" else "ChatGPT (OpenAI)"
+            "anthropic" -> if (isAnthropicSignedIn && anthropicAccountEmail.isNotBlank()) "Claude (${anthropicAccountEmail.substringBefore("@")})" else "Claude (Anthropic)"
+            "groq" -> if (isGroqSignedIn && groqAccountEmail.isNotBlank()) "Groq (${groqAccountEmail.substringBefore("@")})" else "Groq"
+            "deepseek" -> if (isDeepseekSignedIn && deepseekAccountEmail.isNotBlank()) "DeepSeek (${deepseekAccountEmail.substringBefore("@")})" else "DeepSeek"
+            "openrouter" -> if (isOpenRouterSignedIn && openRouterAccountEmail.isNotBlank()) "OpenRouter (${openRouterAccountEmail.substringBefore("@")})" else "OpenRouter"
+            "cerebras" -> if (isCerebrasSignedIn && cerebrasAccountEmail.isNotBlank()) "Cerebras (${cerebrasAccountEmail.substringBefore("@")})" else "Cerebras"
+            "mistral" -> if (isMistralSignedIn && mistralAccountEmail.isNotBlank()) "Mistral (${mistralAccountEmail.substringBefore("@")})" else "Mistral"
             else -> "Local Ollama"
         }
 
@@ -749,6 +815,12 @@ class OllamaConfig(
         get() = when (provider.lowercase()) {
             "google" -> "Google $activeModelName"
             "openai" -> "ChatGPT ($activeModelName)"
+            "anthropic" -> "Claude ($activeModelName)"
+            "groq" -> "Groq $activeModelName"
+            "deepseek" -> "DeepSeek $activeModelName"
+            "openrouter" -> "OpenRouter $activeModelName"
+            "cerebras" -> "Cerebras $activeModelName"
+            "mistral" -> "Mistral $activeModelName"
             else -> "Ollama $activeModelName"
         }
 
@@ -756,6 +828,12 @@ class OllamaConfig(
         get() = when (provider.lowercase()) {
             "google" -> "Gemini"
             "openai" -> "ChatGPT"
+            "anthropic" -> "Claude"
+            "groq" -> "Groq"
+            "deepseek" -> "DeepSeek"
+            "openrouter" -> "OpenRouter"
+            "cerebras" -> "Cerebras"
+            "mistral" -> "Mistral"
             else -> "Ollama"
         }
 }

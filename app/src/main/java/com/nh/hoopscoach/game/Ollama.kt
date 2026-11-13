@@ -105,6 +105,52 @@ object Ollama {
         CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
     )
 
+    /** Anthropic Claude — Haiku first for cost; Sonnet for richer copy. */
+    val ANTHROPIC_MODELS = listOf(
+        CloudModel("claude-haiku-4-5", "Claude Haiku 4.5", "Recommended · cheap", "Fast, affordable Claude for recaps and quotes."),
+        CloudModel("claude-sonnet-4-5", "Claude Sonnet 4.5", "Paid · stronger", "Richer storylines when Haiku feels thin."),
+    )
+
+    /** Groq OpenAI-compatible — free-tier friendly Llama / Gemma. */
+    val GROQ_MODELS = listOf(
+        CloudModel("llama-3.1-8b-instant", "Llama 3.1 8B Instant", "Recommended · free", "Fast free-tier Groq model for recaps."),
+        CloudModel("llama-3.3-70b-versatile", "Llama 3.3 70B", "Free · stronger", "Stronger free Groq model when 8B is weak."),
+        CloudModel("gemma2-9b-it", "Gemma 2 9B", "Free · alt", "Google Gemma on Groq as a lightweight alt."),
+    )
+
+    /** DeepSeek OpenAI-compatible — very cheap chat models. */
+    val DEEPSEEK_MODELS = listOf(
+        CloudModel("deepseek-chat", "DeepSeek Chat", "Recommended · cheap", "Cheap, strong chat model for dynasty copy."),
+        CloudModel("deepseek-reasoner", "DeepSeek Reasoner", "Cheap · deeper", "Slower reasoning model — use when chat feels shallow."),
+    )
+
+    /** OpenRouter curated free (:free) text models. */
+    val OPENROUTER_MODELS = listOf(
+        CloudModel("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Free", "Recommended · free", "Strong free OpenRouter Llama for dynasty copy."),
+        CloudModel("google/gemma-2-9b-it:free", "Gemma 2 9B Free", "Free · light", "Lightweight free Gemma via OpenRouter."),
+        CloudModel("mistralai/mistral-7b-instruct:free", "Mistral 7B Free", "Free · alt", "Classic free Mistral instruct via OpenRouter."),
+        CloudModel("qwen/qwen-2.5-7b-instruct:free", "Qwen 2.5 7B Free", "Free · alt", "Free Qwen instruct — good for short recaps."),
+    )
+
+    /** Cerebras free-tier OpenAI-compatible Llama. */
+    val CEREBRAS_MODELS = listOf(
+        CloudModel("llama3.1-8b", "Llama 3.1 8B", "Recommended · free", "Fast Cerebras free-tier Llama for recaps."),
+        CloudModel("llama-3.3-70b", "Llama 3.3 70B", "Free · stronger", "Stronger Cerebras free Llama when 8B is thin."),
+    )
+
+    /** Mistral cloud — free/cheap Small + open Nemo. */
+    val MISTRAL_MODELS = listOf(
+        CloudModel("mistral-small-latest", "Mistral Small", "Recommended · free tier", "Mistral free-tier small for dynasty copy."),
+        CloudModel("open-mistral-nemo", "Mistral Nemo", "Free · open", "Open Mistral Nemo — solid free alternative."),
+        CloudModel("ministral-8b-latest", "Ministral 8B", "Free · tiny", "Tiny Mistral for fast short takes."),
+    )
+
+    const val GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+    const val DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
+    const val OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+    const val CEREBRAS_CHAT_URL = "https://api.cerebras.ai/v1/chat/completions"
+    const val MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
+
     /** Remaps retired / expensive / specialty ids onto the free curated default. Live flash picks stick. */
     fun snapGoogleModel(id: String): String {
         val t = id.trim().removePrefix("models/").ifEmpty { return GOOGLE_MODELS.first().id }
@@ -121,6 +167,47 @@ object Ollama {
         val blocked = low == "gpt-4o" || low == "gpt-4" || low == "gpt-4-turbo" || low == "gpt-4-turbo-preview" ||
             low.startsWith("o1") || low.startsWith("o3") || low.startsWith("o4")
         return if (blocked) OPENAI_MODELS.first().id else t
+    }
+
+    fun snapAnthropicModel(id: String): String {
+        val t = id.trim().ifEmpty { return ANTHROPIC_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = "opus" in low || low.contains("claude-2") || low.contains("claude-1")
+        return if (blocked) ANTHROPIC_MODELS.first().id else t
+    }
+
+    fun snapGroqModel(id: String): String {
+        val t = id.trim().ifEmpty { return GROQ_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = "whisper" in low || "tts" in low || "guard" in low
+        return if (blocked) GROQ_MODELS.first().id else t
+    }
+
+    fun snapDeepseekModel(id: String): String {
+        val t = id.trim().ifEmpty { return DEEPSEEK_MODELS.first().id }
+        return t
+    }
+
+    fun snapOpenRouterModel(id: String): String {
+        val t = id.trim().ifEmpty { return OPENROUTER_MODELS.first().id }
+        val low = t.lowercase()
+        // Prefer free; remap paid-looking picks onto curated free default.
+        if (":free" !in low && OPENROUTER_MODELS.none { it.id.equals(t, true) }) {
+            return OPENROUTER_MODELS.first().id
+        }
+        return t
+    }
+
+    fun snapCerebrasModel(id: String): String {
+        val t = id.trim().ifEmpty { return CEREBRAS_MODELS.first().id }
+        return t
+    }
+
+    fun snapMistralModel(id: String): String {
+        val t = id.trim().ifEmpty { return MISTRAL_MODELS.first().id }
+        val low = t.lowercase()
+        val blocked = "large" in low || "pixtral" in low || "ocr" in low || "embed" in low || "moderation" in low
+        return if (blocked) MISTRAL_MODELS.first().id else t
     }
 
     fun snapLocalModel(id: String): String {
@@ -167,12 +254,20 @@ object Ollama {
      * Ordered free/cheap candidates for [provider]. Prefer curated ids in [available];
      * skip specialty / preview / retired / previously-failed ids.
      */
+    private fun curatedModelIds(provider: String): List<String> = when (provider.lowercase()) {
+        "google" -> GOOGLE_MODELS.map { it.id }
+        "openai" -> OPENAI_MODELS.map { it.id }
+        "anthropic" -> ANTHROPIC_MODELS.map { it.id }
+        "groq" -> GROQ_MODELS.map { it.id }
+        "deepseek" -> DEEPSEEK_MODELS.map { it.id }
+        "openrouter" -> OPENROUTER_MODELS.map { it.id }
+        "cerebras" -> CEREBRAS_MODELS.map { it.id }
+        "mistral" -> MISTRAL_MODELS.map { it.id }
+        else -> RECOMMENDED_MODELS.map { it.id }
+    }
+
     fun rankedAutoPickCandidates(provider: String, available: List<String> = emptyList()): List<String> {
-        val curated = when (provider.lowercase()) {
-            "google" -> GOOGLE_MODELS.map { it.id }
-            "openai" -> OPENAI_MODELS.map { it.id }
-            else -> RECOMMENDED_MODELS.map { it.id }
-        }
+        val curated = curatedModelIds(provider)
         val raw = available.map { it.trim().removePrefix("models/") }.filter { it.isNotBlank() }.distinct()
         val pool = when (provider.lowercase()) {
             "google" -> {
@@ -198,6 +293,72 @@ object Ollama {
                     else -> curated
                 }
             }
+            "anthropic" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "claude" in k && "opus" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
+            "groq" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "whisper" !in k && "tts" !in k && "guard" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
+            "deepseek" -> {
+                val text = raw.filter { it.lowercase().startsWith("deepseek") }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
+            "openrouter" -> {
+                val free = raw.filter { it.lowercase().endsWith(":free") }
+                val curatedHits = curated.filter { c -> free.any { it.equals(c, true) } || raw.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    free.isNotEmpty() -> free
+                    else -> curated
+                }
+            }
+            "cerebras" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "whisper" !in k && "tts" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
+            "mistral" -> {
+                val text = raw.filter {
+                    val k = it.lowercase()
+                    "embed" !in k && "moderation" !in k && "ocr" !in k && "pixtral" !in k && "large" !in k
+                }
+                val curatedHits = curated.filter { c -> text.any { it.equals(c, true) } }
+                when {
+                    curatedHits.isNotEmpty() -> curatedHits
+                    text.isNotEmpty() -> text
+                    else -> curated
+                }
+            }
             else -> raw.ifEmpty { curated }
         }
         val ranked = catalogFetchedModels(provider, pool)
@@ -213,6 +374,12 @@ object Ollama {
                 when (provider.lowercase()) {
                     "google" -> snapGoogleModel(it.id)
                     "openai" -> snapOpenAiModel(it.id)
+                    "anthropic" -> snapAnthropicModel(it.id)
+                    "groq" -> snapGroqModel(it.id)
+                    "deepseek" -> snapDeepseekModel(it.id)
+                    "openrouter" -> snapOpenRouterModel(it.id)
+                    "cerebras" -> snapCerebrasModel(it.id)
+                    "mistral" -> snapMistralModel(it.id)
                     else -> snapLocalModel(it.id)
                 }
             }
@@ -227,21 +394,13 @@ object Ollama {
      * otherwise fall back to the curated Settings shortlist (never invent unavailable GA aliases).
      */
     fun pickBestModel(provider: String, available: List<String> = emptyList()): String {
-        val curated = when (provider.lowercase()) {
-            "google" -> GOOGLE_MODELS.map { it.id }
-            "openai" -> OPENAI_MODELS.map { it.id }
-            else -> RECOMMENDED_MODELS.map { it.id }
-        }
+        val curated = curatedModelIds(provider)
         return rankedAutoPickCandidates(provider, available).firstOrNull() ?: curated.first()
     }
 
     /** Curated shortlist order — lower is better; unknown ids sort after. */
     private fun curatedIndex(provider: String, id: String): Int {
-        val curated = when (provider.lowercase()) {
-            "google" -> GOOGLE_MODELS.map { it.id }
-            "openai" -> OPENAI_MODELS.map { it.id }
-            else -> RECOMMENDED_MODELS.map { it.id }
-        }
+        val curated = curatedModelIds(provider)
         val idx = curated.indexOfFirst { it.equals(id, true) }
         return if (idx >= 0) idx else curated.size + 1
     }
@@ -272,6 +431,39 @@ object Ollama {
                 "nano" in key -> 2
                 else -> 8
             }
+            "anthropic" -> when {
+                "haiku" in key -> 0
+                "sonnet" in key -> 1
+                else -> 8
+            }
+            "groq" -> when {
+                "8b" in key || "instant" in key -> 0
+                "gemma" in key || "9b" in key -> 1
+                "70b" in key || "versatile" in key -> 2
+                else -> 8
+            }
+            "deepseek" -> when {
+                key == "deepseek-chat" || key.endsWith("-chat") -> 0
+                "reasoner" in key -> 1
+                else -> 8
+            }
+            "openrouter" -> when {
+                key.endsWith(":free") && ("70b" in key || "llama-3.3" in key) -> 0
+                key.endsWith(":free") && ("9b" in key || "gemma" in key) -> 1
+                key.endsWith(":free") -> 2
+                else -> 8
+            }
+            "cerebras" -> when {
+                "8b" in key -> 0
+                "70b" in key -> 1
+                else -> 8
+            }
+            "mistral" -> when {
+                "small" in key -> 0
+                "nemo" in key -> 1
+                "ministral" in key || "8b" in key -> 2
+                else -> 8
+            }
             else -> when {
                 key == "smollm2:135m" || key.startsWith("smollm2:135m") -> 0
                 key == "qwen2.5:0.5b" || key.startsWith("qwen2.5:0.5") -> 1
@@ -290,6 +482,12 @@ object Ollama {
         when (config.provider.lowercase()) {
             "google" -> config.googleModel = pick
             "openai" -> config.openAiModel = pick
+            "anthropic" -> config.anthropicModel = pick
+            "groq" -> config.groqModel = pick
+            "deepseek" -> config.deepseekModel = pick
+            "openrouter" -> config.openRouterModel = pick
+            "cerebras" -> config.cerebrasModel = pick
+            "mistral" -> config.mistralModel = pick
             else -> config.model = pick
         }
         return pick
@@ -319,7 +517,7 @@ object Ollama {
         } else {
             val err = probe.exceptionOrNull()
             if (isModelAccessError(err?.message)) rememberFailedModel(before)
-            Result.failure(err ?: Exception("No working free/cheap model found for this API key."))
+            Result.failure(err ?: Exception("No working free/cheap model found for this account access key."))
         }
     }
 
@@ -334,6 +532,48 @@ object Ollama {
     fun openAiGenerateCandidates(config: OllamaConfig): List<String> {
         val primary = snapOpenAiModel(config.openAiModel.ifBlank { OPENAI_MODELS.first().id })
         val all = (listOf(primary) + OPENAI_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun anthropicGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapAnthropicModel(config.anthropicModel.ifBlank { ANTHROPIC_MODELS.first().id })
+        val all = (listOf(primary) + ANTHROPIC_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun groqGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapGroqModel(config.groqModel.ifBlank { GROQ_MODELS.first().id })
+        val all = (listOf(primary) + GROQ_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun deepseekGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapDeepseekModel(config.deepseekModel.ifBlank { DEEPSEEK_MODELS.first().id })
+        val all = (listOf(primary) + DEEPSEEK_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun openRouterGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapOpenRouterModel(config.openRouterModel.ifBlank { OPENROUTER_MODELS.first().id })
+        val all = (listOf(primary) + OPENROUTER_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun cerebrasGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapCerebrasModel(config.cerebrasModel.ifBlank { CEREBRAS_MODELS.first().id })
+        val all = (listOf(primary) + CEREBRAS_MODELS.map { it.id }).distinct()
+        val live = all.filterNot { isFailedModel(it) }
+        return live.ifEmpty { all }
+    }
+
+    fun mistralGenerateCandidates(config: OllamaConfig): List<String> {
+        val primary = snapMistralModel(config.mistralModel.ifBlank { MISTRAL_MODELS.first().id })
+        val all = (listOf(primary) + MISTRAL_MODELS.map { it.id }).distinct()
         val live = all.filterNot { isFailedModel(it) }
         return live.ifEmpty { all }
     }
@@ -396,6 +636,12 @@ object Ollama {
         return when (provider.lowercase()) {
             "google" -> googleCatalog(key, id, title)
             "openai" -> openAiCatalog(key, id, title)
+            "anthropic" -> anthropicCatalog(key, id, title)
+            "groq" -> groqCatalog(key, id, title)
+            "deepseek" -> deepseekCatalog(key, id, title)
+            "openrouter" -> openRouterCatalog(key, id, title)
+            "cerebras" -> cerebrasCatalog(key, id, title)
+            "mistral" -> mistralCatalog(key, id, title)
             else -> CatalogEntry(id, title, "On-device · free", "Free · local", 0)
         }
     }
@@ -435,6 +681,47 @@ object Ollama {
             CatalogEntry(id, title, "Flagship · paid", "Paid · standard", 1)
         else ->
             CatalogEntry(id, title, "Other OpenAI", "See OpenAI pricing", 3)
+    }
+
+    private fun anthropicCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "haiku" in key -> CatalogEntry(id, title, "Haiku · cheap", "Cheap · text", 0)
+        "sonnet" in key -> CatalogEntry(id, title, "Sonnet · standard", "Paid · standard", 1)
+        "opus" in key -> CatalogEntry(id, title, "Opus · premium", "Paid · premium", 2)
+        else -> CatalogEntry(id, title, "Other Claude", "See Anthropic pricing", 3)
+    }
+
+    private fun groqCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "whisper" in key || "tts" in key -> CatalogEntry(id, title, "Audio", "Audio · skip", 3)
+        "8b" in key || "instant" in key || "gemma" in key ->
+            CatalogEntry(id, title, "Fast · free tier", "Free · text", 0)
+        "70b" in key || "versatile" in key ->
+            CatalogEntry(id, title, "Strong · free tier", "Free · stronger", 1)
+        else -> CatalogEntry(id, title, "Other Groq", "See Groq pricing", 2)
+    }
+
+    private fun deepseekCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "reasoner" in key -> CatalogEntry(id, title, "Reasoner", "Cheap · deeper", 1)
+        "chat" in key -> CatalogEntry(id, title, "Chat · cheap", "Cheap · text", 0)
+        else -> CatalogEntry(id, title, "Other DeepSeek", "See DeepSeek pricing", 2)
+    }
+
+    private fun openRouterCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        key.endsWith(":free") -> CatalogEntry(id, title, "Free OpenRouter", "Free · text", 0)
+        else -> CatalogEntry(id, title, "Paid OpenRouter", "Paid · see OpenRouter", 1)
+    }
+
+    private fun cerebrasCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "8b" in key -> CatalogEntry(id, title, "Fast · free tier", "Free · text", 0)
+        "70b" in key -> CatalogEntry(id, title, "Strong · free tier", "Free · stronger", 1)
+        else -> CatalogEntry(id, title, "Other Cerebras", "See Cerebras pricing", 2)
+    }
+
+    private fun mistralCatalog(key: String, id: String, title: String): CatalogEntry = when {
+        "small" in key || "nemo" in key || "ministral" in key ->
+            CatalogEntry(id, title, "Free / cheap Mistral", "Free tier · text", 0)
+        "large" in key || "pixtral" in key ->
+            CatalogEntry(id, title, "Premium Mistral", "Paid · premium", 1)
+        else -> CatalogEntry(id, title, "Other Mistral", "See Mistral pricing", 2)
     }
 
     data class AutoConfigResult(
@@ -654,43 +941,142 @@ object Ollama {
                     throw Exception("Google AI Error ($code): $errMsg")
                 }
             } else {
-                throw Exception("Gemini requires an API key. Email/password sign-in is not supported.")
+                throw Exception("Connect your Google account: sign in at AI Studio, then paste a free access key. Never enter your Google password here.")
+            }
+        }
+    }
+
+    /** Test connection to an OpenAI-compatible `/models` endpoint. */
+    suspend fun testOpenAiCompatibleConnection(
+        apiKey: String,
+        baseOrChatUrl: String,
+        label: String,
+        modelFilter: (String) -> Boolean,
+        missingKeyMessage: String,
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val key = apiKey.trim()
+            if (key.isEmpty()) throw Exception(missingKeyMessage)
+            val raw = baseOrChatUrl.trim().ifEmpty { "https://api.openai.com/v1" }.removeSuffix("/chat/completions")
+            val base = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "https://$raw"
+            val url = URL("$base/models")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("Authorization", "Bearer $key")
+                setRequestProperty("Accept", "application/json")
+            }
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val models = root["data"]?.jsonArray?.mapNotNull {
+                    it.jsonObject["id"]?.jsonPrimitive?.content
+                }?.filter(modelFilter).orEmpty()
+                models.ifEmpty { throw IllegalStateException("Provider lists no compatible text models.") }
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("$label Error ($code): $errMsg")
             }
         }
     }
 
     /** Test connection to OpenAI ChatGPT API using [apiKey] and optional [customEndpoint]. */
-    suspend fun testOpenAiConnection(apiKey: String = "", customEndpoint: String = "", email: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
+    suspend fun testOpenAiConnection(apiKey: String = "", customEndpoint: String = "", email: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = customEndpoint.ifBlank { "https://api.openai.com/v1" },
+            label = "ChatGPT",
+            modelFilter = { it.startsWith("gpt") },
+            missingKeyMessage = "Connect your OpenAI / ChatGPT account: sign in at platform.openai.com, then paste an access key. ChatGPT Plus alone is not enough.",
+        )
+
+    suspend fun testGroqConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.groq.com/openai/v1",
+            label = "Groq",
+            modelFilter = { id ->
+                val k = id.lowercase()
+                "whisper" !in k && "tts" !in k && "guard" !in k
+            },
+            missingKeyMessage = "Connect your Groq account: sign in at console.groq.com, then paste a free access key.",
+        )
+
+    suspend fun testDeepseekConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.deepseek.com",
+            label = "DeepSeek",
+            modelFilter = { it.lowercase().startsWith("deepseek") },
+            missingKeyMessage = "Connect your DeepSeek account: sign in at platform.deepseek.com, then paste an access key.",
+        )
+
+    suspend fun testOpenRouterConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://openrouter.ai/api/v1",
+            label = "OpenRouter",
+            modelFilter = { it.lowercase().endsWith(":free") },
+            missingKeyMessage = "Connect your OpenRouter account: sign in at openrouter.ai, then paste an access key.",
+        )
+
+    suspend fun testCerebrasConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.cerebras.ai/v1",
+            label = "Cerebras",
+            modelFilter = { id ->
+                val k = id.lowercase()
+                "whisper" !in k && "tts" !in k
+            },
+            missingKeyMessage = "Connect your Cerebras account: sign in at cloud.cerebras.ai, then paste a free access key.",
+        )
+
+    suspend fun testMistralConnection(apiKey: String = ""): Result<List<String>> =
+        testOpenAiCompatibleConnection(
+            apiKey = apiKey,
+            baseOrChatUrl = "https://api.mistral.ai/v1",
+            label = "Mistral",
+            modelFilter = { id ->
+                val k = id.lowercase()
+                "embed" !in k && "moderation" !in k && "ocr" !in k
+            },
+            missingKeyMessage = "Connect your Mistral account: sign in at console.mistral.ai, then paste a free access key.",
+        )
+
+    /** Test connection to Anthropic Claude API. */
+    suspend fun testAnthropicConnection(apiKey: String = ""): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             val key = apiKey.trim()
-            if (key.isNotEmpty()) {
-                val raw = customEndpoint.trim().ifEmpty { "https://api.openai.com/v1" }.removeSuffix("/chat/completions")
-                val base = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "https://$raw"
-                val url = URL("$base/models")
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 8000
-                    readTimeout = 8000
-                    setRequestProperty("Authorization", "Bearer $key")
-                    setRequestProperty("Accept", "application/json")
-                }
-                val code = conn.responseCode
-                if (code in 200..299) {
-                    val body = conn.inputStream.bufferedReader().use { it.readText() }
-                    val root = json.parseToJsonElement(body).jsonObject
-                    val models = root["data"]?.jsonArray?.mapNotNull {
-                        it.jsonObject["id"]?.jsonPrimitive?.content
-                    }?.filter { it.startsWith("gpt") }.orEmpty()
-                    models.ifEmpty { throw IllegalStateException("Provider lists no compatible text models.") }
-                } else {
-                    val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                    val errMsg = runCatching {
-                        json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull() ?: err
-                    throw Exception("ChatGPT Error ($code): $errMsg")
-                }
+            if (key.isEmpty()) throw Exception("Connect your Claude account: sign in at console.anthropic.com, then paste an access key.")
+            val url = URL("https://api.anthropic.com/v1/models")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("x-api-key", key)
+                setRequestProperty("anthropic-version", "2023-06-01")
+                setRequestProperty("Accept", "application/json")
+            }
+            val code = conn.responseCode
+            if (code in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = json.parseToJsonElement(body).jsonObject
+                val models = root["data"]?.jsonArray?.mapNotNull {
+                    it.jsonObject["id"]?.jsonPrimitive?.content
+                }?.filter { it.lowercase().contains("claude") }.orEmpty()
+                models.ifEmpty { throw IllegalStateException("Provider lists no compatible text models.") }
             } else {
-                throw Exception("OpenAI requires an API key. Email/password sign-in is not supported.")
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                val errMsg = runCatching {
+                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                }.getOrNull() ?: err
+                throw Exception("Claude Error ($code): $errMsg")
             }
         }
     }
@@ -706,7 +1092,7 @@ object Ollama {
         onToken: ((String) -> Unit)? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!config.isGoogleSignedIn) {
-            return@withContext Result.failure(Exception("Gemini requires an API key. Email/password sign-in is not supported."))
+            return@withContext Result.failure(Exception("Connect your Google account: sign in at AI Studio, then paste a free access key. Never enter your Google password here."))
         }
         val apiKey = config.googleApiKey.trim()
         if (apiKey.isEmpty()) {
@@ -784,33 +1170,32 @@ object Ollama {
         }
     }
 
-    /** Generate content using OpenAI / ChatGPT REST API or Account Cloud Session. */
-    suspend fun generateOpenAi(
-        config: OllamaConfig,
+    /** Shared OpenAI-compatible chat.completions generate used by ChatGPT, Groq, DeepSeek, OpenRouter, Cerebras, Mistral. */
+    private suspend fun generateChatCompletions(
+        apiKey: String,
+        endpoint: String,
+        candidates: List<String>,
+        label: String,
         prompt: String,
         system: String,
         temperature: Double,
         numPredict: Int,
-        onToken: ((String) -> Unit)? = null,
+        onToken: ((String) -> Unit)?,
+        onUsedModel: (String) -> Unit,
+        extraHeaders: Map<String, String> = emptyMap(),
     ): Result<String> = withContext(Dispatchers.IO) {
-        if (!config.isOpenAiSignedIn) {
-            return@withContext Result.failure(Exception("OpenAI requires an API key. Email/password sign-in is not supported."))
-        }
-        val apiKey = config.openAiApiKey.trim()
         if (apiKey.isEmpty()) {
-            return@withContext Result.failure(IllegalStateException("No ChatGPT model credential; use game-written coverage."))
+            return@withContext Result.failure(IllegalStateException("No $label model credential; use game-written coverage."))
         }
         runCatching {
-            val candidates = openAiGenerateCandidates(config)
-            val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
-            val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
+            val chatUrl = if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) endpoint else "https://$endpoint"
             var lastErr: Exception? = null
             var text: String? = null
             var used: String? = null
             for (model in candidates) {
                 try {
                     val content = retryTransient {
-                        val url = URL(endpoint)
+                        val url = URL(chatUrl)
                         val conn = (url.openConnection() as HttpURLConnection).apply {
                             requestMethod = "POST"
                             connectTimeout = 12000
@@ -819,6 +1204,7 @@ object Ollama {
                             setRequestProperty("Authorization", "Bearer $apiKey")
                             setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                             setRequestProperty("Accept", "application/json")
+                            extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
                         }
 
                         val payload = buildString {
@@ -834,13 +1220,13 @@ object Ollama {
                         val code = conn.responseCode
                         if (code in 200..299) {
                             val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                            openAiResponse(body).also { if (it.isEmpty()) throw Exception("Empty response from ChatGPT") }
+                            openAiResponse(body).also { if (it.isEmpty()) throw Exception("Empty response from $label") }
                         } else {
                             val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
                             val errMsg = runCatching {
                                 json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
                             }.getOrNull() ?: err
-                            throw Exception("ChatGPT Error ($code): $errMsg")
+                            throw Exception("$label Error ($code): $errMsg")
                         }
                     }
                     onToken?.invoke(content)
@@ -858,18 +1244,285 @@ object Ollama {
             }
             if (text != null && used != null) {
                 forgetFailedModel(used)
+                onUsedModel(used)
+            }
+            text ?: throw (lastErr ?: Exception("$label request failed"))
+        }
+    }
+
+    /** Generate content using OpenAI / ChatGPT REST API or Account Cloud Session. */
+    suspend fun generateOpenAi(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isOpenAiSignedIn) {
+            return Result.failure(Exception("Connect your OpenAI / ChatGPT account: sign in at platform.openai.com, then paste an access key. ChatGPT Plus alone is not enough."))
+        }
+        val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
+        return generateChatCompletions(
+            apiKey = config.openAiApiKey.trim(),
+            endpoint = rawEndpoint,
+            candidates = openAiGenerateCandidates(config),
+            label = "ChatGPT",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
                 if ((config.autoPickModel || config.openAiModel.isBlank() || isFailedModel(config.openAiModel)) &&
                     !used.equals(config.openAiModel, true)
                 ) {
                     config.openAiModel = used
                 }
+            },
+        )
+    }
+
+    suspend fun generateGroq(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isGroqSignedIn) {
+            return Result.failure(Exception("Connect your Groq account: sign in at console.groq.com, then paste a free access key."))
+        }
+        return generateChatCompletions(
+            apiKey = config.groqApiKey.trim(),
+            endpoint = GROQ_CHAT_URL,
+            candidates = groqGenerateCandidates(config),
+            label = "Groq",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.groqModel.isBlank() || isFailedModel(config.groqModel)) &&
+                    !used.equals(config.groqModel, true)
+                ) {
+                    config.groqModel = used
+                }
+            },
+        )
+    }
+
+    suspend fun generateDeepseek(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isDeepseekSignedIn) {
+            return Result.failure(Exception("Connect your DeepSeek account: sign in at platform.deepseek.com, then paste an access key."))
+        }
+        return generateChatCompletions(
+            apiKey = config.deepseekApiKey.trim(),
+            endpoint = DEEPSEEK_CHAT_URL,
+            candidates = deepseekGenerateCandidates(config),
+            label = "DeepSeek",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.deepseekModel.isBlank() || isFailedModel(config.deepseekModel)) &&
+                    !used.equals(config.deepseekModel, true)
+                ) {
+                    config.deepseekModel = used
+                }
+            },
+        )
+    }
+
+    suspend fun generateOpenRouter(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isOpenRouterSignedIn) {
+            return Result.failure(Exception("Connect your OpenRouter account: sign in at openrouter.ai, then paste an access key."))
+        }
+        return generateChatCompletions(
+            apiKey = config.openRouterApiKey.trim(),
+            endpoint = OPENROUTER_CHAT_URL,
+            candidates = openRouterGenerateCandidates(config),
+            label = "OpenRouter",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.openRouterModel.isBlank() || isFailedModel(config.openRouterModel)) &&
+                    !used.equals(config.openRouterModel, true)
+                ) {
+                    config.openRouterModel = used
+                }
+            },
+            extraHeaders = mapOf(
+                "HTTP-Referer" to "https://github.com/EncycloAcid/NH",
+                "X-Title" to "Hoops Dynasty",
+            ),
+        )
+    }
+
+    suspend fun generateCerebras(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isCerebrasSignedIn) {
+            return Result.failure(Exception("Connect your Cerebras account: sign in at cloud.cerebras.ai, then paste a free access key."))
+        }
+        return generateChatCompletions(
+            apiKey = config.cerebrasApiKey.trim(),
+            endpoint = CEREBRAS_CHAT_URL,
+            candidates = cerebrasGenerateCandidates(config),
+            label = "Cerebras",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.cerebrasModel.isBlank() || isFailedModel(config.cerebrasModel)) &&
+                    !used.equals(config.cerebrasModel, true)
+                ) {
+                    config.cerebrasModel = used
+                }
+            },
+        )
+    }
+
+    suspend fun generateMistral(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> {
+        if (!config.isMistralSignedIn) {
+            return Result.failure(Exception("Connect your Mistral account: sign in at console.mistral.ai, then paste a free access key."))
+        }
+        return generateChatCompletions(
+            apiKey = config.mistralApiKey.trim(),
+            endpoint = MISTRAL_CHAT_URL,
+            candidates = mistralGenerateCandidates(config),
+            label = "Mistral",
+            prompt = prompt,
+            system = system,
+            temperature = temperature,
+            numPredict = numPredict,
+            onToken = onToken,
+            onUsedModel = { used ->
+                if ((config.autoPickModel || config.mistralModel.isBlank() || isFailedModel(config.mistralModel)) &&
+                    !used.equals(config.mistralModel, true)
+                ) {
+                    config.mistralModel = used
+                }
+            },
+        )
+    }
+
+    /** Generate content using Anthropic Claude Messages API. */
+    suspend fun generateAnthropic(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double,
+        numPredict: Int,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (!config.isAnthropicSignedIn) {
+            return@withContext Result.failure(Exception("Connect your Claude account: sign in at console.anthropic.com, then paste an access key."))
+        }
+        val apiKey = config.anthropicApiKey.trim()
+        if (apiKey.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No Claude model credential; use game-written coverage."))
+        }
+        runCatching {
+            val candidates = anthropicGenerateCandidates(config)
+            var lastErr: Exception? = null
+            var text: String? = null
+            var used: String? = null
+            for (model in candidates) {
+                try {
+                    val content = retryTransient {
+                        val url = URL("https://api.anthropic.com/v1/messages")
+                        val conn = (url.openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            connectTimeout = 12000
+                            readTimeout = 90000
+                            doOutput = true
+                            setRequestProperty("x-api-key", apiKey)
+                            setRequestProperty("anthropic-version", "2023-06-01")
+                            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            setRequestProperty("Accept", "application/json")
+                        }
+                        val payload = buildString {
+                            append("{\"model\":").append(jsonString(model))
+                            append(",\"max_tokens\":$numPredict")
+                            append(",\"temperature\":$temperature")
+                            if (system.isNotBlank()) append(",\"system\":").append(jsonString(system))
+                            append(",\"messages\":[{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}]}")
+                        }
+                        conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+                        val code = conn.responseCode
+                        if (code in 200..299) {
+                            val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                            anthropicResponse(body)
+                        } else {
+                            val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+                            val errMsg = runCatching {
+                                json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                            }.getOrNull() ?: err
+                            throw Exception("Claude Error ($code): $errMsg")
+                        }
+                    }
+                    onToken?.invoke(content)
+                    text = content
+                    used = model
+                    break
+                } catch (e: Exception) {
+                    lastErr = e
+                    when {
+                        isModelAccessError(e.message) -> rememberFailedModel(model)
+                        isTransientProviderError(e.message) -> { /* already retried */ }
+                        else -> throw e
+                    }
+                }
             }
-            text ?: throw (lastErr ?: Exception("ChatGPT request failed"))
+            if (text != null && used != null) {
+                forgetFailedModel(used)
+                if ((config.autoPickModel || config.anthropicModel.isBlank() || isFailedModel(config.anthropicModel)) &&
+                    !used.equals(config.anthropicModel, true)
+                ) {
+                    config.anthropicModel = used
+                }
+            }
+            text ?: throw (lastErr ?: Exception("Claude request failed"))
         }
     }
 
-
-    /** Unified generate dispatcher across all configured AI providers (Google Gemini, OpenAI ChatGPT, Local Ollama). */
+    /** Unified generate dispatcher across configured AI providers. */
     suspend fun generate(
         config: OllamaConfig,
         prompt: String,
@@ -882,6 +1535,12 @@ object Ollama {
             when (config.provider.lowercase()) {
                 "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
                 "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
+                "anthropic" -> generateAnthropic(config, prompt, system, temperature, numPredict, onToken)
+                "groq" -> generateGroq(config, prompt, system, temperature, numPredict, onToken)
+                "deepseek" -> generateDeepseek(config, prompt, system, temperature, numPredict, onToken)
+                "openrouter" -> generateOpenRouter(config, prompt, system, temperature, numPredict, onToken)
+                "cerebras" -> generateCerebras(config, prompt, system, temperature, numPredict, onToken)
+                "mistral" -> generateMistral(config, prompt, system, temperature, numPredict, onToken)
                 else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
             }
         }
@@ -990,6 +1649,18 @@ object Ollama {
             "Model response was incomplete or filtered ($reason)"
         }
         return choice["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content.orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from ChatGPT" } }
+    }
+
+    internal fun anthropicResponse(body: String): String {
+        val root = json.parseToJsonElement(body).jsonObject
+        val reason = root["stop_reason"]?.jsonPrimitive?.content
+        check(reason == null || reason == "end_turn" || reason == "max_tokens" || reason == "stop_sequence") {
+            "Model response was incomplete or filtered ($reason)"
+        }
+        return root["content"]?.jsonArray?.mapNotNull { part ->
+            val obj = part.jsonObject
+            if (obj["type"]?.jsonPrimitive?.content == "text") obj["text"]?.jsonPrimitive?.content else null
+        }?.joinToString("").orEmpty().trim().also { check(it.isNotEmpty()) { "Empty response from Claude" } }
     }
 
     /** Generate or rewrite a complete newspaper article for a [News] item. */

@@ -19,6 +19,11 @@ class AiDiagnosticsTest {
         assertEquals("gemini-3.8-flash", Ollama.snapGoogleModel("gemini-3.1-flash-lite-image"))
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o"))
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o-mini"))
+        assertEquals("claude-haiku-4-5", Ollama.snapAnthropicModel("claude-opus-4"))
+        assertEquals("claude-sonnet-4-5", Ollama.snapAnthropicModel("claude-sonnet-4-5"))
+        assertEquals("llama-3.1-8b-instant", Ollama.snapGroqModel("whisper-large-v3"))
+        assertEquals("llama-3.1-8b-instant", Ollama.snapGroqModel("llama-3.1-8b-instant"))
+        assertEquals("deepseek-chat", Ollama.snapDeepseekModel("deepseek-chat"))
         assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))
         assertEquals("llama3.2:1b", Ollama.snapLocalModel("llama3.2:3b"))
     }
@@ -36,9 +41,24 @@ class AiDiagnosticsTest {
             Ollama.pickBestModel("google", listOf("gemini-3.8-flash", "gemini-3.5-flash-preview-09-2026", "gemini-2.0-flash")),
         )
         assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai", listOf("gpt-4o", "o1-mini", "gpt-4o-mini")))
+        assertEquals("claude-haiku-4-5", Ollama.pickBestModel("anthropic", listOf("claude-opus-4", "claude-sonnet-4-5", "claude-haiku-4-5")))
+        assertEquals("llama-3.1-8b-instant", Ollama.pickBestModel("groq", listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "whisper-large-v3")))
+        assertEquals("deepseek-chat", Ollama.pickBestModel("deepseek", listOf("deepseek-reasoner", "deepseek-chat")))
+        assertEquals(
+            "meta-llama/llama-3.3-70b-instruct:free",
+            Ollama.pickBestModel("openrouter", listOf("openai/gpt-4o", "meta-llama/llama-3.3-70b-instruct:free", "google/gemma-2-9b-it:free")),
+        )
+        assertEquals("llama3.1-8b", Ollama.pickBestModel("cerebras", listOf("llama-3.3-70b", "llama3.1-8b")))
+        assertEquals("mistral-small-latest", Ollama.pickBestModel("mistral", listOf("mistral-large-latest", "mistral-small-latest", "open-mistral-nemo")))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama", listOf("llama3.2:1b", "smollm2:135m", "qwen2.5:0.5b")))
         assertEquals("gemini-3.8-flash", Ollama.pickBestModel("google"))
         assertEquals("gpt-4o-mini", Ollama.pickBestModel("openai"))
+        assertEquals("claude-haiku-4-5", Ollama.pickBestModel("anthropic"))
+        assertEquals("llama-3.1-8b-instant", Ollama.pickBestModel("groq"))
+        assertEquals("deepseek-chat", Ollama.pickBestModel("deepseek"))
+        assertEquals("meta-llama/llama-3.3-70b-instruct:free", Ollama.pickBestModel("openrouter"))
+        assertEquals("llama3.1-8b", Ollama.pickBestModel("cerebras"))
+        assertEquals("mistral-small-latest", Ollama.pickBestModel("mistral"))
         assertEquals("smollm2:135m", Ollama.pickBestModel("ollama"))
         val cfg = OllamaConfig(provider = "google", googleModel = "gemini-1.5-pro", autoPickModel = true)
         assertEquals("gemini-3.1-flash-lite", Ollama.applyAutoPick(cfg, listOf("gemini-3.1-flash-lite", "gemini-1.5-pro", "gemini-2.0-flash")))
@@ -88,6 +108,12 @@ class AiDiagnosticsTest {
         val openai = Ollama.catalogFetchedModels("openai", listOf("gpt-4o-mini", "gpt-4o", "o1-mini"))
         assertEquals("Cheap · text", openai.first { it.id == "gpt-4o-mini" }.price)
         assertTrue(openai.first { it.id == "gpt-4o" }.price.contains("Paid"))
+        val claude = Ollama.catalogFetchedModels("anthropic", listOf("claude-haiku-4-5", "claude-sonnet-4-5"))
+        assertEquals("Cheap · text", claude.first { it.id == "claude-haiku-4-5" }.price)
+        val groq = Ollama.catalogFetchedModels("groq", listOf("llama-3.1-8b-instant", "whisper-large-v3"))
+        assertTrue(groq.first { it.id == "llama-3.1-8b-instant" }.price.contains("Free"))
+        val deepseek = Ollama.catalogFetchedModels("deepseek", listOf("deepseek-chat", "deepseek-reasoner"))
+        assertEquals("Cheap · text", deepseek.first { it.id == "deepseek-chat" }.price)
     }
     @Test fun emptyModelListNeverInventsAvailableModels() {
         assertTrue(Ollama.googleTextModels("""{"models":[]}""").isEmpty())

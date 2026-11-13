@@ -1,5 +1,7 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,7 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -114,6 +116,12 @@ fun AiDiagnosticsPanel(
                             val response = when (config.provider.lowercase()) {
                                 "google" -> Ollama.testGoogleConnection(config.googleApiKey)
                                 "openai" -> Ollama.testOpenAiConnection(config.openAiApiKey, config.customEndpoint)
+                                "anthropic" -> Ollama.testAnthropicConnection(config.anthropicApiKey)
+                                "groq" -> Ollama.testGroqConnection(config.groqApiKey)
+                                "deepseek" -> Ollama.testDeepseekConnection(config.deepseekApiKey)
+                                "openrouter" -> Ollama.testOpenRouterConnection(config.openRouterApiKey)
+                                "cerebras" -> Ollama.testCerebrasConnection(config.cerebrasApiKey)
+                                "mistral" -> Ollama.testMistralConnection(config.mistralApiKey)
                                 else -> Ollama.testConnection(config.host)
                             }
                             val ids = response.getOrNull().orEmpty()
@@ -253,31 +261,81 @@ fun AiDiagnosticsPanel(
     }
 }
 
+/** Shared connected / configure card for cloud API providers in Settings. */
 @Composable
-fun ApiKeyDialog(provider: String, existing: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var key by remember { mutableStateOf(existing) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = P.surface,
-        title = { Text("$provider API key", style = T.head, color = P.ink) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    "Use an API key issued by $provider. This app does not support email/password login or browser OAuth. Never enter your account password here. The key is saved with this career; do not share saves containing it.",
-                    style = T.small,
-                    color = P.sub,
-                )
-                OutlinedTextField(
-                    key,
-                    { key = it.trim() },
-                    label = { Text("API key") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    colors = fieldColors(),
-                )
+fun CloudApiKeyCard(
+    letter: String,
+    configured: Boolean,
+    displayName: String,
+    statusLine: String,
+    promptTitle: String,
+    promptBlurb: String,
+    configureLabel: String,
+    onConfigure: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    if (configured) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(P.surface2, RoundedCornerShape(10.dp))
+                .border(1.5.dp, P.good.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                .padding(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(P.good.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(letter, style = T.head.copy(fontSize = 16.sp), color = P.good)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            displayName,
+                            style = T.bodyB,
+                            color = P.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Tag("CONNECTED", P.good)
+                    }
+                    Text(statusLine, style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                }
             }
-        },
-        confirmButton = { TextButton(enabled = key.isNotBlank(), onClick = { onSave(key) }) { Text("Save key") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecondaryButton("Reconnect", Modifier.weight(1f), onClick = onConfigure)
+                SecondaryButton("Disconnect", Modifier.weight(1f), onClick = onRemove)
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(P.surface2, RoundedCornerShape(10.dp))
+                .border(1.dp, P.faint.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                .padding(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(P.accentSoft),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(letter, style = T.head.copy(fontSize = 16.sp), color = P.accent)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(promptTitle, style = T.bodyB, color = P.ink)
+                    Text(promptBlurb, style = T.small.copy(fontSize = 11.sp), color = P.sub)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            PrimaryButton(configureLabel, Modifier.fillMaxWidth(), onClick = onConfigure)
+        }
+    }
 }
+

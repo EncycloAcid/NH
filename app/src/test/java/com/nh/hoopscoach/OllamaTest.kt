@@ -230,6 +230,14 @@ class OllamaTest {
         val gpt35 = Ollama.OPENAI_MODELS.firstOrNull { it.id == "gpt-3.5-turbo" }
         assertTrue("GPT-3.5 Turbo exists", gpt35 != null)
         assertTrue("Flagship gpt-4o stays out of cheap Settings shortlist", Ollama.OPENAI_MODELS.none { it.id == "gpt-4o" })
+
+        assertTrue(Ollama.ANTHROPIC_MODELS.any { it.id == "claude-haiku-4-5" })
+        assertTrue(Ollama.GROQ_MODELS.any { it.id == "llama-3.1-8b-instant" })
+        assertTrue(Ollama.DEEPSEEK_MODELS.any { it.id == "deepseek-chat" })
+        assertTrue(Ollama.OPENROUTER_MODELS.any { it.id.endsWith(":free") })
+        assertTrue(Ollama.CEREBRAS_MODELS.any { it.id == "llama3.1-8b" })
+        assertTrue(Ollama.MISTRAL_MODELS.any { it.id == "mistral-small-latest" })
+        assertTrue("Opus stays out of Claude shortlist", Ollama.ANTHROPIC_MODELS.none { it.id.contains("opus") })
     }
 
     @Test
@@ -245,6 +253,9 @@ class OllamaTest {
         assertEquals("", lg.ollama.openAiAccountEmail)
         assertFalse(lg.ollama.openAiSignedIn)
         assertEquals("", lg.ollama.customEndpoint)
+        assertEquals("claude-haiku-4-5", lg.ollama.anthropicModel)
+        assertEquals("llama-3.1-8b-instant", lg.ollama.groqModel)
+        assertEquals("deepseek-chat", lg.ollama.deepseekModel)
 
         lg.ollama.provider = "google"
         lg.ollama.googleApiKey = "test_google_key_123"
@@ -258,6 +269,12 @@ class OllamaTest {
         lg.ollama.openAiAccountPassword = "secret_openai_password"
         lg.ollama.openAiSignedIn = true
         lg.ollama.customEndpoint = "https://custom.openai.proxy/v1/chat/completions"
+        lg.ollama.anthropicApiKey = "test_anthropic_key"
+        lg.ollama.anthropicModel = "claude-sonnet-4-5"
+        lg.ollama.groqApiKey = "test_groq_key"
+        lg.ollama.groqModel = "llama-3.3-70b-versatile"
+        lg.ollama.deepseekApiKey = "test_deepseek_key"
+        lg.ollama.deepseekModel = "deepseek-reasoner"
 
         val encoded = SaveIO.encode(lg)
         val decoded = SaveIO.decode(encoded)
@@ -276,6 +293,15 @@ class OllamaTest {
         assertTrue(decoded.ollama.openAiSignedIn)
         assertTrue(decoded.ollama.isOpenAiSignedIn)
         assertEquals("https://custom.openai.proxy/v1/chat/completions", decoded.ollama.customEndpoint)
+        assertEquals("test_anthropic_key", decoded.ollama.anthropicApiKey)
+        assertEquals("claude-sonnet-4-5", decoded.ollama.anthropicModel)
+        assertTrue(decoded.ollama.isAnthropicSignedIn)
+        assertEquals("test_groq_key", decoded.ollama.groqApiKey)
+        assertEquals("llama-3.3-70b-versatile", decoded.ollama.groqModel)
+        assertTrue(decoded.ollama.isGroqSignedIn)
+        assertEquals("test_deepseek_key", decoded.ollama.deepseekApiKey)
+        assertEquals("deepseek-reasoner", decoded.ollama.deepseekModel)
+        assertTrue(decoded.ollama.isDeepseekSignedIn)
     }
 
     @Test
@@ -311,6 +337,22 @@ class OllamaTest {
         assertEquals("llama3.2:1b", cfg.activeModelName)
         assertEquals("Ollama llama3.2:1b", cfg.fullModelDisplayName)
         assertEquals("Ollama", cfg.shortActionName)
+
+        cfg.provider = "anthropic"
+        cfg.anthropicModel = "claude-haiku-4-5"
+        assertEquals("Claude (Anthropic)", cfg.providerDisplayName)
+        assertEquals("claude-haiku-4-5", cfg.activeModelName)
+        assertEquals("Claude", cfg.shortActionName)
+
+        cfg.provider = "groq"
+        cfg.groqModel = "llama-3.1-8b-instant"
+        assertEquals("Groq", cfg.providerDisplayName)
+        assertEquals("Groq", cfg.shortActionName)
+
+        cfg.provider = "deepseek"
+        cfg.deepseekModel = "deepseek-chat"
+        assertEquals("DeepSeek", cfg.providerDisplayName)
+        assertEquals("DeepSeek", cfg.shortActionName)
     }
 
     @Test
