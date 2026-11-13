@@ -27,8 +27,10 @@ object Journalism {
         append(SituationAwareness.leagueBrief(lg))
         appendLine("YOUR TEAM: ${label(lg, u)} (${u.w}-${u.l}) · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}")
         appendLine("DESK PRIORITY: Lead with titles, defending champions, droughts, and league-wide races. Results support the title narrative — they are not the only story.")
-        // Snapshot: AI desks can run while the sim mutates games/news on another thread.
-        val today = lg.games.toList().filter { it.played && it.day == lg.day }.sortedByDescending {
+        // Snapshot: AI desks run on IO while the sim mutates the same ArrayLists.
+        val games = LeagueLists.games(lg)
+        val teams = LeagueLists.teams(lg)
+        val today = games.filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 40 else 0
         }
         if (today.isNotEmpty()) {
@@ -38,12 +40,12 @@ object Journalism {
                 appendLine("- ${a.school} ${g.aws}, ${h.school} ${g.hs}${if (g.ot > 0) " (OT)" else ""}${if (lg.rivalry(g) != null) " [RIVALRY]" else ""} id=${g.id}")
             }
         }
-        val top = lg.teams.sortedByDescending { it.elo }.take(10)
+        val top = teams.sortedByDescending { it.elo }.take(10)
         val userRank = top.indices.firstOrNull { top[it].id == u.id }?.plus(1)
-            ?: (lg.teams.sortedByDescending { it.elo }.indexOfFirst { it.id == u.id } + 1)
+            ?: (teams.sortedByDescending { it.elo }.indexOfFirst { it.id == u.id } + 1)
         appendLine("Your board rank: #$userRank")
         if (!lg.pro) {
-            val board = lg.recruits.toList().filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(8)
+            val board = LeagueLists.recruits(lg).filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(8)
             if (board.isNotEmpty()) {
                 appendLine("RECRUITING BOARD:")
                 for (r in board) {
@@ -52,13 +54,13 @@ object Journalism {
                 }
             }
         } else {
-            val hot = lg.players.toList().filter { it.teamId >= 0 && it.contractYears <= 1 }.sortedByDescending { it.ovr }.take(6)
+            val hot = LeagueLists.players(lg).filter { it.teamId >= 0 && it.contractYears <= 1 }.sortedByDescending { it.ovr }.take(6)
             if (hot.isNotEmpty()) {
                 appendLine("EXPIRING / SHORT CONTRACTS:")
                 for (p in hot) appendLine("- ${p.name} (${lg.team(p.teamId).name}) ovr ${p.ovr}, ${p.contractYears}yr left")
             }
         }
-        val recentNews = lg.news.toList().filter { it.season == lg.season && it.day >= lg.day - 2 }.takeLast(6)
+        val recentNews = LeagueLists.news(lg).filter { it.season == lg.season && it.day >= lg.day - 2 }.takeLast(6)
         if (recentNews.isNotEmpty()) {
             appendLine("RECENT HEADLINES (do not contradict):")
             for (n in recentNews) appendLine("- ${n.text}")
@@ -71,8 +73,8 @@ object Journalism {
         val outlet = "Hoops Wire Desk"
         val u = lg.user
         val defending = TitleDefense.champion(lg)
-        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(6)
-        val board = lg.teams.sortedByDescending { it.elo }
+        val titleLeaders = LeagueLists.teams(lg).map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(6)
+        val board = LeagueLists.teams(lg).sortedByDescending { it.elo }
         val top = board.take(5)
 
         // 1) Title watch — always lead when we have banner facts
@@ -102,8 +104,8 @@ object Journalism {
         }
 
         // 2) League pulse — polls, board, hot seats
-        val hotSeats = lg.coaches.filter { it.teamId >= 0 && it.security <= 35 }.sortedBy { it.security }.take(3)
-        val poll = lg.teams.filter { it.ap in 1..10 }.sortedBy { it.ap }
+        val hotSeats = LeagueLists.coaches(lg).filter { it.teamId >= 0 && it.security <= 35 }.sortedBy { it.security }.take(3)
+        val poll = LeagueLists.teams(lg).filter { it.ap in 1..10 }.sortedBy { it.ap }
         val pulse = buildString {
             append("League pulse after day ${lg.day}:\n\n")
             if (poll.isNotEmpty()) {
@@ -134,7 +136,7 @@ object Journalism {
         )
 
         // 3) Today's result — framed with title context when possible
-        val today = lg.games.filter { it.played && it.day == lg.day && it.involves(lg.userTeamId) }
+        val today = LeagueLists.games(lg).filter { it.played && it.day == lg.day && it.involves(lg.userTeamId) }
         today.maxByOrNull { kotlin.math.abs(it.hs - it.aws) }?.let { g ->
             val won = g.winner() == u.id
             val opp = lg.team(g.opp(u.id))
@@ -154,7 +156,7 @@ object Journalism {
         }
 
         if (!lg.pro) {
-            val r = lg.recruits.filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
+            val r = LeagueLists.recruits(lg).filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
             if (r != null) {
                 val no = if (r.p.recruitRank > 0) "No.${r.p.recruitRank}" else "an unranked"
                 stories += News(

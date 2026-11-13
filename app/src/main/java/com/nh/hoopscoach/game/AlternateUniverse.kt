@@ -352,7 +352,7 @@ object ShadowProWorld {
     }
 
     fun brief(lg: League): String {
-        val stars = lg.shadowPros.filter { !it.retired }.sortedByDescending { it.rings * 5 + it.allStars }.take(4)
+        val stars = LeagueLists.shadowPros(lg).filter { !it.retired }.sortedByDescending { it.rings * 5 + it.allStars }.take(4)
         if (stars.isEmpty()) return ""
         return "SHADOW PRO LEAGUE: " + stars.joinToString("; ") {
             "${it.name} (${it.school}) · ${it.franchise} · ${it.rings} rings · ${"%.1f".format(it.ppg)} ppg"

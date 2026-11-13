@@ -16,7 +16,7 @@ object SituationAwareness {
                 else "TITLE LINE: ${c.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
             } else "TITLE LINE: ${CollegeHistory.line(lg, c)}")
         }
-        val leaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(3)
+        val leaders = LeagueLists.teams(lg).map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(3)
         if (leaders.isNotEmpty()) {
             appendLine("NATIONAL TITLES: " + leaders.joinToString("; ") { (t, n) -> "${t.school} $n" })
         }
@@ -55,7 +55,8 @@ object SituationAwareness {
             )
         }
         val titleCap = if (compact) 5 else 8
-        val titleLeaders = lg.teams
+        val teams = LeagueLists.teams(lg)
+        val titleLeaders = teams
             .map { it to TitleDefense.titles(lg, it).size }
             .filter { it.second > 0 }
             .sortedByDescending { it.second }
@@ -70,7 +71,7 @@ object SituationAwareness {
         }
         if (lg.universeSeed != 0) appendLine("UNIVERSE: alternate basketball history (seed ${lg.universeSeed})")
         ShadowProWorld.brief(lg).takeIf { it.isNotBlank() }?.let { appendLine(it) }
-        val recent = lg.history.takeLast(if (compact) 3 else 6)
+        val recent = LeagueLists.history(lg).takeLast(if (compact) 3 else 6)
         if (recent.isNotEmpty()) {
             appendLine("RECENT LEAGUE CHAMPIONS:")
             for (h in recent) {
@@ -79,20 +80,20 @@ object SituationAwareness {
                 appendLine("- ${h.season}: ${c?.school ?: "?"} over ${r?.school ?: "?"}")
             }
         }
-        val poll = lg.teams.filter { it.ap in 1..25 }.sortedBy { it.ap }
+        val poll = teams.filter { it.ap in 1..25 }.sortedBy { it.ap }
         val pollN = if (compact) 5 else 10
         if (poll.isNotEmpty()) {
             appendLine("AP POLL (top ${minOf(pollN, poll.size)}):")
             for (t in poll.take(pollN)) appendLine("- #${t.ap} ${t.school} (${t.w}-${t.l})")
         } else {
-            val board = lg.teams.sortedByDescending { it.elo }.take(if (compact) 5 else 8)
+            val board = teams.sortedByDescending { it.elo }.take(if (compact) 5 else 8)
             appendLine("POWER BOARD (Elo):")
             board.forEachIndexed { i, t -> appendLine("- ${i + 1}. ${t.school} (${t.w}-${t.l})") }
         }
-        if (!compact && !lg.pro && lg.teams.any { it.cw + it.cl > 0 }) {
+        if (!compact && !lg.pro && teams.any { it.cw + it.cl > 0 }) {
             appendLine("CONFERENCE RACES (leaders):")
             for (c in lg.confs.sortedBy { it.tier }.take(8)) {
-                val stand = lg.teams.filter { it.confId == c.id }.sortedWith(
+                val stand = teams.filter { it.confId == c.id }.sortedWith(
                     compareByDescending<Team> { if (it.cw + it.cl > 0) it.cw.toDouble() / (it.cw + it.cl) else 0.0 }
                         .thenByDescending { it.cw }
                         .thenByDescending { it.elo },
@@ -105,7 +106,7 @@ object SituationAwareness {
                 )
             }
         }
-        val hotSeats = lg.coaches.filter { it.teamId >= 0 && it.security <= 35 }.sortedBy { it.security }.take(if (compact) 3 else 5)
+        val hotSeats = LeagueLists.coaches(lg).filter { it.teamId >= 0 && it.security <= 35 }.sortedBy { it.security }.take(if (compact) 3 else 5)
         if (hotSeats.isNotEmpty()) {
             appendLine("HOT SEATS:")
             for (c in hotSeats) {
@@ -113,7 +114,7 @@ object SituationAwareness {
                 appendLine("- Coach ${c.name} (${t.school}): security ${c.security}/100 · ${t.w}-${t.l} · coach titles ${c.titles}")
             }
         }
-        val streaks = lg.teams.filter { kotlin.math.abs(it.streak) >= 4 }.sortedByDescending { kotlin.math.abs(it.streak) }.take(if (compact) 4 else 6)
+        val streaks = teams.filter { kotlin.math.abs(it.streak) >= 4 }.sortedByDescending { kotlin.math.abs(it.streak) }.take(if (compact) 4 else 6)
         if (streaks.isNotEmpty()) {
             appendLine("STREAKS:")
             for (t in streaks) {
@@ -121,7 +122,7 @@ object SituationAwareness {
                 appendLine("- ${t.school}: $label (${t.w}-${t.l})")
             }
         }
-        val moments = lg.moments.filter { it.season == lg.season && it.day == lg.day }.take(if (compact) 3 else 5)
+        val moments = LeagueLists.moments(lg).filter { it.season == lg.season && it.day == lg.day }.take(if (compact) 3 else 5)
         if (moments.isNotEmpty()) {
             appendLine("TODAY'S HISTORIC MOMENTS:")
             for (m in moments) appendLine("- ${m.kind}: ${m.headline}")
@@ -157,20 +158,21 @@ object SituationAwareness {
     fun namedTeams(lg: League): List<Team> {
         val ids = mutableSetOf(lg.userTeamId)
         TitleDefense.champion(lg)?.let { ids += it.id }
-        lg.history.takeLast(6).forEach { h ->
+        val teams = LeagueLists.teams(lg)
+        LeagueLists.history(lg).takeLast(6).forEach { h ->
             if (h.champion >= 0) ids += h.champion
             if (h.runnerUp >= 0) ids += h.runnerUp
         }
-        lg.teams.filter { it.ap in 1..10 }.forEach { ids += it.id }
-        lg.teams.sortedByDescending { TitleDefense.titles(lg, it).size }.take(8).forEach { ids += it.id }
-        lg.coaches.filter { it.teamId >= 0 && it.security <= 35 }.take(5).forEach { ids += it.teamId }
-        lg.teams.filter { kotlin.math.abs(it.streak) >= 4 }.take(6).forEach { ids += it.id }
+        teams.filter { it.ap in 1..10 }.forEach { ids += it.id }
+        teams.sortedByDescending { TitleDefense.titles(lg, it).size }.take(8).forEach { ids += it.id }
+        LeagueLists.coaches(lg).filter { it.teamId >= 0 && it.security <= 35 }.take(5).forEach { ids += it.teamId }
+        teams.filter { kotlin.math.abs(it.streak) >= 4 }.take(6).forEach { ids += it.id }
         lg.bubble?.takeIf { it.season == lg.season }?.groups?.take(4)?.forEach { g ->
             g.ids.take(4).forEach { ids += it }
         }
         if (!lg.pro) {
             for (c in lg.confs.sortedBy { it.tier }.take(8)) {
-                lg.teams.filter { it.confId == c.id }.sortedWith(
+                teams.filter { it.confId == c.id }.sortedWith(
                     compareByDescending<Team> { if (it.cw + it.cl > 0) it.cw.toDouble() / (it.cw + it.cl) else 0.0 }
                         .thenByDescending { it.cw },
                 ).take(2).forEach { ids += it.id }

@@ -1108,7 +1108,7 @@ object Ollama {
         if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
             generateMediaEcosystem(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1200,7 +1200,7 @@ object Ollama {
         if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
             generateUniversityDevelopment(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1281,7 +1281,7 @@ object Ollama {
         if (lg.rivals.isEmpty() && CoachRivals.rivals(lg).isEmpty()) return
         CoroutineScope(Dispatchers.IO).launch {
             generateHistoricalRivalries(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1363,7 +1363,7 @@ object Ollama {
         if (!draftNightPulse && (lg.day < 12 || lg.day % 8 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
             generateDraftUniverse(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1444,7 +1444,7 @@ object Ollama {
         if (PlayerStorylines.detectArcs(lg).isEmpty()) return
         CoroutineScope(Dispatchers.IO).launch {
             generatePlayerStorylines(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1529,7 +1529,7 @@ object Ollama {
         if (!config.enabled || !config.livingCoachingCareers || !config.autoGenerate) return
         CoroutineScope(Dispatchers.IO).launch {
             generateLivingCoachingCareers(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1621,7 +1621,7 @@ object Ollama {
                     lg.news[match].aiFallbackReason = s.aiFallbackReason
                     lg.news[match].approved = false
                 } else if (pack.stories.isNotEmpty()) {
-                    lg.news.addAll(pack.stories)
+                    LeagueLists.appendNews(lg, pack.stories)
                 }
             }
         }
@@ -1697,7 +1697,7 @@ object Ollama {
         if (lg.day < 3 || lg.day % 3 != 0) return
         CoroutineScope(Dispatchers.IO).launch {
             generateSportsJournalism(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) lg.news.addAll(pack.stories)
+                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
         }
     }
@@ -1713,7 +1713,11 @@ object Ollama {
         if (!config.enabled || !config.sportsJournalism) {
             return@withContext Result.success(Journalism.fallbackPackage(lg))
         }
-        val brief = Journalism.eventBrief(lg)
+        val brief = try {
+            Journalism.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(Journalism.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written package."))
+        }
         val cacheKey = "journalism_${lg.season}_${lg.day}_${config.activeModelName}" + "_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<Journalism.Package>(cacheKey)?.let { return@withContext Result.success(it) }
