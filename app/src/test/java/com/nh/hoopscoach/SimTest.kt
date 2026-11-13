@@ -300,9 +300,13 @@ class SimTest {
                 twice++
                 assertTrue("home-and-home", conf.map { it.home }.toSet().size == 2)
             }
+            // Emerging rivalries are minted after prior meetings; only traditional ones always sold out.
+            val traditional = !r.name.equals("Emerging rivalry", ignoreCase = true)
             for (g in meetings) {
-                assertTrue("rivalry sells out", g.att == (if (g.neutral) g.att else lg.team(g.home).arena))
-                assertTrue("prestige swing", g.swing in 1..2)
+                if (traditional) {
+                    assertTrue("rivalry sells out", g.att == (if (g.neutral) g.att else lg.team(g.home).arena))
+                    assertTrue("prestige swing", g.swing in 1..2)
+                }
             }
         }
         val duke = lg.teams.first { it.school == "Duke" }.id

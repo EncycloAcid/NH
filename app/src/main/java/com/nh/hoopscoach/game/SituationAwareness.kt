@@ -5,9 +5,31 @@ package com.nh.hoopscoach.game
  * hot seats, streaks, moments, and bubble — so copy stays aware of the whole league.
  */
 object SituationAwareness {
+    /** Tiny title/league block for every [AiFacts] sheet — stays inside local model context. */
+    fun microBrief(lg: League): String = buildString {
+        appendLine("LEAGUE SITUATION: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
+        TitleDefense.champion(lg)?.let { c ->
+            appendLine("DEFENDING CHAMPION: ${c.school} (${c.w}-${c.l}${if (c.ap > 0) ", AP #${c.ap}" else ""})")
+            appendLine(if (lg.pro) {
+                val ts = NbaHistory.titles(lg, c)
+                if (ts.isEmpty()) "TITLE LINE: ${c.name} has ${NbaHistory.titleWords(0)}."
+                else "TITLE LINE: ${c.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
+            } else "TITLE LINE: ${CollegeHistory.line(lg, c)}")
+        }
+        val leaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(3)
+        if (leaders.isNotEmpty()) {
+            appendLine("NATIONAL TITLES: " + leaders.joinToString("; ") { (t, n) -> "${t.school} $n" })
+        }
+        appendLine(if (lg.pro) {
+            val ts = NbaHistory.titles(lg, lg.user)
+            if (ts.isEmpty()) "YOUR TITLE HISTORY: ${lg.user.name} has ${NbaHistory.titleWords(0)}."
+            else "YOUR TITLE HISTORY: ${lg.user.name} owns ${NbaHistory.titleWords(ts.size)}, the last in ${ts.last()}."
+        } else "YOUR TITLE HISTORY: ${CollegeHistory.line(lg, lg.user)}")
+    }
+
     /**
      * League-wide brief. Safe for fact sheets and Hoops Wire desks.
-     * @param compact shorter block for [AiFacts] (still includes titles / champ / poll).
+     * @param compact shorter block for desks that still need polls/hot seats.
      */
     fun leagueBrief(lg: League, compact: Boolean = false): String = buildString {
         appendLine("LEAGUE SITUATION: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")

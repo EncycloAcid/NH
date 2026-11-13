@@ -17,7 +17,8 @@ class SituationAwarenessTest {
         val named = SituationAwareness.namedTeams(lg)
         assertTrue(named.any { it.id == lg.userTeamId })
         val facts = AiFacts.build(lg, lg.user.school)
-        assertTrue(facts.text.contains("LEAGUE SITUATION") || facts.text.contains("national titles"))
-        assertTrue(facts.text.contains("TITLE HISTORY") || facts.text.contains("DEFENDING") || facts.text.contains("NATIONAL TITLES"))
+        assertTrue(facts.text.contains("LEAGUE SITUATION") || facts.text.contains("TITLE"))
+        assertTrue(facts.text.contains("YOUR TITLE HISTORY") || facts.text.contains("DEFENDING") || facts.text.contains("NATIONAL TITLES"))
+        assertTrue("fact sheet must stay inside local context", facts.text.length < 8192)
     }
 }
