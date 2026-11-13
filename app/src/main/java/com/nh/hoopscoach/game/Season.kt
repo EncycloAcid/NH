@@ -411,6 +411,7 @@ object Season {
         lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward, targets[lg.userTeamId], userRate)
         if (lg.playerMode) Road.seasonEnd(lg)
         runCatching { Columns.reviewCollege(lg) }
+        runCatching { Turnarounds.publish(lg) }
         // An odd summer: USA Basketball may want him for the U19 World Cup.
         if (!lg.playerMode) runCatching { TeamUSA.offer(lg) }
         lg.phase = Phase.WRAP_UP
