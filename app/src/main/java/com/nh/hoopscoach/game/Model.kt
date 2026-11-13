@@ -284,6 +284,8 @@ class Player(
     /** Career highs: points, rebounds, assists, threes, steals, blocks; and the game for each. */
     var highs: IntArray = IntArray(6),
     var highGames: MutableList<String> = mutableListOf(),
+    /** What he remembers, and how it ties him to a school or turns him against it (see [Memories]). */
+    var memories: MutableList<Memory> = mutableListOf(),
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
@@ -704,7 +706,7 @@ class OllamaConfig(
     // Multi-Provider AI (Google Gemini, OpenAI ChatGPT, Local Ollama)
     var provider: String = "ollama", // "ollama", "google", "openai"
     var googleApiKey: String = "",
-    var googleModel: String = "gemini-1.5-flash",
+    var googleModel: String = "gemini-flash-lite-latest",
     var googleAccountEmail: String = "",
     var googleAccountName: String = "",
     var googleAccountPassword: String = "",
@@ -731,7 +733,7 @@ class OllamaConfig(
 
     val activeModelName: String
         get() = when (provider.lowercase()) {
-            "google" -> googleModel.ifBlank { "gemini-1.5-flash" }
+            "google" -> Ollama.snapGoogleModel(googleModel)
             "openai" -> openAiModel.ifBlank { "gpt-4o-mini" }
             else -> model.ifBlank { "llama3.2:1b" }
         }

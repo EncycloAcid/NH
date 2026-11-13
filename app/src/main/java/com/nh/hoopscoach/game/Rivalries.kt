@@ -165,6 +165,7 @@ object Rivalries {
         l.rivalryDelta += l.prestige - lb
         for (pid in w.roster) lg.player(pid).let { it.happiness = (it.happiness + 3).coerceAtMost(100) }
         for (pid in l.roster) lg.player(pid).let { it.happiness = (it.happiness - 2).coerceAtLeast(0) }
+        Memories.rivalry(lg, g, w, l)
         val user = lg.userTeamId
         val mine = g.involves(user)
         if (mine) lg.userCoach.security = (lg.userCoach.security + if (w.id == user) 2 else -2).coerceIn(0, 100)

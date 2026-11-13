@@ -351,6 +351,7 @@ object Season {
             lg.team(b.champion).confTitles++
             lg.coachOf(lg.team(b.champion)).confTitles++
         }
+        runCatching { Memories.seasonEnd(lg, champ.id, runnerUp) }
         val coty = lg.coaches.firstOrNull { it.id == lg.cotyCoachId }
         lg.history += SeasonSummary(
             lg.season, champ.id, runnerUp, f4, lg.seasonAwards.toList(),

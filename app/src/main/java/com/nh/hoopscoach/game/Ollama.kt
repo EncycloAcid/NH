@@ -62,36 +62,53 @@ object Ollama {
         val description: String,
     )
 
-    /** Free / cheap Gemini tags only — Pro is hidden from Settings. */
+    /**
+     * Free-tier Gemini text models only (checked against Google's pricing, November 2026). The first is
+     * the default: an alias Google keeps pointed at its newest Flash-Lite, so it doesn't go stale the way
+     * a dated id does. Pro, Carbon and Argon have no free tier and are never offered.
+     */
     val GOOGLE_MODELS = listOf(
-        CloudModel("gemini-1.5-flash", "Gemini 1.5 Flash", "Recommended · free", "Fast free-tier model. Ideal for instant recaps."),
-        CloudModel("gemini-2.0-flash", "Gemini 2.0 Flash", "Free · next-gen", "Newest flash model with sub-second generation."),
+        CloudModel("gemini-flash-lite-latest", "Gemini Flash-Lite", "Recommended · free", "Google's newest Flash-Lite. Fastest and cheapest; free tier."),
+        CloudModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "Free tier", "Same family, pinned to one version."),
+        CloudModel("gemini-flash-latest", "Gemini Flash", "Free tier · best writing", "Google's newest Flash. Fuller articles, a little slower."),
+        CloudModel("gemini-3.8-flash", "Gemini 3.8 Flash", "Free tier", "Flash, pinned to one version."),
     )
 
-    /** Cheap OpenAI tags only — flagship gpt-4o is hidden from Settings. */
+    /** Cheap OpenAI text models only (a few tenths of a cent per story); flagships are never offered. */
     val OPENAI_MODELS = listOf(
-        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · cheap", "Affordable and fast. Strong basketball context."),
-        CloudModel("gpt-3.5-turbo", "GPT-3.5 Turbo", "Cheap · legacy", "Classic ChatGPT for basic headlines and recaps."),
+        CloudModel("gpt-4o-mini", "GPT-4o mini", "Recommended · cheap", "Affordable, fast and steady."),
+        CloudModel("gpt-6-luna", "GPT-6 Luna", "Cheap · newest", "OpenAI's current low-cost model."),
+        CloudModel("gpt-5-nano", "GPT-5 nano", "Cheapest", "The lowest price OpenAI offers."),
     )
+
+    /** Gemini ids Google has shut down; a save still pointing at one is moved to the default. */
+    private val RETIRED_GEMINI = Regex("""gemini-(1\.0|1\.5|2\.0)(-|$)|^gemini-pro(-vision)?$|^gemini-ultra$""")
+
+    /** Models that speak, draw, listen or embed rather than write. */
+    private val NOT_TEXT = listOf("tts", "image", "imagen", "banana", "live", "audio", "transcribe", "speech", "omni", "embed", "aqa", "veo", "lyria",
+        "robotics", "computer-use", "customtools", "translate", "decision", "deep-research", "antigravity", "realtime", "whisper", "dall-e",
+        "moderation", "sora", "search", "codex", "guard")
+
+    internal fun writesText(id: String) = id.lowercase().let { low -> NOT_TEXT.none { it in low } }
 
     /**
-     * Only remaps known expensive / blocked ids onto a free/cheap default.
+     * Remaps blank, retired, non-text and expensive ids onto the free default.
      * Custom picks from the provider list (e.g. gemini-3.5-flash) must stick —
      * never force everything onto the curated Settings shortlist.
      */
     fun snapGoogleModel(id: String): String {
         val t = id.trim().removePrefix("models/").ifEmpty { return GOOGLE_MODELS.first().id }
         val low = t.lowercase()
-        val blocked = low == "gemini-1.5-pro" || low == "gemini-1.0-pro" || low == "gemini-pro" ||
-            low == "gemini-ultra" || (low.contains("pro") && !low.contains("flash") && !low.contains("nano"))
-        return if (blocked) GOOGLE_MODELS.first().id else t
+        val costly = (low.contains("pro") && !low.contains("flash") && !low.contains("nano")) || "carbon" in low || "argon" in low || "ultra" in low
+        return if (costly || RETIRED_GEMINI.containsMatchIn(low) || !writesText(low)) GOOGLE_MODELS.first().id else t
     }
 
     fun snapOpenAiModel(id: String): String {
         val t = id.trim().ifEmpty { return OPENAI_MODELS.first().id }
         val low = t.lowercase()
-        val blocked = low == "gpt-4o" || low == "gpt-4" || low == "gpt-4-turbo" || low == "gpt-4-turbo-preview" ||
-            low.startsWith("o1") || low.startsWith("o3") || low.startsWith("o4")
+        val cheap = "mini" in low || "nano" in low || "luna" in low
+        val blocked = low == "gpt-3.5-turbo" || low.startsWith("o1") || low.startsWith("o3") || low.startsWith("o4") ||
+            (low.startsWith("gpt-") && !cheap) || !writesText(low)
         return if (blocked) OPENAI_MODELS.first().id else t
     }
 
@@ -117,9 +134,12 @@ object Ollama {
     )
 
     /** Group + price labels for models returned by a provider's list endpoint. */
-    fun catalogFetchedModels(provider: String, ids: List<String>): List<CatalogEntry> =
-        ids.distinct().map { id -> catalogEntry(provider, id) }
+    fun catalogFetchedModels(provider: String, ids: List<String>): List<CatalogEntry> {
+        val all = ids.distinct().map { id -> catalogEntry(provider, id) }
             .sortedWith(compareBy({ it.categoryOrder }, { it.title.lowercase() }, { it.id.lowercase() }))
+        // Only what is free or cheap and writes text; the whole list only if a provider offers nothing else.
+        return all.filter { it.categoryOrder == 0 && (provider.lowercase() == "ollama" || writesText(it.id)) }.ifEmpty { all }
+    }
 
     private fun catalogEntry(provider: String, id: String): CatalogEntry {
         val key = id.lowercase().removePrefix("models/")
@@ -151,14 +171,20 @@ object Ollama {
             CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheapest", 0)
         "flash" in key ->
             CatalogEntry(id, title, "Flash · free & cheap", "Free tier · cheap", 0)
-        "pro" in key || "ultra" in key || "argon" in key || "carbon" in key || "hydrogen" in key ->
+        RETIRED_GEMINI.containsMatchIn(key) ->
+            CatalogEntry(id, title, "Retired", "Shut down by Google", 6)
+        "hydrogen" in key || "gemma" in key ->
+            CatalogEntry(id, title, "Flash · free & cheap", "Free tier", 0)
+        "pro" in key || "ultra" in key || "argon" in key || "carbon" in key ->
             CatalogEntry(id, title, "Pro / frontier · paid", "Paid · premium", 1)
         else ->
             CatalogEntry(id, title, "Other Gemini", "See Google pricing", 5)
     }
 
     private fun openAiCatalog(key: String, id: String, title: String): CatalogEntry = when {
-        "mini" in key || "3.5" in key || "nano" in key ->
+        !writesText(key) ->
+            CatalogEntry(id, title, "Audio / image", "Not a writing model", 4)
+        "mini" in key || "nano" in key || "luna" in key ->
             CatalogEntry(id, title, "Cheap ChatGPT", "Cheap · text", 0)
         "o1" in key || "o3" in key || "o4" in key ->
             CatalogEntry(id, title, "Reasoning · premium", "Paid · premium", 2)
@@ -368,7 +394,7 @@ object Ollama {
     internal fun googleTextModels(body: String): List<String> = json.parseToJsonElement(body).jsonObject["models"]?.jsonArray?.mapNotNull {
         val model = it.jsonObject
         val name = model["name"]?.jsonPrimitive?.content?.removePrefix("models/") ?: return@mapNotNull null
-        name.takeIf { it.contains("gemini") && model["supportedGenerationMethods"]?.jsonArray?.any { it.jsonPrimitive.content == "generateContent" } == true }
+        name.takeIf { (it.contains("gemini") || it.contains("gemma")) && model["supportedGenerationMethods"]?.jsonArray?.any { it.jsonPrimitive.content == "generateContent" } == true }
     }.orEmpty()
 
     /** Test connection to Google Gemini API using [apiKey]. */
@@ -376,7 +402,7 @@ object Ollama {
         runCatching {
             val key = apiKey.trim()
             if (key.isNotEmpty()) {
-                val url = URL("https://generativelanguage.googleapis.com/v1beta/models?key=$key")
+                val url = URL("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=$key")
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 8000
@@ -437,6 +463,43 @@ object Ollama {
     }
 
 
+    private class Reply(val code: Int, val body: String)
+
+    private fun post(url: String, headers: Map<String, String>, payload: String): Reply {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 10000
+            readTimeout = 90000
+            doOutput = true
+            headers.forEach { (k, v) -> setRequestProperty(k, v) }
+            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            setRequestProperty("Accept", "application/json")
+        }
+        conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        return Reply(code, stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: "HTTP $code")
+    }
+
+    private fun errorText(body: String): String = runCatching {
+        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+    }.getOrNull() ?: body
+
+    /**
+     * How a Gemini model is told to keep its private reasoning short. Its thinking is billed against the
+     * same output limit as the answer, so left alone it can spend the whole limit and return nothing.
+     * 2.5 models take a token budget; 3 and 4 take a level ("minimal" only on the Flash-Lites).
+     */
+    internal fun googleThinking(model: String): String {
+        val low = model.lowercase()
+        return when {
+            "gemma" in low || RETIRED_GEMINI.containsMatchIn(low) -> ""
+            "2.5" in low -> "\"thinkingConfig\":{\"thinkingBudget\":${if ("pro" in low) 128 else 0}}"
+            "flash-lite" in low -> "\"thinkingConfig\":{\"thinkingLevel\":\"minimal\"}"
+            else -> "\"thinkingConfig\":{\"thinkingLevel\":\"low\"}"
+        }
+    }
+
     /** Generate content using Google Gemini REST API or Account Cloud Session. */
     suspend fun generateGoogle(
         config: OllamaConfig,
@@ -450,70 +513,73 @@ object Ollama {
             return@withContext Result.failure(Exception("Gemini requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.googleApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            val remoteResult = runCatching {
-                val model = config.googleModel.ifBlank { "gemini-1.5-flash" }
-                val candidates = listOf(model)
-                var lastErr: Exception? = null
-                var text: String? = null
-
-                for (cand in candidates) {
-                    for (apiVersion in listOf("v1beta")) {
+        if (apiKey.isEmpty()) return@withContext Result.failure(IllegalStateException("No Google model credential; use game-written coverage."))
+        runCatching {
+            val chosen = snapGoogleModel(config.googleModel)
+            // If the chosen model is gone or out of free quota, the other free ones each have their own.
+            val candidates = (listOf(chosen) + GOOGLE_MODELS.map { it.id }).distinct()
+            val headers = buildMap {
+                put("x-goog-api-key", apiKey)
+                if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) put("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
+            }
+            var lastErr: Exception? = null
+            var gone = false              // the chosen model no longer exists, as opposed to being busy or out of quota
+            for (model in candidates) {
+                var thinking = googleThinking(model)
+                // Room for the answer at twice the asked length, plus the model's own reasoning.
+                var limit = numPredict * 2 + if (thinking.isEmpty()) 8192 else 2048
+                var tries = 0
+                while (tries++ < 3) {
+                    // Gemma takes no system instruction, so its brief rides in front of the prompt.
+                    val gemma = "gemma" in model.lowercase()
+                    val payload = buildString {
+                        append("{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":").append(jsonString(if (gemma && system.isNotBlank()) "$system\n\n$prompt" else prompt)).append("}]}]")
+                        if (system.isNotBlank() && !gemma) append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
+                        append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$limit")
+                        if (thinking.isNotEmpty()) append(',').append(thinking)
+                        append("}}")
+                    }
+                    val reply = try {
+                        post("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent", headers, payload)
+                    } catch (e: Exception) {
+                        lastErr = e
+                        break
+                    }
+                    if (reply.code in 200..299) {
                         try {
-                            val url = URL("https://generativelanguage.googleapis.com/$apiVersion/models/$cand:generateContent?key=$apiKey")
-                            val conn = (url.openConnection() as HttpURLConnection).apply {
-                                requestMethod = "POST"
-                                connectTimeout = 8000
-                                readTimeout = 90000
-                                doOutput = true
-                                setRequestProperty("x-goog-api-key", apiKey)
-                                if (apiKey.startsWith("ya29.") || apiKey.startsWith("Bearer ")) {
-                                    setRequestProperty("Authorization", if (apiKey.startsWith("Bearer ")) apiKey else "Bearer $apiKey")
-                                }
-                                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                                setRequestProperty("Accept", "application/json")
-                            }
-
-                            val payload = buildString {
-                                append("{\"contents\":[{\"parts\":[{\"text\":").append(jsonString(prompt)).append("}]}]")
-                                if (system.isNotBlank()) {
-                                    append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
-                                }
-                                append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict}}")
-                            }
-
-                            conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
-
-                            val code = conn.responseCode
-                            if (code in 200..299) {
-                                val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                                val content = googleResponse(body)
-                                if (content.isNotEmpty()) {
-                                    onToken?.invoke(content)
-                                    text = content
-                                    break
-                                }
-                            } else {
-                                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                                val errMsg = runCatching {
-                                    json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                                }.getOrNull() ?: err
-                                lastErr = Exception("Google AI Error ($code): $errMsg")
-                            }
-                        } catch (e: Exception) {
+                            val content = googleResponse(reply.body)
+                            // A retired pick is replaced for good; a busy one is only stood in for this once.
+                            if (chosen != config.googleModel || (gone && model != chosen)) config.googleModel = model
+                            onToken?.invoke(content)
+                            return@runCatching content
+                        } catch (e: IllegalStateException) {
                             lastErr = e
+                            // Cut off at the limit (reasoning ate it): once more with three times the room.
+                            if (e.message?.contains("MAX_TOKENS") == true && limit < 24000) { limit = (limit * 3).coerceAtMost(32000); continue }
+                            break
                         }
                     }
-                    if (text != null) break
+                    val message = errorText(reply.body)
+                    lastErr = Exception("Google AI Error (${reply.code}): $message")
+                    val badKey = message.contains("API key", true) || message.contains("API_KEY", true)
+                    if (reply.code == 400 && thinking.isNotEmpty() && !badKey) {
+                        // This model doesn't take that reasoning setting: ask plainly, with room to think.
+                        thinking = ""
+                        limit = numPredict * 2 + 8192
+                        continue
+                    }
+                    // A bad key or a refused account fails the same way on every model.
+                    if (badKey || reply.code in setOf(401, 402, 403) || (reply.code == 400 && message.contains("FAILED_PRECONDITION", true))) throw lastErr!!
+                    if (reply.code == 404 && model == chosen) gone = true
+                    break                 // 404 retired, 429 out of quota, 5xx busy: try the next free model
                 }
-                text ?: throw (lastErr ?: Exception("Google AI request failed"))
             }
-
-            remoteResult
-        } else {
-            Result.failure(IllegalStateException("No Google model credential; use game-written coverage."))
+            throw (lastErr ?: Exception("Google AI request failed"))
         }
     }
+
+    /** OpenAI's reasoning families: they take no temperature and spend output tokens on thinking. */
+    private fun reasons(model: String) = model.lowercase().let { it.startsWith("gpt-5") || it.startsWith("gpt-6") || it.startsWith("o1") || it.startsWith("o3") || it.startsWith("o4") }
 
     /** Generate content using OpenAI / ChatGPT REST API or Account Cloud Session. */
     suspend fun generateOpenAi(
@@ -528,51 +594,54 @@ object Ollama {
             return@withContext Result.failure(Exception("OpenAI requires an API key. Email/password sign-in is not supported."))
         }
         val apiKey = config.openAiApiKey.trim()
-        if (apiKey.isNotEmpty()) {
-            val remoteResult = runCatching {
-                val model = config.openAiModel.ifBlank { "gpt-4o-mini" }
-                val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
-                val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
-                val url = URL(endpoint)
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 10000
-                    readTimeout = 90000
-                    doOutput = true
-                    setRequestProperty("Authorization", "Bearer $apiKey")
-                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                    setRequestProperty("Accept", "application/json")
-                }
-
+        if (apiKey.isEmpty()) return@withContext Result.failure(IllegalStateException("No ChatGPT model credential; use game-written coverage."))
+        runCatching {
+            val rawEndpoint = config.customEndpoint.trim().ifEmpty { "https://api.openai.com/v1/chat/completions" }
+            val endpoint = if (rawEndpoint.startsWith("http://") || rawEndpoint.startsWith("https://")) rawEndpoint else "https://$rawEndpoint"
+            val own = endpoint.contains("api.openai.com")
+            // Someone else's server keeps whatever model it was given; OpenAI's own is held to the cheap ones.
+            val model = if (own) snapOpenAiModel(config.openAiModel) else config.openAiModel.ifBlank { "gpt-4o-mini" }
+            val thinks = own && reasons(model)
+            // What this model accepts isn't the same across OpenAI's families, so a refused setting is dropped and the request sent again.
+            var newLimitName = own
+            var sendTemperature = !thinks
+            var effort = if (thinks) "low" else ""
+            var limit = numPredict * 2 + if (thinks) 4096 else 256
+            var lastErr: Exception? = null
+            repeat(5) {
                 val payload = buildString {
                     append("{\"model\":").append(jsonString(model))
                     append(",\"messages\":[")
                     append("{\"role\":\"system\",\"content\":").append(jsonString(system)).append("},")
-                    append("{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}")
-                    append("],\"temperature\":$temperature,\"max_tokens\":$numPredict}")
+                    append("{\"role\":\"user\",\"content\":").append(jsonString(prompt)).append("}]")
+                    if (sendTemperature) append(",\"temperature\":$temperature")
+                    if (effort.isNotEmpty()) append(",\"reasoning_effort\":").append(jsonString(effort))
+                    append(",\"${if (newLimitName) "max_completion_tokens" else "max_tokens"}\":$limit}")
                 }
-
-                conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
-
-                val code = conn.responseCode
-                if (code in 200..299) {
-                    val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    val text = openAiResponse(body)
-                    if (text.isEmpty()) throw Exception("Empty response from ChatGPT")
-                    onToken?.invoke(text)
-                    text
-                } else {
-                    val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                    val errMsg = runCatching {
-                        json.parseToJsonElement(err).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull() ?: err
-                    throw Exception("ChatGPT Error ($code): $errMsg")
+                val reply = post(endpoint, mapOf("Authorization" to "Bearer $apiKey"), payload)
+                if (reply.code in 200..299) {
+                    try {
+                        val text = openAiResponse(reply.body)
+                        onToken?.invoke(text)
+                        return@runCatching text
+                    } catch (e: IllegalStateException) {
+                        lastErr = e
+                        if (e.message?.contains("(length)") == true && limit < 24000) { limit = (limit * 3).coerceAtMost(32000); return@repeat }
+                        throw e
+                    }
+                }
+                val message = errorText(reply.body)
+                lastErr = Exception("ChatGPT Error (${reply.code}): $message")
+                if (reply.code != 400) throw lastErr!!
+                when {
+                    newLimitName && message.contains("max_completion_tokens") -> newLimitName = false
+                    !newLimitName && message.contains("max_tokens") -> newLimitName = true
+                    sendTemperature && message.contains("temperature") -> sendTemperature = false
+                    effort.isNotEmpty() && message.contains("reasoning") -> effort = ""
+                    else -> throw lastErr!!
                 }
             }
-
-            remoteResult
-        } else {
-            Result.failure(IllegalStateException("No ChatGPT model credential; use game-written coverage."))
+            throw (lastErr ?: Exception("ChatGPT request failed"))
         }
     }
 

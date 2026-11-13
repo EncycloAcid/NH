@@ -13,7 +13,15 @@ class AiDiagnosticsTest {
     @Test fun snapKeepsProviderPicksAndOnlyBlocksExpensiveDefaults() {
         assertEquals("gemini-3.5-flash", Ollama.snapGoogleModel("gemini-3.5-flash"))
         assertEquals("gemini-3.5-flash-lite", Ollama.snapGoogleModel("gemini-3.5-flash-lite"))
-        assertEquals("gemini-1.5-flash", Ollama.snapGoogleModel("gemini-1.5-pro"))
+        assertEquals("gemini-flash-lite-latest", Ollama.snapGoogleModel("gemini-1.5-pro"))
+        assertEquals("gemini-flash-lite-latest", Ollama.snapGoogleModel("gemini-1.5-flash"))      // shut down by Google
+        assertEquals("gemini-flash-lite-latest", Ollama.snapGoogleModel("gemini-2.5-flash-preview-tts"))
+        assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-3.5-turbo"))
+        assertEquals("gpt-6-luna", Ollama.snapOpenAiModel("gpt-6-luna"))
+        assertTrue(Ollama.googleThinking("gemini-3.5-flash-lite").contains("minimal"))
+        assertTrue(Ollama.googleThinking("gemini-4-hydrogen").contains("low"))
+        assertTrue(Ollama.googleThinking("gemini-2.5-flash").contains("thinkingBudget\":0"))
+        assertEquals(listOf("gemini-3.5-flash-lite"), Ollama.catalogFetchedModels("google", listOf("gemini-3.1-pro-preview", "gemini-3.5-flash-lite", "gemini-3.8-flash-tts", "gemini-3-pro-image")).map { it.id })
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o"))
         assertEquals("gpt-4o-mini", Ollama.snapOpenAiModel("gpt-4o-mini"))
         assertEquals("smollm2:135m", Ollama.snapLocalModel("smollm2:135m"))

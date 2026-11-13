@@ -582,6 +582,7 @@ object Recruiting {
             if (tid == u) it.mine += r.p.id else if (wasTarget) it.lost += r.p.id
         }
         val t = lg.team(tid)
+        Memories.committed(lg, r, t)
         if (tid == u || r.p.stars >= 5 || (r.transfer && r.p.ovr >= 80)) {
             val who = if (r.transfer) "Transfer ${r.p.pos} ${r.p.name}" else "${starText(r.p.stars)} ${r.p.pos} ${r.p.name}"
             lg.news += News(lg.season, lg.day, "$who commits to ${t.school}", tid == u)

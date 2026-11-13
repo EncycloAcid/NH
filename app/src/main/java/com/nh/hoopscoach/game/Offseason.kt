@@ -147,6 +147,8 @@ object Offseason {
         if (p.has(Trait.LOYAL)) c *= 0.35
         val t = if (p.teamId >= 0) lg.team(p.teamId) else null
         if (t != null && lg.coachOf(t).has(CoachSkill.CULTURE)) c *= 0.7
+        // What he remembers: a broken promise makes a content player restless; a title or the staff that believed in him keeps an unhappy one.
+        c *= Memories.transferFactor(p)
         return c.coerceAtMost(0.85)
     }
 

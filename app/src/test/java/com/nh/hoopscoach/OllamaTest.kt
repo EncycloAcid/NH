@@ -212,11 +212,11 @@ class OllamaTest {
     @Test
     fun testCloudModelPresets() {
         assertTrue("Google models list should not be empty", Ollama.GOOGLE_MODELS.isNotEmpty())
-        val flash15 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-1.5-flash" }
+        val flash15 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-flash-lite-latest" }
         assertTrue("Gemini 1.5 Flash exists", flash15 != null)
         assertTrue("Has recommended tag", flash15!!.tag.contains("Recommended"))
 
-        val flash20 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-2.0-flash" }
+        val flash20 = Ollama.GOOGLE_MODELS.firstOrNull { it.id == "gemini-3.8-flash" }
         assertTrue("Gemini 2.0 Flash exists", flash20 != null)
 
         assertTrue("OpenAI models list should not be empty", Ollama.OPENAI_MODELS.isNotEmpty())
@@ -233,7 +233,7 @@ class OllamaTest {
         val lg = LeagueGen.newLeague()
         assertEquals("ollama", lg.ollama.provider)
         assertEquals("", lg.ollama.googleApiKey)
-        assertEquals("gemini-1.5-flash", lg.ollama.googleModel)
+        assertEquals("gemini-flash-lite-latest", lg.ollama.googleModel)
         assertEquals("", lg.ollama.googleAccountEmail)
         assertFalse(lg.ollama.googleSignedIn)
         assertEquals("", lg.ollama.openAiApiKey)
@@ -244,7 +244,7 @@ class OllamaTest {
 
         lg.ollama.provider = "google"
         lg.ollama.googleApiKey = "test_google_key_123"
-        lg.ollama.googleModel = "gemini-2.0-flash"
+        lg.ollama.googleModel = "gemini-3.8-flash"
         lg.ollama.googleAccountEmail = "coach.dynasty@gmail.com"
         lg.ollama.googleAccountPassword = "secret_google_password"
         lg.ollama.googleSignedIn = true
@@ -260,7 +260,7 @@ class OllamaTest {
 
         assertEquals("google", decoded.ollama.provider)
         assertEquals("test_google_key_123", decoded.ollama.googleApiKey)
-        assertEquals("gemini-2.0-flash", decoded.ollama.googleModel)
+        assertEquals("gemini-3.8-flash", decoded.ollama.googleModel)
         assertEquals("coach.dynasty@gmail.com", decoded.ollama.googleAccountEmail)
         assertEquals("secret_google_password", decoded.ollama.googleAccountPassword)
         assertTrue(decoded.ollama.googleSignedIn)
@@ -278,10 +278,10 @@ class OllamaTest {
     fun testMultiProviderDisplayNames() {
         val cfg = OllamaConfig()
         cfg.provider = "google"
-        cfg.googleModel = "gemini-1.5-flash"
+        cfg.googleModel = "gemini-flash-lite-latest"
         assertEquals("Google Gemini", cfg.providerDisplayName)
-        assertEquals("gemini-1.5-flash", cfg.activeModelName)
-        assertEquals("Google gemini-1.5-flash", cfg.fullModelDisplayName)
+        assertEquals("gemini-flash-lite-latest", cfg.activeModelName)
+        assertEquals("Google gemini-flash-lite-latest", cfg.fullModelDisplayName)
         assertEquals("Gemini", cfg.shortActionName)
 
         cfg.googleAccountEmail = "coach.hoops@gmail.com"

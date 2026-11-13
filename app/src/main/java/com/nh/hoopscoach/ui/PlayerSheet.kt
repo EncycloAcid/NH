@@ -631,5 +631,23 @@ private fun BioTab(lg: League, p: Player) {
             }
         }
     }
+    if (p.memories.isNotEmpty()) {
+        // What he carries with him; the ones that tie him to a school, or turn him against it, lean on whether he stays.
+        Section("What he remembers")
+        GroupList(p.memories.sortedByDescending { it.season }) { m ->
+            ListRow {
+                Column(Modifier.weight(1f)) {
+                    Text(m.text, style = T.bodyB, color = P.ink)
+                    Text(when {
+                        m.pull >= 3 -> "${m.season} · ties him to the program"
+                        m.pull > 0 -> "${m.season} · a reason to stay"
+                        m.pull <= -4 -> "${m.season} · he hasn't forgotten it"
+                        m.pull < 0 -> "${m.season} · a reason to look elsewhere"
+                        else -> "${m.season}"
+                    }, style = T.small, color = if (m.pull < 0) P.bad else if (m.pull > 0) P.good else P.sub)
+                }
+            }
+        }
+    }
     if (p.awards.isNotEmpty()) TrophyCase(p)
 }
