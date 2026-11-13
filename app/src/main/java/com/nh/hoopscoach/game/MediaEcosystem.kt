@@ -12,11 +12,17 @@ object MediaEcosystem {
     fun ecosystemBrief(lg: League): String = buildString {
         Brand.ensure(lg)
         val u = lg.user
+        // Snapshot: media desk runs on IO while the sim mutates games/teams/news.
+        val games = LeagueLists.games(lg)
+        val teams = LeagueLists.teams(lg)
+        val recruits = LeagueLists.recruits(lg)
+        val coaches = LeagueLists.coaches(lg)
+        val news = LeagueLists.news(lg)
         append(SituationAwareness.leagueBrief(lg))
         val coach = runCatching { lg.userCoach }.getOrNull()
         appendLine("YOUR PROGRAM: ${if (lg.pro) u.name else u.school} (${u.w}-${u.l}) · AP ${if (u.ap > 0) "#${u.ap}" else "NR"} · Elo ${"%.0f".format(u.elo)} · prestige ${u.prestige}" +
             (coach?.let { " · titles ${it.titles} (coach ${it.name}, security ${it.security})" } ?: ""))
-        val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
+        val today = games.filter { it.played && it.day == lg.day }.sortedByDescending {
             kotlin.math.abs(it.hs - it.aws) + if (it.involves(lg.userTeamId)) 50 else 0 + if (lg.rivalry(it) != null) 20 else 0
         }
         if (today.isNotEmpty()) {
@@ -28,7 +34,7 @@ object MediaEcosystem {
                 appendLine("- ${a.school}${if (a.ap > 0) " #${a.ap}" else ""} ${g.aws}, ${h.school}${if (h.ap > 0) " #${h.ap}" else ""} ${g.hs}${if (g.ot > 0) " OT" else ""}${if (lg.rivalry(g) != null) " RIVALRY" else ""}${if (upset) " UPSET" else ""}")
             }
         }
-        val poll = lg.teams.filter { it.ap in 1..25 }.sortedBy { it.ap }
+        val poll = teams.filter { it.ap in 1..25 }.sortedBy { it.ap }
         if (poll.isNotEmpty()) {
             appendLine("NATIONAL POLL (AP top ${poll.size}):")
             for (t in poll.take(15)) appendLine("- #${t.ap} ${t.school} (${t.w}-${t.l})")
@@ -41,7 +47,7 @@ object MediaEcosystem {
         appendLine(tourney)
         lg.tv?.let { appendLine("TV DEBATE ON AIR: ${it.show} — ${it.topic}${if (it.poll >= 0) " (fans ${it.poll}% yes)" else ""}") }
         if (!lg.pro) {
-            val board = lg.recruits.filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(6)
+            val board = recruits.filter { it.committed < 0 }.sortedBy { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }.take(6)
             if (board.isNotEmpty()) {
                 appendLine("RECRUITING BOARD (insider fuel):")
                 for (r in board) appendLine("- ${if (r.p.recruitRank > 0) "No.${r.p.recruitRank}" else "UR"} ${r.p.name} (${r.p.stars}★) pref ${r.pref.label}")
@@ -56,7 +62,7 @@ object MediaEcosystem {
             }
         }
         CoachRivals.rivals(lg).take(3).forEach { cr ->
-            val oc = lg.coaches.firstOrNull { it.id == cr.coachId } ?: return@forEach
+            val oc = coaches.firstOrNull { it.id == cr.coachId } ?: return@forEach
             appendLine("COACH HEAT: vs ${oc.name} ${cr.w}-${cr.l} (${CoachRivals.heatLabel(cr.heat)})")
         }
         val stars = lg.rosterOf(u).sortedByDescending { it.stats.ppg }.take(3)
@@ -64,7 +70,7 @@ object MediaEcosystem {
             appendLine("YOUR PLAYERS (social fuel):")
             for (p in stars) appendLine("- ${p.name}: ${"%.1f".format(p.stats.ppg)} ppg · happiness ${p.happiness}")
         }
-        val recent = lg.news.filter { it.season == lg.season && it.day >= lg.day - 1 }.takeLast(8)
+        val recent = news.filter { it.season == lg.season && it.day >= lg.day - 1 }.takeLast(8)
         if (recent.isNotEmpty()) {
             appendLine("RECENT WIRE (do not contradict):")
             for (n in recent) appendLine("- ${n.text}")
@@ -74,7 +80,8 @@ object MediaEcosystem {
     /** Rule-based social posts into the road feed when available. */
     fun publishSocialBeats(lg: League) {
         val u = lg.user
-        val today = lg.games.filter { it.played && it.day == lg.day && it.involves(u.id) }.maxByOrNull { kotlin.math.abs(it.hs - it.aws) }
+        val games = LeagueLists.games(lg)
+        val today = games.filter { it.played && it.day == lg.day && it.involves(u.id) }.maxByOrNull { kotlin.math.abs(it.hs - it.aws) }
         if (today != null) {
             val won = today.winner() == u.id
             val opp = lg.team(today.opp(u.id))
@@ -108,7 +115,7 @@ object MediaEcosystem {
             )
         }
         if (!lg.pro) {
-            val r = lg.recruits.filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
+            val r = LeagueLists.recruits(lg).filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
             if (r != null) {
                 val v = Media.insider(lg)
                 Media.say(
@@ -118,7 +125,7 @@ object MediaEcosystem {
                 )
             }
         }
-        val upset = lg.games.filter { it.played && it.day == lg.day }.firstOrNull { g ->
+        val upset = games.filter { it.played && it.day == lg.day }.firstOrNull { g ->
             val w = lg.team(g.winner()); val l = lg.team(g.loser())
             l.ap in 1..10 && (w.ap == 0 || w.ap > l.ap + 4)
         }
@@ -137,8 +144,12 @@ object MediaEcosystem {
         val outlet = "Hoops Wire Network"
         val stories = mutableListOf<News>()
         val u = lg.user
+        val games = LeagueLists.games(lg)
+        val teams = LeagueLists.teams(lg)
+        val recruits = LeagueLists.recruits(lg)
+        val coaches = LeagueLists.coaches(lg)
         val defending = TitleDefense.champion(lg)
-        val titleLeaders = lg.teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(5)
+        val titleLeaders = teams.map { it to TitleDefense.titles(lg, it).size }.filter { it.second > 0 }.sortedByDescending { it.second }.take(5)
         fun titleLine(t: Team): String = if (lg.pro) {
             val ts = NbaHistory.titles(lg, t)
             when {
@@ -168,7 +179,7 @@ object MediaEcosystem {
                 teamId = defending?.id ?: titleLeaders.firstOrNull()?.first?.id ?: u.id,
             )
         }
-        val today = lg.games.filter { it.played && it.day == lg.day }.sortedByDescending {
+        val today = games.filter { it.played && it.day == lg.day }.sortedByDescending {
             (if (it.involves(u.id)) 40 else 0) + kotlin.math.abs(it.hs - it.aws)
         }
         today.firstOrNull()?.let { g ->
@@ -204,7 +215,7 @@ object MediaEcosystem {
             )
         }
         if (!lg.pro) {
-            val r = lg.recruits.filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
+            val r = recruits.filter { it.committed < 0 }.minByOrNull { it.p.recruitRank.takeIf { n -> n > 0 } ?: 9999 }
             if (r != null) {
                 stories += News(
                     lg.season, lg.day,
@@ -217,7 +228,7 @@ object MediaEcosystem {
         }
         val cr = CoachRivals.rivals(lg).firstOrNull()
         if (cr != null) {
-            val oc = lg.coaches.firstOrNull { it.id == cr.coachId }
+            val oc = coaches.firstOrNull { it.id == cr.coachId }
             if (oc != null) {
                 stories += News(
                     lg.season, lg.day,
@@ -228,7 +239,7 @@ object MediaEcosystem {
                 )
             }
         }
-        val pollHit = lg.games.filter { it.played && it.day == lg.day }.firstOrNull { g ->
+        val pollHit = games.filter { it.played && it.day == lg.day }.firstOrNull { g ->
             val l = lg.team(g.loser()); l.ap in 1..15
         }
         if (pollHit != null) {

@@ -12,6 +12,10 @@ object CoachCareers {
     )
 
     fun careerBrief(lg: League): String = buildString {
+        // Snapshot: coaching desk runs on IO while the sim mutates coaches/teams/news.
+        val coaches = LeagueLists.coaches(lg)
+        val teams = LeagueLists.teams(lg)
+        val news = LeagueLists.news(lg)
         appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
         val me = runCatching { lg.userCoach }.getOrNull()
         if (me != null) {
@@ -21,11 +25,11 @@ object CoachCareers {
             if (schools.isNotEmpty()) appendLine("PRIOR STOPS: ${schools.takeLast(6).joinToString(" → ")}")
             if (me.offerSalary > 0) appendLine("EXTENSION ON TABLE: ${me.offerYears}yr / ${CoachContracts.money(me.offerSalary)}")
         }
-        val hot = lg.coaches.filter { it.teamId >= 0 && it.security < 40 }.sortedBy { it.security }.take(6)
+        val hot = coaches.filter { it.teamId >= 0 && it.security < 40 }.sortedBy { it.security }.take(6)
         if (hot.isNotEmpty()) {
             appendLine("HOT SEATS:")
             for (c in hot) {
-                val t = lg.teams.getOrNull(c.teamId) ?: continue
+                val t = teams.getOrNull(c.teamId) ?: continue
                 appendLine("- ${c.name} @ ${t.school} (${t.w}-${t.l}) security ${c.security}/100")
             }
         }
@@ -33,12 +37,12 @@ object CoachCareers {
         if (rivals.isNotEmpty() && me != null) {
             appendLine("COACHING RIVALRIES (you):")
             for (r in rivals) {
-                val oc = lg.coaches.firstOrNull { it.id == r.coachId } ?: continue
-                val school = lg.teams.getOrNull(oc.teamId)?.school ?: "unemployed"
+                val oc = coaches.firstOrNull { it.id == r.coachId } ?: continue
+                val school = teams.getOrNull(oc.teamId)?.school ?: "unemployed"
                 appendLine("- vs ${oc.name} ($school): ${r.w}-${r.l}, heat ${CoachRivals.heatLabel(r.heat)}")
             }
         }
-        val moves = lg.news.filter {
+        val moves = news.filter {
             it.season == lg.season && (
                 it.text.contains("fire", ignoreCase = true) ||
                     it.text.contains("hire", ignoreCase = true) ||
@@ -51,11 +55,11 @@ object CoachCareers {
             appendLine("RECENT COACHING NEWS:")
             for (n in moves) appendLine("- ${n.text}")
         }
-        val legends = lg.coaches.filter { it.titles >= 1 || it.hofSeason > 0 }.sortedByDescending { it.titles * 10 + it.finalFours }.take(5)
+        val legends = coaches.filter { it.titles >= 1 || it.hofSeason > 0 }.sortedByDescending { it.titles * 10 + it.finalFours }.take(5)
         if (legends.isNotEmpty()) {
             appendLine("LEGACY BOARD:")
             for (c in legends) {
-                val stop = lg.teams.getOrNull(c.teamId)?.school ?: c.history.lastOrNull()?.team ?: "—"
+                val stop = teams.getOrNull(c.teamId)?.school ?: c.history.lastOrNull()?.team ?: "—"
                 appendLine("- ${c.name} ($stop): ${c.titles} titles, ${c.finalFours} Final Fours, ${c.w}-${c.l}")
             }
         }
@@ -77,7 +81,8 @@ object CoachCareers {
                 source = "Staff · $outlet", teamId = u.id,
             )
         }
-        val hot = lg.coaches.filter { it.teamId >= 0 && it.security < 35 }.minByOrNull { it.security }
+        val coaches = LeagueLists.coaches(lg)
+        val hot = coaches.filter { it.teamId >= 0 && it.security < 35 }.minByOrNull { it.security }
         if (hot != null) {
             val t = lg.team(hot.teamId)
             stories += News(
@@ -90,7 +95,7 @@ object CoachCareers {
         }
         val rival = CoachRivals.rivals(lg).firstOrNull()
         if (rival != null && me != null) {
-            val oc = lg.coaches.firstOrNull { it.id == rival.coachId }
+            val oc = coaches.firstOrNull { it.id == rival.coachId }
             if (oc != null) {
                 stories += News(
                     lg.season, lg.day,

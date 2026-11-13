@@ -8,6 +8,11 @@ object HistoricalRivalries {
     data class Package(val stories: List<News>, val isAi: Boolean, val detail: String)
 
     fun historyBrief(lg: League): String = buildString {
+        // Snapshot: rivalry desk runs on IO while the sim mutates coaches/games/news.
+        val coachRoster = LeagueLists.coaches(lg)
+        val teams = LeagueLists.teams(lg)
+        val news = LeagueLists.news(lg)
+        val games = LeagueLists.games(lg)
         appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
         val ranked = lg.rivals.sortedByDescending { it.aWins + it.bWins }.take(10)
         if (ranked.isEmpty()) appendLine("PROGRAM RIVALRIES: none recorded yet")
@@ -27,16 +32,16 @@ object HistoricalRivalries {
                 appendLine("- vs ${opp.school}: you ${r.winsFor(lg.userTeamId)}-${r.winsFor(opp.id)} · ${r.title}")
             }
         }
-        val coaches = CoachRivals.rivals(lg).take(6)
-        if (coaches.isNotEmpty()) {
+        val coachHeats = CoachRivals.rivals(lg).take(6)
+        if (coachHeats.isNotEmpty()) {
             appendLine("COACHING RIVALRIES:")
-            for (cr in coaches) {
-                val oc = lg.coaches.firstOrNull { it.id == cr.coachId } ?: continue
-                val school = lg.teams.getOrNull(oc.teamId)?.school ?: "unemployed"
+            for (cr in coachHeats) {
+                val oc = coachRoster.firstOrNull { it.id == cr.coachId } ?: continue
+                val school = teams.getOrNull(oc.teamId)?.school ?: "unemployed"
                 appendLine("- vs ${oc.name} ($school): ${cr.w}-${cr.l}, heat ${CoachRivals.heatLabel(cr.heat)}, big games ${cr.big}")
             }
         }
-        val recent = lg.news.filter { it.season == lg.season && (it.kind == "rivalry" || it.kind == "barb" || it.text.contains("Emerging rivalry", true)) }.takeLast(8)
+        val recent = news.filter { it.season == lg.season && (it.kind == "rivalry" || it.kind == "barb" || it.text.contains("Emerging rivalry", true)) }.takeLast(8)
         if (recent.isNotEmpty()) {
             appendLine("RECENT RIVALRY / BARB HEADLINES:")
             for (n in recent) appendLine("- ${n.text}")
@@ -48,7 +53,7 @@ object HistoricalRivalries {
             appendLine("YOUR PLAYERS IN THE RIVALRY ECOSYSTEM:")
             for (p in stars) appendLine("- ${p.name}: ${"%.1f".format(p.stats.ppg)} ppg · mood happiness ${p.happiness}/100")
         }
-        val upcoming = lg.games.filter { !it.played && it.day >= lg.day && it.day <= lg.day + 14 && lg.rivalry(it) != null }
+        val upcoming = games.filter { !it.played && it.day >= lg.day && it.day <= lg.day + 14 && lg.rivalry(it) != null }
             .sortedBy { it.day }.take(4)
         if (upcoming.isNotEmpty()) {
             appendLine("UPCOMING RIVALRY DATES:")

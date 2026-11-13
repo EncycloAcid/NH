@@ -32,6 +32,10 @@ class LeagueListsTest {
                     try {
                         Journalism.eventBrief(lg)
                         SituationAwareness.leagueBrief(lg)
+                        UniversityDevelopment.campusBrief(lg)
+                        MediaEcosystem.ecosystemBrief(lg)
+                        CoachCareers.careerBrief(lg)
+                        HistoricalRivalries.historyBrief(lg)
                     } catch (e: ConcurrentModificationException) {
                         fails.incrementAndGet()
                     }
@@ -40,7 +44,7 @@ class LeagueListsTest {
         }
         start.countDown()
         (writers + readers).forEach { it.join(10_000) }
-        assertEquals("eventBrief/leagueBrief must not CME under concurrent news writes", 0, fails.get())
+        assertEquals("AI desk briefs must not CME under concurrent news writes", 0, fails.get())
         assertTrue(LeagueLists.news(lg).size > 40)
     }
 

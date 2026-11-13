@@ -20,9 +20,11 @@ object DraftUniverse {
     }
 
     fun eventBrief(lg: League): String = buildString {
+        val players = LeagueLists.players(lg)
+        val teams = LeagueLists.teams(lg)
         appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
         val board = Offseason.draftBoard(lg)
-        val top = lg.players.filter { it.teamId >= 0 }.sortedBy { board[it.id] ?: 9999 }.take(12)
+        val top = players.filter { it.teamId >= 0 }.sortedBy { board[it.id] ?: 9999 }.take(12)
         if (top.isNotEmpty() && !lg.pro) {
             appendLine("COLLEGE DRAFT STOCK (1 = best):")
             for (p in top) {
@@ -41,7 +43,7 @@ object DraftUniverse {
             if (dn.log.isNotEmpty()) {
                 appendLine("PICKS LOGGED:")
                 for (m in dn.log.takeLast(12)) {
-                    val club = lg.teams.getOrNull(m.teamId)?.name ?: "?"
+                    val club = teams.getOrNull(m.teamId)?.name ?: "?"
                     appendLine("- No.${m.pick} $club: ${m.name} (${m.pos}) board No.${m.rank} · grade ${m.grade}")
                 }
                 dn.log.maxByOrNull { it.pick - it.rank }?.takeIf { it.pick - it.rank >= 5 }?.let {
@@ -63,7 +65,7 @@ object DraftUniverse {
         if (recent.isNotEmpty()) {
             appendLine("RECENT DRAFT CLASS (${recent.first().season}):")
             for (d in recent.take(10)) {
-                val club = d.nba.ifBlank { d.proTeam }.ifBlank { lg.teams.getOrNull(d.teamId)?.name ?: "?" }
+                val club = d.nba.ifBlank { d.proTeam }.ifBlank { teams.getOrNull(d.teamId)?.name ?: "?" }
                 appendLine("- No.${d.pick} ${d.playerName} (${d.pos}, ${d.school}) → $club · ovr ${d.ovr}")
             }
         }
@@ -75,7 +77,7 @@ object DraftUniverse {
                 val live = d.pid.takeIf { it >= 0 }?.let { lg.anyPlayer(it) }
                 val dest = d.proTeam.ifBlank { d.nba }.ifBlank { "pro ball" }
                 val line = if (live != null && live.teamId >= 0 && lg.pro) {
-                    val tm = lg.teams.getOrNull(live.teamId)
+                    val tm = teams.getOrNull(live.teamId)
                     "${live.name}: drafted No.${d.pick} (${d.season}) · now ${tm?.name ?: dest} · ${live.proYears} pro yrs · ${"%.1f".format(live.stats.ppg)} ppg"
                 } else {
                     "${d.playerName}: drafted No.${d.pick} (${d.season}) out of ${d.school} · destination $dest · drafted ovr ${d.ovr}"
@@ -95,7 +97,7 @@ object DraftUniverse {
         val stories = mutableListOf<News>()
         val board = Offseason.draftBoard(lg)
         if (!lg.pro) {
-            val top = lg.players.filter { it.teamId >= 0 }.minByOrNull { board[it.id] ?: 9999 }
+            val top = LeagueLists.players(lg).filter { it.teamId >= 0 }.minByOrNull { board[it.id] ?: 9999 }
             if (top != null) {
                 val r = board[top.id]!!
                 val t = lg.team(top.teamId)

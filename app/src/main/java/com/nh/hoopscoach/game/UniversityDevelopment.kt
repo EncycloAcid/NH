@@ -15,6 +15,9 @@ object UniversityDevelopment {
         Brand.ensure(lg)
         val t = lg.user
         Business.ensure(lg, t)
+        // Snapshot: campus desk runs on IO while the sim mutates teams/news.
+        val teams = LeagueLists.teams(lg)
+        val news = LeagueLists.news(lg)
         appendLine("LEVEL: ${if (lg.pro) "NBA" else "NCAA"} · SEASON ${lg.season} · DAY ${lg.day} · PHASE ${lg.phase}")
         appendLine("PROGRAM: ${if (lg.pro) t.name else t.school} · prestige ${t.prestige} · legacy ${"%.0f".format(t.legacy)} · buzz ${"%.0f".format(t.buzz)} (${Brand.buzzLabel(t.buzz)})")
         appendLine("PROGRAM PULL: ${Brand.pull(lg, t)}/100 · conference exposure ${Brand.exposure(lg, t.confId)} (${Brand.exposureLabel(Brand.exposure(lg, t.confId))})")
@@ -37,12 +40,12 @@ object UniversityDevelopment {
         nextUpgrade(lg, t)?.let { n ->
             appendLine("NEXT LOGICAL PROJECT: ${n.name} (${Business.money(Business.cost(lg, n))})")
         }
-        val peers = lg.teams.filter { it.id != t.id }.sortedByDescending { it.upgrades.size + it.arena / 5000 }.take(5)
+        val peers = teams.filter { it.id != t.id }.sortedByDescending { it.upgrades.size + it.arena / 5000 }.take(5)
         if (peers.isNotEmpty()) {
             appendLine("PEER FACILITY SNAPSHOT:")
             for (p in peers) appendLine("- ${p.school}: ${p.upgrades.size} upgrades · ${"%,d".format(p.arena)} seats · prestige ${p.prestige}")
         }
-        val recent = lg.news.filter { it.season == lg.season && (it.kind == "facility" || it.source.contains("Campus", true) || it.text.contains("unveil", true)) }.takeLast(6)
+        val recent = news.filter { it.season == lg.season && (it.kind == "facility" || it.source.contains("Campus", true) || it.text.contains("unveil", true)) }.takeLast(6)
         if (recent.isNotEmpty()) {
             appendLine("RECENT CAMPUS NEWS:")
             for (n in recent) appendLine("- ${n.text}")

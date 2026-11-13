@@ -1182,8 +1182,12 @@ object Ollama {
         if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
         if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateMediaEcosystem(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generateMediaEcosystem(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Media desk raced the sim.
             }
         }
     }
@@ -1197,7 +1201,11 @@ object Ollama {
             return@withContext Result.success(MediaEcosystem.fallbackPackage(lg))
         }
         MediaEcosystem.publishSocialBeats(lg)
-        val brief = MediaEcosystem.ecosystemBrief(lg)
+        val brief = try {
+            MediaEcosystem.ecosystemBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(MediaEcosystem.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written media ecosystem."))
+        }
         val cacheKey = "media_eco_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<MediaEcosystem.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1274,8 +1282,12 @@ object Ollama {
         if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
         if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
         CoroutineScope(Dispatchers.IO).launch {
-            generateUniversityDevelopment(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generateUniversityDevelopment(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Campus desk raced the sim.
             }
         }
     }
@@ -1288,7 +1300,11 @@ object Ollama {
         if (!config.enabled || !config.universityDevelopment) {
             return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg))
         }
-        val brief = UniversityDevelopment.campusBrief(lg)
+        val brief = try {
+            UniversityDevelopment.campusBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(UniversityDevelopment.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written campus package."))
+        }
         val cacheKey = "campus_dev_${lg.season}_${lg.day}_${lg.user.upgrades.size}_${lg.user.cash}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<UniversityDevelopment.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1369,7 +1385,11 @@ object Ollama {
         if (!config.enabled || !config.historicalRivalries) {
             return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg))
         }
-        val brief = HistoricalRivalries.historyBrief(lg)
+        val brief = try {
+            HistoricalRivalries.historyBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(HistoricalRivalries.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written rivalry package."))
+        }
         val cacheKey = "hist_rivals_${lg.season}_${lg.day}_${lg.rivals.size}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<HistoricalRivalries.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1451,7 +1471,11 @@ object Ollama {
         if (!config.enabled || !config.draftUniverse) {
             return@withContext Result.success(DraftUniverse.fallbackPackage(lg))
         }
-        val brief = DraftUniverse.eventBrief(lg)
+        val brief = try {
+            DraftUniverse.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(DraftUniverse.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written draft package."))
+        }
         val cacheKey = "draft_universe_${lg.season}_${lg.day}_${lg.proState?.draftNight?.at ?: -1}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<DraftUniverse.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1516,10 +1540,19 @@ object Ollama {
     fun maybeAutoGeneratePlayerStorylines(config: OllamaConfig, lg: League) {
         if (!config.enabled || !config.playerStorylines || !config.autoGenerate) return
         if (lg.day < 8 || lg.day % 7 != 0) return
-        if (PlayerStorylines.detectArcs(lg).isEmpty()) return
+        val arcs = try {
+            PlayerStorylines.detectArcs(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return
+        }
+        if (arcs.isEmpty()) return
         CoroutineScope(Dispatchers.IO).launch {
-            generatePlayerStorylines(config, lg).onSuccess { pack ->
-                if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+            try {
+                generatePlayerStorylines(config, lg).onSuccess { pack ->
+                    if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
+                }
+            } catch (_: java.util.ConcurrentModificationException) {
+                // Storyline desk raced the sim.
             }
         }
     }
@@ -1532,7 +1565,11 @@ object Ollama {
         if (!config.enabled || !config.playerStorylines) {
             return@withContext Result.success(PlayerStorylines.fallbackPackage(lg))
         }
-        val brief = PlayerStorylines.eventBrief(lg)
+        val brief = try {
+            PlayerStorylines.eventBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(PlayerStorylines.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written storyline package."))
+        }
         val cacheKey = "player_arcs_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<PlayerStorylines.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1620,7 +1657,11 @@ object Ollama {
         if (!config.enabled || !config.livingCoachingCareers) {
             return@withContext Result.success(CoachCareers.fallbackPackage(lg))
         }
-        val brief = CoachCareers.careerBrief(lg)
+        val brief = try {
+            CoachCareers.careerBrief(lg)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(CoachCareers.fallbackPackage(lg).copy(detail = "Desk raced the sim — used game-written coaching package."))
+        }
         val cacheKey = "coach_careers_${lg.season}_${lg.day}_${config.activeModelName}_facts_${AiFacts.version(lg)}_${config.provider}"
         if (config.cacheResponses) {
             Cache.get<CoachCareers.Package>(cacheKey)?.let { return@withContext Result.success(it) }
@@ -1711,7 +1752,11 @@ object Ollama {
         if (!config.enabled || !config.historicMoments) {
             return@withContext Result.success(HistoricMoments.fallbackPackage(lg, m))
         }
-        val brief = HistoricMoments.momentBrief(lg, m)
+        val brief = try {
+            HistoricMoments.momentBrief(lg, m)
+        } catch (_: java.util.ConcurrentModificationException) {
+            return@withContext Result.success(HistoricMoments.fallbackPackage(lg, m).copy(detail = "Desk raced the sim — used game-written moment package."))
+        }
         val cacheKey = "historic_${m.season}_${m.day}_${m.gameId}_${m.kind}_${config.activeModelName}_facts_${AiFacts.version(lg)}"
         if (config.cacheResponses) {
             Cache.get<HistoricMoments.Package>(cacheKey)?.let { return@withContext Result.success(it) }
