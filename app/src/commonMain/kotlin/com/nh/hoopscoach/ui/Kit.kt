@@ -136,12 +136,14 @@ fun Section(title: String, modifier: Modifier = Modifier, action: String? = null
     val link = action != null
     if (LocalPrint.current) {
         // In print: a full-width rule over small capitals, like a magazine section head.
-        Column(modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = 20.dp, bottom = if (link) 0.dp else 8.dp)) {
-            Box(Modifier.fillMaxWidth().height(2.dp).background(P.ink))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title.uppercase(), style = T.label.copy(fontSize = 12.sp, letterSpacing = 2.sp), color = P.ink, modifier = Modifier.weight(1f).padding(top = 6.dp))
-                if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
+        // In print: a black tab with white capitals, then a rule out to the margin, like a sports weekly.
+        Row(modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = 20.dp, bottom = if (link) 0.dp else 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.background(P.ink).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Text(title.uppercase(), style = T.label.copy(fontSize = 11.sp, letterSpacing = 1.5.sp), color = Color.White, maxLines = 1)
             }
+            Box(Modifier.weight(1f).height(2.dp).background(P.ink))
+            if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
         }
         return
     }

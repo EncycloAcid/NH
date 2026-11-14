@@ -136,16 +136,17 @@ fun palette(dark: Boolean, primary: Color?, secondary: Color?): Palette {
 
 
 /**
- * Magazine paper: cream stock, ink-black type, and the school's color as the spot color, the same in
+ * Magazine paper: glossy white stock, deep black type, and the school's color as the spot color, the same in
  * light and dark mode (a magazine is printed). Used by the season previews.
  */
 fun paperPalette(primary: Color?, secondary: Color?): Palette {
-    val surface = Color(0xFFFAF6EC)
-    val accent = primary?.let { accentFrom(it, secondary ?: it, false) } ?: Color(0xFF9B1C1C)
+    // Glossy white stock, like a sports weekly.
+    val surface = Color(0xFFFFFFFF)
+    val accent = primary?.let { accentFrom(it, secondary ?: it, false) } ?: Color(0xFFC8102E)
     return Palette(
         dark = false,
-        bg = Color(0xFFF1EBDD), surface = surface, surface2 = Color(0xFFE8E0CE),
-        ink = Color(0xFF1B1813), sub = Color(0xFF5A5246), faint = Color(0xFF948A79), line = Color(0xFFD6CBB5),
+        bg = Color(0xFFF7F7F5), surface = surface, surface2 = Color(0xFFECECE8),
+        ink = Color(0xFF0D0D0F), sub = Color(0xFF4C4C52), faint = Color(0xFF8E8E95), line = Color(0xFFDCDCD8),
         accent = accent, onAccent = onColor(accent), accentSoft = mix(surface, accent, 0.14f),
         good = Color(0xFF1E7a3A), bad = Color(0xFFB42318), warn = Color(0xFF9A5B0B), gold = Color(0xFF9C6B12),
         hero = accent, onHero = onColor(accent),

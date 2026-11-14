@@ -273,23 +273,20 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
 
 @Composable
 internal fun PageHead(kicker: String, title: String, page: Int, running: String = "HOOPS DYNASTY PREVIEW") {
-    Column(Modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 10.dp, bottom = 4.dp)) {
-        // The running head: the magazine's name and the page number, over a hairline.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(running.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 2.sp), color = P.sub, modifier = Modifier.weight(1f), maxLines = 1)
-            Text("$page", style = T.numSm.copy(fontSize = 14.sp), color = P.ink)
-        }
-        Box(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp).height(1.dp).background(P.ink.copy(alpha = 0.6f)))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.background(P.accent).padding(horizontal = 8.dp, vertical = 3.dp)) { Text(kicker.uppercase(), style = T.label, color = P.onAccent) }
-        }
+    // The running strip: the magazine's name in white on black, the page number in the spot color.
+    Row(Modifier.fillMaxWidth().background(Color(0xFF0D0D0F)).padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(running.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 2.sp), color = Color.White, modifier = Modifier.weight(1f), maxLines = 1)
+        Box(Modifier.background(P.accent).padding(horizontal = 6.dp, vertical = 1.dp)) { Text("$page", style = T.numSm.copy(fontSize = 13.sp), color = P.onAccent) }
+    }
+    Column(Modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 14.dp, bottom = 4.dp)) {
+        Box(Modifier.background(P.accent).padding(horizontal = 8.dp, vertical = 3.dp)) { Text(kicker.uppercase(), style = T.label.copy(letterSpacing = 1.5.sp), color = P.onAccent) }
+        Spacer(Modifier.height(6.dp))
+        Text(title.uppercase(), style = T.hero.copy(fontSize = 42.sp, lineHeight = 41.sp, fontStyle = FontStyle.Italic), color = P.ink)
         Spacer(Modifier.height(8.dp))
-        Text(title.uppercase(), style = T.title.copy(fontSize = 34.sp, lineHeight = 35.sp), color = P.ink)
-        Spacer(Modifier.height(8.dp))
-        // A double rule under the headline, like print.
-        Box(Modifier.fillMaxWidth().height(3.dp).background(P.ink))
-        Spacer(Modifier.height(2.dp))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(P.ink))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Box(Modifier.width(72.dp).height(7.dp).background(P.accent))
+            Box(Modifier.weight(1f).height(2.dp).background(P.ink))
+        }
     }
 }
 
@@ -383,7 +380,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
     if (pv.coverStyle == 1 && story != null && subject != null) {
         item {
             val lines = pv.stories.filter { it.head != story.head && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
-            FeatureCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
+            FeatureCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId == subject.id } ?: Previews.star(lg, subject), story.kicker, story.head,
                 story.body.substringBefore(". ").take(220) + ".", lines, count, onRead, onSkip) { CollegeUserBox(lg, pv, onGoReport) }
         }
         return

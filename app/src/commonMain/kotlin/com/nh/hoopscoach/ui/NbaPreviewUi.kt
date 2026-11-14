@@ -296,7 +296,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
     if (pv.coverStyle == 1 && story != null && subject != null) {
         item {
             val lines = pv.stories.filter { it !== story && it.head != story.head && it.kicker != "Your team" }.take(3).map { it.kicker to it.head }
-            FeatureCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId >= 0 }, story.kicker, story.head,
+            FeatureCover("HOOPS DYNASTY PRO", "${pv.season} SEASON PREVIEW", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId == subject.id } ?: NbaPreviews.star(lg, subject), story.kicker, story.head,
                 story.body.substringBefore(". ").take(220) + ".", lines, count, onRead, onSkip) { NbaUserBox(lg, pv) }
         }
         return

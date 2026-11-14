@@ -413,7 +413,7 @@ fun PlayerLine(vm: GameViewModel, lg: League, t: Team?, p: Player, sub: String, 
 }
 
 @Composable
-fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
+fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp, plate: Boolean = true) {
     val primary = t?.let { Color(it.primary) } ?: P.faint
     // A real headshot when there is one (unless the setting draws everyone retro); otherwise his retro bit portrait.
     if (p.photo.isNotEmpty() && !LocalRetroAll.current) {
@@ -427,7 +427,7 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
         }
         if (img != null) {
             // A headshot on a soft team-colored plate, cropped to a circle from the top.
-            Box(Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f))) {
+            Box(if (plate) Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f)) else Modifier.size(size)) {
                 androidx.compose.foundation.Image(
                     img, p.name, Modifier.size(size),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter,
@@ -436,7 +436,7 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp) {
             return
         }
     }
-    PixelPortrait(p, t, size)
+    PixelPortrait(p, t, size, plate = plate)
 }
 
 @Composable

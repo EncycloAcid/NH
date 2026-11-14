@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Feature
@@ -107,12 +109,11 @@ internal fun CoverFrame(masthead: String, issue: String, footer: String, base: C
                 autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 28.sp, maxFontSize = 120.sp, stepSize = 2.sp),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Box(Modifier.fillMaxWidth().height(2.dp).background(fg.copy(alpha = 0.85f)))
-            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(issue.uppercase(), style = T.label.copy(fontSize = 10.sp, letterSpacing = 1.5.sp), color = fg, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("$9.99", style = T.label.copy(fontSize = 10.sp), color = fg)
+            // Over the cover star, who stands in front of the masthead.
+            Row(Modifier.zIndex(1f).fillMaxWidth().background(Color.Black.copy(alpha = 0.85f)).padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(issue.uppercase(), style = T.label.copy(fontSize = 10.sp, letterSpacing = 1.5.sp), color = Color.White, modifier = Modifier.weight(1f).padding(vertical = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.background(accent).padding(horizontal = 8.dp, vertical = 4.dp)) { Text("$9.99", style = T.label.copy(fontSize = 10.sp), color = onColor(accent)) }
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(fg.copy(alpha = 0.5f)))
             Spacer(Modifier.height(10.dp))
             content()
             Spacer(Modifier.weight(1f))
@@ -193,24 +194,26 @@ internal fun ClassicCover(
 ) {
     val (base, fg, accent) = coverColors(team)
     CoverFrame(masthead, issue, footer, base, fg, accent, userBox) {
-        Text(headline.uppercase(), style = T.title.copy(fontSize = 30.sp, lineHeight = 31.sp), color = accent)
-        Spacer(Modifier.height(6.dp))
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
             val w = maxWidth
-            Box(Modifier.fillMaxWidth().height(w * 0.98f)) {
-                // The cover star, big, cut off by the right edge like a photo.
-                Box(Modifier.align(Alignment.BottomEnd).offset(x = 28.dp)) {
-                    if (star != null) PlayerJersey(star, team, w * 0.74f) else TeamBadge(team, w * 0.5f)
+            Box(Modifier.fillMaxWidth().height(w * 1.08f)) {
+                // The cover star, huge: in front of the masthead and cut off by the right edge, like a sports cover.
+                Box(Modifier.align(Alignment.BottomEnd).offset(x = w * 0.22f).wrapContentSize(unbounded = true, align = Alignment.BottomEnd)) {
+                    if (star != null) PlayerJersey(star, team, w * 1.28f, plate = false) else TeamBadge(team, w * 0.6f)
                 }
-                CoverLines(lines, fg, accent, Modifier.align(Alignment.TopStart).fillMaxWidth(0.5f))
-                CoverSticker(sticker.first, sticker.second, accent, Modifier.align(Alignment.TopEnd))
+                Column(Modifier.align(Alignment.TopStart).fillMaxWidth(0.52f)) {
+                    Text(headline.uppercase(), style = T.hero.copy(fontSize = 34.sp, lineHeight = 33.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = accent, maxLines = 3)
+                    Spacer(Modifier.height(10.dp))
+                    CoverLines(lines, fg, accent)
+                }
+                CoverSticker(sticker.first, sticker.second, accent, Modifier.align(Alignment.BottomEnd).offset(x = (-6).dp, y = -(w * 0.36f)))
                 Column(
                     Modifier.align(Alignment.BottomStart).fillMaxWidth()
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
                         .padding(top = 30.dp),
                 ) {
                     Text(label, style = T.label.copy(letterSpacing = 1.5.sp), color = accent)
-                    Text(name.uppercase(), style = T.hero.copy(fontSize = 50.sp, lineHeight = 48.sp), color = Color.White, maxLines = 2)
+                    Text(name.uppercase(), style = T.hero.copy(fontSize = 56.sp, lineHeight = 52.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = Color.White, maxLines = 2)
                     Text(dek, style = T.small.copy(fontSize = 13.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 3)
                 }
             }
@@ -229,14 +232,20 @@ internal fun FeatureCover(
 ) {
     val (base, fg, accent) = coverColors(team)
     CoverFrame(masthead, season, "THE COVER STORY · AND ${lines.size} MORE INSIDE", base, fg, accent, userBox) {
-        Text(kicker.uppercase(), style = T.label.copy(fontSize = 13.sp, letterSpacing = 3.sp), color = accent)
-        Text(headline.uppercase(), style = T.hero.copy(fontSize = 44.sp, lineHeight = 43.sp), color = fg, maxLines = 4)
-        Spacer(Modifier.height(8.dp))
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
             val w = maxWidth
-            Box(Modifier.fillMaxWidth().height(w * 0.8f)) {
-                Box(Modifier.align(Alignment.BottomEnd).offset(x = 28.dp)) {
-                    if (player != null) PlayerJersey(player, team, w * 0.66f) else TeamBadge(team, w * 0.5f)
+            Box(Modifier.fillMaxWidth().height(w * 1.12f)) {
+                // The subject, huge, in front of the masthead and cut off by the right edge.
+                Box(Modifier.align(Alignment.BottomEnd).offset(x = w * 0.24f).wrapContentSize(unbounded = true, align = Alignment.BottomEnd)) {
+                    if (player != null) PlayerJersey(player, team, w * 1.22f, plate = false) else TeamBadge(team, w * 0.6f)
+                }
+                // The headline over the bottom, like a sports cover's main line.
+                Column(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)))).padding(top = 28.dp),
+                ) {
+                    Text(kicker.uppercase(), style = T.label.copy(fontSize = 13.sp, letterSpacing = 3.sp), color = accent)
+                    Text(headline.uppercase(), style = T.hero.copy(fontSize = 46.sp, lineHeight = 44.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = Color.White, maxLines = 3)
                 }
                 Column(Modifier.align(Alignment.TopStart).fillMaxWidth(0.52f)) {
                     Text(deck, style = T.body.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontSize = 15.sp, lineHeight = 21.sp),

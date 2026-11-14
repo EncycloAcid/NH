@@ -137,7 +137,7 @@ fun warmPortraits(lg: com.nh.hoopscoach.game.League) {
 }
 
 @Composable
-fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: Gear = Gear.decode(p.gear)) {
+fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: Gear = Gear.decode(p.gear), plate: Boolean = true) {
     SpriteSheets.install()
     val primary = t?.primary ?: 0xFF5C6B7AL
     val secondary = t?.secondary ?: 0xFFFFFFFFL
@@ -150,7 +150,8 @@ fun PixelPortrait(p: Player, t: Team?, size: Dp, face: Face = Face.of(p), gear: 
     LaunchedEffect(key, half) {
         if (bmp == null) bmp = Pixels.load(face, primary, secondary, p.number, gear, jersey, label, half)
     }
-    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.2f)).background(Color(primary)),
+    // On its team-colored plate, or (on a magazine cover) cut out against whatever is behind it.
+    Box(if (plate) Modifier.size(size).clip(RoundedCornerShape(size * 0.2f)).background(Color(primary)) else Modifier.size(size),
         contentAlignment = androidx.compose.ui.Alignment.Center) {
         val b = bmp
         if (b != null) {
