@@ -94,7 +94,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     var number by remember { mutableIntStateOf(saved?.number ?: 3) }
     val range = heightRange(pos)
     if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
-    val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
+    val styles = (Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())).distinct().sortedBy { it.group.ordinal }
     if (style !in styles) style = styles.first()
     if (height !in range) height = (range.first + range.last) / 2
     Column(Modifier.fillMaxSize()) {
@@ -142,7 +142,8 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                     HoopsSlider(weight.toFloat(), { weight = it.roundToInt() }, 160f..290f)
                 }
                 Section("Play style")
-                Picker("Archetype", style.label, styles.map { it.label to "${it.blurb}. Boosts ${it.boosts.joinToString(" · ") { b -> b.label }}." }, Modifier.padding(horizontal = Gutter).fillMaxWidth()) { style = styles[it] }
+                Picker("Archetype", style.label, styles.map { it.label to "${it.blurb}. Boosts ${it.boosts.joinToString(" · ") { b -> b.label }}." }, Modifier.padding(horizontal = Gutter).fillMaxWidth(),
+                    display = "${style.label} · ${style.group.label}", sections = styles.map { it.group.label }) { style = styles[it] }
                 Text("${style.blurb}. Boosts ${style.boosts.joinToString(" · ") { it.label }}.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
                 Section("Hometown")
                 Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {

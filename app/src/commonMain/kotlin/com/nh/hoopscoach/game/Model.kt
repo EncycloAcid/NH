@@ -114,8 +114,100 @@ enum class Arch(val label: String, val short: String, val boosts: List<Attr>, va
     MIDRANGE_ASSASSIN("Midrange Assassin", "MDA", listOf(Attr.MID, Attr.HND, Attr.PER), "Lives in the midrange and creates pull-ups off the dribble"),
     SWITCH_BIG("Switch Big", "SBG", listOf(Attr.PER, Attr.IDF, Attr.REB), "Can guard one through five and cleans the glass"),
     PURE_POINT("Pure Point", "PPT", listOf(Attr.HND, Attr.PAS, Attr.PER), "Pass-first floor general who sets up teammates and pressures the ball"),
-    FACILITATING_WING("Facilitating Wing", "FCW", listOf(Attr.MID, Attr.PAS, Attr.PER), "Wing who makes the right read, hits the open midrange and checks the other wing");
+    FACILITATING_WING("Facilitating Wing", "FCW", listOf(Attr.MID, Attr.PAS, Attr.PER), "Wing who makes the right read, hits the open midrange and checks the other wing"),
+    // New archetypes: point guards
+    FLOATER_SPECIALIST("Floater Specialist", "FLT", listOf(Attr.INS, Attr.MID, Attr.HND), "Lives in the in-between: floaters and runners over the big man"),
+    HESITATION_ARTIST("Hesitation Artist", "HES", listOf(Attr.INS, Attr.OUT, Attr.HND), "Freezes his man with a hesitation, then gets to the rim or pulls up"),
+    BACKCOURT_THIEF("Backcourt Thief", "THF", listOf(Attr.STL, Attr.PAS, Attr.OUT), "Picks pockets in the backcourt and kicks it ahead for threes"),
+    TEMPO_PUSHER("Tempo Pusher", "TMP", listOf(Attr.HND, Attr.PAS, Attr.REB), "Grabs the rebound and is across half court in three dribbles"),
+    DRIVE_AND_KICK("Drive-and-Kick Guard", "DKG", listOf(Attr.INS, Attr.PAS, Attr.OUT), "Collapses the defense and sprays it out to the shooters"),
+    GAME_MANAGER("Game Manager", "GMG", listOf(Attr.MID, Attr.PAS, Attr.PER), "Takes care of the ball, makes the right play and guards his man"),
+    SHIFTY_SCORER("Shifty Scorer", "SHF", listOf(Attr.MID, Attr.OUT, Attr.STL), "Changes speeds, hits the step-back and jumps the passing lanes"),
+    FULL_COURT_PRESSURE("Full-Court Pressure", "FCP", listOf(Attr.PER, Attr.STL, Attr.HND), "Picks up the ball 94 feet away and never lets the guard breathe"),
+    DEEP_RANGE_POINT("Deep Range Point", "DRG", listOf(Attr.OUT, Attr.HND, Attr.STL), "Pulls up from 30 feet and pressures the ball the other way"),
+    STEADY_HAND("Steady Hand", "STH", listOf(Attr.MID, Attr.PAS, Attr.REB), "Low turnovers, smart shots and a box-out on every miss"),
+    CHANGE_OF_PACE("Change-of-Pace Guard", "CPG", listOf(Attr.INS, Attr.OUT, Attr.HND), "Slow, slow, then gone: the burst nobody can stay in front of"),
+    // New archetypes: shooting guards
+    CATCH_AND_SHOOT("Catch-and-Shoot Specialist", "CNS", listOf(Attr.OUT, Attr.MID, Attr.PER), "Feet set, ball up, and it's gone; honest on defense"),
+    SHOT_HUNTER("Shot Hunter", "HNT", listOf(Attr.MID, Attr.OUT, Attr.INS), "Comes off the bench looking for his shot, and finds it"),
+    SLITHERY_SCORER("Slithery Scorer", "SLT", listOf(Attr.INS, Attr.MID, Attr.HND), "Snakes the pick-and-roll and finishes with either hand"),
+    RELENTLESS_DEFENDER("Relentless Defender", "RLD", listOf(Attr.PER, Attr.STL, Attr.REB), "Fights through every screen and finishes the stop with a rebound"),
+    CONTACT_FINISHER("Contact Finisher", "CTF", listOf(Attr.INS, Attr.REB, Attr.MID), "Seeks out contact, finishes through it and lives at the line"),
+    SWINGMAN_SHOOTER("Swingman Shooter", "SWS", listOf(Attr.OUT, Attr.REB, Attr.PAS), "Hits threes from both wings and makes the extra pass"),
+    HEAT_CHECK("Heat Check", "HTC", listOf(Attr.OUT, Attr.HND, Attr.MID), "When he hits two, the third is coming from 30 feet"),
+    GLUE_GUARD("Glue Guard", "GLG", listOf(Attr.PAS, Attr.PER, Attr.REB), "Does every little thing: the extra pass, the box-out, the stop"),
+    CHASE_DOWN_GUARD("Chase-Down Guard", "CHD", listOf(Attr.PER, Attr.BLK, Attr.STL), "Erases layups from behind and jumps every passing lane"),
+    SIXTH_MAN("Sixth Man Scorer", "6MS", listOf(Attr.INS, Attr.MID, Attr.OUT), "Instant scoring off the bench from all three levels"),
+    COMBO_DEFENDER("Combo Defender", "CDF", listOf(Attr.PER, Attr.HND, Attr.PAS), "Guards both backcourt spots and brings the ball up under pressure"),
+    TWO_GUARD_DISTRIBUTOR("Two-Guard Distributor", "TGD", listOf(Attr.PAS, Attr.MID, Attr.HND), "A shooting guard who sees the floor like a point guard"),
+    // New archetypes: small forwards
+    SWISS_ARMY_KNIFE("Swiss Army Knife", "SAK", listOf(Attr.MID, Attr.REB, Attr.STL), "Scores, rebounds, gets steals: whatever the night needs"),
+    WING_STOPPER("Wing Stopper", "WST", listOf(Attr.PER, Attr.STL, Attr.BLK), "Takes the other team's best wing and makes him work for everything"),
+    SLASHING_WING("Slashing Wing", "SLW", listOf(Attr.INS, Attr.HND, Attr.PER), "Attacks closeouts with long strides and defends the wing"),
+    SPOT_UP_WING("Spot-Up Wing", "SUW", listOf(Attr.OUT, Attr.MID, Attr.STL), "Waits in the corner for the kick-out and jumps passing lanes"),
+    POSTERIZER("Posterizer", "PZR", listOf(Attr.INS, Attr.REB, Attr.BLK), "Dunks on whoever is standing in the way"),
+    HELP_SIDE_DEFENDER("Help-Side Defender", "HSD", listOf(Attr.BLK, Attr.STL, Attr.IDF), "Rotates early, takes charges and blocks shots from the weak side"),
+    MISMATCH_HUNTER("Mismatch Hunter", "MMH", listOf(Attr.INS, Attr.MID, Attr.HND), "Posts up small guards and blows by slow forwards"),
+    ENERGY_WING("Energy Wing", "ENW", listOf(Attr.REB, Attr.STL, Attr.INS), "Crashes the glass, dives for loose balls and scores on putbacks"),
+    POINT_WING("Point Wing", "PWN", listOf(Attr.HND, Attr.PAS, Attr.MID), "A wing who brings the ball up and runs the half-court offense"),
+    LONG_RANGE_WING("Long-Range Wing", "LRW", listOf(Attr.OUT, Attr.PER, Attr.BLK), "Tall shooter who closes out and contests with his length"),
+    BASELINE_ARTIST("Baseline Artist", "BLA", listOf(Attr.MID, Attr.INS, Attr.PAS), "Baseline fadeaways, reverse layups and drop-off passes"),
+    // New archetypes: power forwards
+    STRETCH_DEFENDER("Stretch Defender", "SDF", listOf(Attr.OUT, Attr.IDF, Attr.REB), "Spaces the floor and holds his ground against post-ups"),
+    HIGH_POST_HUB("High-Post Hub", "HPH", listOf(Attr.MID, Attr.PAS, Attr.REB), "Catches at the free-throw line and finds every cutter"),
+    POWER_SLASHER("Power Slasher", "PSL", listOf(Attr.INS, Attr.HND, Attr.REB), "Puts it on the floor from the wing and bulldozes to the rim"),
+    TRAIL_THREE_BIG("Trail-Three Big", "TTB", listOf(Attr.OUT, Attr.REB, Attr.HND), "Trails the break and lets it fly from the top of the key"),
+    BANGER("Banger", "BNG", listOf(Attr.IDF, Attr.REB, Attr.INS), "Battles for position, sets bruising screens and never gives an inch"),
+    WEAK_SIDE_SWATTER("Weak-Side Swatter", "WSS", listOf(Attr.BLK, Attr.PER, Attr.REB), "Comes from nowhere to pin shots against the glass"),
+    GLASS_CRASHER("Offensive Glass Crasher", "OGC", listOf(Attr.REB, Attr.INS, Attr.STL), "Every miss is a second chance: tip-ins, putbacks and kick-outs"),
+    HIGH_MOTOR("High Motor", "MTR", listOf(Attr.REB, Attr.STL, Attr.PER), "Never stops running: deflections, loose balls and box-outs"),
+    ELBOW_SHOOTER("Elbow Shooter", "EJF", listOf(Attr.MID, Attr.REB, Attr.IDF), "Knocks down the elbow jumper and holds the paint on defense"),
+    SMALL_BALL_FIVE("Small-Ball Five", "SBF", listOf(Attr.PER, Attr.BLK, Attr.INS), "Undersized big who switches everything and blocks shots with timing"),
+    HANDOFF_HUB("Handoff Hub", "HOH", listOf(Attr.PAS, Attr.IDF, Attr.MID), "Runs dribble handoffs at the top and reads the defense"),
+    // New archetypes: centers
+    DROP_ANCHOR("Drop Coverage Anchor", "DRA", listOf(Attr.IDF, Attr.BLK, Attr.REB), "Sits back in the paint, walls off drives and cleans up the miss"),
+    HOOK_SHOT("Hook Shot Specialist", "HKS", listOf(Attr.INS, Attr.MID, Attr.IDF), "A sky hook from either block that nobody can get to"),
+    SCREEN_SETTER("Screen Setter", "SCN", listOf(Attr.IDF, Attr.REB, Attr.PAS), "Frees shooters with bone-crushing screens and finds them on the slip"),
+    VERTICAL_SPACER("Vertical Spacer", "VSP", listOf(Attr.INS, Attr.BLK, Attr.REB), "Rolls to the rim and catches anything thrown near it"),
+    SEVEN_FOOT_SHOOTER("Seven-Foot Shooter", "7FS", listOf(Attr.OUT, Attr.MID, Attr.BLK), "A true center who shoots like a guard and still blocks shots"),
+    TWIN_TOWER("Twin Tower", "TWT", listOf(Attr.INS, Attr.REB, Attr.BLK), "Size at both ends: finishes over the top and owns the glass"),
+    FOOTWORK_BIG("Footwork Big", "FWB", listOf(Attr.INS, Attr.MID, Attr.PAS), "Up-and-unders, spin moves and a counter to every counter"),
+    HUB_CENTER("Hub Center", "HUB", listOf(Attr.PAS, Attr.HND, Attr.IDF), "The offense runs through him: handoffs, reads and outlet passes"),
+    ENERGY_BIG("Energy Big", "EBG", listOf(Attr.REB, Attr.PER, Attr.INS), "Runs the floor every possession and outworks every big he sees"),
+    THE_WALL("The Wall", "WAL", listOf(Attr.IDF, Attr.PER, Attr.REB), "Stays down on pump fakes and never gives up an easy basket"),
+    OLD_SCHOOL_CENTER("Old-School Center", "OSC", listOf(Attr.INS, Attr.REB, Attr.IDF), "Back to the basket, elbows out, and every rebound is his"),
+    ROLL_MAN_PASSER("Roll-Man Passer", "RMP", listOf(Attr.INS, Attr.PAS, Attr.BLK), "Rolls hard, then hits the open shooter when the help comes");
 
+    /** The category it's listed under. */
+    val group: ArchGroup get() = ArchGroups.of(this)
+
+
+}
+
+/** The categories archetypes are listed under, in the order they're shown. */
+enum class ArchGroup(val label: String, val blurb: String) {
+    SCORING("Scoring", "Get buckets: off the dribble, at the rim, from every level."),
+    SHOOTING("Shooting", "Space the floor and make the defense pay from outside."),
+    PLAYMAKING("Playmaking", "Run the offense and make everyone around him better."),
+    DEFENSE("Defense", "Stop the ball, protect the rim, take it away."),
+    INSIDE("Post & Paint", "Win the paint: post moves, rebounds and physical play."),
+    ATHLETIC("Energy & Athleticism", "Run, jump and outwork everyone on the floor."),
+    TWO_WAY("Two-Way & All-Around", "Help at both ends and fill whatever the team needs."),
+    MANUAL("Manual", "Bank level-ups and choose later."),
+}
+
+object ArchGroups {
+    // Exhaustive, so a new archetype can't be added without a category.
+    fun of(a: Arch): ArchGroup = when (a) {
+        Arch.MANUAL -> ArchGroup.MANUAL
+        Arch.SHOT_CREATOR, Arch.MICROWAVE, Arch.SCORING_POINT, Arch.THREE_LEVEL, Arch.VOLUME_SCORER, Arch.MIDRANGE_ASSASSIN, Arch.MIDRANGE_MAESTRO, Arch.SHOT_MAKER, Arch.PULL_UP_ARTIST, Arch.CRAFTY_FINISHER, Arch.SLASHER, Arch.DOWNHILL_GUARD, Arch.SPARK_PLUG, Arch.COMBO_GUARD, Arch.FLOATER_SPECIALIST, Arch.HESITATION_ARTIST, Arch.SHIFTY_SCORER, Arch.SHOT_HUNTER, Arch.SLITHERY_SCORER, Arch.CONTACT_FINISHER, Arch.SIXTH_MAN, Arch.SLASHING_WING, Arch.MISMATCH_HUNTER, Arch.BASELINE_ARTIST, Arch.POWER_SLASHER -> ArchGroup.SCORING
+        Arch.SHARPSHOOTER, Arch.LOGO_SHOOTER, Arch.MOVEMENT_SHOOTER, Arch.SPOT_UP, Arch.CORNER_SPECIALIST, Arch.STRETCH, Arch.PICK_AND_POP, Arch.SPACING_FIVE, Arch.STRETCH_FIVE, Arch.DEEP_RANGE_POINT, Arch.CATCH_AND_SHOOT, Arch.SWINGMAN_SHOOTER, Arch.HEAT_CHECK, Arch.SPOT_UP_WING, Arch.TRAIL_THREE_BIG, Arch.ELBOW_SHOOTER, Arch.SEVEN_FOOT_SHOOTER -> ArchGroup.SHOOTING
+        Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.PNR_MAESTRO, Arch.JUMBO_PLAYMAKER, Arch.PURE_POINT, Arch.SECONDARY_CREATOR, Arch.POINT_FORWARD, Arch.FACILITATING_WING, Arch.CONNECTOR, Arch.PLAYMAKING_FOUR, Arch.SHORT_ROLL, Arch.POINT_CENTER, Arch.ELBOW_HUB, Arch.POST_PLAYMAKER, Arch.FACE_UP_FOUR, Arch.TEMPO_PUSHER, Arch.DRIVE_AND_KICK, Arch.GAME_MANAGER, Arch.TWO_GUARD_DISTRIBUTOR, Arch.POINT_WING, Arch.HIGH_POST_HUB, Arch.HANDOFF_HUB, Arch.HUB_CENTER, Arch.ROLL_MAN_PASSER -> ArchGroup.PLAYMAKING
+        Arch.LOCKDOWN, Arch.BALL_HAWK, Arch.PEST, Arch.POINT_OF_ATTACK, Arch.PERIMETER_STOPPER, Arch.RANGY_DEFENDER, Arch.DEFENSIVE_FOUR, Arch.RIM_PROTECTOR, Arch.SWITCHABLE_BIG, Arch.SHOT_BLOCKER, Arch.MOBILE_BIG, Arch.SWITCH_BIG, Arch.BACKCOURT_THIEF, Arch.FULL_COURT_PRESSURE, Arch.RELENTLESS_DEFENDER, Arch.CHASE_DOWN_GUARD, Arch.WING_STOPPER, Arch.HELP_SIDE_DEFENDER, Arch.WEAK_SIDE_SWATTER, Arch.DROP_ANCHOR, Arch.THE_WALL -> ArchGroup.DEFENSE
+        Arch.POST_SCORER, Arch.POST_WING, Arch.LOW_POST_FOUR, Arch.BRUISER, Arch.ENFORCER, Arch.PAINT_BEAST, Arch.REBOUNDER, Arch.GLASS_CLEANER, Arch.DUNKER_SPOT, Arch.BULLY_GUARD, Arch.BANGER, Arch.HOOK_SHOT, Arch.SCREEN_SETTER, Arch.TWIN_TOWER, Arch.FOOTWORK_BIG, Arch.OLD_SCHOOL_CENTER -> ArchGroup.INSIDE
+        Arch.HIGH_FLYER, Arch.RIM_RUNNER, Arch.LOB_THREAT, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR, Arch.TRANSITION_WING, Arch.TRANSITION_FINISHER, Arch.SPEEDSTER, Arch.CRASH_GUARD, Arch.OFF_BALL_CUTTER, Arch.CHANGE_OF_PACE, Arch.POSTERIZER, Arch.ENERGY_WING, Arch.GLASS_CRASHER, Arch.HIGH_MOTOR, Arch.VERTICAL_SPACER, Arch.ENERGY_BIG -> ArchGroup.ATHLETIC
+        Arch.THREE_AND_D, Arch.TWO_WAY_GUARD, Arch.TWO_WAY_WING, Arch.TWO_WAY_POINT, Arch.TWO_WAY_FOUR, Arch.ISO_WING, Arch.GLUE_GUY, Arch.UNICORN, Arch.STRETCH_REBOUNDER, Arch.STEADY_HAND, Arch.GLUE_GUARD, Arch.COMBO_DEFENDER, Arch.SWISS_ARMY_KNIFE, Arch.LONG_RANGE_WING, Arch.STRETCH_DEFENDER, Arch.SMALL_BALL_FIVE -> ArchGroup.TWO_WAY
+    }
 }
 
 enum class Trait(val label: String, val good: Boolean) {

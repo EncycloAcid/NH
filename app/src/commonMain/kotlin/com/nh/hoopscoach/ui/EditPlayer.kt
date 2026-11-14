@@ -70,7 +70,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     }
     val ovr = Ratings.ovr(pos, p.attrs)
     if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
-    val styles = Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())
+    val styles = (Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())).distinct().sortedBy { it.group.ordinal }
     if (style !in styles) style = styles.first()
 
     LazyColumn(Modifier.fillMaxSize()) {
@@ -217,6 +217,8 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                 style.label,
                 styles.map { it.label to it.blurb },
                 Modifier.padding(horizontal = Gutter).fillMaxWidth(),
+                display = "${style.label} · ${style.group.label}",
+                sections = styles.map { it.group.label },
             ) { style = styles[it] }
             Text(
                 "The archetype is his identity: it's the training focus that suits him best. It doesn't change his ratings.",

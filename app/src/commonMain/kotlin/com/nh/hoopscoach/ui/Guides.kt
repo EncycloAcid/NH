@@ -186,7 +186,7 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
         ),
         sec(
             "Training focus",
-            "Each level-up raises the three ratings of the player's training focus by 1. The focus is an archetype: 28 play styles, from Floor General and Sharpshooter to Two-Way Guard, Pure Point, Switch Big and Facilitating Wing. Choose Manual to bank level-ups and spend them later.",
+            "Each level-up raises the three ratings of the player's training focus by 1. The focus is an archetype: 139 play styles in seven categories (Scoring, Shooting, Playmaking, Defense, Post & Paint, Energy & Athleticism, Two-Way & All-Around), from Floor General and Sharpshooter to Hesitation Artist, Wing Stopper and Seven-Foot Shooter. Choose Manual to bank level-ups and spend them later.",
         ),
         sec(
             "Build Lab",

@@ -101,30 +101,37 @@ object Ratings {
     }
 
     /** Play styles for a player: his position's, and his second position's too. */
-    fun stylesFor(p: Player): List<Arch> = styles(p.pos) + (p.pos2?.let { styles(it) } ?: emptyList())
+    fun stylesFor(p: Player): List<Arch> = (styles(p.pos) + (p.pos2?.let { styles(it) } ?: emptyList())).distinct().sortedBy { it.group.ordinal }
 
-    fun styles(pos: Pos): List<Arch> = when (pos) {
+    fun styles(pos: Pos): List<Arch> = stylesRaw(pos).sortedBy { it.group.ordinal }
+
+    private fun stylesRaw(pos: Pos): List<Arch> = when (pos) {
         // Every archetype belongs to one position (HEAD roster set + GOAT Build Lab additions).
         Pos.PG -> listOf(Arch.FLOOR_GENERAL, Arch.PLAYMAKER, Arch.TABLE_SETTER, Arch.BALL_HAWK, Arch.PEST, Arch.LOGO_SHOOTER,
             Arch.SCORING_POINT, Arch.SPEEDSTER, Arch.PNR_MAESTRO, Arch.POINT_OF_ATTACK,
             Arch.JUMBO_PLAYMAKER, Arch.PULL_UP_ARTIST, Arch.TWO_WAY_POINT, Arch.CRAFTY_FINISHER,
-            Arch.PURE_POINT, Arch.MIDRANGE_ASSASSIN)
+            Arch.PURE_POINT, Arch.MIDRANGE_ASSASSIN,
+            Arch.FLOATER_SPECIALIST, Arch.HESITATION_ARTIST, Arch.BACKCOURT_THIEF, Arch.TEMPO_PUSHER, Arch.DRIVE_AND_KICK, Arch.GAME_MANAGER, Arch.SHIFTY_SCORER, Arch.FULL_COURT_PRESSURE, Arch.DEEP_RANGE_POINT, Arch.STEADY_HAND, Arch.CHANGE_OF_PACE)
         Pos.SG -> listOf(Arch.SHARPSHOOTER, Arch.COMBO_GUARD, Arch.SHOT_CREATOR, Arch.TWO_WAY_GUARD, Arch.MICROWAVE, Arch.MOVEMENT_SHOOTER, Arch.BULLY_GUARD,
             Arch.SPOT_UP, Arch.MIDRANGE_MAESTRO, Arch.DOWNHILL_GUARD, Arch.SPARK_PLUG,
             Arch.SECONDARY_CREATOR, Arch.PERIMETER_STOPPER, Arch.CRASH_GUARD, Arch.OFF_BALL_CUTTER,
-            Arch.TRANSITION_FINISHER, Arch.VOLUME_SCORER)
+            Arch.TRANSITION_FINISHER, Arch.VOLUME_SCORER,
+            Arch.CATCH_AND_SHOOT, Arch.SHOT_HUNTER, Arch.SLITHERY_SCORER, Arch.RELENTLESS_DEFENDER, Arch.CONTACT_FINISHER, Arch.SWINGMAN_SHOOTER, Arch.HEAT_CHECK, Arch.GLUE_GUARD, Arch.CHASE_DOWN_GUARD, Arch.SIXTH_MAN, Arch.COMBO_DEFENDER, Arch.TWO_GUARD_DISTRIBUTOR)
         Pos.SF -> listOf(Arch.SLASHER, Arch.THREE_AND_D, Arch.LOCKDOWN, Arch.POINT_FORWARD, Arch.GLUE_GUY, Arch.HIGH_FLYER, Arch.ISO_WING,
             Arch.THREE_LEVEL, Arch.POST_WING, Arch.CORNER_SPECIALIST, Arch.TWO_WAY_WING,
             Arch.SHOT_MAKER, Arch.CONNECTOR, Arch.RANGY_DEFENDER, Arch.TRANSITION_WING,
-            Arch.FACILITATING_WING)
+            Arch.FACILITATING_WING,
+            Arch.SWISS_ARMY_KNIFE, Arch.WING_STOPPER, Arch.SLASHING_WING, Arch.SPOT_UP_WING, Arch.POSTERIZER, Arch.HELP_SIDE_DEFENDER, Arch.MISMATCH_HUNTER, Arch.ENERGY_WING, Arch.POINT_WING, Arch.LONG_RANGE_WING, Arch.BASELINE_ARTIST)
         Pos.PF -> listOf(Arch.STRETCH, Arch.REBOUNDER, Arch.FACE_UP_FOUR, Arch.SWITCHABLE_BIG, Arch.PICK_AND_POP, Arch.HUSTLE_BIG, Arch.ATHLETIC_FOUR,
             Arch.LOW_POST_FOUR, Arch.PLAYMAKING_FOUR, Arch.DUNKER_SPOT, Arch.DEFENSIVE_FOUR,
             Arch.STRETCH_REBOUNDER, Arch.TWO_WAY_FOUR, Arch.SHORT_ROLL, Arch.BRUISER,
-            Arch.SWITCH_BIG, Arch.FACILITATING_WING, Arch.TRANSITION_FINISHER)
+            Arch.SWITCH_BIG, Arch.FACILITATING_WING, Arch.TRANSITION_FINISHER,
+            Arch.STRETCH_DEFENDER, Arch.HIGH_POST_HUB, Arch.POWER_SLASHER, Arch.TRAIL_THREE_BIG, Arch.BANGER, Arch.WEAK_SIDE_SWATTER, Arch.GLASS_CRASHER, Arch.HIGH_MOTOR, Arch.ELBOW_SHOOTER, Arch.SMALL_BALL_FIVE, Arch.HANDOFF_HUB)
         Pos.C -> listOf(Arch.POST_SCORER, Arch.RIM_PROTECTOR, Arch.RIM_RUNNER, Arch.POINT_CENTER, Arch.STRETCH_FIVE, Arch.ENFORCER, Arch.UNICORN,
             Arch.GLASS_CLEANER, Arch.ELBOW_HUB, Arch.MOBILE_BIG, Arch.PAINT_BEAST,
             Arch.LOB_THREAT, Arch.SPACING_FIVE, Arch.POST_PLAYMAKER, Arch.SHOT_BLOCKER,
-            Arch.SWITCH_BIG)
+            Arch.SWITCH_BIG,
+            Arch.DROP_ANCHOR, Arch.HOOK_SHOT, Arch.SCREEN_SETTER, Arch.VERTICAL_SPACER, Arch.SEVEN_FOOT_SHOOTER, Arch.TWIN_TOWER, Arch.FOOTWORK_BIG, Arch.HUB_CENTER, Arch.ENERGY_BIG, Arch.THE_WALL, Arch.OLD_SCHOOL_CENTER, Arch.ROLL_MAN_PASSER)
     }
 
     /** Build an attribute set whose overall lands near [target]. */

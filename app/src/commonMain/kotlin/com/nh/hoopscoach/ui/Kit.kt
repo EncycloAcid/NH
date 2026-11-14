@@ -461,6 +461,8 @@ fun Picker(
     modifier: Modifier = Modifier,
     /** Shown in the field; defaults to [current]. Use when the value includes prefixes like "Auto ·". */
     display: String = current,
+    /** A heading for each option; a new heading is shown wherever it changes (options grouped in order). */
+    sections: List<String>? = null,
     onPick: (Int) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -490,6 +492,11 @@ fun Picker(
         }
         AppMenu(open, { open = false }, title = label, minWidth = maxOf(fieldWidth, 260.dp), scrollState = scroll) {
             options.forEachIndexed { i, (l, b) ->
+                val head = sections?.getOrNull(i)
+                if (head != null && head != sections.getOrNull(i - 1)) {
+                    if (i > 0) AppMenuDivider()
+                    Text(head.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.padding(start = 18.dp, top = 8.dp, bottom = 4.dp))
+                }
                 AppMenuItem(l, b.ifEmpty { null }, selected = i == sel) { open = false; onPick(i) }
             }
         }

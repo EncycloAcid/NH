@@ -335,8 +335,18 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        // Only the archetypes of his position (plus whatever he trains now, for older saves).
-        items(Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.stylesFor(p) }) { a ->
+        // Only the archetypes of his position (plus whatever he trains now, for older saves), under their categories.
+        val shown = Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.stylesFor(p) }
+        for ((group, list) in shown.groupBy { it.group }.entries.sortedBy { it.key.ordinal }) {
+        item(key = "h-" + group.name) {
+            Row(Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.Bottom) {
+                Text(group.label.uppercase(), style = T.label, color = P.accent)
+                Spacer(Modifier.width(8.dp))
+                Text("${list.size}", style = T.small, color = P.faint)
+            }
+            if (group != com.nh.hoopscoach.game.ArchGroup.MANUAL) Text(group.blurb, style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, bottom = 8.dp))
+        }
+        items(list, key = { it.name }) { a ->
             val current = p.focus == a
             Panel(
                 Modifier.padding(bottom = 8.dp),
@@ -358,6 +368,7 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     }
                 }
             }
+        }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
