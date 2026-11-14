@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         PlatformContext.filesDir = filesDir
         PlatformContext.versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull() ?: "3.4-pro.211"
+        }.getOrNull() ?: "3.4-pro.212"
         AndroidAssets.appContext = applicationContext
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

@@ -127,13 +127,18 @@ fun CourtPreview(t: Team, modifier: Modifier = Modifier) {
     DrawnCourt(t, modifier)
 }
 
-/** Court art from assets/courts, by the same key as the jersey art. Decoded once and kept. */
+/**
+ * Court art from assets/courts: an NBA team's by the same key as its jersey art, a college team's by its
+ * abbreviation (every school has one). Decoded once and kept.
+ */
 object CourtArt {
     private val cache = HashMap<String, androidx.compose.ui.graphics.ImageBitmap?>()
+    private val paths = HashMap<String, String?>()
 
-    fun path(t: Team): String? {
-        val key = SpriteSheets.artKey(t.abbr, t.slot) ?: return null
-        return if (com.nh.hoopscoach.assetBytes("courts/nba/$key.png") != null) "courts/nba/$key.png" else "courts/college/$key.png"
+    @Synchronized fun path(t: Team): String? = paths.getOrPut(t.slot + "|" + t.abbr) {
+        val key = SpriteSheets.artKey(t.abbr, t.slot)
+        val nba = key?.let { "courts/nba/$it.png" }?.takeIf { com.nh.hoopscoach.assetBytes(it) != null }
+        nba ?: if (t.slot.isBlank() && t.abbr.isNotBlank()) "courts/college/${t.abbr.lowercase()}.png".takeIf { com.nh.hoopscoach.assetBytes(it) != null } else null
     }
 
     @Synchronized fun image(t: Team): androidx.compose.ui.graphics.ImageBitmap? {
