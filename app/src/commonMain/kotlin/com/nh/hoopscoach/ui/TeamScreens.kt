@@ -522,7 +522,9 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
     var tab by remember(teamId) { mutableIntStateOf(0) }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() }) {
+            BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() })
+            // The actions get their own row, so the team's name and standing aren't squeezed off the top bar.
+            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FollowTeamButton(vm, lg, t)
                 SmallButton("Connections") { vm.push(Route.Web(com.nh.hoopscoach.game.WebNode.TEAM, t.id)) }
             }

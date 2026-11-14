@@ -239,7 +239,7 @@ fun CoachPoints(vm: GameViewModel, lg: League, earned: Int = 0) {
                     Text(s.blurb, style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
-                if (owned) Tag("OWNED", P.good) else SmallButton("Learn", enabled = c.points >= Coaching.SKILL_COST) { vm.act { Coaching.buySkill(it.userCoach, s) } }
+                if (owned) Tag("OWNED", P.good) else SmallButton(if (c.points >= Coaching.SKILL_COST) "Learn" else "${Coaching.SKILL_COST} pts", enabled = c.points >= Coaching.SKILL_COST) { vm.act { Coaching.buySkill(it.userCoach, s) } }
             }
         }
     }
@@ -331,12 +331,12 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                         slotToClone = activeSlot
                         cloneTitle = "$schoolName Checkpoint ($seasonYear)"
                     }
-                    SecondaryButton("Rename", Modifier.weight(0.7f)) {
+                    SecondaryButton("Rename", Modifier.weight(1f)) {
                         val activeSlot = active ?: SaveSlot("default", title, schoolName, lg.user.mascot, lg.user.abbr, seasonYear, rec, modeLabel, person, lg.user.primary.toInt(), lg.user.secondary.toInt(), System.currentTimeMillis())
                         slotToRename = activeSlot
                         renameTitle = title
                     }
-                    SecondaryButton("Export", Modifier.weight(0.7f)) {
+                    SecondaryButton("Export", Modifier.weight(1f)) {
                         exportSlotId = vm.activeSlotId
                         exporter()
                     }
@@ -363,15 +363,15 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                             PrimaryButton("Load", Modifier.weight(1f)) {
                                 vm.loadSlot(slot.id)
                             }
-                            SecondaryButton("Snapshot", Modifier.weight(0.7f)) {
+                            SmallButton("Snapshot", Modifier.weight(1f)) {
                                 slotToClone = slot
                                 cloneTitle = "${slot.school} Branch"
                             }
-                            SecondaryButton("Rename", Modifier.weight(0.7f)) {
+                            SmallButton("Rename", Modifier.weight(1f)) {
                                 slotToRename = slot
                                 renameTitle = slot.title
                             }
-                            SecondaryButton("Delete", Modifier.weight(0.7f)) {
+                            SmallButton("Delete", Modifier.weight(1f), danger = true) {
                                 slotToDelete = slot
                             }
                         }

@@ -281,10 +281,13 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                 }
                 Spacer(Modifier.height(10.dp))
                 Row {
-                    Stat("Style", p.style.short, Modifier.weight(1f), style = T.numSm)
+                    Stat("Height", Ratings.heightLabel(p.height), Modifier.weight(1f), style = T.numSm)
                     Stat("NIL ask", money(r.nilAsk), Modifier.weight(1f), style = T.numSm)
                     Stat("Scout", fog.label, Modifier.weight(1f), if (fog.known) P.good else P.sub, T.numSm)
                 }
+                // The play style in words, not a three-letter code.
+                Spacer(Modifier.height(8.dp))
+                Text("Play style: ${p.style.label}" + if (p.style.group != com.nh.hoopscoach.game.ArchGroup.MANUAL) " · ${p.style.group.label}" else "", style = T.small, color = P.accent)
                 if (p.buildName.isNotEmpty() || p.likeA.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
                     if (p.buildName.isNotEmpty()) Text(p.buildName, style = T.bodyB, color = P.ink)

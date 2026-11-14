@@ -156,9 +156,12 @@ object T {
     val label = TextStyle(fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 11.sp, lineHeight = 13.sp, letterSpacing = 1.1.sp)
 }
 
+/** Forces light or dark regardless of the system (null follows the system). Used by the screen renders. */
+@Volatile var forceDarkTheme: Boolean? = null
+
 @Composable
 fun HoopsTheme(primary: Color? = null, secondary: Color? = null, content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = forceDarkTheme ?: isSystemInDarkTheme()
     val p = remember(dark, primary, secondary) { palette(dark, primary, secondary) }
     val scheme = if (dark) darkColorScheme(
         primary = p.accent, onPrimary = p.onAccent, background = p.bg, surface = p.surface, onSurface = p.ink,

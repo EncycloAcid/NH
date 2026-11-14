@@ -226,7 +226,14 @@ private fun storyClick(vm: GameViewModel, lg: League, p: Post): (() -> Unit)? {
 /** The feed in two tabs: what people say about you, and what's happening around the league. Newest first. */
 @Composable
 fun SocialScreen(vm: GameViewModel, lg: League) {
-    val r = lg.road ?: return
+    val r = lg.road ?: run {
+        // Only a player career has a feed; never leave a blank screen without a way back.
+        Column(Modifier.fillMaxSize()) {
+            BackBar("Social", null, onBack = { vm.back() })
+            Empty("Social is part of a player career: your followers, posts and the league's chatter.")
+        }
+        return
+    }
     var kind by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize()) {
