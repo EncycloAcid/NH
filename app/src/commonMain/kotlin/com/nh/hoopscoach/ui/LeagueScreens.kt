@@ -58,7 +58,9 @@ fun LeagueScreen(vm: GameViewModel, lg: League) {
     val board = if (vm.leagueTab == TAB_BUBBLE || vm.leagueTab == TAB_BUBBLE + 1) remember(lg, lg.day, lg.phase) { Bracketology.board(lg) } else null
     LazyColumn(Modifier.fillMaxWidth(), state = listState) {
         item {
-            ScreenHeader("${lg.teams.size} teams · ${lg.confs.size} conferences", "League", Season.statusLine(lg))
+            ScreenHeader("${lg.teams.size} teams · ${lg.confs.size} conferences", "League", Season.statusLine(lg)) {
+                SmallButton("Explore", primary = true) { vm.push(Route.Explore) }
+            }
             Segmented(LEAGUE_TABS, vm.leagueTab, { vm.leagueTab = it }, scroll = true)
         }
         when (vm.leagueTab) {
@@ -507,18 +509,7 @@ fun HistoryScreen(vm: GameViewModel, lg: League, kind: HistoryKind) {
                 HighlightReel(vm, lg, mine == 1)
             }
             HistoryKind.GREATEST -> greatestTeams(vm, lg)
-            HistoryKind.RECORDS -> item {
-                Spacer(Modifier.height(8.dp))
-                GroupList(lg.records) { r ->
-                    ListRow {
-                        Column(Modifier.weight(1f)) {
-                            Text(r.label, style = T.bodyB, color = P.ink)
-                            Text(if (r.holder.isEmpty()) "Not set yet" else "${r.holder} · ${r.detail}", style = T.small, color = P.sub)
-                        }
-                        Text("${r.value}", style = T.num, color = P.accent)
-                    }
-                }
-            }
+            HistoryKind.RECORDS -> item { RecordBookView(vm, lg, null) }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }

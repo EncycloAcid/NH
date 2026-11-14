@@ -1683,6 +1683,11 @@ class League(
     var staffPoolSeason: Int = 0,
     var tree: MutableList<TreeBranch> = mutableListOf(),
     /** The user's standing with the compliance office (see [Compliance]): warnings on file, the last check, and the season he self-reported. */
+    /** Schools and coaches the user follows from Explore (ids). */
+    var followTeams: MutableList<Int> = mutableListOf(),
+    /** Schools that keep fighting the user for recruits (see [RecruitRivals]). */
+    var recruitRivals: MutableList<RecruitRival> = mutableListOf(),
+    var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,
     var selfReported: Int = 0,

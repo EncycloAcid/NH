@@ -443,6 +443,8 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
         }
         PipelinePanel(vm, lg, t)
         ProgramLegends(t) { vm.openPlayer(it) }
+        Section("Program records")
+        RecordBookView(vm, lg, t.id, n = 3)
         FormerPlayers(vm, lg, t)
     }
 }
@@ -456,6 +458,7 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() }) {
+                FollowTeamButton(vm, lg, t)
                 SmallButton("Connections") { vm.push(Route.Web(com.nh.hoopscoach.game.WebNode.TEAM, t.id)) }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -487,6 +490,8 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             }
             3 -> item {
                 ProgramNumbers(vm, lg, t)
+                Section("Program records")
+                RecordBookView(vm, lg, t.id, n = 3)
                 FanPanel(t)
                 val co = com.nh.hoopscoach.game.Shoes.of(t)
                 if (co != null) {

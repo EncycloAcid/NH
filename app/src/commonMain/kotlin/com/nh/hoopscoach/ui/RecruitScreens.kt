@@ -456,6 +456,21 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                 )
             }
         }
+        com.nh.hoopscoach.game.RecruitRivals.inOn(lg, r).takeIf { it.isNotEmpty() }?.let { rivals ->
+            item {
+                Spacer(Modifier.height(10.dp))
+                Panel(color = mix(P.surface, P.bad, if (P.dark) 0.14f else 0.07f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        rivals.take(2).forEach { TeamBadge(it, 30.dp); Spacer(Modifier.width(8.dp)) }
+                        Column(Modifier.weight(1f)) {
+                            Text("RECRUITING RIVAL", style = T.label, color = P.bad)
+                            Text("${rivals.joinToString(" and ") { it.school }} ${if (rivals.size == 1) "is" else "are"} after him too, and their pitch is 20% tougher against you.",
+                                style = T.small, color = P.ink)
+                        }
+                    }
+                }
+            }
+        }
         item {
             val fs = Recruiting.factors(lg, u, r, ctx)
             val fit = fs.fold(1.0) { a, f -> if (f.multiplier) a * f.value else a }

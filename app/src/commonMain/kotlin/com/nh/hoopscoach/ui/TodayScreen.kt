@@ -81,6 +81,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
             ScreenHeader("Season ${lg.season} · Game ${(u.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}", u.school, recordLine(lg, u)) {
+                SmallButton("Calendar") { vm.push(Route.Calendar) }
                 TeamBadge(u, 46.dp)
             }
         }
@@ -98,6 +99,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { Form(vm, lg, u) }
         if (u.gp >= 8) item { Outlook(vm, lg) }
         item { ConfSnapshot(vm, lg, u) }
+        item { FollowingCard(vm, lg) }
         item { TopPlayers(vm, lg, u) }
         if (lg.playerMode) item { SocialStrip(vm, lg) }
         item { Headlines(vm, lg) }

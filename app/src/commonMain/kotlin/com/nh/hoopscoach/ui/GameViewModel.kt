@@ -38,7 +38,7 @@ enum class HistoryKind(val title: String, val sub: String) {
     AWARDS("Champions & Awards", "Every national award winner"),
     DRAFT("Draft History", "Every pick, every year"),
     HOF("Hall of Fame", "Inducted players and coaches"),
-    RECORDS("Record Book", "Single-game records"),
+    RECORDS("Record Book", "Single-game, season and career records"),
     GREATEST("Greatest Teams", "Every champion, rated on one scale"),
 }
 
@@ -72,6 +72,9 @@ sealed interface Route {
     data object Mixtape : Route
     /** The relationship web around a coach (kind 'C') or a team ('T'). */
     data class Web(val kind: Char, val id: Int) : Route
+    data object Calendar : Route
+    data object Explore : Route
+    data class ConfPage(val confId: Int) : Route
 }
 
 /** A game being watched possession by possession. */

@@ -74,6 +74,7 @@ fun ConnectionsScreen(vm: GameViewModel, lg: League, focus: WebNode) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar("Connections", Connections.title(lg, focus), onBack = { vm.back() }) {
+                if (focus.kind == WebNode.COACH) lg.coaches.firstOrNull { it.id == focus.id }?.let { FollowCoachButton(vm, lg, it) }
                 teamOf(lg, focus)?.let { tid -> SmallButton(if (focus.kind == WebNode.TEAM) "Team page" else "His team") { vm.push(Route.TeamPage(tid)) } }
             }
         }
@@ -119,6 +120,7 @@ private fun sectionTitle(k: LinkKind, n: Int) = when (k) {
     LinkKind.FORMER_COACH -> "Former head coaches"
     LinkKind.COACH_RIVAL -> "Coaching rivals"
     LinkKind.TEAM_RIVAL -> "Rivalries"
+    LinkKind.RECRUIT_RIVAL -> "Recruiting rivals"
     LinkKind.PLAYED_AT -> "Played at"
     LinkKind.PLAYER -> "Former players · $n"
     LinkKind.LEGEND -> "Program legends"

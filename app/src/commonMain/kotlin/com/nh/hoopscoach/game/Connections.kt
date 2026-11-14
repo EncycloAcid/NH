@@ -19,6 +19,7 @@ enum class LinkKind(val label: String, val group: String) {
     FORMER_COACH("Former head coach", "Program"),
     COACH_RIVAL("Coaching rival", "Rivals"),
     TEAM_RIVAL("Rival", "Rivals"),
+    RECRUIT_RIVAL("Recruiting rival", "Rivals"),
     PLAYED_AT("Played there", "Program"),
     PLAYER("Former player", "Players"),
     LEGEND("Program legend", "Players"),
@@ -123,6 +124,13 @@ object Connections {
             val you = lg.userCoach
             out += WebLink(LinkKind.COACH_RIVAL, WebNode(WebNode.COACH, you.id), you.name,
                 "${CoachRivals.heatLabel(r.heat)} · he's ${r.l}-${r.w} against you", r.heat.coerceIn(1, 10))
+        }
+
+        // Schools that keep beating him for recruits.
+        if (isUser) RecruitRivals.rivals(lg).forEach { e ->
+            val t = lg.teams.getOrNull(e.teamId) ?: return@forEach
+            out += WebLink(LinkKind.RECRUIT_RIVAL, WebNode(WebNode.TEAM, t.id), teamName(lg, t),
+                "Beat you for ${e.names.take(3).joinToString(", ")}" + if (e.won > 0) " · you've won ${e.won} back" else "", (4 + e.lost).coerceAtMost(9))
         }
 
         // Where he played.

@@ -373,7 +373,8 @@ object Recruiting {
                 pts > 0 -> nilGain(r, aiNilOffer(r, ctx, tid))
                 else -> 0.0
             }
-            val g = gain(pts, if (pts > 0) fit(lg, lg.team(tid), r, ctx) else 1.0) + nil
+            // A recruiting rival comes harder after the recruits the user wants.
+            val g = (gain(pts, if (pts > 0) fit(lg, lg.team(tid), r, ctx) else 1.0) + nil) * RecruitRivals.pitch(lg, r, tid)
             // Gains taper as interest climbs, so the last stretch to 100 is the hardest.
             out[tid] = if (g > 0) (now + g * (1 - now / 104.0).coerceAtLeast(0.04)).roundToInt().coerceAtMost(100) else (now * 0.9).roundToInt()
         }
@@ -585,6 +586,11 @@ object Recruiting {
         val t = lg.team(tid)
         Memories.committed(lg, r, t)
         if (tid != u && wasTarget && u >= 0 && r.p.stars >= 4 && (r.interest[u] ?: 0) >= 50) WorldEvents.stolen(lg, r, lg.team(u), t)
+        // Recruiting rivals: who beats the user for the recruits he was really in on, and whom he beats.
+        if (u >= 0 && !r.transfer) runCatching {
+            if (tid != u && wasTarget && (r.interest[u] ?: 0) >= 40) RecruitRivals.lost(lg, r, t)
+            else if (tid == u) r.interest.filter { it.key != u && (it.value) >= 40 }.maxByOrNull { it.value }?.let { RecruitRivals.won(lg, r, lg.team(it.key)) }
+        }
         if (!r.transfer && r.p.stars >= 5 && t.prestige < 60) Timeline.record(lg, "commit", "Five-star ${r.p.name} picks ${t.school}",
             "${r.p.name}, the No. ${r.p.recruitRank} recruit, chose ${t.school} over bigger programs.", t.id, r.p.id, weight = 3)
         if (tid == u || r.p.stars >= 5 || (r.transfer && r.p.ovr >= 80)) {

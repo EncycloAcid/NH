@@ -157,6 +157,7 @@ object WorldEvents {
     fun seasonEnd(lg: League) {
         if (lg.pro) return
         Brand.ensure(lg)
+        runCatching { RecruitRivals.seasonEnd(lg) }
         records(lg)
         dynasties(lg)
         unbeatenRegularSeasons(lg)
