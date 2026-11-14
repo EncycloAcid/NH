@@ -101,8 +101,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
     Column(Modifier.fillMaxSize()) {
-        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() }, actions = {
-            SmallButton("Skip") { vm.back() }
+        BackBar("Preview ${pv.season}", list[pager.currentPage].second, onBack = { vm.back() }, actions = {
         })
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             list.indices.forEach { i ->
@@ -155,6 +154,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
+        Hairline()
         Row(Modifier.fillMaxWidth().background(P.bg).padding(horizontal = Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (pager.currentPage == 0) SmallButton("Skip") { vm.back() }
             else SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
@@ -276,7 +276,7 @@ private fun NbaUserBox(lg: League, pv: NbaPreview) {
         Column(Modifier.weight(1f)) {
             Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
             Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}", style = T.bodyB, color = Color.White, maxLines = 2)
-            Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+            Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo} to ${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
         }
     }
 }
@@ -324,7 +324,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
                 Text("HOOPS DYNASTY PRO", style = T.label, color = fg.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
                 Text("${pv.season} SEASON", style = T.label, color = fg.copy(alpha = 0.85f))
             }
-            Text("PREVIEW", style = T.hero.copy(fontSize = 72.sp, lineHeight = 68.sp, letterSpacing = 2.sp), color = fg)
+            Text("PREVIEW", style = T.hero.copy(fontSize = 56.sp, lineHeight = 54.sp, letterSpacing = 2.sp), color = fg)
             Box(Modifier.fillMaxWidth().height(3.dp).background(accent))
             Spacer(Modifier.height(16.dp))
             Text(pv.headline.ifEmpty { "The team to beat" }.uppercase(), style = T.title.copy(fontSize = 36.sp, lineHeight = 37.sp), color = accent)
@@ -351,13 +351,8 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
                 Column(Modifier.weight(1f)) {
                     Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
                     Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}", style = T.bodyB, color = Color.White, maxLines = 2)
-                    Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+                    Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo} to ${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
-                Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
             }
         }
     }

@@ -114,11 +114,6 @@ internal fun FeatureCover(
         lines.forEach { (k, h) -> CoverLine(k, h, fg, accent) }
         Spacer(Modifier.height(12.dp))
         userBox()
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
-            if (onSkip != null) Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
-        }
     }
 }
 
@@ -164,11 +159,6 @@ internal fun VersusCover(
         lines.forEach { (k, h) -> CoverLine(k, h, Color.White, P.gold) }
         Spacer(Modifier.height(12.dp))
         userBox()
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("$count pages · swipe to open →", style = T.bodyB, color = P.gold, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
-            if (onSkip != null) Text("Skip preview →", style = T.small, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
-        }
     }
 }
 

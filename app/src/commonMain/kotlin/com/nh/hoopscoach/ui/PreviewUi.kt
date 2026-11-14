@@ -192,10 +192,8 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        BackBar("Preview ${pv.season}", "Page ${pager.currentPage + 1} of ${list.size} · ${list[pager.currentPage].second}", onBack = { vm.back() }, actions = {
+        BackBar("Preview ${pv.season}", list[pager.currentPage].second, onBack = { vm.back() }, actions = {
             SmallButton("Contents") { showIndex = true }
-            Spacer(Modifier.width(6.dp))
-            SmallButton("Skip") { vm.back() }
         })
         // Thumb index: one tick per page with spring height and smooth color transition.
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -256,6 +254,7 @@ fun PreviewScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
+        Hairline()
         Row(Modifier.fillMaxWidth().background(P.bg).padding(horizontal = Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (pager.currentPage == 0) SmallButton("Skip") { vm.back() }
             else SmallButton("‹ Prev", enabled = pager.currentPage > 0) { go(pager.currentPage - 1) }
@@ -361,12 +360,11 @@ private fun CollegeUserBox(lg: League, pv: Preview, onClick: (() -> Unit)? = nul
         TeamBadge(u, 40.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
-                if (onClick != null) Text("Team report →", style = T.label.copy(fontSize = 9.sp), color = P.accent)
-            }
+            Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
             Text("${u.school}: No. ${mine.nat}, ${Previews.ordinal(mine.confRank)} in the ${lg.conf(u.confId).abbr}", style = T.bodyB, color = Color.White, maxLines = 2)
-            Text("NCAA ${odd(uo.ncaa)} · ${lg.conf(u.confId).abbr} title ${odd(uo.conf)} · ${uo.lo}-${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
+            Text("NCAA ${odd(uo.ncaa)} · ${lg.conf(u.confId).abbr} title ${odd(uo.conf)}", style = T.small, color = Color.White.copy(alpha = 0.85f))
+            Text("${uo.lo} to ${uo.hi} wins projected", style = T.small, color = Color.White.copy(alpha = 0.85f))
+            if (onClick != null) Text("Team report →", style = T.bodyB.copy(fontSize = 13.sp), color = Color.White, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -413,13 +411,13 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
                 Text("HOOPS DYNASTY", style = T.label, color = fg.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
                 Text("PRESEASON ${pv.season}", style = T.label, color = fg.copy(alpha = 0.85f))
             }
-            Text("PREVIEW", style = T.hero.copy(fontSize = 72.sp, lineHeight = 68.sp, letterSpacing = 2.sp), color = fg)
+            Text("PREVIEW", style = T.hero.copy(fontSize = 56.sp, lineHeight = 54.sp, letterSpacing = 2.sp), color = fg)
             Box(Modifier.fillMaxWidth().height(3.dp).background(accent))
-            Spacer(Modifier.height(16.dp))
-            Text(pv.headline.ifEmpty { "The team to beat" }.uppercase(), style = T.title.copy(fontSize = 38.sp, lineHeight = 38.sp), color = accent)
+            Spacer(Modifier.height(12.dp))
+            Text(pv.headline.ifEmpty { "The team to beat" }.uppercase(), style = T.title.copy(fontSize = 32.sp, lineHeight = 33.sp), color = accent)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (star != null) PlayerJersey(star, top, 104.dp)
+                if (star != null) PlayerJersey(star, top, 92.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("NO. 1 · ${odd(to.title)} TO WIN IT ALL", style = T.label, color = accent)
@@ -434,11 +432,6 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
             Spacer(Modifier.height(12.dp))
             // The user's team, on the cover's corner.
             CollegeUserBox(lg, pv, onGoReport)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("$count pages · swipe to open →", style = T.bodyB, color = accent, modifier = Modifier.clickable(onClick = onRead).padding(vertical = 6.dp))
-                Text("Skip preview →", style = T.small, color = fg.copy(alpha = 0.85f), modifier = Modifier.clickable(onClick = onSkip).padding(vertical = 6.dp))
-            }
         }
     }
 }
