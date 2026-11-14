@@ -2082,6 +2082,7 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
             TrophyRoomLink(vm, lg)
+            ConnectionsCard(vm, lg)
             CoachRivalsCard(lg)
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -455,7 +455,9 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
     var tab by remember(teamId) { mutableIntStateOf(0) }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() })
+            BackBar(t.name, "${lg.conf(t.confId).name} · ${if (lg.pro) franchiseLabel(t.prestige) else prestigeLabel(t.prestige)}", onBack = { vm.back() }) {
+                SmallButton("Connections") { vm.push(Route.Web(com.nh.hoopscoach.game.WebNode.TEAM, t.id)) }
+            }
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 TeamBadge(t, 64.dp)
                 Spacer(Modifier.width(14.dp))

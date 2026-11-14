@@ -69,6 +69,8 @@ sealed interface Route {
     data class Portrait(val playerId: Int) : Route
     data object TopTen : Route
     data object Mixtape : Route
+    /** The relationship web around a coach (kind 'C') or a team ('T'). */
+    data class Web(val kind: Char, val id: Int) : Route
 }
 
 /** A game being watched possession by possession. */

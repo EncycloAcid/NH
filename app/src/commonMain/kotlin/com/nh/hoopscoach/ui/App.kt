@@ -249,6 +249,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.MyPlayer -> MyPlayerScreen(vm, lg)
         is Route.TopTen -> TopTenScreen(vm, lg)
         is Route.Mixtape -> MixtapeScreen(vm, lg)
+        is Route.Web -> ConnectionsScreen(vm, lg, com.nh.hoopscoach.game.WebNode(r.kind, r.id))
     }
 }
 

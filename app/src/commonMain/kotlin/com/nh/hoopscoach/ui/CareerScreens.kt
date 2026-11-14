@@ -162,6 +162,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
             GroupList(rows) { it() }
         }
         item { TrophyRoomLink(vm, lg) }
+        item { ConnectionsCard(vm, lg) }
         item { CoachRivalsCard(lg) }
         item {
             Section("Archive")
