@@ -1,5 +1,15 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.layout.statusBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+
+import androidx.compose.foundation.layout.navigationBarsPadding
+
+import androidx.compose.foundation.layout.statusBarsPadding
+
 import com.nh.hoopscoach.PlatformBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -61,8 +71,10 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
     // The title fades in, the way a moment should.
     val fade = remember(c) { Animatable(0f) }
     LaunchedEffect(c) { fade.animateTo(1f, tween(900)) }
+    val top = lerp(base, Color.Black, 0.1f)
     Box(Modifier.fillMaxSize().background(P.bg)) {
-        LazyColumn(Modifier.fillMaxSize()) {
+        // Content stays below the status bar; a strip in the team's color sits behind the clock and icons.
+        LazyColumn(Modifier.fillMaxSize().statusBarsPadding()) {
             item {
                 Box(
                     Modifier.fillMaxWidth()
@@ -85,15 +97,21 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
                         Spacer(Modifier.height(16.dp))
                         team?.let { TeamBadge(it, 64.dp) }
                         Spacer(Modifier.height(18.dp))
-                        // The numbers.
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            c.statLabels.forEachIndexed { i, l ->
-                                Column(
-                                    Modifier.widthIn(min = 92.dp).clip(RoundedCornerShape(14.dp)).background(fg.copy(alpha = 0.1f))
-                                        .border(1.dp, fg.copy(alpha = 0.15f), RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
-                                ) {
-                                    Text(c.statValues.getOrNull(i) ?: "", style = T.num.copy(fontSize = 24.sp), color = fg)
-                                    Text(l, style = T.label.copy(fontSize = 10.sp), color = fg.copy(alpha = 0.7f))
+                        // The numbers, as an even grid: four make two rows of two, never three and an orphan.
+                        val n = c.statLabels.size
+                        val perRow = when { n == 4 -> 2; n <= 3 -> n.coerceAtLeast(1); else -> 3 }
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            c.statLabels.indices.chunked(perRow).forEach { row ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    for (i in row) Column(
+                                        Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(fg.copy(alpha = 0.1f))
+                                            .border(1.dp, fg.copy(alpha = 0.15f), RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                                    ) {
+                                        Text(c.statValues.getOrNull(i) ?: "", style = T.num.copy(fontSize = 24.sp), color = fg, maxLines = 1)
+                                        Text(c.statLabels[i], style = T.label.copy(fontSize = 10.sp), color = fg.copy(alpha = 0.7f), maxLines = 1)
+                                    }
+                                    // Keep a short last row the same width as the rows above.
+                                    repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -131,17 +149,22 @@ fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
             }
             item { Spacer(Modifier.height(100.dp)) }
         }
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(P.bg.copy(alpha = 0.94f)).padding(horizontal = Gutter, vertical = 10.dp)) {
-            val ready = !choosing || c.chosen >= 0
-            PrimaryButton(
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars).background(top))
+        // Until he's spoken there's nothing to press: a quiet hint, not a dead button over the choices.
+        val ready = !choosing || c.chosen >= 0
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(P.bg)) {
+            Hairline()
+            if (ready) PrimaryButton(
                 when {
-                    !ready -> if (hire) "Choose your opening statement" else "Choose what you say"
                     hire -> "Get to work"
                     lg.ceremonyQueue.isNotEmpty() -> "Next"
                     else -> "Continue"
                 },
-                Modifier.fillMaxWidth(), enabled = ready,
+                Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 10.dp),
             ) { vm.act { Farewell.dismiss(it) } }
+            else Text(if (hire) "Pick your opening statement above" else "Pick what you say above",
+                style = T.small, color = P.sub, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp))
+            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }
