@@ -27,13 +27,17 @@ class RoadExtrasTest {
     @Test
     fun archetypes() {
         val styles = Arch.entries.filter { it != Arch.MANUAL }
-        assertEquals("seventy-four archetypes", 74, styles.size)
+        assertEquals("137 archetypes", 137, styles.size)
+        assertTrue("every archetype has a category", styles.all { it.group != com.nh.hoopscoach.game.ArchGroup.MANUAL })
         assertEquals("short codes are unique", styles.size, styles.map { it.short }.toSet().size)
         assertTrue("each boosts three ratings", styles.all { it.boosts.size == 3 && it.boosts.toSet().size == 3 })
-        for (pos in Pos.entries) assertTrue("$pos has 14 or 15 styles", Ratings.styles(pos).size in 14..15)
+        for (pos in Pos.entries) assertTrue("$pos has 25 to 32 styles", Ratings.styles(pos).size in 25..32)
+        // The GOAT Build Lab styles were added on top of the position sets and may overlap them.
+        val lab = setOf(Arch.VOLUME_SCORER, Arch.TRANSITION_FINISHER, Arch.MIDRANGE_ASSASSIN, Arch.SWITCH_BIG, Arch.PURE_POINT, Arch.FACILITATING_WING)
         assertTrue("no two styles at a position boost the same three ratings",
-            Pos.entries.all { pos -> Ratings.styles(pos).map { it.boosts.toSet() }.let { it.size == it.toSet().size } })
-        assertTrue("every archetype belongs to exactly one position", styles.all { a -> Pos.entries.count { a in Ratings.styles(it) } == 1 })
+            Pos.entries.all { pos -> Ratings.styles(pos).filter { it !in lab }.map { it.boosts.toSet() }.let { it.size == it.toSet().size } })
+        assertTrue("every archetype belongs to a position", styles.all { a -> Pos.entries.any { a in Ratings.styles(it) } })
+        assertTrue("every other archetype belongs to exactly one position", styles.filter { it !in lab }.all { a -> Pos.entries.count { a in Ratings.styles(it) } == 1 })
         // Growth slows above 90: a 98 rarely moves, a 70 always does.
         Rng.r = Random(2)
         val p = LeagueGen.makePlayer(LeagueGen.newLeague(), Pos.SG, 1, 75, -1)
