@@ -1,5 +1,7 @@
 package com.nh.hoopscoach
 
+import com.nh.hoopscoach.ArgbBitmap
+
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import com.nh.hoopscoach.game.Face
@@ -15,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class AvatarRenderTest {
     @Before fun install() {
-        SpriteSheets.install(ApplicationProvider.getApplicationContext<android.content.Context>().assets)
+        AndroidAssets.appContext = ApplicationProvider.getApplicationContext(); SpriteSheets.install()
     }
 
     @Test fun savedLooksDecodeToValidChoices() {
@@ -109,6 +111,56 @@ class AvatarRenderTest {
         assertTrue(checked > 100)
     }
 
+    @Test fun teamsWithoutJerseyArtWearTheirOwnColorsAndAbbreviation() {
+        assertNull(SpriteSheets.jerseyArt("not-a-team"))
+        assertNull(SpriteSheets.jerseyArt(null))
+        assertEquals("character/nba_jerseys/lakers.png", SpriteSheets.jerseyArt("lakers"))
+        val orange = 0xFFF56600.toInt(); val purple = 0xFF522D80.toInt()
+        val plain = SpriteCompose.teamJersey(orange, purple, null)!!
+        val worded = SpriteCompose.teamJersey(orange, purple, "clem")!!
+        assertSame(worded, SpriteCompose.teamJersey(orange, purple, "CLEM"))
+        val template = SpriteSheets.bitmap(SpriteSheets.TEAM_JERSEY)!!
+        var cloth = 0; var letters = 0
+        for (y in 0 until 512) for (x in 0 until 512) {
+            // Same silhouette as the template, and never a see-through pixel inside it.
+            assertEquals("$x,$y", template.getPixel(x, y) ushr 24, plain.getPixel(x, y) ushr 24)
+            assertEquals("$x,$y", template.getPixel(x, y) ushr 24, worded.getPixel(x, y) ushr 24)
+            val c = plain.getPixel(x, y)
+            if (c ushr 24 == 255 && (c ushr 16 and 255) > 200 && (c ushr 8 and 255) in 70..140 && (c and 255) < 40) cloth++
+            if (worded.getPixel(x, y) != c) letters++
+        }
+        assertTrue("orange cloth $cloth", cloth > 15_000)
+        assertTrue("wordmark $letters", letters in 800..4000)
+        // The wordmark stays above the chest number.
+        val number = SpriteSheets.chestNumber(88)!!
+        for (y in 0 until 512) for (x in 0 until 512) if (number.getPixel(x, y) ushr 24 != 0) assertEquals(plain.getPixel(x, y), worded.getPixel(x, y))
+        // A school with no art is drawn in its jersey, not Duke's.
+        val face = Face(4, 0, 0, 0, 0, 0, 0, 0, 0)
+        val noArt = SpriteCompose.render(face, orange, purple, 5, jerseyKey = null, label = "CLEM")
+        val duke = SpriteCompose.render(face, orange, purple, 5, jerseyKey = "01_duke")
+        assertFalse(noArt.contentEquals(duke))
+        assertEquals(worded.getPixel(256, 300), noArt[300 * 512 + 256])
+    }
+
+    @Test fun whiteSchoolColorGoesOnTheTrimAndLookalikeColorsGetContrastingPiping() {
+        val white = 0xFFFFFFFF.toInt(); val navy = 0xFF003087.toInt(); val black = 0xFF000000.toInt()
+        assertEquals(navy to white, SpriteCompose.teamColors(white, navy))
+        assertEquals(navy to white, SpriteCompose.teamColors(navy, white))
+        assertEquals(black to white, SpriteCompose.teamColors(black, black))
+        assertEquals(0xFF14161C.toInt(), SpriteCompose.teamColors(white, white).second)
+    }
+
+    @Test fun halfSizePortraitAveragesBlocksAndKeepsEdgesClean() {
+        val px = IntArray(512 * 512)
+        for (y in 0 until 2) for (x in 0 until 2) px[y * 512 + x] = 0xFF204060.toInt()
+        px[2] = 0xFFFF0000.toInt()                       // one opaque pixel of four in the next block
+        val half = SpriteCompose.half(px)
+        assertEquals(256 * 256, half.size)
+        assertEquals(0xFF204060.toInt(), half[0])
+        assertEquals(0x40FF0000, half[1])                // a quarter covered, still pure red
+        assertEquals(0, half[2])
+    }
+
     @Test fun orderAndFallback() {
         val look = PlayerLook(hairIndex = 1, beardIndex = 1, eyewearIndex = 1, headbandIndex = 1, mouthIndex = 1, eyeIndex = 1)
         val paths = SpriteCompose.lookLayers(look, "not-a-team", 1000)
@@ -146,7 +198,7 @@ class AvatarRenderTest {
     @Test fun ordinaryAndEmptyNumbersStayUnchanged() {
         val number = SpriteSheets.chestNumber(23)!!
         assertSame(number, SpriteCompose.positionNumber(number, SpriteSheets.jerseyPath("lakers")))
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.positionNumber(clear,
             SpriteSheets.jerseyPath("grizzlies_retro")))).all { it == 0 })
     }
@@ -170,8 +222,7 @@ class AvatarRenderTest {
             for (n in 0..99) {
                 val number = SpriteCompose.positionNumber(SpriteSheets.chestNumber(n)!!, path)
                 for ((x, y) in wordmark) assertEquals("$key #$n at $x,$y", 0, number.getPixel(x, y) ushr 24)
-                number.recycle()
-            }
+}
         }
     }
 
@@ -188,15 +239,15 @@ class AvatarRenderTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsCroppedNumberPlacement() {
-        SpriteCompose.positionNumber(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888),
+        SpriteCompose.positionNumber(ArgbBitmap.create(10, 10),
             SpriteSheets.jerseyPath("wizards"))
     }
 
     @Test fun transparentLayersAndSourceOver() {
         assertTrue(SpriteCompose.composite(emptyList()).all { it == 0 })
-        val red = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val red = ArgbBitmap.create(512, 512)
         red.eraseColor(0xFFFF0000.toInt())
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertEquals(0xFFFF0000.toInt(), SpriteCompose.composite(listOf(red, clear))[0])
         clear.eraseColor(0x800000FF.toInt())
         val c = SpriteCompose.composite(listOf(red, clear))[0]
@@ -207,11 +258,11 @@ class AvatarRenderTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsLegacyCroppedLayers() {
-        SpriteCompose.composite(listOf(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888)))
+        SpriteCompose.composite(listOf(ArgbBitmap.create(10, 10)))
     }
 
     @Test fun hairColorPreservesAlphaAndOtherLayers() {
-        val hair = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val hair = ArgbBitmap.create(512, 512)
         hair.setPixel(12, 20, 0xFF806040.toInt())
         val base = SpriteCompose.composite(listOf(hair))
         val colored = SpriteCompose.composite(listOf(hair), 7, setOf(hair))
@@ -222,7 +273,7 @@ class AvatarRenderTest {
     }
 
     @Test fun brightHairKeepsItsTextureInEveryColor() {
-        val hair = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val hair = ArgbBitmap.create(512, 512)
         hair.setPixel(20, 20, 0xFFB4B4B4.toInt())
         hair.setPixel(21, 20, 0xFFE6E6E6.toInt())
         for (color in 0..7) {
@@ -231,7 +282,7 @@ class AvatarRenderTest {
             assertEquals(255, result[20 * 512 + 20] ushr 24)
             assertEquals(0, result[0])
         }
-        val empty = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val empty = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(empty), 1, setOf(empty)).all { it == 0 })
     }
 
@@ -287,7 +338,7 @@ class AvatarRenderTest {
     }
 
     @Test fun lipTintPreservesTransparentPixels() {
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.tintMouth(clear, clear))).all { it == 0 })
     }
 
@@ -300,9 +351,9 @@ class AvatarRenderTest {
         }
         assertArrayEquals(assets.open("character/beards/02_trimmed_goatee.png").readBytes(),
             assets.open("character/beards/02_goatee.png").readBytes())
-        val band = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val band = ArgbBitmap.create(512, 512)
         band.setPixel(200, 100, 0xFFFFFFFF.toInt())
-        val hair = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val hair = ArgbBitmap.create(512, 512)
         assertEquals(band.getPixel(200, 100), SpriteCompose.occludeHeadband(band, hair).getPixel(200, 100))
         hair.setPixel(200, 100, 0xFF201A18.toInt())
         assertEquals(0, SpriteCompose.occludeHeadband(band, hair).getPixel(200, 100))
@@ -311,12 +362,12 @@ class AvatarRenderTest {
         assertEquals(band.getPixel(200, 100), SpriteCompose.occludeHeadband(band, hair).getPixel(200, 100))
         assertSame(band, SpriteCompose.occludeHeadband(band, null))
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.occludeHeadband(
-            Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888), hair))).all { it == 0 })
+            ArgbBitmap.create(512, 512), hair))).all { it == 0 })
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun headbandOcclusionRejectsCroppedLayers() {
-        SpriteCompose.occludeHeadband(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888), null)
+        SpriteCompose.occludeHeadband(ArgbBitmap.create(10, 10), null)
     }
 
     @Test fun suppliedBandsNeverFloatOutsideAnyBodyForEveryHairstyle() {
@@ -331,11 +382,10 @@ class AvatarRenderTest {
                     for (y in 88..113) for (x in 174..339) {
                         if (body.getPixel(x, y) ushr 24 == 0) assertEquals(0, result.getPixel(x, y))
                     }
-                    result.recycle()
-                }
+}
             }
         }
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.occludeHeadband(clear, null, clear))).all { it == 0 })
     }
 
@@ -354,19 +404,19 @@ class AvatarRenderTest {
         }
         assertTrue(removed > 0)
         assertSame(hair, SpriteCompose.occludeEmbeddedBand(hair, null))
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.occludeEmbeddedBand(clear, band))).all { it == 0 })
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun embeddedBandOcclusionRejectsCroppedHair() {
-        SpriteCompose.occludeEmbeddedBand(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888), null)
+        SpriteCompose.occludeEmbeddedBand(ArgbBitmap.create(10, 10), null)
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun bandBodyOcclusionRejectsCroppedBodies() {
-        SpriteCompose.occludeHeadband(Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888), null,
-            Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))
+        SpriteCompose.occludeHeadband(ArgbBitmap.create(512, 512), null,
+            ArgbBitmap.create(10, 10))
     }
 
     @Test fun suppliedMasksLeaveBothPupilCentersOpenOnEverySkinAndEyeStyle() {
@@ -453,7 +503,7 @@ class AvatarRenderTest {
         val face = Face(4, 0, 0, 0, 0, 0, 0, 1, 0)
         val layers = listOfNotNull(
             SpriteCompose.softenCheekHighlights(SpriteSheets.body(face.skin)!!),
-            SpriteSheets.bitmap(SpriteSheets.jerseyPath(null)),
+            SpriteCompose.teamJersey(0, 0, null),     // no team: a plain jersey, not another school's
             SpriteSheets.chestNumber(0),
             SpriteCompose.tintMouth(SpriteSheets.body(face.skin)!!, SpriteSheets.mouth(face.mouth)!!),
         )
@@ -513,25 +563,25 @@ class AvatarRenderTest {
             body.getPixels(after, 0, 512, 0, 0, 512, 512)
             assertArrayEquals(before, after)
         }
-        val clear = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val clear = ArgbBitmap.create(512, 512)
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.tintEyes(clear, clear))).all { it == 0 })
         assertTrue(SpriteCompose.composite(listOf(SpriteCompose.softenCheekHighlights(clear))).all { it == 0 })
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun eyeSkinSamplingRejectsCroppedLayers() {
-        SpriteCompose.tintEyes(Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888),
-            Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))
+        SpriteCompose.tintEyes(ArgbBitmap.create(512, 512),
+            ArgbBitmap.create(10, 10))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun cheekSofteningRejectsCroppedBodies() {
-        SpriteCompose.softenCheekHighlights(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))
+        SpriteCompose.softenCheekHighlights(ArgbBitmap.create(10, 10))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun mouthReplacementRejectsCroppedBody() {
-        SpriteCompose.tintMouth(Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888),
-            Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888))
+        SpriteCompose.tintMouth(ArgbBitmap.create(10, 10),
+            ArgbBitmap.create(512, 512))
     }
 }

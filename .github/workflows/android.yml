@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK and PC
 
 on:
   push:
@@ -42,18 +42,192 @@ jobs:
       - name: Name the APK
         run: cp app/build/outputs/apk/release/app-release.apk HoopsDynasty.apk
 
+      - name: Build Linux PC packages
+        run: |
+          ./gradlew :app:packageUberJarForCurrentOS --no-daemon
+          # Best-effort Linux installer; the runnable jar is the required Linux artifact.
+          ./gradlew :app:packageDeb --no-daemon || echo "packageDeb skipped"
+
+      - name: Check no two classes differ only by case (Windows would drop one)
+        run: |
+          dupes=$(find app/build/classes/kotlin/desktop/main -name '*.class' | tr 'A-Z' 'a-z' | sort | uniq -d)
+          if [ -n "$dupes" ]; then echo "Class names that clash on Windows:"; echo "$dupes"; exit 1; fi
+
+      - name: Collect Linux PC artifacts
+        run: |
+          mkdir -p pc-dist
+          find app/build/compose/binaries -type f -name '*.deb' -exec cp {} pc-dist/ \; || true
+          JAR=$(find app/build/compose/jars -type f -name 'HoopsDynasty-*.jar' | head -1)
+          if [ -z "$JAR" ]; then
+            echo "PC jar missing" >&2
+            exit 1
+          fi
+          cp "$JAR" pc-dist/HoopsDynasty-pc-linux.jar
+          # Keep the old name as a convenience alias for Linux users.
+          cp "$JAR" pc-dist/HoopsDynasty-pc.jar
+          ls -la pc-dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: HoopsDynasty-apk
           path: HoopsDynasty.apk
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HoopsDynasty-pc-linux
+          path: pc-dist/*
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # The shared Gradle module still configures the Android target, so the SDK is required.
+      # Do not install the obsolete `tools` package (sdkmanager no longer ships it).
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Maven Central can flake on windows-latest; retry a few times before failing the job.
+      - name: Build Windows EXE installer
+        shell: bash
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "packageExe attempt ${attempt}/3"
+            if ./gradlew :app:packageExe --no-daemon --refresh-dependencies; then
+              exit 0
+            fi
+            echo "packageExe failed on attempt ${attempt}" >&2
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 20))
+          done
+
+      # Play the game on Windows with the same jars and Java modules the installer ships.
+      - name: Windows test - build a league, play a season, save, reload, offseason
+        shell: bash
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          set -euo pipefail
+          ./gradlew :app:createDistributable --no-daemon
+          APP=app/build/compose/binaries/main/app/HoopsDynasty
+          ls "$APP" "$APP/app" | head -40
+          java --limit-modules java.base,java.datatransfer,java.xml,java.prefs,java.desktop,java.logging,jdk.crypto.ec \
+            -Xmx2g -cp "$APP/app/*" com.nh.hoopscoach.WindowsSmokeKt
+
+      - name: Windows test - open the game window
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $exe = "app/build/compose/binaries/main/app/HoopsDynasty/HoopsDynasty.exe"
+          $p = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 45
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          try { [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save("windows-screen.png") } catch { "screenshot failed: $_" }
+          $log = Join-Path $env:USERPROFILE ".hoopsdynasty/hoops-log.txt"
+          if (Test-Path $log) { Get-Content $log -TotalCount 80 }
+          if ($p.HasExited) { "Game exited early with code $($p.ExitCode)"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          if ((Test-Path $log) -and (Select-String -Path $log -Pattern "Exception" -Quiet)) { "Exception in game log"; exit 1 }
+          "Game window stayed open for 45 seconds with no errors"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: windows-test-screenshot
+          path: windows-screen.png
+          if-no-files-found: ignore
+
+      - name: Collect Windows artifacts
+        shell: bash
+        run: |
+          mkdir -p win-dist
+          # Only the installer: the app folder the Windows test made also has a small HoopsDynasty.exe launcher.
+          mapfile -t EXES < <(find app/build/compose/binaries/main/exe -type f -name '*.exe' 2>/dev/null)
+          if [ ${#EXES[@]} -eq 0 ]; then
+            echo "Windows EXE missing" >&2
+            find app/build/compose -type f | head -100
+            exit 1
+          fi
+          cp "${EXES[0]}" win-dist/HoopsDynasty-windows.exe
+          size=$(stat -c %s win-dist/HoopsDynasty-windows.exe)
+          if [ "$size" -lt 50000000 ]; then echo "Windows installer is only $size bytes; that's not the installer" >&2; exit 1; fi
+          ls -la win-dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HoopsDynasty-pc-windows
+          path: win-dist/*
+
+  release:
+    needs: [build, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app/build.gradle.kts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HoopsDynasty-apk
+          path: release
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HoopsDynasty-pc-linux
+          path: release
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: HoopsDynasty-pc-windows
+          path: release
+
+      - name: Read app version
+        id: ver
+        run: |
+          NAME=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          echo "name=${NAME:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Put the version at the end of each file name
+        env:
+          VER: ${{ steps.ver.outputs.name }}
+        run: |
+          cd release
+          for f in *; do
+            [ -f "$f" ] || continue
+            base="${f%.*}"; ext="${f##*.}"
+            case "$f" in *"$VER"*|*.deb) continue ;; esac   # a .deb already carries its version
+            mv -- "$f" "${base}-${VER}.${ext}"
+          done
+          ls -la
+
       - name: Publish a downloadable release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Hoops Dynasty (build ${{ github.run_number }})
+          name: Hoops Dynasty ${{ steps.ver.outputs.name }} (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           body: |
-            Install on Android: download HoopsDynasty.apk on your phone, open it, and allow installs from your browser if asked.
-            Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
-          files: HoopsDynasty.apk
+            **Android:** download `HoopsDynasty-${{ steps.ver.outputs.name }}.apk` on your phone, open it, and allow installs from your browser if asked.
+            **Windows:** download `HoopsDynasty-windows-${{ steps.ver.outputs.name }}.exe` and run the installer (Java is bundled).
+            **Linux / other PC:** download `HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` and run with Java 17+: `java -jar HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` (a `.deb` may also be attached).
+            Version: ${{ steps.ver.outputs.name }} · Branch: ${{ github.ref_name }} · Commit: ${{ github.sha }}
+          files: release/*

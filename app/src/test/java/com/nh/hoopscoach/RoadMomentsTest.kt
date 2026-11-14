@@ -68,7 +68,7 @@ class RoadMomentsTest {
             games++
             maxFatigue = maxOf(maxFatigue, r.fatigue)
         }
-        println("final margins $margins; role ${com.nh.hoopscoach.game.Gameplan.role(lg.user, h.id)}, ${"%.1f".format(h.stats.mpg)} mpg")
+        println("final margins $margins; role ${com.nh.hoopscoach.game.Tactics.role(lg.user, h.id)}, ${"%.1f".format(h.stats.mpg)} mpg")
         println("games $games, big moments offered $offered, recorded ${r.moments}, came through ${r.momentsWon}")
         println("fatigue peak $maxFatigue, now ${r.fatigue} (${Road.fatigueLabel(r.fatigue)}); 3PT ${startOut} -> ${h.attrs[com.nh.hoopscoach.game.Attr.OUT.ordinal]}, ovr ${h.ovr}")
         println("POY race: No. ${r.raceRank} (last week ${r.lastRaceRank}), live ${Road.raceRank(lg)} · ${Road.allAmericaPace(Road.raceRank(lg))}")

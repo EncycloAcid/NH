@@ -1,6 +1,6 @@
 package com.nh.hoopscoach
 
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.OffStep
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Phase
@@ -49,7 +49,7 @@ class RedshirtTest {
         assertTrue(Redshirts.sitting(p))
         assertTrue(t.plan.slots.none { it.starter == p.id || it.reserve == p.id })
         assertTrue(p.cls.startsWith("RS "))
-        assertTrue(Gameplan.role(lg, t, p.id) == "Redshirt")
+        assertTrue(Tactics.role(lg, t, p.id) == "Redshirt")
     }
 
     @Test

@@ -19,7 +19,7 @@ import java.io.File
 class PortraitDumpTest {
     @Test
     fun dumpSheet() {
-        SpriteSheets.install(ApplicationProvider.getApplicationContext<android.content.Context>().assets)
+        AndroidAssets.appContext = ApplicationProvider.getApplicationContext(); SpriteSheets.install()
         val out = File(System.getProperty("portraits.dir") ?: "build/portraits").apply { mkdirs() }
         val teams = listOf(
             Triple("lakers", 0xFF552583.toInt(), 0xFFFDB927.toInt()),

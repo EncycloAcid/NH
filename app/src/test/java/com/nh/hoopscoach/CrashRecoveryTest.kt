@@ -24,7 +24,7 @@ class CrashRecoveryTest {
         val app = ApplicationProvider.getApplicationContext<Application>()
         GameViewModel.autoLoad = false
         try {
-            val vm = GameViewModel(app)
+            val vm = testViewModel()
             val lg = LeagueGen.newLeague()
             lg.user.elo = Double.NaN
             vm.install(lg)

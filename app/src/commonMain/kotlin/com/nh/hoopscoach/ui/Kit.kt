@@ -1,0 +1,773 @@
+package com.nh.hoopscoach.ui
+
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nh.hoopscoach.game.Team
+
+val Gutter = 16.dp
+private val CardShape = RoundedCornerShape(20.dp)
+
+@Composable
+fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier, fallbackReason: String = "") {
+    if (!isAi && fallbackReason.isBlank()) return
+    var details by remember { mutableStateOf(false) }
+    Box(modifier) {
+        if (!isAi) Text("Game-written: $fallbackReason", style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 160.dp).clickable { details = true })
+        else Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF228B50)).clickable { details = true }, contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Check, contentDescription = "AI-generated", tint = Color.White, modifier = Modifier.size(16.dp))
+        }
+        DropdownMenu(expanded = details, onDismissRequest = { details = false }) {
+            Text(if (!isAi) fallbackReason else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+        }
+    }
+}
+
+// ---------- layout ----------
+
+@Composable
+fun ScreenHeader(eyebrow: String?, title: String, sub: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
+    Row(Modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter, top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f)) {
+            if (eyebrow != null) Text(eyebrow.uppercase(), style = T.label, color = P.accent)
+            Text(title.uppercase(), style = T.title, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (sub != null) Text(sub, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
+}
+
+@Composable
+fun BackBar(title: String, sub: String? = null, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = Gutter, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = P.ink)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = T.head, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub != null) Text(sub, style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
+}
+
+@Composable
+fun Section(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
+    // With a link the row trades its own padding for the link's taller tap area, so the section sits the same.
+    val link = action != null
+    Row(modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = if (link) 14.dp else 22.dp, bottom = if (link) 0.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(width = 3.dp, height = 12.dp).clip(RoundedCornerShape(2.dp)).background(P.accent))
+        Spacer(Modifier.width(7.dp))
+        Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.weight(1f))
+        if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
+    }
+}
+
+/** A rounded surface on the page background. */
+@Composable
+fun Panel(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(16.dp), color: Color = P.surface, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    // Cards rise into place as a screen opens (see [reveal]).
+    val hero = color == P.hero
+    val m = modifier.reveal().padding(horizontal = Gutter).fillMaxWidth().clip(CardShape).background(color).then(if (hero) Modifier.sheen() else Modifier)
+    Column((if (onClick != null) m.hoverClick(onClick, tint = if (hero) Color.White else P.ink) else m).padding(padding), content = content)
+}
+
+/** Grouped list: rows separated by inset hairlines inside one panel. */
+@Composable
+fun <T> GroupList(items: List<T>, modifier: Modifier = Modifier, inset: Dp = 16.dp, row: @Composable (T) -> Unit) {
+    if (items.isEmpty()) return
+    Panel(modifier, padding = PaddingValues(0.dp)) {
+        items.forEachIndexed { i, it ->
+            row(it)
+            if (i < items.lastIndex) Hairline(Modifier.padding(start = inset))
+        }
+    }
+}
+
+@Composable
+fun Hairline(modifier: Modifier = Modifier) = Box(modifier.fillMaxWidth().height(1.dp).background(P.line))
+
+@Composable
+fun ListRow(onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 11.dp), content: @Composable RowScope.() -> Unit) {
+    val m = if (onClick != null) modifier.fillMaxWidth().hoverClick(onClick) else modifier.fillMaxWidth()
+    Row(m.padding(padding), verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+/**
+ * Clickable with a mouse in mind: a hand cursor and a faint wash while the pointer is over it (on a PC;
+ * a phone has no pointer, so it's just a click there).
+ */
+@Composable
+fun Modifier.hoverClick(onClick: () -> Unit, tint: Color = P.ink, enabled: Boolean = true): Modifier {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    return this
+        .background(if (hovered && enabled) tint.copy(alpha = 0.05f) else Color.Transparent)
+        .pointerHoverIcon(if (enabled) androidx.compose.ui.input.pointer.PointerIcon.Hand else androidx.compose.ui.input.pointer.PointerIcon.Default)
+        .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
+}
+
+@Composable
+fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Color = P.ink, style: TextStyle = T.num) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = style, color = color, maxLines = 1)
+        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, maxLines = 1)
+    }
+}
+
+@Composable
+fun StatRow(stats: List<Triple<String, String, Color?>>, modifier: Modifier = Modifier, style: TextStyle = T.num) {
+    Row(modifier.fillMaxWidth()) {
+        stats.forEach { (l, v, c) -> Stat(l, v, Modifier.weight(1f), c ?: P.ink, style) }
+    }
+}
+
+@Composable
+fun Empty(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = T.body, color = P.sub, textAlign = TextAlign.Center, modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 22.dp))
+}
+
+// ---------- controls ----------
+
+@Composable
+fun Segmented(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    scroll: Boolean = false,
+    /** Horizontal screen gutter. Off inside [Panel] so the control aligns with sibling fields. */
+    inset: Boolean = true,
+) {
+    val track = Modifier.clip(RoundedCornerShape(14.dp)).background(if (P.dark) P.surface else Color(0xFFE6E8EC)).padding(3.dp)
+    val rowH = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Where each tab sits, so the selected pill can slide from one to the next.
+    val starts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+    val widths = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+    val density = LocalDensity.current
+    val edge = if (inset) Gutter else 0.dp
+    val pillX by androidx.compose.animation.core.animateIntAsState(
+        starts[selected] ?: 0,
+        androidx.compose.animation.core.spring(dampingRatio = 0.84f, stiffness = 460f),
+        label = "pillX",
+    )
+    val pillW by androidx.compose.animation.core.animateIntAsState(
+        widths[selected] ?: 0,
+        androidx.compose.animation.core.spring(dampingRatio = 0.84f, stiffness = 460f),
+        label = "pillW",
+    )
+    val pillColor = if (P.dark) P.surface2 else Color.White
+    @Composable
+    fun chip(i: Int, label: String, m: Modifier) {
+        val sel = i == selected
+        val fg by androidx.compose.animation.animateColorAsState(
+            if (sel) P.ink else P.sub,
+            tween(240, easing = Motion.Emphasized),
+            label = "tab",
+        )
+        Box(
+            // Until the pill has measured itself, the selected tab draws its own background.
+            m.clip(RoundedCornerShape(11.dp)).background(if (sel && pillW == 0) pillColor else Color.Transparent)
+                .clickable { onSelect(i) }.padding(horizontal = if (scroll) 14.dp else 4.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(label, style = T.bodyB.copy(fontSize = if (!scroll && options.size >= 5) 13.sp else 14.sp), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+    @Composable
+    fun pill() {
+        if (pillW > 0) Box(
+            Modifier.offset { androidx.compose.ui.unit.IntOffset(pillX, 0) }.width(with(density) { pillW.toDp() }).height(with(density) { rowH.intValue.toDp() })
+                .graphicsLayer { shadowElevation = 2f; shape = RoundedCornerShape(11.dp); clip = true }.background(pillColor),
+        )
+    }
+    fun Modifier.track(i: Int) = onGloballyPositioned { starts[i] = it.positionInParent().x.toInt(); widths[i] = it.size.width; rowH.intValue = it.size.height }
+    if (scroll) {
+        // The strip scrolls to keep the selected tab in view.
+        val state = rememberScrollState()
+        LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
+        Box(modifier.padding(horizontal = edge).horizontalScroll(state).then(track)) {
+            pill()
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
+            }
+        }
+    } else {
+        Box(modifier.padding(horizontal = edge).fillMaxWidth().then(track)) {
+            pill()
+            Row(Modifier.fillMaxWidth()) {
+                // Five or more tabs share the width by label length so none gets cut off.
+                options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(if (options.size >= 5) l.length + 4f else 1f).track(i)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun Chips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEachIndexed { i, l ->
+            val sel = i == selected
+            Box(
+                Modifier.clip(RoundedCornerShape(50)).background(if (sel) P.accent else P.surface)
+                    .border(1.dp, if (sel) P.accent else P.line, RoundedCornerShape(50)).clickable { onSelect(i) }.padding(horizontal = 14.dp, vertical = 7.dp),
+            ) { Text(l, style = T.bodyB.copy(fontSize = 13.sp), color = if (sel) P.onAccent else P.sub) }
+        }
+    }
+}
+
+/** Buttons give a little as you press them — snappy down, springy release. */
+@Composable
+private fun Modifier.pressable(enabled: Boolean, onClick: () -> Unit): Modifier {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed) 0.97f else 1f,
+        if (pressed) androidx.compose.animation.core.tween(70) else Motion.Press,
+        label = "press",
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        alpha = if (enabled) 1f else 0.55f
+    }
+        .pointerHoverIcon(if (enabled) androidx.compose.ui.input.pointer.PointerIcon.Hand else androidx.compose.ui.input.pointer.PointerIcon.Default)
+        .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
+}
+
+@Composable
+fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(if (enabled) P.accent else P.surface2)
+            .pressable(enabled, onClick).padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.onAccent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+}
+
+@Composable
+fun SecondaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(P.accentSoft)
+            .pressable(enabled, onClick).padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.accent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+}
+
+@Composable
+fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    // A risky action is outlined, never filled, so it can't be mistaken for the main one even when the team's color is red.
+    val bg = when { !enabled -> P.surface2; danger -> Color.Transparent; primary -> P.accent; else -> P.accentSoft }
+    val fg = when { !enabled -> P.faint; danger -> P.bad; primary -> P.onAccent; else -> P.accent }
+    val shape = RoundedCornerShape(11.dp)
+    Box(
+        modifier.heightIn(min = 38.dp).clip(shape).background(bg).then(if (danger && enabled) Modifier.border(1.dp, P.bad.copy(alpha = 0.45f), shape) else Modifier)
+            .pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1) }
+}
+
+@Composable
+fun IconCircle(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(Modifier.size(42.dp).clip(CircleShape).background(P.surface).clickable(onClick = onClick), contentAlignment = Alignment.Center) { content() }
+}
+
+@Composable
+fun Tag(text: String, color: Color, modifier: Modifier = Modifier, filled: Boolean = false) {
+    Box(modifier.clip(RoundedCornerShape(6.dp)).background(if (filled) color else color.copy(alpha = 0.13f)).padding(horizontal = 7.dp, vertical = 2.dp)) {
+        Text(text, style = T.label.copy(fontSize = 10.sp, letterSpacing = 0.6.sp), color = if (filled) onColor(color) else color, maxLines = 1)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HoopsSlider(value: Float, onValueChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float>, modifier: Modifier = Modifier, enabled: Boolean = true, onFinished: () -> Unit = {}) {
+    val accent = P.accent
+    val track = P.surface2
+    val thumb = if (P.dark) P.ink else Color.White
+    val border = P.line
+    Slider(
+        value = value, onValueChange = onValueChange, valueRange = range, enabled = enabled, modifier = modifier, onValueChangeFinished = onFinished,
+        thumb = { Box(Modifier.size(22.dp).clip(CircleShape).background(thumb).border(1.dp, border, CircleShape)) },
+        track = { st ->
+            val frac = ((st.value - st.valueRange.start) / (st.valueRange.endInclusive - st.valueRange.start)).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(track)) {
+                Box(Modifier.fillMaxWidth(frac).height(8.dp).clip(RoundedCornerShape(4.dp)).background(if (enabled) accent else P.faint))
+            }
+        },
+    )
+}
+
+// ---------- menus ----------
+
+/** Small line icons for menu rows, drawn like the tab bar's. */
+object MenuIcons {
+    private fun line(name: String, d: String): ImageVector = ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
+        addPath(addPathNodes(d), fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
+    }.build()
+
+    val Week = line("week", "M4 6.5l7 5.5-7 5.5z M13 6.5l7 5.5-7 5.5z")
+    val Calendar = line("calendar", "M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z M4 10h16 M8 3v4 M16 3v4")
+    val Star = line("star", "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z")
+    val Trophy = line("trophy", "M8 4h8v5a4 4 0 0 1-8 0z M8 5.5H5.5a3 3 0 0 0 2.8 4 M16 5.5h2.5a3 3 0 0 1-2.8 4 M12 13v3.5 M8.5 20h7 M10 16.5h4V20h-4z")
+    val Bracket = line("bracket", "M4 5h5v5H4 M4 14h5v5H4 M9 7.5h4v9H9 M13 12h7")
+    val Swap = line("swap", "M5 8h13l-3.5-3.5 M19 16H6l3.5 3.5")
+    val Flag = line("flag", "M6 21V4 M6 4.5h11l-2.5 4 2.5 4H6")
+}
+
+/**
+ * The app's drop-down menu: a rounded card on the surface color with a hairline border and a soft
+ * shadow, an optional small heading, at least [minWidth] wide, and scrolling past [maxHeight].
+ */
+@Composable
+fun AppMenu(
+    expanded: Boolean, onDismiss: () -> Unit, title: String? = null, minWidth: Dp = 232.dp, maxWidth: Dp = 340.dp,
+    maxHeight: Dp = 440.dp, scrollState: ScrollState = rememberScrollState(), content: @Composable ColumnScope.() -> Unit,
+) {
+    DropdownMenu(
+        expanded, onDismiss,
+        modifier = Modifier.widthIn(min = minWidth, max = maxOf(minWidth, maxWidth)).heightIn(max = maxHeight),
+        offset = DpOffset(0.dp, 6.dp),
+        scrollState = scrollState,
+        shape = RoundedCornerShape(18.dp),
+        containerColor = P.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 14.dp,
+        border = BorderStroke(1.dp, P.line),
+    ) {
+        if (title != null) Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 6.dp))
+        content()
+    }
+}
+
+/** One menu row: an optional icon tile, a title and a short line under it, and a check on the current choice. */
+@Composable
+fun AppMenuItem(title: String, subtitle: String? = null, icon: ImageVector? = null, selected: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 1.dp).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) P.accentSoft else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (selected) P.accent else P.accentSoft), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = if (selected) P.onAccent else if (enabled) P.accent else P.faint, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = T.bodyB, color = if (enabled) P.ink else P.faint, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrEmpty()) Text(subtitle, style = T.small, color = if (enabled) P.sub else P.faint)
+        }
+        if (selected) {
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Default.Check, "Selected", tint = P.accent, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** A thin rule between groups of menu rows. */
+@Composable
+fun AppMenuDivider() = Box(Modifier.padding(horizontal = 18.dp, vertical = 5.dp).fillMaxWidth().height(1.dp).background(P.line))
+
+/**
+ * A field-like button that opens a menu of options with descriptions. The menu is at least as wide
+ * as the field, checks the current choice, and opens scrolled to it in a long list.
+ */
+@Composable
+fun Picker(
+    label: String,
+    current: String,
+    options: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+    /** Shown in the field; defaults to [current]. Use when the value includes prefixes like "Auto ·". */
+    display: String = current,
+    onPick: (Int) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var fieldWidth by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    val scroll = rememberScrollState()
+    val sel = options.indexOfFirst { it.first == current }
+    LaunchedEffect(open) {
+        // Rows with a one-line description are about 60dp; once the menu is laid out, land the current one near the top.
+        if (open && sel > 3) {
+            withTimeoutOrNull(600) { snapshotFlow { scroll.maxValue }.first { it in 1 until Int.MAX_VALUE } }
+            with(density) { scroll.scrollTo(((sel - 1) * 60.dp.toPx()).toInt()) }
+        }
+    }
+    Box(modifier) {
+        Column(
+            Modifier.fillMaxWidth().onGloballyPositioned { fieldWidth = with(density) { it.size.width.toDp() } }
+                .clip(RoundedCornerShape(14.dp)).background(if (open) P.accentSoft else P.surface2)
+                .border(if (open) 1.5.dp else 1.dp, if (open) P.accent else P.line, RoundedCornerShape(14.dp))
+                .clickable { open = true }.padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = if (open) P.accent else P.sub)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(display, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = if (open) P.accent else P.sub, modifier = Modifier.size(20.dp).rotate(if (open) 180f else 0f))
+            }
+        }
+        AppMenu(open, { open = false }, title = label, minWidth = maxOf(fieldWidth, 260.dp), scrollState = scroll) {
+            options.forEachIndexed { i, (l, b) ->
+                AppMenuItem(l, b.ifEmpty { null }, selected = i == sel) { open = false; onPick(i) }
+            }
+        }
+    }
+}
+
+/** Themed switch matching accent / surface2 instead of stock Material purple. */
+@Composable
+fun AppSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = P.onAccent,
+            checkedTrackColor = P.accent,
+            checkedBorderColor = P.accent,
+            uncheckedThumbColor = P.ink,
+            uncheckedTrackColor = P.surface2,
+            uncheckedBorderColor = P.line,
+            disabledCheckedTrackColor = P.faint,
+            disabledUncheckedTrackColor = P.surface2,
+        ),
+    )
+}
+
+@Composable
+fun Chevron() = Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = P.faint, modifier = Modifier.size(20.dp))
+
+// ---------- sports graphics ----------
+
+/** The school's logo on a light plate, or a monogram in school colors when there's no logo file. */
+@Composable
+fun TeamBadge(t: Team, size: Dp, modifier: Modifier = Modifier) {
+    // Pro teams use their own logo files (assets/nba/logos), kept apart from the college ones.
+    val logo = remember(t.abbr, t.logo) {
+        if (t.logo == com.nh.hoopscoach.game.ProLeague.LOGO) com.nh.hoopscoach.game.ProLeague.logoKey(t.abbr)?.let { Logos.asset("nba/logos/$it.webp") }
+        else if (t.logo == com.nh.hoopscoach.game.ProLeague.ERA_BADGE) null
+        else Logos.get(t.abbr)
+    }
+    if (logo != null) {
+        // Logos are drawn for light backgrounds, so they sit on a light plate in both themes.
+        val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White
+        val ringColor = P.line
+        Canvas(modifier.size(size)) {
+            val r = this.size.minDimension / 2
+            drawCircle(plate, r)
+            drawCircle(ringColor, r - 0.5f, style = Stroke(width = 1f))
+            val inset = this.size.width * 0.15f
+            val side = this.size.width - inset * 2
+            drawImage(
+                logo, srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                srcSize = androidx.compose.ui.unit.IntSize(logo.width, logo.height),
+                dstOffset = androidx.compose.ui.unit.IntOffset(inset.toInt(), inset.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()),
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            )
+        }
+        return
+    }
+    val primary = Color(t.primary)
+    val secondary = Color(t.secondary)
+    val ring = if (contrast(primary, secondary) > 1.6f) secondary else onColor(primary)
+    val text = if (contrast(primary, secondary) >= 3f) secondary else onColor(primary)
+    val label = t.abbr
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val fs = with(density) { (size * when (label.length) { 1 -> 0.52f; 2 -> 0.44f; 3 -> 0.36f; else -> 0.3f }).toSp() }
+    Canvas(modifier.size(size)) {
+        val r = this.size.minDimension / 2
+        drawCircle(primary, r)
+        drawCircle(ring, r * 0.84f, style = Stroke(width = r * 0.07f))
+        val layout = measurer.measure(label, TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = fs, color = text))
+        drawText(layout, topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f))
+    }
+}
+
+/** Badge for a saved dynasty slot, showing either its school/NBA logo or stylized monogram. */
+@Composable
+fun SaveSlotBadge(slot: com.nh.hoopscoach.game.SaveSlot, size: Dp, modifier: Modifier = Modifier) {
+    val logo = remember(slot.abbr) {
+        com.nh.hoopscoach.game.ProLeague.logoKey(slot.abbr)?.let { Logos.asset("nba/logos/$it.webp") }
+            ?: Logos.get(slot.abbr)
+    }
+    if (logo != null) {
+        val plate = if (P.dark) Color(0xFFF1F2F4) else Color.White
+        val ringColor = P.line
+        Canvas(modifier.size(size)) {
+            val r = this.size.minDimension / 2
+            drawCircle(plate, r)
+            drawCircle(ringColor, r - 0.5f, style = Stroke(width = 1f))
+            val inset = this.size.width * 0.15f
+            val side = this.size.width - inset * 2
+            drawImage(
+                logo, srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                srcSize = androidx.compose.ui.unit.IntSize(logo.width, logo.height),
+                dstOffset = androidx.compose.ui.unit.IntOffset(inset.toInt(), inset.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(side.toInt(), side.toInt()),
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+            )
+        }
+        return
+    }
+    val primary = Color(slot.primaryColor)
+    val secondary = Color(slot.secondaryColor)
+    val ring = if (contrast(primary, secondary) > 1.6f) secondary else onColor(primary)
+    val text = if (contrast(primary, secondary) >= 3f) secondary else onColor(primary)
+    val label = slot.abbr.take(3)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val fs = with(density) { (size * when (label.length) { 1 -> 0.52f; 2 -> 0.44f; 3 -> 0.36f; else -> 0.3f }).toSp() }
+    Canvas(modifier.size(size)) {
+        val r = this.size.minDimension / 2
+        drawCircle(primary, r)
+        drawCircle(ring, r * 0.84f, style = Stroke(width = r * 0.07f))
+        val layout = measurer.measure(label, TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = fs, color = text))
+        drawText(layout, topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f))
+    }
+}
+
+/** Jersey-shaped chip with the player's number in team colors. */
+@Composable
+fun Jersey(number: Int, primary: Color, secondary: Color, size: Dp, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val fs = with(density) { (size * 0.36f).toSp() }
+    val trim = if (contrast(primary, secondary) > 1.5f) secondary else onColor(primary)
+    val num = if (contrast(primary, secondary) >= 2.6f) secondary else onColor(primary)
+    val plate = P.surface2
+    Canvas(modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        drawCircle(plate, w / 2)
+        val p = Path().apply {
+            moveTo(w * 0.30f, h * 0.16f)
+            quadraticTo(w * 0.5f, h * 0.34f, w * 0.70f, h * 0.16f)
+            lineTo(w * 0.80f, h * 0.20f)
+            quadraticTo(w * 0.78f, h * 0.38f, w * 0.86f, h * 0.44f)
+            lineTo(w * 0.80f, h * 0.86f)
+            lineTo(w * 0.20f, h * 0.86f)
+            lineTo(w * 0.14f, h * 0.44f)
+            quadraticTo(w * 0.22f, h * 0.38f, w * 0.20f, h * 0.20f)
+            close()
+        }
+        drawPath(p, primary)
+        drawPath(p, trim, style = Stroke(width = w * 0.035f))
+        val layout = measurer.measure(number.toString(), TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = fs, color = num))
+        drawText(layout, topLeft = Offset(w / 2 - layout.size.width / 2f, h * 0.56f - layout.size.height / 2f))
+    }
+}
+
+/** Rating ring: the arc fills toward 99 and takes the tier color. */
+@Composable
+fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: String? = null, textSize: TextUnit = 17.sp) {
+    val value = shown(rating)
+    val c = tier(value)
+    val track = P.surface2
+    val fill = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(value) { fill.animateTo(value.coerceIn(0, 99) / 99f, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(size)) {
+            val sw = this.size.width * 0.09f
+            val inset = sw / 2
+            val arcSize = Size(this.size.width - sw, this.size.height - sw)
+            drawArc(track, 135f, 270f, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
+            drawArc(c, 135f, 270f * fill.value, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("$value", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)
+            if (label != null) Text(label, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = P.sub)
+        }
+    }
+}
+
+/** Initials avatar for coaches. */
+@Composable
+fun CoachBadge(first: String, last: String, size: Dp, modifier: Modifier = Modifier, color: Color = P.accentSoft, textColor: Color = P.accent) {
+    Box(modifier.size(size).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
+        val fs = with(LocalDensity.current) { (size * 0.38f).toSp() }
+        Text("${first.firstOrNull() ?: ' '}${last.firstOrNull() ?: ' '}", style = T.numSm.copy(fontSize = fs, lineHeight = fs), color = textColor)
+    }
+}
+
+@Composable
+fun Stars(n: Int, size: TextUnit = 13.sp) {
+    Row { repeat(5) { i -> Text("★", color = if (i < n) P.gold else P.line, fontSize = size) } }
+}
+
+@Composable
+fun ResultDot(won: Boolean, size: Dp = 26.dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(if (won) P.good.copy(alpha = 0.14f) else P.bad.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+        Text(if (won) "W" else "L", style = T.numSm.copy(fontSize = 15.sp), color = if (won) P.good else P.bad)
+    }
+}
+
+/** Side-by-side comparison bar for "tale of the tape" rows. */
+@Composable
+fun Compare(label: String, a: Int, b: Int, aColor: Color, bColor: Color) {
+    val total = (a + b).coerceAtLeast(1).toFloat()
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$a", style = T.numSm, color = if (a >= b) P.ink else P.sub, modifier = Modifier.width(36.dp))
+            Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Text("$b", style = T.numSm, color = if (b >= a) P.ink else P.sub, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+        }
+        Spacer(Modifier.height(4.dp))
+        // The two sides start even and settle to their real split.
+        var shown by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { shown = true }
+        val fa by androidx.compose.animation.core.animateFloatAsState(if (shown) a / total else 0.5f, tween(700, 120, easing = Motion.Emphasized), label = "cmp")
+        Row(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))) {
+            Box(Modifier.weight(fa.coerceIn(0.01f, 0.99f)).height(6.dp).background(aColor))
+            Spacer(Modifier.width(3.dp))
+            Box(Modifier.weight((1f - fa).coerceIn(0.01f, 0.99f)).height(6.dp).background(bColor))
+        }
+    }
+}
+
+@Composable
+fun Expandable(title: String, initiallyOpen: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    var open by remember { mutableStateOf(initiallyOpen) }
+    Column(Modifier.fillMaxWidth().animateContentSize()) {
+        Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = T.bodyB, color = P.accent, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.KeyboardArrowDown, null, tint = P.accent, modifier = Modifier.size(20.dp))
+        }
+        if (open) content()
+    }
+}
+
+/** Distinct team color for charts: falls back to the secondary color if the primary is too close to the background. */
+@Composable
+fun teamInk(t: Team): Color {
+    val p = Color(t.primary)
+    val s = Color(t.secondary)
+    val bg = P.surface
+    return when {
+        contrast(p, bg) >= 1.8f -> p
+        contrast(s, bg) >= 1.8f -> s
+        else -> P.sub
+    }
+}
+
+/**
+ * A team's primary color, deepened just enough to carry white text: for big cards in a team's colors that
+ * fade darker toward the bottom. Black stays black; a gold or white school turns a deep shade of itself
+ * instead of picking dark text that the darker half of the card would swallow.
+ */
+fun teamCard(t: Team): Color {
+    val c = Color(t.primary)
+    var out = c
+    var k = 0f
+    while (contrast(out, Color.White) < 4.5f && k < 0.9f) {
+        k += 0.05f
+        out = mix(c, Color.Black, k)
+    }
+    return out
+}
+
+/** The small gold label on a feature card: gold when it reads on the card's color, soft white when it doesn't (a red or orange team). */
+val heroKicker: Color @Composable get() = if (contrast(P.gold, P.hero) >= 3f) P.gold else P.onHero.copy(alpha = 0.78f)
+
+fun f1(v: Double) = "%.1f".format(v)
+fun pct(v: Double) = "%.1f%%".format(v * 100)
+fun money(k: Int): String = when {
+    k == 0 -> "$0"
+    k >= 1000 -> "$" + "%.2fM".format(k / 1000.0).replace(".00M", "M").replace(Regex("(\\.\\d)0M"), "$1M")
+    else -> "$${k}K"
+}
+fun ordinal(n: Int): String = "$n" + when { n % 100 in 11..13 -> "th"; n % 10 == 1 -> "st"; n % 10 == 2 -> "nd"; n % 10 == 3 -> "rd"; else -> "th" }
+fun grade(v: Int): String = when {
+    v >= 88 -> "A+"; v >= 84 -> "A"; v >= 80 -> "A-"; v >= 77 -> "B+"; v >= 73 -> "B"; v >= 70 -> "B-"
+    v >= 66 -> "C+"; v >= 62 -> "C"; v >= 58 -> "C-"; v >= 54 -> "D+"; v >= 50 -> "D"; else -> "F"
+}
+/** A pro franchise's standing, in the pros' words. */
+fun franchiseLabel(p: Int) = when {
+    p >= 90 -> "Marquee franchise"; p >= 78 -> "Big market"; p >= 64 -> "Established"; p >= 50 -> "Mid-market"; else -> "Small market"
+}
+fun prestigeLabel(p: Int) = when {
+    p >= 90 -> "Blueblood"; p >= 78 -> "Power program"; p >= 64 -> "Contender"; p >= 50 -> "Rising"; p >= 35 -> "Rebuilding"; else -> "Underdog"
+}
