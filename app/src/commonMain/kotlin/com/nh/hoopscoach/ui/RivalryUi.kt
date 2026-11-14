@@ -82,14 +82,15 @@ fun RivalryPreview(lg: League, g: Game, r: Rivalry) {
 /** Crowd line for live games and box scores. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CrowdLine(lg: League, g: Game, modifier: Modifier = Modifier) {
-    if (g.att <= 0) return
+fun CrowdLine(lg: League, g: Game, modifier: Modifier = Modifier, lead: (@Composable () -> Unit)? = null) {
+    if (g.att <= 0) { lead?.let { Row(modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp)) { it() } }; return }
     val r = lg.rivalry(g)
     // Ribbon and crowd share a line when they fit; on narrow screens the crowd drops below.
     FlowRow(
         modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        lead?.let { Box(Modifier.padding(end = 10.dp)) { it() } }
         if (r != null) Box(Modifier.padding(end = 10.dp)) { RivalryRibbon(r) }
         Text("${fans(g.att)} fans" + if (Rivalries.sellout(lg, g)) " · sellout" else "", style = T.small, color = P.sub, maxLines = 1)
     }

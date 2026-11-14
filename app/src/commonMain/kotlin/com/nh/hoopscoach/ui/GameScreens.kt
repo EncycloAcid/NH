@@ -174,20 +174,12 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         val focus = !e.finished && (lv.moment != null || lv.call != null)
         Column(if (focus) Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
         if (!e.game.neutral && !focus) {
-            CourtBanner(home, Modifier.padding(horizontal = Gutter).fillMaxWidth().height(76.dp))
+            CourtBanner(home, Modifier.padding(horizontal = Gutter).fillMaxWidth().height(58.dp))
             Spacer(Modifier.height(6.dp))
         }
-        Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
-        Spacer(Modifier.height(8.dp))
-        CrowdLine(lg, e.game)
-        if (e.bigNight.isNotEmpty() && !e.finished) {
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tag(e.bigNight.uppercase(), P.bad, filled = true)
-                Spacer(Modifier.width(8.dp))
-                Text("Up to five big moments tonight", style = T.small, color = P.sub)
-            }
-        }
+        Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId, compact = true)
+        Spacer(Modifier.height(6.dp))
+        CrowdLine(lg, e.game, lead = if (e.bigNight.isNotEmpty() && !e.finished) ({ Tag(e.bigNight.uppercase(), P.bad, filled = true) }) else null)
         if (lg.playerMode && com.nh.hoopscoach.game.Rival.isDuel(lg, e.game)) {
             val rv = com.nh.hoopscoach.game.Rival.active(lg)
             val me = lg.playerOrNull(lg.heroId)
@@ -201,8 +193,8 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        if (!focus) Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
+        Spacer(Modifier.height(6.dp))
+        if (!focus) Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)) {
             val pts = remember(lv.tick) {
                 val half = e.half.toInt()
                 val len = e.periodLen.toInt()
@@ -216,13 +208,13 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             val now = pts.last().second
             val mine = if (userHome) now else 1 - now
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("${(mine * 100).toInt()}%", style = T.num, color = P.ink)
-                Text("  ${lg.user.abbr} win probability", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 3.dp))
+                Text("${(mine * 100).toInt()}%", style = T.numSm, color = P.ink)
+                Text("  ${lg.user.abbr} win probability", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 1.dp))
             }
-            Spacer(Modifier.height(6.dp))
-            WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(96.dp), e.half.toFloat())
+            Spacer(Modifier.height(4.dp))
+            WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(if (e.finished) 56.dp else 64.dp), e.half.toFloat())
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         // The halftime adjustment, measured as the second half goes.
         e.adjustmentNote?.let { note ->
             Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
@@ -349,7 +341,20 @@ private fun WinChart(points: List<Pair<Float, Float>>, oppColor: Color, myColor:
 }
 
 @Composable
-fun Scoreboard(away: Team, home: Team, as_: Int, hs: Int, center: String, sub: String, user: Int) {
+fun Scoreboard(away: Team, home: Team, as_: Int, hs: Int, center: String, sub: String, user: Int, compact: Boolean = false) {
+    if (compact) {
+        val final = center == "FINAL"
+        Row(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(P.surface).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            CompactSide(away, as_, as_ > hs, final, user, Modifier.weight(1f), flip = false)
+            Column(Modifier.width(76.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(center, style = T.h2.copy(fontSize = 22.sp), color = if (final) P.accent else P.ink, maxLines = 1)
+                if (sub.isNotEmpty()) Text(sub.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, maxLines = 1)
+            }
+            CompactSide(home, hs, hs > as_, final, user, Modifier.weight(1f), flip = true)
+        }
+        return
+    }
     Row(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(P.surface)) {
         ScoreHalf(away, as_, as_ > hs, center == "FINAL", Modifier.weight(1f), user)
         Column(Modifier.width(84.dp).padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -357,6 +362,21 @@ fun Scoreboard(away: Team, home: Team, as_: Int, hs: Int, center: String, sub: S
             if (sub.isNotEmpty()) Text(sub.uppercase(), style = T.label, color = P.sub)
         }
         ScoreHalf(home, hs, hs > as_, center == "FINAL", Modifier.weight(1f), user)
+    }
+}
+
+@Composable
+private fun CompactSide(t: Team, score: Int, ahead: Boolean, final: Boolean, user: Int, modifier: Modifier, flip: Boolean) {
+    val c by androidx.compose.animation.animateColorAsState(if (final && !ahead) P.sub else P.ink, tween(500), label = "score")
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (flip) Arrangement.End else Arrangement.Start) {
+        val badge = @Composable {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TeamBadge(t, 38.dp)
+                Text(t.abbr, style = T.label.copy(fontSize = 10.sp), color = if (t.id == user) P.accent else P.sub, maxLines = 1)
+            }
+        }
+        val num = @Composable { RollingText("$score", T.hero.copy(fontSize = 38.sp, lineHeight = 38.sp), c, Modifier.pulseOn(score, 0.1f)) }
+        if (flip) { num(); Spacer(Modifier.width(10.dp)); badge() } else { badge(); Spacer(Modifier.width(10.dp)); num() }
     }
 }
 
