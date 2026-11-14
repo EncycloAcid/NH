@@ -440,6 +440,12 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                     SmallButton("Clear", Modifier.weight(1f), enabled = r.nilOffer > 0) { set(0) }
                     SmallButton("Match ask", Modifier.weight(1f), enabled = r.nilOffer != r.nilAsk) { set(r.nilAsk) }
                 }
+                if (com.nh.hoopscoach.game.Compliance.aboveMarket(r)) Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Tag("ABOVE MARKET", P.bad, filled = true)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Offers over his ask draw compliance warnings, and it becomes his salary while he's here. " +
+                        "Program: ${com.nh.hoopscoach.game.Compliance.level(lg).label.lowercase()}.", style = T.small, color = P.bad)
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     (if (Recruiting.inCycle(lg)) "" else "Counts once the recruiting rounds start. ") +

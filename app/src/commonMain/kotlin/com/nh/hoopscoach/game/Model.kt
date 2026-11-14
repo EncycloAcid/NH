@@ -1682,6 +1682,10 @@ class League(
     var staffPool: MutableList<Assistant> = mutableListOf(),
     var staffPoolSeason: Int = 0,
     var tree: MutableList<TreeBranch> = mutableListOf(),
+    /** The user's standing with the compliance office (see [Compliance]): warnings on file, the last check, and the season he self-reported. */
+    var complianceWarnings: Int = 0,
+    var complianceStamp: Int = 0,
+    var selfReported: Int = 0,
     var nextAssistantId: Int = 1,
     /** The user's head-to-head with every coach he's faced, and how heated each one is. */
     var coachRivals: MutableList<CoachRival> = mutableListOf(),

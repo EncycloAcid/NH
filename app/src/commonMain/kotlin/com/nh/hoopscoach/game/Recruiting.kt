@@ -517,6 +517,7 @@ object Recruiting {
     /** Lock in the round: interest moves, some prospects commit, schools drop out and new ones enter. */
     fun lockRound(lg: League) {
         val os = lg.offseason ?: return
+        runCatching { Compliance.check(lg) }
         val round = os.round.coerceIn(1, ROUNDS)
         val ctx = Ctx(lg)
         val room = IntArray(lg.teams.size) { openSpots(lg, lg.teams[it]) }

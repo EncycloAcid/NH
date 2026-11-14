@@ -248,7 +248,9 @@ object WorldEvents {
 
     /** Daily: a freshman nobody saw coming, recognised once he has a real body of work. */
     fun daily(lg: League) {
-        if (lg.pro || lg.phase != Phase.REGULAR || lg.day != Schedule.REG_DAYS / 2) return
+        if (lg.pro || lg.phase != Phase.REGULAR) return
+        if (lg.day % 7 == 0) Compliance.check(lg)
+        if (lg.day != Schedule.REG_DAYS / 2) return
         for (t in lg.teams) {
             val p = lg.rosterOf(t).filter { it.year == 1 && it.stats.gp >= 8 && it.stats.ppg >= 14.0 && it.stars <= 3 }.maxByOrNull { it.stats.ppg } ?: continue
             Timeline.record(lg, "breakout", "${p.stars}-star freshman ${p.name} breaks out at ${t.school}",
@@ -267,6 +269,7 @@ object WorldEvents {
     fun offseason(lg: League) {
         if (lg.pro) return
         Brand.ensure(lg)
+        runCatching { Compliance.offseason(lg) }
         val spend = lg.teams.associate { it.id to Morale.nilSpent(lg, it).toDouble() }
         val bands = lg.teams.groupBy { it.prestige / 10 }.mapValues { (_, ts) -> ts.map { spend.getValue(it.id) }.average().coerceAtLeast(1.0) }
         for (t in lg.teams) {
@@ -301,15 +304,16 @@ object WorldEvents {
      * scares off recruits; a major one also bans the program from next season's postseason, which frees
      * its players to transfer, and all but ends the coach's tenure.
      */
-    private fun scandal(lg: League, t: Team, c: Coach, major: Boolean) {
-        val what = Rng.pick(listOf("recruiting violations", "improper benefits to players", "academic misconduct"))
+    internal fun scandal(lg: League, t: Team, c: Coach, major: Boolean, what: String = Rng.pick(listOf("recruiting violations", "improper benefits to players", "academic misconduct"))) {
+        val mine = t.id == lg.userTeamId
         t.prestige = (t.prestige - if (major) Rng.range(5, 8) else Rng.range(2, 4)).coerceAtLeast(5)
         t.legacy = (t.legacy - if (major) 3.0 else 1.5).coerceAtLeast(5.0)
         Fans.ensure(t)
         t.fans = (t.fans - if (major) 14 else 8).coerceAtLeast(5.0)
         c.security = (c.security - if (major) 45 else 25).coerceAtLeast(0)
-        t.scholarshipsLost = if (major) 3 else Rng.range(1, 2)
-        t.sanctionUntil = lg.season + if (major) 2 else 1
+        val already = if (t.sanctionUntil >= lg.season) t.scholarshipsLost else 0
+        t.scholarshipsLost = (already + if (major) 3 else Rng.range(1, 2)).coerceAtMost(4)
+        t.sanctionUntil = maxOf(t.sanctionUntil, lg.season + if (major) 2 else 1)
         if (major) t.banSeason = lg.season + 1
         val penalties = listOfNotNull(
             "a postseason ban for ${lg.season + 1}".takeIf { major },
@@ -318,9 +322,16 @@ object WorldEvents {
         )
         Timeline.record(lg, "scandal", "${t.school} hit by an investigation into $what",
             "The NCAA found $what at ${t.school} under ${c.name}. Penalties: ${penalties.joinToString(", ")}.", t.id, coach = c.name, weight = if (major) 4 else 3)
-        lg.news += News(lg.season, lg.day, "NCAA ${if (major) "hammers" else "sanctions"} ${t.school} over $what", false, kind = "move", teamId = t.id,
+        lg.news += News(lg.season, lg.day, "NCAA ${if (major) "hammers" else "sanctions"} ${t.school} over $what", mine, kind = "move", teamId = t.id,
             body = "${t.school} (${t.w}-${t.l}) gets ${penalties.joinToString(", ")}. Recruits are already looking elsewhere, and ${c.name}'s job is in question.",
             source = "Hoops Wire")
+        if (mine) {
+            Alerts.add(lg, if (major) "The NCAA hammers your program" else "NCAA sanctions",
+                "The investigation into $what is done: ${penalties.joinToString(", ")}. " +
+                    "Your job security took a hit" + (if (c.security < 30) " and you're on the hot seat." else ".") +
+                    " Keep NIL deals at market value from here on.", "")
+            return
+        }
         val u = lg.user
         val chasing = lg.recruits.count { it.interest.containsKey(t.id) && it.interest.containsKey(u.id) }
         if (t.confId == u.confId || lg.rivalry(t.id, u.id) != null || chasing > 0) Alerts.add(lg, "Scandal at ${t.school}",

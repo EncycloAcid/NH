@@ -120,6 +120,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
                 com.nh.hoopscoach.game.CoachContracts.ensure(lg)
                 Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)} · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
             }
+            ComplianceCard(vm, lg)
             Section("Coaching skills", action = "Develop", onAction = { vm.push(Route.CoachDev) })
             Panel(onClick = { vm.push(Route.CoachDev) }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {

@@ -180,3 +180,53 @@ fun CoachRivalsCard(lg: League) {
         }
     }
 }
+
+/**
+ * The user's standing with the compliance office: how far above market his deals run, the warnings on
+ * file, the odds of an investigation this offseason, sanctions in force, and the option to self-report.
+ */
+@Composable
+fun ComplianceCard(vm: GameViewModel, lg: League) {
+    val C = com.nh.hoopscoach.game.Compliance
+    if (!C.active(lg)) return
+    val ratio = C.overpay(lg)
+    val level = C.level(ratio)
+    val risk = C.risk(lg)
+    val sanctions = com.nh.hoopscoach.game.WorldEvents.sanctionLine(lg, lg.user)
+    var confirm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val color = when (level) {
+        com.nh.hoopscoach.game.Compliance.Level.CLEAN -> P.good
+        com.nh.hoopscoach.game.Compliance.Level.WATCHED -> P.warn
+        com.nh.hoopscoach.game.Compliance.Level.REVIEW -> P.warn
+        com.nh.hoopscoach.game.Compliance.Level.RED -> P.bad
+    }
+    Section("Compliance")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(level.label, style = T.head, color = color, modifier = Modifier.weight(1f))
+            Tag("${(ratio * 100).toInt()}% OF MARKET", color)
+        }
+        Text(level.note, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Stat("Warnings", "${lg.complianceWarnings}", Modifier.weight(1f), color = if (lg.complianceWarnings > 0) P.bad else P.ink, style = T.numSm)
+            Stat("Investigation odds", C.riskLabel(risk), Modifier.weight(1f), color = if (risk >= 0.2) P.bad else if (risk > 0) P.warn else P.good, style = T.numSm)
+        }
+        if (sanctions.isNotEmpty()) Text(sanctions, style = T.small, color = P.bad, modifier = Modifier.padding(top = 8.dp))
+        if (lg.selfReported == lg.season) Text("You self-reported this season: the risk of an investigation is much lower.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))
+        else if (lg.complianceWarnings > 0 || level >= com.nh.hoopscoach.game.Compliance.Level.REVIEW) {
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton("Self-report violations", Modifier.fillMaxWidth()) { confirm = true }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("NIL offers above a recruit's ask become his salary, and they're what the compliance office watches. Paying market value clears warnings over time.",
+            style = T.small, color = P.faint)
+    }
+    if (confirm) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirm = false }, containerColor = P.surface,
+        title = { Text("Self-report?", style = T.head, color = P.ink) },
+        text = { Text("You give up one scholarship next season and take a small hit to job security. Your warnings are cleared and an investigation this offseason becomes much less likely.", style = T.body, color = P.sub) },
+        confirmButton = { androidx.compose.material3.TextButton({ confirm = false; vm.act { C.selfReport(it) } }) { Text("Self-report", color = P.bad) } },
+        dismissButton = { androidx.compose.material3.TextButton({ confirm = false }) { Text("Not now", color = P.sub) } },
+    )
+}
