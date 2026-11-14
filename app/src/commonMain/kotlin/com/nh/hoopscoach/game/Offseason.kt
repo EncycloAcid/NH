@@ -147,6 +147,8 @@ object Offseason {
         if (p.has(Trait.LOYAL)) c *= 0.35
         val t = if (p.teamId >= 0) lg.team(p.teamId) else null
         if (t != null && lg.coachOf(t).has(CoachSkill.CULTURE)) c *= 0.7
+        // What he remembers: a broken promise makes a content player restless; a title or the staff that believed in him keeps an unhappy one.
+        c *= Memories.transferFactor(p)
         return c.coerceAtMost(0.85)
     }
 
@@ -180,6 +182,8 @@ object Offseason {
                 val p = lg.player(pid)
                 if (pid in entrants || pid == lg.heroId || pid == lg.road?.rivalId || !Rng.chance(transferChance(lg, p))) continue
                 t.roster.remove(pid)
+                if (p.ovr >= 84 || p.awards.isNotEmpty()) Timeline.record(lg, "transfer", "${p.name} leaves ${t.school}",
+                    "${p.name} entered the transfer portal after averaging ${"%.1f".format(p.stats.ppg)} points at ${t.school}." + (Memories.defining(p)?.takeIf { it.pull < 0 }?.let { " ${it.text}." } ?: ""), t.id, p.id, weight = 2)
                 if (t.id == lg.userTeamId) { os.transferredOut += p.name; os.freedOther += p.nil }
                 toPortal(lg, p, t.id)
             }
@@ -489,20 +493,25 @@ object Coaching {
     }
 
     fun carousel(lg: League, os: OffseasonState) {
+        val touched = mutableSetOf<Int>()     // schools whose coach already changed this offseason
         for (t in lg.teams) {
-            if (lg.humanCoach(t)) continue
+            if (lg.humanCoach(t) || t.id in touched) continue
             val c = lg.coachOf(t)
             val retire = c.age >= 72 || (c.age >= 66 && Rng.chance(0.3))
-            val fired = !retire && t.w - t.expWins < -5 && Rng.chance(0.35)
+            val fired = !retire && Rng.chance(CoachTrees.fireChance(lg, t, c))
             if (retire || fired) {
                 Legacy.honorCoach(lg, t, c)
                 if (retire && c.titles >= 2) lg.hallOfFame += HofEntry(lg.season, c.name, Pos.PG, t.school, "${c.w}-${c.l} · ${c.titles} titles", isCoach = true)
+                if (retire && (c.titles >= 1 || c.finalFours >= 2)) lg.news += News(lg.season, lg.day, "${c.name} retires at ${t.school} after ${c.w} wins", t.id == lg.userTeamId, kind = "column",
+                    body = "${c.name}, ${c.age}, steps away at ${c.w}-${c.l} with ${c.titles} national ${if (c.titles == 1) "title" else "titles"} and ${c.finalFours} Final Fours." +
+                        CoachTrees.branches(lg, c.name).takeIf { it.isNotEmpty() }?.let { tree -> " ${tree.size} of his former assistants are head coaches: ${tree.joinToString(", ") { a -> "${a.name} (${lg.team(a.teamId).school})" }}." }.orEmpty(),
+                    source = "Hoops Wire", teamId = t.id)
+                else if (fired && t.prestige >= 60) lg.news += News(lg.season, lg.day, "${t.school} fires ${c.name} after a ${t.w}-${t.l} season", t.id == lg.userTeamId, kind = "move", teamId = t.id)
+                if (retire) Timeline.record(lg, "retire", "${c.name} retires at ${t.school}", "${c.name} finished ${c.w}-${c.l} with ${c.titles} national titles and ${c.finalFours} Final Fours.", t.id, coach = c.name, weight = if (c.titles >= 1) 4 else if (c.finalFours >= 1) 2 else 1)
+                else Timeline.record(lg, "fire", "${t.school} fires ${c.name}", "${c.name} was let go after a ${t.w}-${t.l} season, ${c.history.count { it.teamId == t.id }} years into the job.", t.id, coach = c.name, weight = if (t.prestige >= 75) 2 else 1)
+                // Still in the list while his successor is chosen, so an assistant can be measured against him.
+                CoachTrees.fill(lg, t, c, retire, touched)
                 lg.coaches.remove(c)
-                val n = LeagueGen.makeCoach(lg, t.prestige, Rng.range(34, 55), withCareer = true)
-                n.teamId = t.id
-                t.coachId = n.id
-                GenerationalLegacy.inheritProgram(lg, t, n)
-                if (t.prestige >= 80) lg.news += News(lg.season, lg.day, "${t.school} hires ${n.name} as head coach", false)
             }
         }
         // In player mode the user doesn't coach: just keep "your team" and its coach in step.

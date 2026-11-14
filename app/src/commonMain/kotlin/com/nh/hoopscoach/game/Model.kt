@@ -284,6 +284,8 @@ class Player(
     /** Career highs: points, rebounds, assists, threes, steals, blocks; and the game for each. */
     var highs: IntArray = IntArray(6),
     var highGames: MutableList<String> = mutableListOf(),
+    /** What he remembers, and how it ties him to a school or turns him against it (see [Memories]). */
+    var memories: MutableList<Memory> = mutableListOf(),
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
@@ -1622,6 +1624,8 @@ class League(
     var nextCoachId: Int,
     val news: MutableList<News> = mutableListOf(),
     val history: MutableList<SeasonSummary> = mutableListOf(),
+    /** Everything notable that has happened in this world, recorded as it happened (see [Timeline]). */
+    val timeline: MutableList<WorldEvent> = mutableListOf(),
     val draftHistory: MutableList<DraftPick> = mutableListOf(),
     val hallOfFame: MutableList<HofEntry> = mutableListOf(),
     val records: MutableList<RecordEntry> = mutableListOf(),

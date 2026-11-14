@@ -33,6 +33,7 @@ enum class Tab(val label: String) { TODAY("Today"), TEAM("Team"), RECRUIT("Recru
 
 enum class HistoryKind(val title: String, val sub: String) {
     SEASONS("Season Review", "Champions, awards and Final Fours by year"),
+    TIMELINE("Timeline", "Everything this world remembers, as it happened"),
     MOMENTS("Highlight Reel", "Upsets, buzzer-beaters and Cinderella runs"),
     AWARDS("Champions & Awards", "Every national award winner"),
     DRAFT("Draft History", "Every pick, every year"),

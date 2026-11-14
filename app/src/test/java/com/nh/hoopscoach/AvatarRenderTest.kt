@@ -111,6 +111,56 @@ class AvatarRenderTest {
         assertTrue(checked > 100)
     }
 
+    @Test fun teamsWithoutJerseyArtWearTheirOwnColorsAndAbbreviation() {
+        assertNull(SpriteSheets.jerseyArt("not-a-team"))
+        assertNull(SpriteSheets.jerseyArt(null))
+        assertEquals("character/nba_jerseys/lakers.png", SpriteSheets.jerseyArt("lakers"))
+        val orange = 0xFFF56600.toInt(); val purple = 0xFF522D80.toInt()
+        val plain = SpriteCompose.teamJersey(orange, purple, null)!!
+        val worded = SpriteCompose.teamJersey(orange, purple, "clem")!!
+        assertSame(worded, SpriteCompose.teamJersey(orange, purple, "CLEM"))
+        val template = SpriteSheets.bitmap(SpriteSheets.TEAM_JERSEY)!!
+        var cloth = 0; var letters = 0
+        for (y in 0 until 512) for (x in 0 until 512) {
+            // Same silhouette as the template, and never a see-through pixel inside it.
+            assertEquals("$x,$y", template.getPixel(x, y) ushr 24, plain.getPixel(x, y) ushr 24)
+            assertEquals("$x,$y", template.getPixel(x, y) ushr 24, worded.getPixel(x, y) ushr 24)
+            val c = plain.getPixel(x, y)
+            if (c ushr 24 == 255 && (c ushr 16 and 255) > 200 && (c ushr 8 and 255) in 70..140 && (c and 255) < 40) cloth++
+            if (worded.getPixel(x, y) != c) letters++
+        }
+        assertTrue("orange cloth $cloth", cloth > 15_000)
+        assertTrue("wordmark $letters", letters in 800..4000)
+        // The wordmark stays above the chest number.
+        val number = SpriteSheets.chestNumber(88)!!
+        for (y in 0 until 512) for (x in 0 until 512) if (number.getPixel(x, y) ushr 24 != 0) assertEquals(plain.getPixel(x, y), worded.getPixel(x, y))
+        // A school with no art is drawn in its jersey, not Duke's.
+        val face = Face(4, 0, 0, 0, 0, 0, 0, 0, 0)
+        val noArt = SpriteCompose.render(face, orange, purple, 5, jerseyKey = null, label = "CLEM")
+        val duke = SpriteCompose.render(face, orange, purple, 5, jerseyKey = "01_duke")
+        assertFalse(noArt.contentEquals(duke))
+        assertEquals(worded.getPixel(256, 300), noArt[300 * 512 + 256])
+    }
+
+    @Test fun whiteSchoolColorGoesOnTheTrimAndLookalikeColorsGetContrastingPiping() {
+        val white = 0xFFFFFFFF.toInt(); val navy = 0xFF003087.toInt(); val black = 0xFF000000.toInt()
+        assertEquals(navy to white, SpriteCompose.teamColors(white, navy))
+        assertEquals(navy to white, SpriteCompose.teamColors(navy, white))
+        assertEquals(black to white, SpriteCompose.teamColors(black, black))
+        assertEquals(0xFF14161C.toInt(), SpriteCompose.teamColors(white, white).second)
+    }
+
+    @Test fun halfSizePortraitAveragesBlocksAndKeepsEdgesClean() {
+        val px = IntArray(512 * 512)
+        for (y in 0 until 2) for (x in 0 until 2) px[y * 512 + x] = 0xFF204060.toInt()
+        px[2] = 0xFFFF0000.toInt()                       // one opaque pixel of four in the next block
+        val half = SpriteCompose.half(px)
+        assertEquals(256 * 256, half.size)
+        assertEquals(0xFF204060.toInt(), half[0])
+        assertEquals(0x40FF0000, half[1])                // a quarter covered, still pure red
+        assertEquals(0, half[2])
+    }
+
     @Test fun orderAndFallback() {
         val look = PlayerLook(hairIndex = 1, beardIndex = 1, eyewearIndex = 1, headbandIndex = 1, mouthIndex = 1, eyeIndex = 1)
         val paths = SpriteCompose.lookLayers(look, "not-a-team", 1000)
@@ -453,7 +503,7 @@ class AvatarRenderTest {
         val face = Face(4, 0, 0, 0, 0, 0, 0, 1, 0)
         val layers = listOfNotNull(
             SpriteCompose.softenCheekHighlights(SpriteSheets.body(face.skin)!!),
-            SpriteSheets.bitmap(SpriteSheets.jerseyPath(null)),
+            SpriteCompose.teamJersey(0, 0, null),     // no team: a plain jersey, not another school's
             SpriteSheets.chestNumber(0),
             SpriteCompose.tintMouth(SpriteSheets.body(face.skin)!!, SpriteSheets.mouth(face.mouth)!!),
         )

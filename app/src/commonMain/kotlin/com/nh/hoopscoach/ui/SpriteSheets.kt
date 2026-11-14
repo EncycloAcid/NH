@@ -10,26 +10,49 @@ import com.nh.hoopscoach.decodeArgbBitmap
  * Assets are resolved via [assetBytes] (Android assets / desktop classpath).
  */
 object SpriteSheets {
-    private val cache = HashMap<String, ArgbBitmap>()
+    /** The neutral jersey a team without art of its own wears in its own colors (see [SpriteCompose.teamJersey]). */
+    const val TEAM_JERSEY = "character/jersey_template.png"
+
+    // Insertion-ordered with access order, so the least recently used layer goes first. Every layer is a
+    // 512x512 bitmap (1 MB) and a roster's faces, hair and numbers run to a few dozen, so it keeps 24-48.
+    private val cache = LinkedHashMap<String, ArgbBitmap>(64, 0.75f, true)
     private var cacheBytes = 0
-    private val maxBytes = (Runtime.getRuntime().maxMemory() / 12).coerceIn(4L * 1024 * 1024, 16L * 1024 * 1024).toInt()
+    private val maxBytes = (Runtime.getRuntime().maxMemory() / 8).coerceIn(24L shl 20, 48L shl 20).toInt()
+
+    /** Paths that aren't in the pack, so asking again (every college key is tried as an NBA one first) costs nothing. */
+    private val missing = HashSet<String>()
 
     /** No-op kept for call sites that previously installed an AssetManager. */
     fun install() { /* assets resolved via Platform.assetBytes */ }
 
     @Synchronized fun bitmap(path: String): ArgbBitmap? {
         cache[path]?.let { return it }
-        val bytes = assetBytes(path) ?: return null
-        val bmp = decodeArgbBitmap(bytes) ?: return null
+        if (path in missing) return null
+        val bmp = assetBytes(path)?.let { decodeArgbBitmap(it) }
+        if (bmp == null) {
+            missing += path
+            return null
+        }
+        return keep(path, bmp)
+    }
+
+    @Synchronized private fun keep(key: String, bmp: ArgbBitmap): ArgbBitmap {
         val size = bmp.width * bmp.height * 4
         while (cacheBytes + size > maxBytes && cache.isNotEmpty()) {
             val victim = cache.keys.first()
             val old = cache.remove(victim)
             if (old != null) cacheBytes -= old.width * old.height * 4
         }
-        cache[path] = bmp
+        cache[key] = bmp
         cacheBytes += size
         return bmp
+    }
+
+    /** A layer built from others (a team-colored jersey, say), kept in the same cache under [key]. */
+    fun derived(key: String, build: () -> ArgbBitmap?): ArgbBitmap? {
+        synchronized(this) { cache[key]?.let { return it } }
+        val made = build() ?: return null
+        return keep(key, made)
     }
 
     fun body(skin: Int): ArgbBitmap? {
@@ -49,15 +72,18 @@ object SpriteSheets {
         return null
     }
 
-    fun jerseyPath(key: String?): String {
-        if (key != null) {
-            val nba = "character/nba_jerseys/$key.png"
-            if (bitmap(nba) != null) return nba
-            val college = "character/college_jerseys/$key.png"
-            if (bitmap(college) != null) return college
-        }
-        return "character/college_jerseys/01_duke.png"
+    /** The team's own jersey art, or null when it has none; it then wears [TEAM_JERSEY] in its own colors. */
+    fun jerseyArt(key: String?): String? {
+        if (key == null) return null
+        val nba = "character/nba_jerseys/$key.png"
+        if (bitmap(nba) != null) return nba
+        val college = "character/college_jerseys/$key.png"
+        if (bitmap(college) != null) return college
+        return null
     }
+
+    /** A jersey file for [key] whatever it is: its art, or a stock jersey for layer lists that need a path. */
+    fun jerseyPath(key: String?): String = jerseyArt(key) ?: "character/college_jerseys/01_duke.png"
 
     /** Chest number 0–99 (and `00` via [zeroZero]). */
     fun chestNumber(number: Int, zeroZero: Boolean = false): ArgbBitmap? {

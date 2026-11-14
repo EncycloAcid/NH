@@ -220,6 +220,21 @@ object Ollama {
     }
 
     /** Shut-down Gemini families that still appear in old saves / menus. */
+    /**
+     * How a Gemini model is told to keep its private reasoning short. Its thinking is billed against the
+     * same output limit as the answer, so left alone it can spend the whole limit and return nothing.
+     * 2.5 models take a token budget; 3 and later take a level ("minimal" only on the Flash-Lites).
+     */
+    internal fun googleThinking(model: String): String {
+        val low = model.lowercase().removePrefix("models/")
+        return when {
+            "gemma" in low || isRetiredGoogleModel(low) -> ""
+            "2.5" in low -> "\"thinkingConfig\":{\"thinkingBudget\":${if ("pro" in low) 128 else 0}}"
+            "flash-lite" in low -> "\"thinkingConfig\":{\"thinkingLevel\":\"minimal\"}"
+            else -> "\"thinkingConfig\":{\"thinkingLevel\":\"low\"}"
+        }
+    }
+
     internal fun isRetiredGoogleModel(id: String): Boolean {
         val key = id.lowercase().removePrefix("models/")
         return key.startsWith("gemini-1.") || key.startsWith("gemini-2.0") ||
@@ -1126,7 +1141,10 @@ object Ollama {
                             if (system.isNotBlank()) {
                                 append(",\"systemInstruction\":{\"parts\":[{\"text\":").append(jsonString(system)).append("}]}")
                             }
-                            append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict}}")
+                            val thinking = googleThinking(cand)
+                            append(",\"generationConfig\":{\"temperature\":$temperature,\"maxOutputTokens\":$numPredict")
+                            if (thinking.isNotEmpty()) append(",").append(thinking)
+                            append("}}")
                         }
 
                         conn.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }

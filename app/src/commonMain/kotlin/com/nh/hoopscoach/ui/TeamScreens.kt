@@ -492,6 +492,10 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 ProgramLegends(t) { vm.openPlayer(it) }
             }
             else -> item {
+                com.nh.hoopscoach.game.Timeline.of(lg, t.id).takeIf { it.isNotEmpty() }?.let { events ->
+                    Section("Timeline")
+                    TimelineRows(vm, lg, events.sortedByDescending { it.season * 10 + it.weight }.take(12), showSchool = false)
+                }
                 ProgramLegends(t) { vm.openPlayer(it) }
                 FormerPlayers(vm, lg, t)
                 RivalsList(vm, lg, t)

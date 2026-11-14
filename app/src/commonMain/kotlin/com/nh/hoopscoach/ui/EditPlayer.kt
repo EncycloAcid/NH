@@ -104,6 +104,7 @@ fun EditPlayerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                             primary = t.primary.toInt(),
                             secondary = t.secondary.toInt(),
                             number = number,
+                            label = t.abbr,
                             background = Color(0xFF1A1714),
                             corner = 14.dp,
                             modifier = Modifier.size(112.dp),

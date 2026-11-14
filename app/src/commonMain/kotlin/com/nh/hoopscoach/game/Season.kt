@@ -351,6 +351,8 @@ object Season {
             lg.team(b.champion).confTitles++
             lg.coachOf(lg.team(b.champion)).confTitles++
         }
+        runCatching { Memories.seasonEnd(lg, champ.id, runnerUp) }
+        runCatching { Timeline.seasonEnd(lg, champ.id, runnerUp, f4) }
         val coty = lg.coaches.firstOrNull { it.id == lg.cotyCoachId }
         lg.history += SeasonSummary(
             lg.season, champ.id, runnerUp, f4, lg.seasonAwards.toList(),
@@ -410,6 +412,7 @@ object Season {
         lg.wrapUp = buildWrapUp(lg, beforeUser, points, reward, targets[lg.userTeamId], userRate)
         if (lg.playerMode) Road.seasonEnd(lg)
         runCatching { Columns.reviewCollege(lg) }
+        runCatching { Turnarounds.publish(lg) }
         // An odd summer: USA Basketball may want him for the U19 World Cup.
         if (!lg.playerMode) runCatching { TeamUSA.offer(lg) }
         lg.phase = Phase.WRAP_UP

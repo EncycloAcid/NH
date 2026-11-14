@@ -10,6 +10,6 @@ import com.nh.hoopscoach.game.Gear
 object CelRender {
     const val N = SpriteCompose.N
 
-    fun render(f: Face, primary: Int, secondary: Int, number: Int, gear: Gear = Gear(), jerseyKey: String? = null): IntArray =
-        SpriteCompose.render(f, primary, secondary, number, gear, jerseyKey)
+    fun render(f: Face, primary: Int, secondary: Int, number: Int, gear: Gear = Gear(), jerseyKey: String? = null, label: String? = null): IntArray =
+        SpriteCompose.render(f, primary, secondary, number, gear, jerseyKey, label)
 }
