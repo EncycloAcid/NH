@@ -275,7 +275,7 @@ private fun NbaUserBox(lg: League, pv: NbaPreview) {
     val u = lg.user
     val uo = proj(pv, u)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TeamBadge(u, 40.dp)
@@ -691,7 +691,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
     item {
         val ink = teamInk(u)
         Spacer(Modifier.height(8.dp))
-        Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(P.surface)) {
+        Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).background(P.surface)) {
             TeamBand(u) { fg, accent ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TeamBadge(u, 52.dp)

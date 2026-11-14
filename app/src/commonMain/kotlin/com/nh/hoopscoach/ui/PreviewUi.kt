@@ -356,7 +356,7 @@ private fun CollegeUserBox(lg: League, pv: Preview, onClick: (() -> Unit)? = nul
     val mine = pv.proj.getValue(u.id)
     val uo = odds(pv, u)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f))
+        Modifier.fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).background(Color.Black.copy(alpha = 0.28f))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -530,28 +530,53 @@ internal fun CoverLine(kicker: String, text: String, fg: Color, accent: Color) {
 private fun LazyListScope.contents(lg: League, pv: Preview, list: List<Pair<String, String>>, go: (Int) -> Unit) {
     item {
         Section("From the editor")
-        Panel {
-            Previews.editorsLetter(lg, pv).forEachIndexed { i, para ->
-                Text(para, style = if (i == 0) T.bodyB else T.body, color = P.ink, modifier = Modifier.padding(vertical = 4.dp))
+        Column(Modifier.padding(horizontal = Gutter + 4.dp)) {
+            val letter = Previews.editorsLetter(lg, pv)
+            letter.forEachIndexed { i, para ->
+                if (i == 0 && para.isNotEmpty()) Row(Modifier.padding(vertical = 4.dp)) {
+                    // A drop cap opens the letter.
+                    Text(para.take(1), style = T.hero.copy(fontSize = 62.sp, lineHeight = 54.sp), color = P.accent, modifier = Modifier.padding(end = 8.dp))
+                    Text(para.drop(1), style = bodyCopy.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.ink, modifier = Modifier.weight(1f).padding(top = 4.dp))
+                } else Text(para, style = bodyCopy, color = P.ink, modifier = Modifier.padding(vertical = 4.dp))
             }
-            Text("— The editors", style = T.small.copy(fontStyle = FontStyle.Italic), color = P.sub, modifier = Modifier.padding(top = 4.dp))
+            Text("— The editors", style = bodyCopy.copy(fontStyle = FontStyle.Italic, fontSize = 13.sp), color = P.sub, modifier = Modifier.padding(top = 4.dp))
+        }
+        // The issue in three numbers.
+        val top = topTeam(lg, pv)
+        val uo = odds(pv, lg.user)
+        val shots = lg.teams.count { odds(pv, it).title >= 0.05 }
+        Section("By the numbers")
+        Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp).height(IntrinsicSize.Min)) {
+            for ((i, kv) in listOf(
+                odd(odds(pv, top).title) to "title odds for No. 1 ${top.school}",
+                "$shots" to "teams with a real shot at the title",
+                "${uo.lo}-${uo.hi}" to "wins we project for ${lg.user.school}",
+            ).withIndex()) {
+                if (i > 0) Box(Modifier.padding(horizontal = 10.dp).width(1.dp).fillMaxHeight().background(P.line))
+                Column(Modifier.weight(1f)) {
+                    Text(kv.first, style = T.hero.copy(fontSize = 40.sp, lineHeight = 40.sp, fontStyle = FontStyle.Italic), color = P.accent, maxLines = 1)
+                    Text(kv.second.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.8.sp, lineHeight = 12.sp), color = P.sub)
+                }
+            }
+        }
+        Section("Contents")
+        Column(Modifier.padding(horizontal = Gutter + 4.dp)) {
+            list.withIndex().drop(2).forEach { (i, pg) ->
+                Row(Modifier.fillMaxWidth().clickable { go(i) }.padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("%02d".format(i + 1), style = T.hero.copy(fontSize = 26.sp, lineHeight = 26.sp, fontStyle = FontStyle.Italic), color = P.accent, modifier = Modifier.width(44.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(pg.first.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 1.5.sp), color = P.sub, maxLines = 1)
+                        Text(pg.second, style = T.h2.copy(fontSize = 19.sp, lineHeight = 21.sp), color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Hairline()
+            }
         }
         Section("How we project")
-        Panel {
+        Column(Modifier.padding(horizontal = Gutter + 4.dp)) {
             Text("Every team gets a strength rating from its roster (its best players, weighted) and its coach. We play the season 400 times from those ratings and the real schedule: conference tournaments, a 68-team field and the bracket. Projected records are the average; the win range covers 8 seasons in 10.", style = T.small, color = P.ink)
             Spacer(Modifier.height(6.dp))
             Text("Odds are observed frequencies in 400 simulated seasons, not guarantees or measured real-world accuracy. Known absences reduce strength for their expected missed games. The live tracker compares this frozen issue with current results.", style = T.small, color = P.sub)
-        }
-        Section("Contents")
-        GroupList(list.withIndex().drop(2).toList()) { (i, pg) ->
-            ListRow(onClick = { go(i) }) {
-                Text("${i + 1}", style = T.numSm, color = P.accent, modifier = Modifier.width(34.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(pg.second, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(pg.first, style = T.small, color = P.sub)
-                }
-                Chevron()
-            }
         }
     }
 }
@@ -560,6 +585,13 @@ private fun LazyListScope.contents(lg: League, pv: Preview, list: List<Pair<Stri
 
 private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview) {
     item { Deck("The questions that will decide the season, from our ${pv.stories.size} biggest storylines.") }
+    pv.stories.forEachIndexed { i, s ->
+        item {
+            Spacer(Modifier.height(10.dp))
+            StoryCard(vm, lg, s, i, lead = i == 0)
+        }
+    }
+    if (pv.stories.isEmpty()) item { Panel { Text("No storylines this year.", style = bodyCopy, color = P.sub) } }
     if (lg.ollama.enabled) item {
         Spacer(Modifier.height(10.dp))
         var generating by remember { mutableStateOf(false) }
@@ -631,13 +663,6 @@ private fun LazyListScope.storylines(vm: GameViewModel, lg: League, pv: Preview)
             }
         }
     }
-    pv.stories.forEachIndexed { i, s ->
-        item {
-            Spacer(Modifier.height(10.dp))
-            StoryCard(vm, lg, s, i, lead = i == 0)
-        }
-    }
-    if (pv.stories.isEmpty()) item { Panel { Text("No storylines this year.", style = bodyCopy, color = P.sub) } }
 }
 
 @Composable
@@ -769,7 +794,7 @@ private fun TeamFeature(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
     val (strength, concern) = Previews.scoutingProse(lg, t)
     val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
     val ink = teamInk(t)
-    Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(P.surface)) {
+    Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).background(P.surface)) {
         Box(Modifier.clickable { vm.push(Route.TeamPage(t.id)) }) {
             TeamBand(t) { fg, accent ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -914,7 +939,7 @@ private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
                 Text("MARCH ODDS · Dance ${odd(o.ncaa)} · Final 4 ${odd(o.f4)} · Title ${odd(o.title)} · Range ${o.lo}-${o.hi} W", style = T.small.copy(fontSize = 11.sp), color = P.sub)
                 Spacer(Modifier.height(6.dp))
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(P.surface).clickable { vm.push(Route.TeamPage(t.id)) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    Modifier.fillMaxWidth().background(P.surface2).clickable { vm.push(Route.TeamPage(t.id)) }.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("Full ${t.school} team page", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = P.accent, modifier = Modifier.weight(1f))
@@ -934,7 +959,7 @@ private fun LazyListScope.allAmerica(vm: GameViewModel, lg: League, pv: Preview)
         item {
             val t = lg.team(p.teamId)
             Spacer(Modifier.height(10.dp))
-            Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable { vm.openPlayer(p.id) }) {
+            Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).clickable { vm.openPlayer(p.id) }) {
                 TeamBand(t) { fg, accent ->
                     Text("PRESEASON PLAYER OF THE YEAR", style = T.label, color = accent)
                     Spacer(Modifier.height(8.dp))
@@ -1278,7 +1303,7 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
     item {
         val ink = teamInk(u)
         Spacer(Modifier.height(8.dp))
-        Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(P.surface)) {
+        Column(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.ui.graphics.RectangleShape).background(P.surface)) {
             TeamBand(u) { fg, accent ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TeamBadge(u, 52.dp)

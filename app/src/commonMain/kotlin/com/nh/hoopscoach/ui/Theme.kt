@@ -145,11 +145,12 @@ fun paperPalette(primary: Color?, secondary: Color?): Palette {
     val accent = primary?.let { accentFrom(it, secondary ?: it, false) } ?: Color(0xFFC8102E)
     return Palette(
         dark = false,
-        bg = Color(0xFFF7F7F5), surface = surface, surface2 = Color(0xFFECECE8),
+        bg = Color(0xFFFFFFFF), surface = surface, surface2 = Color(0xFFF0F0EE),
         ink = Color(0xFF0D0D0F), sub = Color(0xFF4C4C52), faint = Color(0xFF8E8E95), line = Color(0xFFDCDCD8),
         accent = accent, onAccent = onColor(accent), accentSoft = mix(surface, accent, 0.14f),
         good = Color(0xFF1E7a3A), bad = Color(0xFFB42318), warn = Color(0xFF9A5B0B), gold = Color(0xFF9C6B12),
-        hero = accent, onHero = onColor(accent),
+        // Feature boxes print black with white type, the way a sports weekly sets its sidebars.
+        hero = Color(0xFF111114), onHero = Color.White,
     )
 }
 
