@@ -339,6 +339,8 @@ object Offseason {
             if (!c.isUser) Coaching.aiGrowth(c)
         }
         lg.season++
+        // Sanctions can expire on this bump; refill any school that just got scholarships back.
+        for (t in lg.teams) fillHoles(lg, t)
         // An era career's college years: this season's real players join their schools.
         EraCollege.populate(lg)
         setupSeason(lg, carryElo = true)
