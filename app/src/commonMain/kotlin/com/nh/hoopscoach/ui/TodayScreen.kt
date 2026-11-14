@@ -89,6 +89,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { MidnightMadnessCard(vm, lg) }
         item { SummerTourCard(vm, lg) }
+        item { RadioShowCard(vm, lg) }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
@@ -138,6 +139,9 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
             val ds = home.traditions.mapNotNull { com.nh.hoopscoach.game.HomeCourt.def(it) }
             if (ds.isNotEmpty()) Text((if (home.id == u.id) "Your building: " else "${home.abbr}'s building: ") + ds.joinToString(" · ") { it.name.lowercase() },
                 style = T.small, color = if (home.id == u.id) P.good else P.warn)
+        }
+        com.nh.hoopscoach.game.Homecoming.players(lg, g).filter { it.teamId == u.id }.takeIf { it.isNotEmpty() }?.let { ps ->
+            Text("Homecoming: " + ps.joinToString(", ") { "${it.short} (${it.hometown})" } + ". Family in the stands.", style = T.small, color = P.good)
         }
         if (rivalry == null && !g.neutral) {
             val home = lg.team(g.home)

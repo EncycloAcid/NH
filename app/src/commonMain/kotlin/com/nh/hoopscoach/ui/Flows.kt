@@ -430,7 +430,7 @@ fun OffseasonFlow(vm: GameViewModel, lg: League) {
                 OffStep.DRAFT -> draftStep(vm, lg)
                 OffStep.CAREER -> careerStep(vm, lg)
                 OffStep.DEVELOPMENT -> developmentStep(vm, lg)
-                OffStep.BUDGET -> budgetStep(lg)
+                OffStep.BUDGET -> budgetStep(vm, lg)
                 OffStep.RECRUITING -> {
                     item {
                         Panel(color = P.accentSoft) {
@@ -772,14 +772,19 @@ private fun LazyListScope.developmentStep(vm: GameViewModel, lg: League) {
                 val p = lg.player(pid)
                 Panel(Modifier.padding(bottom = 8.dp)) {
                     Text(p.name, style = T.head, color = P.ink)
-                    Text(com.nh.hoopscoach.game.Shoes.offerLabel(p), style = T.bodyB, color = P.accent)
+                    if (p.shoeBids.size > 1) Text("${p.shoeBids.size} brands are bidding", style = T.bodyB, color = P.accent)
+                    else Text(com.nh.hoopscoach.game.Shoes.offerLabel(p), style = T.bodyB, color = P.accent)
                     Text(
                         if (p.shoePay > 0) "Replaces his current ${com.nh.hoopscoach.game.Shoes.label(p)}."
                         else "Stars without a deal get restless — especially Bag Chasers.",
                         style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp),
                     )
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (p.shoeBids.size > 1) {
+                        ShoeBids(vm, lg, p)
+                        Spacer(Modifier.height(8.dp))
+                        SecondaryButton("Pass on all of them", Modifier.fillMaxWidth()) { vm.act { com.nh.hoopscoach.game.Shoes.declineOffer(it.player(pid)) } }
+                    } else Spacer(Modifier.height(10.dp))
+                    if (p.shoeBids.size <= 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SecondaryButton("Decline", Modifier.weight(1f)) {
                             vm.act { com.nh.hoopscoach.game.Shoes.declineOffer(it.player(pid)) }
                         }
@@ -922,8 +927,9 @@ private fun DrillRow(drill: String, grade: String, level: Int, gut: Boolean) {
     }
 }
 
-private fun LazyListScope.budgetStep(lg: League) {
+private fun LazyListScope.budgetStep(vm: GameViewModel, lg: League) {
     val t = lg.user
+    if (t.apparelBids.isNotEmpty()) item { ApparelBids(vm, lg, t) }
     val os = lg.offseason!!
     val donor = Finance.donor(t.prestige)
     val rev = Finance.revShare(lg, t)

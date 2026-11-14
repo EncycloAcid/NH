@@ -447,6 +447,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
         }
         PipelinePanel(vm, lg, t)
         HomeCourtPanel(lg, t)
+        ApparelPanel(lg, t)
         ProgramLegends(t) { vm.openPlayer(it) }
         Section("Program records")
         RecordBookView(vm, lg, t.id, n = 3)
@@ -496,17 +497,10 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             3 -> item {
                 ProgramNumbers(vm, lg, t)
                 HomeCourtPanel(lg, t)
+                ApparelPanel(lg, t)
                 Section("Program records")
                 RecordBookView(vm, lg, t.id, n = 3)
                 FanPanel(t)
-                val co = com.nh.hoopscoach.game.Shoes.of(t)
-                if (co != null) {
-                    Section("Apparel")
-                    Panel {
-                        Text(co.label, style = T.head, color = P.ink)
-                        Text("${co.blurb} · ${money(com.nh.hoopscoach.game.Shoes.apparelMoney(t))}/yr kit money", style = T.small, color = P.sub)
-                    }
-                }
                 ProgramLegends(t) { vm.openPlayer(it) }
             }
             else -> item {

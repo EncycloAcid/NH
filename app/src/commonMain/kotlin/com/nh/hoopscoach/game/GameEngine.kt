@@ -120,6 +120,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val court: Team? = if (game.neutral) null else teams[0].also { HomeCourt.ensure(lg, it) }
     /** Each side's chemistry edge: added make chance and turnovers saved (see [Culture]). */
     private val chem = Array(2) { side -> if (lg.pro) 0.0 to 0.0 else Culture.gameEdge(Culture.chemistry(lg, teams[side])) }
+    /** Players back home tonight (see [Homecoming]). */
+    private val homecoming: Set<Int> = runCatching { Homecoming.players(lg, game).map { it.id }.toSet() }.getOrDefault(emptySet())
 
     init {
         if (game.att <= 0) game.att = Rivalries.attendance(lg, game)
@@ -184,6 +186,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         p += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
         p += chem[o].first
+        if (shooter.id in homecoming) p += 0.025
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
@@ -1020,6 +1023,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             pMake += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
             pMake += chem[o].first
+            if (shooter.id in homecoming) pMake += 0.025
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
@@ -1401,6 +1405,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         runCatching { Business.afterGame(lg, game) }
         if (!lg.pro) {
             Rivalries.afterGame(lg, game)
+            if (homecoming.isNotEmpty()) runCatching { Homecoming.afterGame(lg, game) { pid -> (lines[0][pid] ?: lines[1][pid])?.pts ?: 0 } }
             Fans.afterGame(lg, game)
             Brand.afterGame(lg, game)
             Moments.afterGame(lg, game, buzzerBeater, forcedOt)

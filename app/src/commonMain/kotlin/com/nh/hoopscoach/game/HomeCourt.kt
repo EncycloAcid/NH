@@ -128,3 +128,38 @@ object RivalryTrophies {
         }
     }
 }
+
+/**
+ * Homecoming games: a player back in his home state with a school from somewhere else. The family's in
+ * the stands and the local paper is there; he plays a little better, keeps the memory, and recruits
+ * from that state notice.
+ */
+object Homecoming {
+    /** The players in [game] who are home, by id. */
+    fun players(lg: League, game: Game): List<Player> {
+        if (game.neutral || lg.pro) return emptyList()
+        val arena = Geo.stateOf(lg.team(game.home)) ?: return emptyList()
+        return listOf(game.home, game.away).flatMap { tid ->
+            val t = lg.team(tid)
+            if (Geo.stateOf(t) == arena) emptyList() else lg.rosterOf(t).filter { Geo.stateOf(it) == arena }
+        }
+    }
+
+    /** After the game: the memory, the story, and recruits from his state warming to his school. */
+    fun afterGame(lg: League, game: Game, pts: (Int) -> Int) {
+        for (p in players(lg, game)) {
+            val t = lg.teams.getOrNull(p.teamId) ?: continue
+            val town = p.hometown.substringBefore(",")
+            val won = game.winner() == t.id
+            val scored = pts(p.id)
+            Memories.add(lg, p, "homecoming", "Played in front of family near $town" + if (won && scored >= 15) ", and won" else "", t.id, if (won) 1 else 0)
+            if (t.id != lg.userTeamId) continue
+            val state = Geo.stateOf(p) ?: continue
+            for (r in lg.recruits) if (r.committed < 0 && Geo.stateOf(r.p) == state) r.interest[t.id] = ((r.interest[t.id] ?: 4) + if (scored >= 15) 3 else 1).coerceAtMost(100)
+            if (scored >= 10 || won) lg.news += News(lg.season, lg.day,
+                "${p.name} comes home: $scored points ${if (won) "in a win" else "in front of family"} near $town", true, game.id, "column",
+                body = "A section of family and friends made the trip. ${p.name} grew up in ${p.hometown}, and recruits back home were watching.",
+                source = "Hoops Wire", teamId = t.id, pid = p.id)
+        }
+    }
+}

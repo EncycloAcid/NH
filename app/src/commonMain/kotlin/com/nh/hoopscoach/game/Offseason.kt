@@ -296,6 +296,7 @@ object Offseason {
 
 
     private fun finish(lg: League) {
+        runCatching { Shoes.settleApparel(lg) }
         val os = lg.offseason ?: return
         os.signed += Recruiting.endCycle(lg)
         // Other programs fill their open scholarships; the user holds walk-on tryouts first.

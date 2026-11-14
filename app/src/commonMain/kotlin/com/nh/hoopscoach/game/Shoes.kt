@@ -279,6 +279,7 @@ object Shoes {
 
     fun apparelMoney(t: Team): Int {
         val co = of(t) ?: return 0
+        if (t.apparelPay > 0) return t.apparelPay
         val donor = Finance.donor(t.prestige)
         return max(co.apparelFloor, (donor * co.apparelPct).roundToInt() / 5 * 5)
     }
@@ -361,6 +362,85 @@ object Shoes {
 
     fun clearOffer(p: Player) {
         p.shoeOffer = ""; p.shoeOfferPay = 0; p.shoeOfferYears = 0
+        p.shoeBids.clear()
+    }
+
+    // ---------- bidding ----------
+
+    /** A bid as (brand, pay, years). */
+    fun parseBid(s: String): Triple<ShoeCo, Int, Int>? {
+        val p = s.split('|')
+        val co = byId(p.getOrNull(0) ?: return null) ?: return null
+        return Triple(co, p.getOrNull(1)?.toIntOrNull() ?: return null, p.getOrNull(2)?.toIntOrNull() ?: 1)
+    }
+
+    /** Two or three brands bidding for one of the user's players; the school's kit brand pays a little more to keep its look. */
+    fun playerBids(lg: League, p: Player, t: Team): List<String> {
+        val school = of(t)
+        val brands = LinkedHashSet<ShoeCo>()
+        repeat(8) { if (brands.size < 3) brands += pickPlayerBrand(p, t) }
+        if (school != null && school.signature && Rng.chance(0.7)) brands += school
+        return brands.take(3).map { co ->
+            var pay = dealValue(p, co) * (0.9 + Rng.d() * 0.25)
+            if (co == school) pay *= 1.08
+            "${co.name}|${(pay / 5).roundToInt() * 5}|${Rng.range(1, 3)}"
+        }
+    }
+
+    /** Signs one of a player's bids. A deal with the school's own brand pleases him a little more (no clash on game day). */
+    fun signBid(lg: League, p: Player, bid: String): Boolean {
+        val (co, pay, years) = parseBid(bid) ?: return false
+        applyDeal(p, co, pay, years)
+        val t = lg.teams.getOrNull(p.teamId)
+        if (t != null && of(t) == co) p.happiness = (p.happiness + 3).coerceAtMost(100)
+        return true
+    }
+
+    /** What brands bid for the school's apparel deal: money a season, years, and a Final Four bonus. */
+    fun apparelBids(lg: League, t: Team): List<String> {
+        val brands = LinkedHashSet<ShoeCo>()
+        repeat(12) { if (brands.size < 3) brands += pickSchoolBrand(t.prestige) }
+        val donor = Finance.donor(t.prestige)
+        // Deep March runs make a school worth more to a brand.
+        val march = t.history.takeLast(3).count { Brand.roundOf(it.result) >= 3 }
+        return brands.map { co ->
+            val base = max(co.apparelFloor, (donor * co.apparelPct).roundToInt()) * (0.9 + Rng.d() * 0.3 + march * 0.05)
+            val pay = (base / 5).roundToInt() * 5
+            val bonus = (pay * (0.15 + Rng.d() * 0.2) / 5).roundToInt() * 5
+            "${co.name}|$pay|${Rng.range(3, 6)}|$bonus"
+        }
+    }
+
+    /** Signs a school apparel bid. */
+    fun signApparel(lg: League, t: Team, bid: String) {
+        val p = bid.split('|')
+        val co = byId(p.getOrNull(0) ?: return) ?: return
+        t.apparel = co.name
+        t.apparelPay = p.getOrNull(1)?.toIntOrNull() ?: 0
+        t.apparelLeft = p.getOrNull(2)?.toIntOrNull() ?: 4
+        t.apparelBonus = p.getOrNull(3)?.toIntOrNull() ?: 0
+        t.apparelBids.clear()
+        lg.news += News(lg.season, lg.day, "${t.school} signs a ${t.apparelLeft}-year apparel deal with ${co.label}", t.id == lg.userTeamId, kind = "move", teamId = t.id,
+            body = "${moneyK(t.apparelPay)} a season" + (if (t.apparelBonus > 0) ", plus ${moneyK(t.apparelBonus)} for a Final Four" else "") + ". ${co.blurb}.", source = "Hoops Wire")
+    }
+
+    /** If the user never chose, the best-paying bid is signed. */
+    fun settleApparel(lg: League) {
+        val t = lg.teams.getOrNull(lg.userTeamId) ?: return
+        val best = t.apparelBids.maxByOrNull { it.split('|').getOrNull(1)?.toIntOrNull() ?: 0 } ?: return
+        signApparel(lg, t, best)
+    }
+
+    /** Season's end: brands pay their Final Four bonuses. */
+    fun marchBonuses(lg: League) {
+        if (lg.pro) return
+        for (t in lg.teams) {
+            if (t.apparelBonus <= 0 || Awards.tourneyRound(lg, t.id) < 5) continue
+            Business.ensure(lg, t)
+            t.cash += t.apparelBonus
+            if (t.id == lg.userTeamId) lg.news += News(lg.season, lg.day, "${of(t)?.label ?: "Your apparel partner"} pays a ${moneyK(t.apparelBonus)} Final Four bonus", true,
+                kind = "move", teamId = t.id, body = "The bonus in the apparel deal goes into the upgrade budget.", source = "Hoops Wire")
+        }
     }
 
     fun applyDeal(p: Player, co: ShoeCo, pay: Int, years: Int) {
@@ -393,7 +473,10 @@ object Shoes {
         ensure(lg)
         for (t in lg.teams) {
             if (t.apparelLeft > 0) t.apparelLeft--
-            if (t.apparelLeft <= 0) assignApparel(t, force = true)
+            if (t.apparelLeft > 0) continue
+            // The user's deal is up: brands bid and he chooses (see [apparelBids]); everyone else renews on the spot.
+            if (t.id == lg.userTeamId && !lg.pro && !lg.playerMode) t.apparelBids = apparelBids(lg, t).toMutableList()
+            else { assignApparel(t, force = true); t.apparelPay = 0; t.apparelBonus = 0 }
         }
         for (t in lg.teams) {
             for (pid in t.roster) {
@@ -414,9 +497,12 @@ object Shoes {
                     if (!betterPay && !betterBrand) continue
                 }
                 if (t.id == lg.userTeamId) {
-                    p.shoeOffer = co.name
-                    p.shoeOfferPay = pay
-                    p.shoeOfferYears = years
+                    // A bidding war for his own stars: two or three brands, the school's kit brand among them when it wants him.
+                    p.shoeBids = playerBids(lg, p, t).toMutableList()
+                    val best = p.shoeBids.mapNotNull { parseBid(it) }.maxByOrNull { it.second } ?: Triple(co, pay, years)
+                    p.shoeOffer = best.first.name
+                    p.shoeOfferPay = best.second
+                    p.shoeOfferYears = best.third
                     os.shoeOffers += p.id
                 } else {
                     applyDeal(p, co, pay, years)

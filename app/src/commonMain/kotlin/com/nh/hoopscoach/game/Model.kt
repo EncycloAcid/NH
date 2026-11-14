@@ -333,6 +333,8 @@ class Player(
     var shoeOffer: String = "",
     var shoeOfferPay: Int = 0,
     var shoeOfferYears: Int = 0,
+    /** Competing endorsement bids for the user's players, "BRAND|pay|years" (see [Shoes.playerBids]). */
+    var shoeBids: MutableList<String> = mutableListOf(),
     /** Short scout note on how he plays (rule-based or AI personality). */
     var personalityNote: String = "",
 ) {
@@ -451,6 +453,10 @@ class Team(
     /** Designer: wear the team-colored kit instead of the school's jersey art, and the court's paint (0 team color, 1 second color, 2 natural wood). */
     var customKit: Boolean = false,
     var courtPaint: Int = 0,
+    /** A negotiated apparel deal: pay a season ($K, 0 = the brand's standard), the Final Four bonus, and bids waiting on the user, "BRAND|pay|years|bonus". */
+    var apparelPay: Int = 0,
+    var apparelBonus: Int = 0,
+    var apparelBids: MutableList<String> = mutableListOf(),
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -1726,6 +1732,9 @@ class League(
     var challenge: ChallengeRun? = null,
     /** Crowd and horn in live games. */
     var soundOn: Boolean = true,
+    /** The coach's radio show: the week last done ([RadioShow.week]) and calls answered in the current one. */
+    var radioWeek: Int = 0,
+    var radioAnswered: Int = 0,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

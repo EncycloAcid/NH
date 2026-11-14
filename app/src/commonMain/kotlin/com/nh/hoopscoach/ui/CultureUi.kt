@@ -246,3 +246,28 @@ fun CinderellaScreen(vm: GameViewModel, lg: League) {
         }
     }
 }
+
+/** The coach's weekly radio show, one caller at a time. */
+@Composable
+fun RadioShowCard(vm: GameViewModel, lg: League) {
+    val R = com.nh.hoopscoach.game.RadioShow
+    if (!R.due(lg)) return
+    val calls = R.calls(lg)
+    val i = lg.radioAnswered
+    val call = calls.getOrNull(i) ?: return
+    Section("The coach's show · call ${i + 1} of ${calls.size}", action = "Skip this week", onAction = { vm.act { R.skip(it) } })
+    Panel {
+        Text("ON THE LINE: ${call.caller.uppercase()}", style = T.label, color = P.accent)
+        Text("\"${call.question}\"", style = T.bodyB, color = P.ink, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+        call.answers.forEachIndexed { ai, a ->
+            ListRow(onClick = {
+                var reaction = ""
+                vm.act { reaction = R.answer(it, i, ai) }
+                if (reaction.isNotEmpty()) vm.toast(reaction)
+            }) {
+                Text(a.text, style = T.body, color = P.ink, modifier = Modifier.weight(1f))
+            }
+        }
+        Text("What you say moves the fans, your rivals and your bosses.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+    }
+}
