@@ -167,19 +167,34 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     val away = e.teams[1]
     val userHome = home.id == lg.userTeamId
     val edge = (home.elo - away.elo + Rankings.homeElo(lg, e.game)) / 28.0
+    // Win probability after every play (home's), for the bar and the Flow tab.
+    val probs = remember(lv.tick, e.finished) {
+        val half = e.half.toInt()
+        val len = e.periodLen.toInt()
+        val list = mutableListOf(0f to winProb(0, 2 * half, edge, 2 * half).toFloat())
+        for (ev in e.events) {
+            val at = elapsed(ev.period, ev.clock, len, e.regPeriods)
+            list += at.toFloat() to winProb(ev.hs - ev.aws, (2 * half - at).coerceAtLeast(0), edge, 2 * half).toFloat()
+        }
+        if (e.finished) list += list.last().first to (if (e.score[0] > e.score[1]) 1f else 0f)
+        list
+    }
     Column(Modifier.fillMaxSize()) {
         BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodName} · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
         // A big moment or a coaching call is the whole screen until it's answered: the chart and the
         // play-by-play step aside and the rest scrolls, so the card and its buttons always fit.
         val focus = !e.finished && (lv.moment != null || lv.call != null)
         Column(if (focus) Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
-        if (!e.game.neutral && !focus) {
-            CourtBanner(home, Modifier.padding(horizontal = Gutter).fillMaxWidth().height(58.dp))
+        if (!focus) {
+            // The broadcast look: the score bug over the home floor, then the win-probability bar.
+            BroadcastHero(lg, e, home, away)
+            Spacer(Modifier.height(8.dp))
+            ProbBar(probs.last().second, home, away, lg.userTeamId)
+        } else {
+            Scoreboard(away, home, e.score[1], e.score[0], clock(e.clock.toInt().coerceAtLeast(0)), e.periodLabel, lg.userTeamId, compact = true)
             Spacer(Modifier.height(6.dp))
+            CrowdLine(lg, e.game, lead = if (e.bigNight.isNotEmpty()) ({ Tag(e.bigNight.uppercase(), P.bad, filled = true) }) else null)
         }
-        Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId, compact = true)
-        Spacer(Modifier.height(6.dp))
-        CrowdLine(lg, e.game, lead = if (e.bigNight.isNotEmpty() && !e.finished) ({ Tag(e.bigNight.uppercase(), P.bad, filled = true) }) else null)
         if (lg.playerMode && com.nh.hoopscoach.game.Rival.isDuel(lg, e.game)) {
             val rv = com.nh.hoopscoach.game.Rival.active(lg)
             val me = lg.playerOrNull(lg.heroId)
@@ -193,28 +208,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
-        if (!focus) Panel(padding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)) {
-            val pts = remember(lv.tick) {
-                val half = e.half.toInt()
-                val len = e.periodLen.toInt()
-                val list = mutableListOf(0f to winProb(0, 2 * half, edge, 2 * half).toFloat())
-                for (ev in e.events) {
-                    val at = elapsed(ev.period, ev.clock, len, e.regPeriods)
-                    list += at.toFloat() to winProb(ev.hs - ev.aws, (2 * half - at).coerceAtLeast(0), edge, 2 * half).toFloat()
-                }
-                list
-            }
-            val now = pts.last().second
-            val mine = if (userHome) now else 1 - now
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("${(mine * 100).toInt()}%", style = T.numSm, color = P.ink)
-                Text("  ${lg.user.abbr} win probability", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 1.dp))
-            }
-            Spacer(Modifier.height(4.dp))
-            WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(if (e.finished) 56.dp else 64.dp), e.half.toFloat())
-        }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         // The halftime adjustment, measured as the second half goes.
         e.adjustmentNote?.let { note ->
             Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
@@ -223,8 +217,9 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
-        lv.call?.let { c -> CallCard(lg, lv, c); Spacer(Modifier.height(8.dp)) }
+        // A question left open when the game ended (Finish, or the last horn) is moot.
+        lv.moment?.takeIf { !e.finished }?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
+        lv.call?.takeIf { !e.finished }?.let { c -> CallCard(lg, lv, c); Spacer(Modifier.height(8.dp)) }
         // At the final horn, the game's leaders replace the last big moment.
         if (e.finished) { GameLeaders(e.boxScore(), home, away); Spacer(Modifier.height(8.dp)) }
         lv.momentResult?.takeIf { lv.moment == null && lv.call == null && !e.finished }?.let {
@@ -233,11 +228,13 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         }
         if (!lv.done) {
             if (lv.moment == null) {
+                // Speed on its own row so every setting has room; the actions below it.
+                Segmented(listOf(if (lv.speed == 0) "Play" else "Pause", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it })
+                Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Segmented(listOf(if (lv.speed == 0) "▶" else "❚❚", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it }, Modifier.weight(1f).padding(horizontal = 0.dp))
-                    if (e.coachSide >= 0) SmallButton("Timeout · ${e.timeoutsLeft}", enabled = e.timeoutsLeft > 0) { if (e.callTimeout()) { lv.momentResult = e.lastCall; lv.tick++ } }
-                    SmallButton(if (soundOn) "Sound" else "Muted") { vm.act { it.soundOn = !it.soundOn } }
-                    SmallButton("Finish", primary = true) { vm.completeLive() }
+                    if (e.coachSide >= 0) SmallButton("Timeout · ${e.timeoutsLeft}", Modifier.weight(1f), enabled = e.timeoutsLeft > 0) { if (e.callTimeout()) { lv.momentResult = e.lastCall; lv.tick++ } }
+                    SmallButton(if (soundOn) "Sound on" else "Muted", Modifier.weight(1f)) { vm.act { it.soundOn = !it.soundOn } }
+                    SmallButton("Finish", Modifier.weight(1f), primary = true) { vm.completeLive() }
                 }
                 Spacer(Modifier.height(8.dp))
                 val t = e.teams[if (userHome) 0 else 1]
@@ -262,9 +259,33 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Spacer(Modifier.height(if (focus) 24.dp else 10.dp))
         }
         if (!focus) {
-            Segmented(listOf("Plays", away.abbr, home.abbr), view, { view = it })
+            Segmented(listOf("Plays", "Flow", away.abbr, home.abbr), view, { view = it })
             Spacer(Modifier.height(6.dp))
-            if (view == 0) {
+            if (view == 1) {
+                LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                    item {
+                        Panel(padding = PaddingValues(14.dp)) {
+                            val now = probs.last().second
+                            val mine = if (userHome) now else 1 - now
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text("${(mine * 100).toInt()}%", style = T.num, color = P.ink)
+                                Text("  ${lg.user.abbr} win probability", style = T.small, color = P.sub, modifier = Modifier.padding(bottom = 3.dp))
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            WinChart(probs, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(150.dp), e.half.toFloat())
+                            Spacer(Modifier.height(6.dp))
+                            Row(Modifier.fillMaxWidth()) {
+                                Text("Tip-off", style = T.small, color = P.faint, modifier = Modifier.weight(1f))
+                                Text("Half", style = T.small, color = P.faint, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                Text(if (e.finished) "Final" else "Now", style = T.small, color = P.faint, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        if (!e.finished && e.events.isNotEmpty()) GameLeaders(e.boxScore(), home, away, title = "LEADERS SO FAR")
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+            } else if (view == 0) {
                 val events = e.events.asReversed()
                 LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                     // Each play keeps its key, so a new one slides in at the top and the rest move down.
@@ -276,17 +297,90 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 }
             } else {
                 val box = e.boxScore()
-                LazyColumn(Modifier.fillMaxWidth().weight(1f)) { item { BoxTable(vm, lg, if (view == 1) away else home, if (view == 1) box.away else box.home) } }
+                LazyColumn(Modifier.fillMaxWidth().weight(1f)) { item { BoxTable(vm, lg, if (view == 2) away else home, if (view == 2) box.away else box.home) } }
             }
+        }
+    }
+}
+
+/**
+ * The score bug over the home floor, like a broadcast: the court darkened behind, each team's logo,
+ * abbreviation and score, the clock and period between, and the crowd along the bottom.
+ */
+@Composable
+private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home: Team, away: Team) {
+    val final = e.finished
+    val shape = RoundedCornerShape(20.dp)
+    Box(Modifier.padding(horizontal = Gutter).fillMaxWidth().height(150.dp).clip(shape).background(Color(0xFF101318))) {
+        if (!e.game.neutral) CourtBanner(home, Modifier.fillMaxSize())
+        else Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color(away.primary), Color(home.primary)))))
+        // Darken the floor so the numbers read, a little more at the edges.
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Black.copy(alpha = 0.72f)))))
+        Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                BugSide(away, e.score[1], e.score[1] > e.score[0], final, lg.userTeamId, Modifier.weight(1f), flip = false)
+                Column(Modifier.width(78.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (final) Text("FINAL", style = T.h2.copy(fontSize = 22.sp), color = Color.White)
+                    else {
+                        Text(clock(e.clock.toInt().coerceAtLeast(0)), style = T.h2.copy(fontSize = 22.sp), color = Color.White, maxLines = 1)
+                        Text(e.periodLabel.uppercase(), style = T.label.copy(fontSize = 10.sp), color = Color.White.copy(alpha = 0.75f), maxLines = 1)
+                    }
+                }
+                BugSide(home, e.score[0], e.score[0] > e.score[1], final, lg.userTeamId, Modifier.weight(1f), flip = true)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (e.bigNight.isNotEmpty() && !final) { Tag(e.bigNight.uppercase(), P.bad, filled = true); Spacer(Modifier.width(8.dp)) }
+                lg.rivalry(e.game)?.let { Text(it.name.uppercase(), style = T.label.copy(fontSize = 10.sp), color = Color(0xFFFFC94D), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)); Spacer(Modifier.width(8.dp)) }
+                Spacer(Modifier.weight(1f))
+                if (e.game.att > 0) Text("${"%,d".format(e.game.att)} fans" + if (com.nh.hoopscoach.game.Rivalries.sellout(lg, e.game)) " · sellout" else "",
+                    style = T.small.copy(fontSize = 12.sp), color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BugSide(t: Team, score: Int, ahead: Boolean, final: Boolean, user: Int, modifier: Modifier, flip: Boolean) {
+    val c by androidx.compose.animation.animateColorAsState(if (final && !ahead) Color.White.copy(alpha = 0.5f) else Color.White, tween(500), label = "bug")
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (flip) Arrangement.End else Arrangement.Start) {
+        val badge = @Composable {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TeamBadge(t, 42.dp)
+                Spacer(Modifier.height(2.dp))
+                Text(t.abbr, style = T.label.copy(fontSize = 10.sp), color = if (t.id == user) Color(0xFFFFC94D) else Color.White.copy(alpha = 0.8f), maxLines = 1)
+            }
+        }
+        val num = @Composable { RollingText("$score", T.hero.copy(fontSize = 44.sp, lineHeight = 44.sp), c, Modifier.pulseOn(score, 0.1f)) }
+        if (flip) { num(); Spacer(Modifier.width(10.dp)); badge() } else { badge(); Spacer(Modifier.width(10.dp)); num() }
+    }
+}
+
+/** Win probability as a tug of war in the two teams' colors, away on the left. */
+@Composable
+private fun ProbBar(homeP: Float, home: Team, away: Team, user: Int) {
+    val h = homeP.coerceIn(0f, 1f)
+    val anim by androidx.compose.animation.core.animateFloatAsState(h, tween(500), label = "prob")
+    val ac = teamInk(away)
+    val hc = teamInk(home).let { if (contrast(it, ac) < 1.6f) P.sub else it }
+    Column(Modifier.padding(horizontal = Gutter + 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("${away.abbr} ${((1 - h) * 100).toInt()}%", style = T.label.copy(fontSize = 11.sp), color = if (away.id == user) P.accent else P.sub)
+            Text("WIN PROBABILITY", style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text("${(h * 100).toInt()}% ${home.abbr}", style = T.label.copy(fontSize = 11.sp), color = if (home.id == user) P.accent else P.sub)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
+            if (1 - anim > 0.001f) Box(Modifier.weight(1 - anim).fillMaxHeight().background(ac))
+            if (anim > 0.001f) Box(Modifier.weight(anim).fillMaxHeight().background(hc))
         }
     }
 }
 
 /** Each side's top scorer, in a line: name, points, rebounds, assists. */
 @Composable
-private fun GameLeaders(box: com.nh.hoopscoach.game.BoxScore, home: Team, away: Team) {
+private fun GameLeaders(box: com.nh.hoopscoach.game.BoxScore, home: Team, away: Team, title: String = "GAME LEADERS") {
     Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
-        Text("GAME LEADERS", style = T.label, color = P.accent)
+        Text(title, style = T.label, color = P.accent)
         Spacer(Modifier.height(4.dp))
         for ((t, lines) in listOf(away to box.away, home to box.home)) {
             val top = lines.maxByOrNull { it.s.pts * 3 + it.s.orb + it.s.drb + it.s.ast } ?: continue
