@@ -1,5 +1,9 @@
 package com.nh.hoopscoach.game
 
+import kotlinx.coroutines.CoroutineExceptionHandler
+
+import kotlinx.coroutines.SupervisorJob
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -20,6 +24,14 @@ import java.util.Collections
  * game recaps, and season preview storylines.
  */
 object Ollama {
+    /**
+     * Where the fire-and-forget AI writers run. One failing (a network error, a league caught mid-change by
+     * the sim) only skips that batch of stories; it never takes the app down with it.
+     */
+    private val aiScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+        runCatching { System.err.println("AI background job skipped: ${e::class.simpleName}: ${e.message}") }
+    })
+
     private val json = Json { ignoreUnknownKeys = true }
     /** Free-tier keys get hammered when every desk launches at once — queue cloud/local generates. */
     private val generateGate = Mutex()
@@ -2101,7 +2113,7 @@ object Ollama {
     /** Fire-and-forget generation if auto-generate is enabled. */
     fun maybeAutoGenerate(config: OllamaConfig, lg: League, news: News) {
         if (!config.enabled || !config.autoGenerate) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             try {
                 generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
             } catch (_: java.util.ConcurrentModificationException) {
@@ -2114,7 +2126,7 @@ object Ollama {
     fun maybeAutoGenerateMediaEcosystem(config: OllamaConfig, lg: League, force: Boolean = false) {
         if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
         if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             try {
                 generateMediaEcosystem(config, lg).onSuccess { pack ->
                     if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
@@ -2214,7 +2226,7 @@ object Ollama {
     fun maybeAutoGenerateUniversityDevelopment(config: OllamaConfig, lg: League, force: Boolean = false) {
         if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
         if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             try {
                 generateUniversityDevelopment(config, lg).onSuccess { pack ->
                     if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
@@ -2303,7 +2315,7 @@ object Ollama {
         if (!config.enabled || !config.historicalRivalries || !config.autoGenerate) return
         if (!force && (lg.day < 6 || lg.day % 6 != 0)) return
         if (lg.rivals.isEmpty() && CoachRivals.rivals(lg).isEmpty()) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateHistoricalRivalries(config, lg).onSuccess { pack ->
                 if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
@@ -2389,7 +2401,7 @@ object Ollama {
         val dn = lg.proState?.draftNight
         val draftNightPulse = dn != null && (dn.log.isNotEmpty() || !dn.done)
         if (!draftNightPulse && (lg.day < 12 || lg.day % 8 != 0)) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateDraftUniverse(config, lg).onSuccess { pack ->
                 if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
@@ -2479,7 +2491,7 @@ object Ollama {
             return
         }
         if (arcs.isEmpty()) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             try {
                 generatePlayerStorylines(config, lg).onSuccess { pack ->
                     if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
@@ -2572,7 +2584,7 @@ object Ollama {
     /** Fire-and-forget living coaching careers package (hot seats, rivals, legacy). */
     fun maybeAutoGenerateCoachingCareers(config: OllamaConfig, lg: League) {
         if (!config.enabled || !config.livingCoachingCareers || !config.autoGenerate) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateLivingCoachingCareers(config, lg).onSuccess { pack ->
                 if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
@@ -2658,7 +2670,7 @@ object Ollama {
     /** Fire-and-forget historic moment feature for a recorded highlight. */
     fun maybeAutoGenerateHistoricMoment(config: OllamaConfig, lg: League, m: Moment) {
         if (!config.enabled || !config.historicMoments || !config.autoGenerate) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateHistoricMoment(config, lg, m).onSuccess { pack ->
                 // Prefer fleshing the matching news row; otherwise append.
                 val match = lg.news.indexOfLast { it.gameId == m.gameId && it.season == m.season && it.text == m.headline }
@@ -2748,7 +2760,7 @@ object Ollama {
     fun maybeAutoGenerateJournalism(config: OllamaConfig, lg: League) {
         if (!config.enabled || !config.sportsJournalism || !config.autoGenerate) return
         if (lg.day < 3 || lg.day % 3 != 0) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateSportsJournalism(config, lg).onSuccess { pack ->
                 if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
             }
@@ -2841,7 +2853,7 @@ object Ollama {
     fun maybeAutoGenerateInterviews(config: OllamaConfig, lg: League, g: Game) {
         if (!config.enabled || !config.playerInterviews || !config.autoGenerate) return
         if (!g.involves(lg.userTeamId) || g.box == null) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generatePlayerInterviews(config, lg, g).onSuccess { list ->
                 if (list.isNotEmpty()) {
                     g.interviews.clear()
@@ -2863,7 +2875,7 @@ object Ollama {
         winner: Boolean = false,
     ) {
         if (!config.enabled || !config.pressConference || !config.autoGenerate) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generatePressConference(config, lg, g, player, line, won, rivalry, winner).onSuccess { aiQ ->
                 if (lg.road?.press?.gameId == g.id) {
                     lg.road?.press = aiQ
@@ -2882,7 +2894,7 @@ object Ollama {
         won: Boolean,
     ) {
         if (!config.enabled || !config.socialFeed || !config.autoGenerate) return
-        CoroutineScope(Dispatchers.IO).launch {
+        aiScope.launch {
             generateSocialTakes(config, lg, g, player, line, won).onSuccess { posts ->
                 lg.road?.feed?.addAll(posts)
             }

@@ -1792,7 +1792,23 @@ class League(
     }
 
     fun player(id: Int): Player = playerIndex[id] ?: players.first { it.id == id }.also { playerIndex[id] = it }
-    fun playerOrNull(id: Int): Player? = playerIndex[id] ?: players.firstOrNull { it.id == id }?.also { playerIndex[id] = it }
+    /**
+     * The current player with [id], or null. Safe to call from a background thread (the AI writers) while the
+     * sim changes the roster: a list caught mid-change reads as "not found" instead of crashing.
+     */
+    fun playerOrNull(id: Int): Player? {
+        try { playerIndex[id]?.let { return it } } catch (_: RuntimeException) {}
+        val found = try {
+            var hit: Player? = null
+            for (i in 0 until players.size) {
+                val p = players.getOrNull(i) as Player? ?: continue
+                if (p.id == id) { hit = p; break }
+            }
+            hit
+        } catch (_: RuntimeException) { null }
+        if (found != null) runCatching { playerIndex[id] = found }
+        return found
+    }
     /** A current player or, failing that, a former one. */
     fun anyPlayer(id: Int): Player? = playerOrNull(id) ?: alumni.firstOrNull { it.id == id }
     fun addPlayer(p: Player) { players.add(p); playerIndex[p.id] = p }
