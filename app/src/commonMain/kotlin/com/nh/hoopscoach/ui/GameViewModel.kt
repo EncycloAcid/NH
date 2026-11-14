@@ -172,6 +172,8 @@ class GameViewModel : ViewModel() {
     var offRecruitTab by mutableIntStateOf(0)
     var draftTab by mutableIntStateOf(0)
     var recruitPos by mutableStateOf<com.nh.hoopscoach.game.Pos?>(null)
+    var recruitGroup by mutableStateOf<com.nh.hoopscoach.game.ArchGroup?>(null)
+    var recruitNeeds by mutableStateOf(false)
     /** Teams picked for the Bubble Watch resume comparison (up to two). */
     val bubblePick = mutableStateListOf<Int>()
 

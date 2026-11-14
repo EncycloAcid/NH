@@ -86,6 +86,40 @@ fun TeamScreen(vm: GameViewModel, lg: League) {
     }
 }
 
+/**
+ * The roster by play-style category: who covers each, and what's missing. Gaps are what to recruit.
+ */
+@Composable
+fun RosterBalance(vm: GameViewModel, lg: League, t: Team) {
+    val players = lg.rosterOf(t)
+    val cover = com.nh.hoopscoach.game.ArchFit.coverage(players)
+    val gaps = com.nh.hoopscoach.game.ArchFit.gaps(players)
+    Section("Roster balance")
+    Panel {
+        Text(
+            if (gaps.isEmpty()) "Every kind of player is on the roster." else "Missing: ${gaps.joinToString(", ") { it.label }}. Look for recruits who fill it.",
+            style = T.small, color = if (gaps.isEmpty()) P.good else P.warn,
+        )
+        // Next season, once seniors leave and commits arrive: what the recruiting board marks as a need.
+        if (!lg.pro) {
+            val next = com.nh.hoopscoach.game.ArchFit.gaps(com.nh.hoopscoach.game.ArchFit.nextRoster(lg, t)) - gaps.toSet()
+            if (next.isNotEmpty()) Text("Next season, after seniors leave: also missing ${next.joinToString(", ") { it.label }}.",
+                style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        for (g in com.nh.hoopscoach.game.ArchFit.GROUPS) {
+            val who = cover[g].orEmpty().sortedByDescending { it.ovr }
+            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(g.label, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, modifier = Modifier.width(150.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (who.isEmpty()) Text(if (g in gaps) "None — a need" else "None", style = T.small, color = if (g in gaps) P.warn else P.faint, modifier = Modifier.weight(1f))
+                else Text(who.take(3).joinToString(", ") { it.name.substringAfterLast(' ') } + if (who.size > 3) " +${who.size - 3}" else "",
+                    style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text("${who.size}", style = T.numSm, color = if (who.isEmpty() && g in gaps) P.warn else P.ink)
+            }
+        }
+    }
+}
+
 @Composable
 fun TeamRings(lg: League, t: Team) {
     Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
@@ -293,6 +327,7 @@ private fun UsageRow(label: String, value: Int, onSet: (Int) -> Unit) {
 // ---------- develop ----------
 
 private fun LazyListScope.develop(vm: GameViewModel, lg: League, t: Team) {
+    item { RosterBalance(vm, lg, t) }
     item {
         Section("Training focus")
         Panel {
@@ -335,6 +370,15 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
             Spacer(Modifier.height(8.dp))
         }
+        // The styles that build on what he already does best.
+        val best = com.nh.hoopscoach.game.ArchFit.best(p)
+        item(key = "best-h") {
+            Row(Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.Bottom) {
+                Text("BEST FITS FOR HIS GAME", style = T.label, color = P.good)
+            }
+            Text("The styles that train what he's already best at.", style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, bottom = 8.dp))
+        }
+        items(best, key = { "best-" + it.name }) { a -> FocusOption(vm, p, playerId, a, best = true) }
         // Only the archetypes of his position (plus whatever he trains now, for older saves), under their categories.
         val shown = Arch.entries.filter { it == Arch.MANUAL || it == p.focus || it in Ratings.stylesFor(p) }
         for ((group, list) in shown.groupBy { it.group }.entries.sortedBy { it.key.ordinal }) {
@@ -346,31 +390,35 @@ fun FocusScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
             if (group != com.nh.hoopscoach.game.ArchGroup.MANUAL) Text(group.blurb, style = T.small, color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter + 4.dp, bottom = 8.dp))
         }
-        items(list, key = { it.name }) { a ->
-            val current = p.focus == a
-            Panel(
-                Modifier.padding(bottom = 8.dp),
-                color = if (current) P.accentSoft else P.surface,
-                onClick = {
-                    vm.act { val pl = it.player(playerId); if (a != Arch.MANUAL && pl.banked > 0) Ratings.spendBanked(pl, a); pl.focus = a }
-                    vm.back()
-                },
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(a.label, style = T.head, color = if (current) P.accent else P.ink, modifier = Modifier.weight(1f))
-                    if (current) Tag("CURRENT", P.accent, filled = true) else if (a == p.style) Tag("NATURAL FIT", P.good)
-                }
-                Text(a.blurb, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
-                if (a.boosts.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        a.boosts.forEach { at -> Tag("${at.label.uppercase()} +1", P.accent) }
-                    }
-                }
-            }
-        }
+        items(list, key = { it.name }) { a -> FocusOption(vm, p, playerId, a) }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** One training focus to pick: what it is, and what it trains with his rating in each. */
+@Composable
+private fun FocusOption(vm: GameViewModel, p: com.nh.hoopscoach.game.Player, playerId: Int, a: Arch, best: Boolean = false) {
+    val current = p.focus == a
+    Panel(
+        Modifier.padding(bottom = 8.dp),
+        color = if (current) P.accentSoft else P.surface,
+        onClick = {
+            vm.act { val pl = it.player(playerId); if (a != Arch.MANUAL && pl.banked > 0) Ratings.spendBanked(pl, a); pl.focus = a }
+            vm.back()
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(a.label, style = T.head, color = if (current) P.accent else P.ink, modifier = Modifier.weight(1f))
+            if (current) Tag("CURRENT", P.accent, filled = true) else if (a == p.style) Tag("NATURAL FIT", P.good)
+        }
+        Text((if (best && a.group != com.nh.hoopscoach.game.ArchGroup.MANUAL) a.group.label + " · " else "") + a.blurb, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        if (a.boosts.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                a.boosts.forEach { at -> Tag("${at.label.uppercase()} ${p.attrs[at.ordinal]} +1", P.accent) }
+            }
+        }
     }
 }
 

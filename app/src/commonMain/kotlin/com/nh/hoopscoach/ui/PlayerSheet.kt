@@ -149,7 +149,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             }
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Tag(p.style.label.uppercase(), P.accent)
+                Tag(p.style.label.uppercase() + if (p.style.group != com.nh.hoopscoach.game.ArchGroup.MANUAL) " · " + p.style.group.label.uppercase() else "", P.accent)
                 // College players have a draft stock and a mood; pros have a trade value.
                 if (lg.pro && team != null) Tag("TRADE VALUE: ${com.nh.hoopscoach.game.Trades.tier(p).uppercase()}", P.sub)
                 else if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
@@ -314,7 +314,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
 }
 
 /** What his play style does on the floor, in a line: "Two-Way Guard: hunts threes, creates off the dribble, locks down the perimeter." */
-private fun playsLike(p: Player): String = p.style.label + ": " + p.style.boosts.joinToString(", ") {
+private fun playsLike(p: Player): String = p.style.label + " (" + p.style.group.label.lowercase() + "): " + p.style.boosts.joinToString(", ") {
     when (it) {
         Attr.OUT -> "hunts threes"; Attr.INS -> "attacks the rim"; Attr.MID -> "pulls up from mid-range"; Attr.PAS -> "sets up teammates"
         Attr.HND -> "creates off the dribble"; Attr.REB -> "crashes the glass"; Attr.PER -> "locks down the perimeter"; Attr.IDF -> "guards the paint"

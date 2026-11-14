@@ -256,6 +256,8 @@ object Recruiting {
 
     /** Per-round lookups shared by every fit calculation. */
     class Ctx(lg: League) {
+        /** The play-style categories the user's roster is missing next season (for the "fills a need" tag). */
+        val needs: List<ArchGroup> by lazy { if (lg.userTeamId >= 0 && !lg.pro) ArchFit.gaps(ArchFit.nextRoster(lg, lg.user)) else emptyList() }
         val pulls = Brand.pullTable(lg)
         val pipes = Pipeline.table(lg)
         /** Share of a prospect's NIL ask each program offers, from its NIL budget rank (0.6 to 1.2). */

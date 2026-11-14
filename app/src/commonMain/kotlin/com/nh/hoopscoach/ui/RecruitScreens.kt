@@ -112,6 +112,13 @@ fun LazyListScope.recruitBoard(vm: GameViewModel, lg: League) {
             "${pos.name} · $n"
         }
         Chips(opts, vm.recruitPos?.let { it.ordinal + 1 } ?: 0, { i -> vm.recruitPos = if (i == 0) null else Pos.entries[i - 1] })
+        Spacer(Modifier.height(8.dp))
+        // By play style, with the roster's gaps marked.
+        val needs = com.nh.hoopscoach.game.ArchFit.gaps(com.nh.hoopscoach.game.ArchFit.nextRoster(lg, u))
+        val groups = com.nh.hoopscoach.game.ArchFit.GROUPS
+        Chips(listOf("Any style", "Fills a need") + groups.map { if (it in needs) "${it.label} · need" else it.label },
+            when (val g = vm.recruitGroup) { null -> if (vm.recruitNeeds) 1 else 0; else -> groups.indexOf(g) + 2 },
+            { i -> vm.recruitNeeds = i == 1; vm.recruitGroup = if (i >= 2) groups[i - 2] else null })
         Spacer(Modifier.height(10.dp))
     }
     val list = when (vm.recruitView) {
@@ -120,6 +127,8 @@ fun LazyListScope.recruitBoard(vm: GameViewModel, lg: League) {
         2 -> lg.recruits.filter { it.committed < 0 && it.transfer }
         else -> commits
     }.filter { vm.recruitPos == null || it.p.pos == vm.recruitPos }
+        .filter { r -> vm.recruitGroup == null || r.p.style.group == vm.recruitGroup }
+        .let { l -> if (!vm.recruitNeeds) l else com.nh.hoopscoach.game.ArchFit.gaps(com.nh.hoopscoach.game.ArchFit.nextRoster(lg, u)).let { needs -> l.filter { it.p.style.group in needs } } }
         .sortedWith(compareByDescending<Recruit> { Recruiting.mine(lg, it) }.thenByDescending { if (it.transfer) it.p.ovr + 8 else it.estOvr + it.p.stars * 3 })
     if (list.isEmpty()) item {
         Empty(when (vm.recruitView) {
@@ -182,6 +191,10 @@ fun RecruitRow(vm: GameViewModel, lg: League, r: Recruit, ctx: Recruiting.Ctx) {
             Text(r.p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val from = if (r.transfer && r.p.transferFrom >= 0) "from ${lg.team(r.p.transferFrom).school}" else r.p.hometown
             Text("${r.p.pos} · ${Ratings.heightLabel(r.p.height)} · $from", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(r.p.style.label, style = T.small.copy(fontSize = 12.sp), color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (r.committed < 0 && r.p.style.group in ctx.needs) { Spacer(Modifier.width(6.dp)); Tag("FILLS A NEED", P.good) }
+            }
             Spacer(Modifier.height(5.dp))
             when {
                 r.committed == u.id -> Text("Committed to you" + if (r.round in 1..Recruiting.ROUNDS) " in round ${r.round}" else "", style = T.small, color = P.good)
