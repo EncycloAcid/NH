@@ -40,8 +40,11 @@ object WorldEvents {
     fun banned(lg: League, teamId: Int): Boolean = !lg.pro && lg.teams.getOrNull(teamId)?.banSeason == lg.season
 
     /** Scholarships it can fill: the usual 13, less any taken away by sanctions. */
-    fun cap(lg: League, t: Team): Int =
-        Recruiting.MAX_ROSTER - if (!lg.pro && t.sanctionUntil >= lg.season) t.scholarshipsLost else 0
+    fun cap(lg: League, t: Team): Int {
+        // The offseason builds next season's roster, so it counts against next season's sanctions.
+        val forSeason = if (lg.phase == Phase.OFFSEASON) lg.season + 1 else lg.season
+        return Recruiting.MAX_ROSTER - if (!lg.pro && t.sanctionUntil >= forSeason) t.scholarshipsLost else 0
+    }
 
     /** A short description of what's hanging over a program, for its page ("" if nothing). */
     fun sanctionLine(lg: League, t: Team): String = listOfNotNull(
