@@ -160,6 +160,14 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             WinChart(pts, if (userHome) teamInk(away) else teamInk(home), P.accent, userHome, Modifier.fillMaxWidth().height(96.dp), e.half.toFloat())
         }
         Spacer(Modifier.height(10.dp))
+        // The halftime adjustment, measured as the second half goes.
+        e.adjustmentNote?.let { note ->
+            Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+                Text("HALFTIME ADJUSTMENT", style = T.label, color = P.accent)
+                Text(note, style = T.small, color = P.ink)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
         lv.call?.let { c -> CallCard(lg, lv, c); Spacer(Modifier.height(8.dp)) }
         lv.momentResult?.takeIf { lv.moment == null && lv.call == null }?.let {

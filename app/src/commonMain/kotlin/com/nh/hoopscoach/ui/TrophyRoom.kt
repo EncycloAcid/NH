@@ -86,6 +86,7 @@ fun TrophyRoomScreen(vm: GameViewModel, lg: League) {
             GroupList(banners) { b -> ListRow { Text("🏆", style = T.bodyB); Spacer(Modifier.width(10.dp)); Text(b, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f)) } }
         }
         if (h != null) item { TrophyCase(h) }
+        if (lg.road == null) item { RivalryTrophyShelf(lg) }
         if (c != null && c.history.isNotEmpty()) item {
             Section("Coaching résumé")
             Panel {

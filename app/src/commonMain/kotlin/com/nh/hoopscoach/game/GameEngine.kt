@@ -116,6 +116,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
     /** 1.0 is a normal home crowd; rivalry crowds scale it up to match their extra Elo. */
     private val homeEdge = Rankings.homeElo(lg, game) / Rankings.HOME_ELO
+    /** The home team's building and its traditions, in a real home game (see [HomeCourt]). */
+    private val court: Team? = if (game.neutral) null else teams[0].also { HomeCourt.ensure(lg, it) }
 
     init {
         if (game.att <= 0) game.att = Rivalries.attendance(lg, game)
@@ -178,6 +180,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         }
         p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+        p += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
@@ -477,7 +480,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     // ---------- tactics ----------
 
     private fun off(side: Int) = teams[side].plan.offense
-    private fun def(side: Int) = teams[side].plan.defense
+    private fun def(side: Int) = halftimeDefense?.takeIf { side == coachSide && secondHalf } ?: teams[side].plan.defense
 
     private fun possLength(o: Int): Double {
         var base = when (off(o)) {
@@ -605,6 +608,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         private set
     private var halftimeStar = -1
     private var halfMargin = 0
+    /** The defense the coach switched to at the half (null: the team's own), and asked yet. */
+    var halftimeDefense: Defense? = null
+        private set
+    private var halftimeDefAsked = false
+    /** The other team's shooting at the half, to measure the adjustment against: FGM, FGA, 3PM, 3PA, TOV, points. */
+    private var halfThem = IntArray(6)
+    /** How the halftime adjustments are going, for the live screen (null until there's enough to say). */
+    var adjustmentNote: String? = null
+        private set
     private val secondHalf get() = period > regPeriods / 2
     private fun adjusting(side: Int, plan: String) = side == coachSide && secondHalf && halftimePlan == plan
     private var closers: List<Int>? = null
@@ -645,6 +657,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 Triple("h_stay", "Stay the course", "No changes"),
             ))
         }
+        if (halftimeAsked && !halftimeDefAsked && secondHalf && !finished) {
+            val now = teams[me].plan.defense
+            fun tot(side: Int) = StatLine().also { st -> lines[side].values.forEach { st.add(it) } }
+            val b = tot(them)
+            val fg = if (b.fga > 0) "${(b.fgm * 100.0 / b.fga).roundToInt()}%" else "—"
+            return CoachCall("halftime", "Halftime: your defense",
+                "You've played ${now.label}. ${teams[them].abbr} shot $fg, ${b.tpm}/${b.tpa} from three, with ${b.tov} turnovers.",
+                Defense.entries.filter { it != now }.map { d -> Triple("hd_${d.name}", "Switch to ${d.label}", d.blurb) } +
+                    Triple("hd_stay", "Stay in ${now.label}", "No change"))
+        }
         // They're on a run: stop it?
         if (timeoutsLeft > 0 && runFor == them && runPts >= 8 && !runAsked && !(finalPeriod && clock < 24)) return CoachCall(
             "timeout", "${teams[them].abbr} on a ${runPts}-0 run", "Call a timeout to settle your team down?",
@@ -680,7 +702,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             return CoachCall("offense", title, if (need3) "You need a three. Draw it up." else "Your ball. Draw it up.", listOfNotNull(
                 Triple("o_iso", "Iso for ${star.short}", "${if (starType == 2) "Three" else "Pull-up"} · ${pct(makeChance(me, them, star, starType, ds, margin) - 0.02)}"),
                 Triple("o_pnr", "Pick-and-roll: ${handler.short} and ${big.short}", if (need3) "Two points only · ${pct(maxOf(roll, pull))}" else pct(maxOf(roll, pull))),
-                Triple("o_kick", "Drive and kick to ${shooter.short}", "Three · ${pct(makeChance(me, them, shooter, 2, ds, margin) + 0.03)}"),
+                Triple("o_kick", "Corner three for ${shooter.short}", "Drive and kick · ${pct(makeChance(me, them, shooter, 2, ds, margin) + 0.03)}"),
                 Triple("o_post", "Post up ${big.short}", if (need3) "Two points (and maybe a foul) · ${pct(makeChance(me, them, big, 0, ds, margin))}" else "Draws fouls · ${pct(makeChance(me, them, big, 0, ds, margin))}"),
             ))
         }
@@ -712,6 +734,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 log(me, "Halftime adjustment, ${teams[me].abbr}: $what", 0)
                 lastCall = "Second half: $what."
             }
+            id.startsWith("hd_") -> {
+                halftimeDefAsked = true
+                halftimeDefense = Defense.entries.firstOrNull { "hd_${it.name}" == id }
+                val them = 1 - me
+                val b = StatLine().also { st -> lines[them].values.forEach { st.add(it) } }
+                halfThem = intArrayOf(b.fgm, b.fga, b.tpm, b.tpa, b.tov, score[them])
+                val d = halftimeDefense
+                if (d != null) log(me, "${teams[me].abbr} comes out of halftime in a ${d.label.lowercase()}", 0)
+                lastCall = if (d != null) "Second half: ${d.label}. ${d.blurb}" else "Same defense in the second half."
+            }
             id == "t_yes" -> { runAsked = true; callTimeout() }
             id == "t_no" -> runAsked = true
             id.startsWith("c_") -> {
@@ -738,6 +770,29 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 }
             }
         }
+    }
+
+    /** Second half against first: their shooting since the half, and the score since the half. */
+    private fun noteAdjustment() {
+        val me = coachSide
+        val them = 1 - me
+        val b = StatLine().also { st -> lines[them].values.forEach { st.add(it) } }
+        val fgm = b.fgm - halfThem[0]
+        val fga = b.fga - halfThem[1]
+        if (fga < 6) return
+        val tpm = b.tpm - halfThem[2]
+        val tpa = b.tpa - halfThem[3]
+        val tov = b.tov - halfThem[4]
+        val before = if (halfThem[1] > 0) (halfThem[0] * 100.0 / halfThem[1]).roundToInt() else 0
+        val now = (fgm * 100.0 / fga).roundToInt()
+        val run = (score[me] - score[them]) - halfMargin
+        val plan = halftimeDefense?.label ?: teams[me].plan.defense.label
+        adjustmentNote = "Since halftime (${plan}): ${teams[them].abbr} $fgm-of-$fga ($now%), $tpm-of-$tpa from three, $tov turnovers. " +
+            "First half: $before%. " + when {
+                run > 0 -> "You're +$run in the second half."
+                run < 0 -> "You're ${run} in the second half."
+                else -> "Even in the second half."
+            }
     }
 
     /** A timeout: the run is over, and his team settles down for a few possessions. */
@@ -852,6 +907,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         elapse(len, offense, defense)
         runPossession(o, offense, defense, trail)
         if (settle > 0) settle--
+        if (coachSide >= 0 && halftimeDefAsked) noteAdjustment()
         endCheck()
         return !finished
     }
@@ -892,6 +948,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         var pTo = 0.168 + ((stealD - n[7]) * 0.0018 - (handler[Attr.HND] - n[3]) * 0.0018 - (pasAvg - n[4]) * 0.0008) * talent
         when (def(d)) { Defense.PRESS -> pTo += 0.035; Defense.PACKLINE -> pTo -= 0.012; Defense.ZONE -> pTo -= 0.006; else -> {} }
         when (off(o)) { Offense.UPTEMPO -> pTo += 0.01; Offense.GRIND -> pTo -= 0.012; else -> {} }
+        if (o == 1) pTo += HomeCourt.visitorTurnovers(court)
         pTo -= (coaches[o].off - 70) * 0.0004 * coaching
         if (lg.pro) pTo *= 0.9
         pTo = pTo.coerceIn(0.07, 0.3)
@@ -957,6 +1014,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + proEra.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
+            pMake += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
@@ -1175,7 +1233,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** [n] free throws; a one-and-one stops after a miss on the first. */
     private fun freeThrows(o: Int, shooter: Player, n: Int, offense: List<Player>, defense: List<Player>, oneAndOne: Boolean = false) {
         val d = 1 - o
-        val pct = ft(shooter)
+        val pct = ft(shooter) - if (o == 1) HomeCourt.visitorFreeThrows(court) else 0.0
         var made = 0
         var taken = 0
         var lastMade = true

@@ -72,6 +72,11 @@ fun RivalryPreview(lg: League, g: Game, r: Rivalry) {
     Spacer(Modifier.height(6.dp))
     Text("Sellout crowd of ${fans(crowd)}. $edge", style = T.small, color = P.ink)
     Text("${seriesLine(lg, r)} · Winner takes prestige from the loser.", style = T.small, color = P.sub)
+    if (com.nh.hoopscoach.game.RivalryTrophies.named(r)) {
+        val holder = lg.teams.getOrNull(r.holder)
+        Text("${com.nh.hoopscoach.game.RivalryTrophies.name(r)} on the line" + (holder?.let { " · held by ${if (it.id == user) "you" else it.school}" } ?: ""),
+            style = T.small, color = P.gold)
+    }
 }
 
 /** Crowd line for live games and box scores. */
@@ -225,6 +230,58 @@ fun RivalsList(vm: GameViewModel, lg: League, t: Team) {
                 Text("$w-$l", style = T.numSm, color = when { w > l -> P.good; w < l -> P.bad; else -> P.ink })
                 Text("SERIES", style = T.label.copy(fontSize = 9.sp), color = P.faint)
             }
+        }
+    }
+}
+
+/** A building's home-court traditions: what each does to visitors, and (for the user's school) what's left to earn. */
+@Composable
+fun HomeCourtPanel(lg: League, t: com.nh.hoopscoach.game.Team) {
+    val HC = com.nh.hoopscoach.game.HomeCourt
+    HC.ensure(lg, t)
+    val mine = t.id == lg.userTeamId
+    val has = t.traditions.mapNotNull { HC.def(it) }
+    if (has.isEmpty() && !mine) return
+    Section("Home court")
+    Panel {
+        if (has.isEmpty()) Text("No traditions yet. A building earns them.", style = T.body, color = P.sub)
+        has.forEachIndexed { i, d ->
+            if (i > 0) Spacer(Modifier.height(8.dp))
+            Text(d.name, style = T.bodyB, color = P.ink)
+            Text(d.effect, style = T.small, color = P.sub)
+        }
+        if (mine) {
+            val open = HC.ALL.filter { it.id !in t.traditions && it.id in setOf("students", "banners", "fortress") }
+            if (open.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text("STILL TO EARN", style = T.label, color = P.accent)
+                open.forEach { d -> Text("${d.name}: ${d.how}", style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp)) }
+            }
+        }
+    }
+}
+
+/** The trophy room's shelf of rivalry trophies: each trophy, the seasons you held it, and whether you hold it now. */
+@Composable
+fun RivalryTrophyShelf(lg: League) {
+    val RT = com.nh.hoopscoach.game.RivalryTrophies
+    val held = lg.rivalsOf(lg.userTeamId).filter { RT.named(it) && it.holder == lg.userTeamId }.map { RT.name(it) }.toSet()
+    val shelf = lg.trophyShelf.groupBy { it.name }
+    val names = (shelf.keys + held).distinct()
+    if (names.isEmpty()) return
+    Section("Rivalry trophies")
+    GroupList(names) { n ->
+        val years = shelf[n].orEmpty().map { it.season }.sorted()
+        val opp = shelf[n]?.lastOrNull()?.oppId?.let { lg.teams.getOrNull(it) }
+            ?: lg.rivalsOf(lg.userTeamId).firstOrNull { RT.name(it) == n }?.let { lg.teams.getOrNull(it.other(lg.userTeamId)) }
+        ListRow {
+            Text("🏆", style = T.bodyB)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(n, style = T.bodyB, color = P.ink)
+                Text((opp?.let { "vs ${it.school} · " } ?: "") + if (years.isEmpty()) "Won it this season" else "Held ${years.size}×: ${years.joinToString(", ")}", style = T.small, color = P.sub)
+            }
+            if (n in held) Tag("HELD", P.gold, filled = true)
         }
     }
 }

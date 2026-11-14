@@ -442,6 +442,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
             }
         }
         PipelinePanel(vm, lg, t)
+        HomeCourtPanel(lg, t)
         ProgramLegends(t) { vm.openPlayer(it) }
         Section("Program records")
         RecordBookView(vm, lg, t.id, n = 3)
@@ -490,6 +491,7 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
             }
             3 -> item {
                 ProgramNumbers(vm, lg, t)
+                HomeCourtPanel(lg, t)
                 Section("Program records")
                 RecordBookView(vm, lg, t.id, n = 3)
                 FanPanel(t)

@@ -438,6 +438,9 @@ class Team(
     /** Scholarships taken away, through the season in [sanctionUntil]. */
     var scholarshipsLost: Int = 0,
     var sanctionUntil: Int = 0,
+    /** Home-court traditions (see [HomeCourt]), and whether the building's own have been given yet. */
+    var traditions: MutableList<String> = mutableListOf(),
+    var traditionsSet: Boolean = false,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -885,6 +888,8 @@ class Rivalry(
     val neutral: Boolean = false,
     var aWins: Int = 0,
     var bWins: Int = 0,
+    /** Who holds the rivalry trophy (named rivalries; -1 until the first meeting). See [RivalryTrophies]. */
+    var holder: Int = -1,
 ) {
     fun involves(t: Int) = a == t || b == t
     fun other(t: Int) = if (a == t) b else a
@@ -1687,6 +1692,8 @@ class League(
     var followTeams: MutableList<Int> = mutableListOf(),
     /** Schools that keep fighting the user for recruits (see [RecruitRivals]). */
     var recruitRivals: MutableList<RecruitRival> = mutableListOf(),
+    /** Every season the user ended holding a rivalry trophy. */
+    var trophyShelf: MutableList<TrophyYear> = mutableListOf(),
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

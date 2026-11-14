@@ -158,6 +158,8 @@ object WorldEvents {
         if (lg.pro) return
         Brand.ensure(lg)
         runCatching { RecruitRivals.seasonEnd(lg) }
+        runCatching { HomeCourt.seasonEnd(lg) }
+        runCatching { RivalryTrophies.seasonEnd(lg) }
         records(lg)
         dynasties(lg)
         unbeatenRegularSeasons(lg)

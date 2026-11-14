@@ -131,6 +131,12 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
         if (big.isNotEmpty()) Text(big.uppercase(), style = T.label, color = P.gold)
         Text("$kind · $where".uppercase(), style = T.label, color = P.sub)
         com.nh.hoopscoach.game.CoachRivals.pregame(lg, g)?.let { Text(it, style = T.small, color = P.bad) }
+        if (!g.neutral) lg.team(g.home).let { home ->
+            com.nh.hoopscoach.game.HomeCourt.ensure(lg, home)
+            val ds = home.traditions.mapNotNull { com.nh.hoopscoach.game.HomeCourt.def(it) }
+            if (ds.isNotEmpty()) Text((if (home.id == u.id) "Your building: " else "${home.abbr}'s building: ") + ds.joinToString(" · ") { it.name.lowercase() },
+                style = T.small, color = if (home.id == u.id) P.good else P.warn)
+        }
         if (rivalry == null && !g.neutral) {
             val home = lg.team(g.home)
             val fill = com.nh.hoopscoach.game.Fans.expectedFill(lg, g)
