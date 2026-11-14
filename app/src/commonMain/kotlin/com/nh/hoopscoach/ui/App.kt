@@ -151,7 +151,19 @@ private fun Shell(vm: GameViewModel, lg: League) {
     SpriteSheets.customKits = lg.teams.filter { it.customKit }.map { it.abbr.uppercase() }.toSet()
     PlatformBackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
     // A career moment (his retirement, his introduction as a coach) takes the whole screen until he moves on.
-    lg.ceremony?.let { CeremonyScreen(vm, lg, it); return }
+    lg.ceremony?.let { c ->
+        // On a big screen the moment is a centered column with the team's color dimmed behind it, not
+        // a page stretched edge to edge.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            if (maxWidth >= BigScreen.WIDE) {
+                val back = lg.teams.getOrNull(c.teamId)?.let { androidx.compose.ui.graphics.lerp(teamCard(it), Color.Black, 0.72f) } ?: Color(0xFF101114)
+                Box(Modifier.fillMaxSize().background(back), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.widthIn(max = BigScreen.CONTENT).fillMaxHeight().shadow(24.dp)) { CeremonyScreen(vm, lg, c) }
+                }
+            } else CeremonyScreen(vm, lg, c)
+        }
+        return
+    }
     // Big moments pop up one at a time.
     lg.alerts.firstOrNull()?.let { a -> AlertPopup(vm, a) }
     // The preseason magazine opens by itself once, before the first game of every season.
@@ -318,7 +330,7 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
                     Text(if (draft) "DRAFT NIGHT" else if (done) "CAREER COMPLETE" else if (lg.phase == Phase.WRAP_UP) "SEASON COMPLETE" else "OFFSEASON", style = T.label, color = P.accent)
                     Text(if (draft) "Back to the green room" else if (done) "See how it ended" else if (lg.phase == Phase.WRAP_UP) "Review the ${lg.season} season" else "Pick up where you left off", style = T.bodyB, color = P.ink, maxLines = 1)
                 }
-                SmallButton("Continue", primary = true) { vm.select(Tab.TODAY) }
+                SmallButton(if (com.nh.hoopscoach.SaveTransfer.host != null) "Continue  ·  Space" else "Continue", primary = true) { vm.select(Tab.TODAY) }
             }
             else -> {
                 Column(Modifier.weight(1f)) {
@@ -357,11 +369,12 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
                     }
                 }
                 Spacer(Modifier.width(4.dp))
+                val pc = com.nh.hoopscoach.SaveTransfer.host != null
                 if (game != null) {
-                    SmallButton("Sim") { vm.simDay() }
+                    SmallButton(if (pc) "Sim  ·  S" else "Sim") { vm.simDay() }
                     Spacer(Modifier.width(8.dp))
-                    SmallButton("Play", primary = true) { vm.startLive() }
-                } else SmallButton(if (lg.phase == Phase.REGULAR) "Next day" else "Sim round", primary = true) { vm.simDay() }
+                    SmallButton(if (pc) "Play  ·  Space" else "Play", primary = true) { vm.startLive() }
+                } else SmallButton((if (lg.phase == Phase.REGULAR) "Next day" else "Sim round") + if (pc) "  ·  Space" else "", primary = true) { vm.simDay() }
             }
         }
     }

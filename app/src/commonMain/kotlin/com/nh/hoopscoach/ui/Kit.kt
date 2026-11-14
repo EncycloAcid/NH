@@ -1,5 +1,9 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -144,7 +148,7 @@ fun Panel(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(
     // Cards rise into place as a screen opens (see [reveal]).
     val hero = color == P.hero
     val m = modifier.reveal().padding(horizontal = Gutter).fillMaxWidth().clip(CardShape).background(color).then(if (hero) Modifier.sheen() else Modifier)
-    Column((if (onClick != null) m.clickable(onClick = onClick) else m).padding(padding), content = content)
+    Column((if (onClick != null) m.hoverClick(onClick, tint = if (hero) Color.White else P.ink) else m).padding(padding), content = content)
 }
 
 /** Grouped list: rows separated by inset hairlines inside one panel. */
@@ -164,8 +168,22 @@ fun Hairline(modifier: Modifier = Modifier) = Box(modifier.fillMaxWidth().height
 
 @Composable
 fun ListRow(onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 11.dp), content: @Composable RowScope.() -> Unit) {
-    val m = if (onClick != null) modifier.fillMaxWidth().clickable(onClick = onClick) else modifier.fillMaxWidth()
+    val m = if (onClick != null) modifier.fillMaxWidth().hoverClick(onClick) else modifier.fillMaxWidth()
     Row(m.padding(padding), verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+/**
+ * Clickable with a mouse in mind: a hand cursor and a faint wash while the pointer is over it (on a PC;
+ * a phone has no pointer, so it's just a click there).
+ */
+@Composable
+fun Modifier.hoverClick(onClick: () -> Unit, tint: Color = P.ink, enabled: Boolean = true): Modifier {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    return this
+        .background(if (hovered && enabled) tint.copy(alpha = 0.05f) else Color.Transparent)
+        .pointerHoverIcon(if (enabled) androidx.compose.ui.input.pointer.PointerIcon.Hand else androidx.compose.ui.input.pointer.PointerIcon.Default)
+        .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
 }
 
 @Composable
@@ -292,6 +310,7 @@ private fun Modifier.pressable(enabled: Boolean, onClick: () -> Unit): Modifier 
         scaleY = scale
         alpha = if (enabled) 1f else 0.55f
     }
+        .pointerHoverIcon(if (enabled) androidx.compose.ui.input.pointer.PointerIcon.Hand else androidx.compose.ui.input.pointer.PointerIcon.Default)
         .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, onClick = onClick)
 }
 
