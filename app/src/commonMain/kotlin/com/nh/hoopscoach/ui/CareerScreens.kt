@@ -372,6 +372,7 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                     importer()
                 }
             }
+            TransferPanel(vm)
             }
             item {
             Section("Portraits")

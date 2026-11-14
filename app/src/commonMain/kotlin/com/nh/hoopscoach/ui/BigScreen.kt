@@ -101,7 +101,17 @@ private fun Sidebar(vm: GameViewModel, lg: League) {
                 Text(tabLabel(vm, t), style = T.bodyB.copy(fontSize = 15.sp), color = if (sel) P.ink else P.sub)
             }
         }
+        Spacer(Modifier.height(10.dp))
+        val links = listOfNotNull(
+            ("Calendar" to Route.Calendar).takeIf { !lg.pro },
+            "Explore" to Route.Explore,
+        )
+        for ((label, route) in links) Row(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { vm.push(route) }.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Text(label, style = T.bodyB.copy(fontSize = 14.sp), color = P.sub)
+        }
         Spacer(Modifier.weight(1f))
+        if (com.nh.hoopscoach.SaveTransfer.host != null) Text("Space continue · S sim · 1-5 tabs · F1 keys", style = T.small.copy(fontSize = 11.sp), color = P.faint,
+            modifier = Modifier.padding(horizontal = 26.dp, vertical = 4.dp))
         if (vm.stack.isNotEmpty()) Row(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { vm.back() }.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text("← Back  (Esc)", style = T.bodyB.copy(fontSize = 14.sp), color = P.accent)
         }

@@ -292,6 +292,13 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
     val u = lg.user
     val game = Season.userGameToday(lg)
     var menu by remember { mutableStateOf(false) }
+    // On PC, Space/Enter does what the main button says and S sims the day (see Main.kt).
+    val offseason = lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON
+    androidx.compose.runtime.SideEffect {
+        vm.keyPrimary = when { offseason -> { -> vm.select(Tab.TODAY) }; game != null -> { -> vm.startLive() }; else -> { -> vm.simDay() } }
+        vm.keySim = if (offseason) null else { -> vm.simDay() }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.keyPrimary = null; vm.keySim = null } }
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp).shadow(10.dp, RoundedCornerShape(18.dp), clip = false)
             .clip(RoundedCornerShape(18.dp)).background(P.surface).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),

@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.nh.hoopscoach.game.Coach
 import com.nh.hoopscoach.game.Conference
 import com.nh.hoopscoach.game.League
@@ -245,5 +246,84 @@ fun FollowingCard(vm: GameViewModel, lg: League) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Phone and PC: on the PC, start receiving and read the address and code off the screen; on the phone,
+ * type them in and send this career to the PC or bring the PC's career over.
+ */
+@Composable
+fun TransferPanel(vm: GameViewModel) {
+    val host = com.nh.hoopscoach.SaveTransfer.host
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    Section("Phone and PC")
+    if (host != null) {
+        var code by remember { mutableStateOf("") }
+        var addresses by remember { mutableStateOf<List<String>>(emptyList()) }
+        var error by remember { mutableStateOf("") }
+        androidx.compose.runtime.DisposableEffect(Unit) { onDispose { host.stop() } }
+        Panel {
+            if (addresses.isEmpty()) {
+                Text("Move a career between this PC and your phone over your home Wi-Fi. Start here, then use Phone and PC in the phone's Settings.", style = T.small, color = P.sub)
+                if (error.isNotEmpty()) Text(error, style = T.small, color = P.bad, modifier = Modifier.padding(top = 6.dp))
+                Spacer(Modifier.height(10.dp))
+                PrimaryButton("Start phone transfer", Modifier.fillMaxWidth()) {
+                    val c = com.nh.hoopscoach.SaveTransfer.newCode()
+                    runCatching {
+                        host.start(c,
+                            outgoing = { kotlinx.coroutines.runBlocking { vm.saveNow(); vm.exportSlotBytes(vm.activeSlotId) } },
+                            incoming = { bytes -> scope.launch { vm.importSave(bytes); vm.toast("Career received from your phone") } },
+                        )
+                    }.onSuccess { addresses = it; code = c; error = "" }
+                        .onFailure { error = "Couldn't start: ${it.message ?: "the port may be in use"}" }
+                }
+            } else {
+                Text("ON YOUR PHONE, ENTER", style = T.label, color = P.sub)
+                addresses.forEach { Text(it, style = T.num, color = P.ink) }
+                Text("Code $code", style = T.head, color = P.accent, modifier = Modifier.padding(top = 4.dp))
+                Text("Keep this screen open while the phone sends or fetches. If Windows asks about network access, allow it on private networks.",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton("Stop", Modifier.fillMaxWidth()) { host.stop(); addresses = emptyList() }
+            }
+        }
+        return
+    }
+    var address by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+    Panel {
+        Text("Play the same career on your PC. On the PC, open Settings, Phone and PC, and tap Start; then type what it shows here.", style = T.small, color = P.sub)
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(address, { address = it.take(40) }, singleLine = true, label = { Text("PC address (like 192.168.1.20:${com.nh.hoopscoach.SaveTransfer.PORT})") },
+            colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(code, { code = it.filter(Char::isDigit).take(4) }, singleLine = true, label = { Text("Code") },
+            colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        val ready = address.isNotBlank() && code.length == 4 && !working
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            PrimaryButton(if (working) "Working…" else "Send to PC", Modifier.weight(1f), enabled = ready) {
+                working = true
+                scope.launch {
+                    vm.saveNow()
+                    val bytes = vm.exportSlotBytes(vm.activeSlotId)
+                    val r = if (bytes == null) Result.failure(Exception("No career to send yet."))
+                        else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.nh.hoopscoach.SaveTransfer.send(address, code, bytes) }
+                    working = false
+                    vm.toast(r.fold({ "Sent. It's in the PC's save slots now." }, { it.message ?: "Couldn't send" }))
+                }
+            }
+            SecondaryButton("Get from PC", Modifier.weight(1f), enabled = ready) {
+                working = true
+                scope.launch {
+                    val r = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.nh.hoopscoach.SaveTransfer.fetch(address, code) }
+                    working = false
+                    r.fold({ vm.importSave(it); vm.toast("Career brought over from the PC") }, { vm.toast(it.message ?: "Couldn't get the career") })
+                }
+            }
+        }
+        Text("Both go into a new save slot; nothing is overwritten.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 8.dp))
     }
 }

@@ -2,6 +2,8 @@ package com.nh.hoopscoach
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
@@ -15,7 +17,8 @@ import java.io.File
 fun main() {
     val home = File(System.getProperty("user.home"), ".hoopsdynasty").apply { mkdirs() }
     PlatformContext.filesDir = home
-    PlatformContext.versionName = "3.4-pro.195"
+    SaveTransfer.host = DesktopTransferHost()
+    PlatformContext.versionName = "3.4-pro.196"
     // A Windows app has no console, so errors go to a log beside the saves (the previous run's is kept).
     runCatching {
         val log = File(home, "hoops-log.txt")
@@ -35,6 +38,8 @@ fun main() {
     }
 }
 
+private val TAB_KEYS = listOf(Key.One, Key.Two, Key.Three, Key.Four, Key.Five)
+
 @androidx.compose.runtime.Composable
 private fun androidx.compose.ui.window.ApplicationScope.Game(vm: GameViewModel) {
     // A desktop-sized window: sidebar, the screen and the league panel side by side. Narrow it and it
@@ -47,11 +52,20 @@ private fun androidx.compose.ui.window.ApplicationScope.Game(vm: GameViewModel) 
         },
         title = "Hoops Dynasty Pro",
         state = state,
+        // Keys a text box doesn't take: Esc back, Space/Enter continue, S sim the day, W sim a week,
+        // 1-5 tabs, Ctrl+S save, F1 the list.
         onKeyEvent = { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                vm.back()
-            } else {
-                false
+            if (event.type != KeyEventType.KeyDown) false
+            else when {
+                event.key == Key.Escape -> vm.back()
+                event.isCtrlPressed && event.key == Key.S -> { vm.saveSoon(); vm.toast("Saved"); true }
+                event.key == Key.F1 -> { vm.toast("Space or Enter: continue · S: sim the day · W: sim a week · 1-5: tabs · Esc: back · Ctrl+S: save"); true }
+                vm.busy != null || vm.league == null || event.isCtrlPressed || event.isAltPressed -> false
+                event.key == Key.Spacebar || event.key == Key.Enter -> vm.keyPrimary?.let { it(); true } ?: false
+                event.key == Key.S -> vm.keySim?.let { it(); true } ?: false
+                event.key == Key.W -> if (vm.league?.phase == com.nh.hoopscoach.game.Phase.REGULAR && vm.keySim != null) { vm.simDays(7); true } else false
+                event.key in TAB_KEYS -> { vm.select(com.nh.hoopscoach.ui.Tab.entries[TAB_KEYS.indexOf(event.key)]); true }
+                else -> false
             }
         },
     ) {

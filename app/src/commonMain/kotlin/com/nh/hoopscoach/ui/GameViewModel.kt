@@ -238,7 +238,7 @@ class GameViewModel : ViewModel() {
         viewModelScope.launch(failSafe) { saveNow() }
     }
 
-    private suspend fun saveNow(): Boolean = saveMutex.withLock {
+    internal suspend fun saveNow(): Boolean = saveMutex.withLock {
         val lg = league ?: return@withLock true
         val slotId = activeSlotId
         try {
@@ -808,6 +808,10 @@ class GameViewModel : ViewModel() {
     }
 
     // ---------- navigation ----------
+
+    /** What the keyboard's Space/Enter and S do right now (set by the continue bar while it's showing; PC only). */
+    var keyPrimary: (() -> Unit)? = null
+    var keySim: (() -> Unit)? = null
 
     fun push(r: Route) { stack.add(r) }
 
