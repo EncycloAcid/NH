@@ -137,8 +137,10 @@ object SpriteSheets {
     /** The school's own art key (jersey and court files share it), whatever kit it's wearing. */
     fun artKey(abbr: String?, slot: String? = null): String? {
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
-        if (s != null) JERSEY_BY_ABBR[s]?.let { return it }
-        val a = abbr?.uppercase()?.takeIf { it.isNotBlank() } ?: return null
+        val a = abbr?.uppercase()?.takeIf { it.isNotBlank() }
+        // A pro team: its own identity first (the Sonics in the Thunder's slot wear Sonics art), then the slot's.
+        if (s != null) (a?.let { JERSEY_BY_ABBR[it] } ?: JERSEY_BY_ABBR[s])?.let { return it }
+        if (a == null) return null
         COLLEGE_BY_ABBR[a]?.let { return it }
         return null
     }

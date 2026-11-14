@@ -180,7 +180,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)
-        if (e.bigNight.isNotEmpty()) {
+        if (e.bigNight.isNotEmpty() && !e.finished) {
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Tag(e.bigNight.uppercase(), P.bad, filled = true)
@@ -233,7 +233,9 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         }
         lv.moment?.let { m -> MomentCard(lg, lv, m); Spacer(Modifier.height(8.dp)) }
         lv.call?.let { c -> CallCard(lg, lv, c); Spacer(Modifier.height(8.dp)) }
-        lv.momentResult?.takeIf { lv.moment == null && lv.call == null }?.let {
+        // At the final horn, the game's leaders replace the last big moment.
+        if (e.finished) { GameLeaders(e.boxScore(), home, away); Spacer(Modifier.height(8.dp)) }
+        lv.momentResult?.takeIf { lv.moment == null && lv.call == null && !e.finished }?.let {
             Panel(Modifier.popIn(it), color = P.accentSoft, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) { Text("★ $it", style = T.bodyB, color = P.ink) }
             Spacer(Modifier.height(8.dp))
         }
@@ -283,6 +285,25 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
             } else {
                 val box = e.boxScore()
                 LazyColumn(Modifier.fillMaxWidth().weight(1f)) { item { BoxTable(vm, lg, if (view == 1) away else home, if (view == 1) box.away else box.home) } }
+            }
+        }
+    }
+}
+
+/** Each side's top scorer, in a line: name, points, rebounds, assists. */
+@Composable
+private fun GameLeaders(box: com.nh.hoopscoach.game.BoxScore, home: Team, away: Team) {
+    Panel(padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+        Text("GAME LEADERS", style = T.label, color = P.accent)
+        Spacer(Modifier.height(4.dp))
+        for ((t, lines) in listOf(away to box.away, home to box.home)) {
+            val top = lines.maxByOrNull { it.s.pts * 3 + it.s.orb + it.s.drb + it.s.ast } ?: continue
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(width = 3.dp, height = 18.dp).clip(RoundedCornerShape(2.dp)).background(teamInk(t)))
+                Spacer(Modifier.width(8.dp))
+                Text(t.abbr, style = T.label, color = P.sub, modifier = Modifier.width(44.dp))
+                Text(top.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text("${top.s.pts} PTS · ${top.s.orb + top.s.drb} REB · ${top.s.ast} AST", style = T.small, color = P.sub, maxLines = 1)
             }
         }
     }
