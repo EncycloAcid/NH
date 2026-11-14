@@ -96,6 +96,9 @@ object Assistants {
             lg.staff.remove(a)
             val where = if (lg.pro) "the ${opening.name}" else opening.school
             lg.tree += TreeBranch(a.name, a.skill, a.seasons, lg.season, if (lg.pro) opening.name else opening.school, c.id)
+            Timeline.record(lg, "poached", "${if (lg.pro) opening.name else opening.school} hires ${a.name} off ${lg.userCoach.name}'s staff",
+                "${a.name} ran the ${skillName(a.skill).lowercase()} for ${lg.userCoach.name} for ${a.seasons} season${if (a.seasons == 1) "" else "s"} before taking the job.",
+                opening.id, coach = a.name, weight = 2)
             lg.news += News(lg.season, lg.day, "${a.name}, an assistant on ${lg.userCoach.name}'s staff, is the new head coach of $where", true, -1, "",
                 "${a.name} spent ${a.seasons} season${if (a.seasons == 1) "" else "s"} on ${lg.userCoach.last}'s bench, running the ${skillName(a.skill).lowercase()}. Another branch on the coaching tree.", "", opening.id)
             Alerts.add(lg, "Your assistant got a head job", "${a.name} leaves to coach $where. Your coaching tree grows.", "")

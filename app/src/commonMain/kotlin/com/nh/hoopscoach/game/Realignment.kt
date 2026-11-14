@@ -46,6 +46,7 @@ object Realignment {
         os.confInvites.clear()
         if (!lg.playerMode) userInvites(lg, os)
         aiMoves(lg)
+        runCatching { WorldEvents.raid(lg) }
     }
 
     private fun userInvites(lg: League, os: OffseasonState) {
@@ -97,6 +98,7 @@ object Realignment {
         t.confId = new.id
         t.buzz = (t.buzz + 12).coerceAtMost(100.0)
         lg.news += News(lg.season, lg.day, "${t.school} leaves the ${old.name} for the ${new.name}", t.id == lg.userTeamId, -1, "", "", "", t.id)
+        runCatching { WorldEvents.realigned(lg, t, old, new) }
         if (old.teamIds.size < MIN_SIZE) {
             val region = regionOf(lg, old)
             lg.teams.filter { lg.conf(it.confId).tier == old.tier + 1 && it.id != lg.userTeamId && lg.conf(it.confId).teamIds.size > MIN_SIZE }

@@ -433,6 +433,11 @@ class Team(
     var philosophy: String = "",
     /** Former player whose pedigree stamped this program's identity, if any. */
     var legacyCoach: String = "",
+    /** NCAA sanctions (see [WorldEvents]): the season it sits out the postseason (0: none). */
+    var banSeason: Int = 0,
+    /** Scholarships taken away, through the season in [sanctionUntil]. */
+    var scholarshipsLost: Int = 0,
+    var sanctionUntil: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l

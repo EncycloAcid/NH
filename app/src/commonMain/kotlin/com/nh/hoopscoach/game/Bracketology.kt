@@ -65,12 +65,15 @@ object Bracketology {
             if (c.teamIds.isEmpty()) continue
             val b = lg.confBrackets.firstOrNull { it.confId == c.id }
             val alive = b?.rounds?.getOrNull(b.current)?.filter { it >= 0 }
-            out[c.id] = when {
+            val pick = when {
                 b == null -> Season.standings(lg, c.id).first().id
                 b.done -> b.champion
                 !alive.isNullOrEmpty() -> alive.minBy { b.seeds[it] ?: 99 }
                 else -> Season.standings(lg, c.id).first().id
             }
+            // A school serving a postseason ban can't take the bid: it goes to the best eligible school in the standings.
+            out[c.id] = if (!WorldEvents.banned(lg, pick)) pick
+                else Season.standings(lg, c.id).firstOrNull { !WorldEvents.banned(lg, it.id) }?.id ?: continue
         }
         return out
     }
@@ -122,8 +125,10 @@ object Bracketology {
 
     fun project(lg: League): Projection {
         val sheets = sheets(lg)
-        val order = sheets.values.sortedWith(compareBy<Sheet>({ it.score }, { it.net })).map { it.teamId }
+        // Schools serving a postseason ban aren't considered at all.
+        val order = sheets.values.sortedWith(compareBy<Sheet>({ it.score }, { it.net })).map { it.teamId }.filter { !WorldEvents.banned(lg, it) }
         order.forEachIndexed { i, id -> sheets.getValue(id).rank = i + 1 }
+        for (sh in sheets.values) if (WorldEvents.banned(lg, sh.teamId)) sh.rank = sheets.size + 1     // listed last, never in
         val auto = autoBids(lg).values.toSet()
         val spots = (FIELD - auto.size).coerceAtLeast(4)
         val atLargeRank = HashMap<Int, Int>()

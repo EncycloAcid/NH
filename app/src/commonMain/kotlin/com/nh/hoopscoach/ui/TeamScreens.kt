@@ -469,6 +469,13 @@ fun TeamPage(vm: GameViewModel, lg: League, teamId: Int) {
                 }
             }
             TeamRings(lg, t)
+            com.nh.hoopscoach.game.WorldEvents.sanctionLine(lg, t).takeIf { it.isNotEmpty() }?.let { line ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Tag("NCAA SANCTIONS", P.bad, filled = true)
+                    Spacer(Modifier.width(8.dp))
+                    Text(line, style = T.small, color = P.bad)
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Segmented(listOf("Roster", "Schedule", "History", if (lg.pro) "Franchise" else "Program"), tab, { tab = it })
         }

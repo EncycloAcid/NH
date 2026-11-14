@@ -15,7 +15,7 @@ import java.io.File
 fun main() {
     val home = File(System.getProperty("user.home"), ".hoopsdynasty").apply { mkdirs() }
     PlatformContext.filesDir = home
-    PlatformContext.versionName = "3.4-pro.190"
+    PlatformContext.versionName = "3.4-pro.191"
     // A Windows app has no console, so errors go to a log beside the saves (the previous run's is kept).
     runCatching {
         val log = File(home, "hoops-log.txt")

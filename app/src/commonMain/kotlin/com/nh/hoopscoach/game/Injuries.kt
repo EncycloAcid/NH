@@ -103,6 +103,8 @@ object Injuries {
             "$Team ${if (lg.pro) "are" else "are"} ${t.record}." + if (star && games >= 10) " Without him, the rotation tightens and everyone else moves up a spot." else "",
         ).filter { it.isNotBlank() }.joinToString(" ")
         lg.news += News(lg.season, lg.day, head, mine || hero, -1, "injury", body, "Hoops Wire", t.id, p.id)
+        if (games >= SEASON_OUT && (star || mine || hero)) Timeline.record(lg, "injury", "${p.name} lost for the season",
+            "${p.name} (${t.school}) was ruled out for the year with $what" + (if (p.stats.gp > 0) " after averaging ${"%.1f".format(p.stats.ppg)} points." else "."), t.id, p.id, weight = if (star) 3 else 2)
         if (hero) Alerts.add(lg, if (games >= SEASON_OUT) "Season over" else "You're hurt",
             if (games >= SEASON_OUT) "You tore it up: $what. You're done for the season." else "${what.replaceFirstChar { it.uppercase() }}: you'll miss ${if (games == 1) "a game" else "about $games games"}.", "injury")
     }

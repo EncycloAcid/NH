@@ -149,6 +149,8 @@ object Offseason {
         if (t != null && lg.coachOf(t).has(CoachSkill.CULTURE)) c *= 0.7
         // What he remembers: a broken promise makes a content player restless; a title or the staff that believed in him keeps an unhappy one.
         c *= Memories.transferFactor(p)
+        // A new coach, NCAA sanctions and close friends on the roster.
+        c *= WorldEvents.transferFactor(lg, p)
         return c.coerceAtMost(0.85)
     }
 
@@ -304,7 +306,7 @@ object Offseason {
 
     /** Unrecruited players fill any scholarship left open. */
     private fun fillHoles(lg: League, t: Team) {
-        while (Tryouts.scholarships(lg, t) < Recruiting.MAX_ROSTER) {
+        while (Tryouts.scholarships(lg, t) < WorldEvents.cap(lg, t)) {
             val w = Tryouts.filler(lg, t)
             w.number = Recruiting.freeNumber(lg, t)
             lg.addPlayer(w)
@@ -493,6 +495,7 @@ object Coaching {
     }
 
     fun carousel(lg: League, os: OffseasonState) {
+        runCatching { WorldEvents.offseason(lg) }
         val touched = mutableSetOf<Int>()     // schools whose coach already changed this offseason
         for (t in lg.teams) {
             if (lg.humanCoach(t) || t.id in touched) continue

@@ -32,8 +32,9 @@ object CoachTrees {
      * years in a row at a proud program is very likely gone.
      */
     fun fireChance(lg: League, t: Team, c: Coach): Double {
+        val scandal = WorldEvents.scandalFireChance(lg, t)
         val here = c.history.filter { it.teamId == t.id }
-        if (here.size < 2) return 0.0                               // nobody is fired after one year
+        if (here.size < 2) return scandal                           // nobody is fired after one year, unless there's a scandal
         val recent = here.takeLast(3)
         val losing = recent.count { it.w < it.l }
         val short = t.expWins - t.w                                 // wins short of what this roster should manage
@@ -46,7 +47,7 @@ object CoachTrees {
         val round = Awards.tourneyRound(lg, t.id)
         if (round >= 1) p -= 0.15 + round * 0.05
         if (recent.any { it.result == "Final Four" || it.result == "Runner-Up" || it.result == "National Champion" }) p -= 0.3
-        return p.coerceIn(0.0, 0.85)
+        return (p.coerceIn(0.0, 0.85) + scandal).coerceAtMost(0.95)
     }
 
     /** An assistant stepping up: a young coach shaped by the man he worked for. */
@@ -91,7 +92,8 @@ object CoachTrees {
                     body = "${c.name} went ${from.w}-${from.l} at ${from.school} this season and ${c.w}-${c.l} for his career. ${identity(c)}." +
                         (if (c.mentor.isNotBlank()) " He came up as an assistant under ${c.mentor}." else ""),
                     source = "Hoops Wire", teamId = t.id)
-                Timeline.record(lg, "hire", "${t.school} hires ${c.name} from ${from.school}", "${c.name} left ${from.school} after a ${from.w}-${from.l} season to take over at ${t.school}.", t.id, coach = c.name, weight = if (t.prestige >= 80) 3 else 2)
+                Timeline.record(lg, "hire", "${t.school} hires ${c.name} from ${from.school}", "${c.name} left ${from.school} after a ${from.w}-${from.l} season to take over at ${t.school}.", t.id, coach = c.name, weight = if (t.prestige >= 80) 3 else 2, team2 = from.id)
+                runCatching { WorldEvents.followCoach(lg, from, t, c) }
                 // The school he left keeps what he built: one of his assistants takes over.
                 val next = assistantOf(lg, from, c)
                 seat(lg, from, next, c.name)

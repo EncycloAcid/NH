@@ -33,7 +33,7 @@ object Tryouts {
     fun scholarships(lg: League, t: Team) = t.roster.count { !lg.player(it).walkOn }
     fun walkOns(lg: League, t: Team) = t.roster.count { lg.player(it).walkOn }
     fun openWalkOnSpots(lg: League, t: Team) = (WALK_ON_SPOTS - walkOns(lg, t)).coerceAtLeast(0)
-    fun openScholarships(lg: League, t: Team) = (Recruiting.MAX_ROSTER - scholarships(lg, t)).coerceAtLeast(0)
+    fun openScholarships(lg: League, t: Team) = (WorldEvents.cap(lg, t) - scholarships(lg, t)).coerceAtLeast(0)
 
     /** How many tryout players the user can keep: walk-on spots plus any scholarship left unused. */
     fun capacity(lg: League) = openWalkOnSpots(lg, lg.user) + openScholarships(lg, lg.user)

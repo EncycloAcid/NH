@@ -361,7 +361,16 @@ private fun BracketLine(lg: League, b: Bracket, id: Int, g: Game?, tbd: String? 
 
 // ---------- history ----------
 
+/** Kinds of timeline event that change the landscape: scandals, coaching moves, conference moves. */
+private val SHAKEUPS = setOf("scandal", "fire", "hire", "follow", "exodus", "poached", "realign", "raid", "retire", "steal", "donor")
+
 private fun LazyListScope.history(vm: GameViewModel, lg: League) {
+    val shakeups = lg.timeline.filter { it.type in SHAKEUPS && it.season >= lg.season - 1 && it.weight >= 2 }
+        .sortedWith(compareByDescending<com.nh.hoopscoach.game.WorldEvent> { it.season }.thenByDescending { it.weight }).take(8)
+    if (shakeups.isNotEmpty()) item {
+        Section("Around the country")
+        TimelineRows(vm, lg, shakeups)
+    }
     val latest = lg.moments.maxOfOrNull { it.season }
     if (latest != null) item {
         Section("Highlight reel · $latest", action = "See all", onAction = { vm.push(Route.History(HistoryKind.MOMENTS)) })

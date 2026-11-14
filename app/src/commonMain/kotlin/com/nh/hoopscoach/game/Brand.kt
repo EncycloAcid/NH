@@ -114,7 +114,7 @@ object Brand {
 
     fun pull(lg: League, t: Team): Int {
         val c = lg.coachOf(t)
-        val v = 0.45 * t.prestige + 0.15 * t.legacy + 0.10 * exposure(lg, t.confId) + 0.10 * c.rec + 0.10 * proof(t) + 0.10 * t.buzz + Shoes.pullBonus(t)
+        val v = 0.45 * t.prestige + 0.15 * t.legacy + 0.10 * exposure(lg, t.confId) + 0.10 * c.rec + 0.10 * proof(t) + 0.10 * t.buzz + Shoes.pullBonus(t) + WorldEvents.aura(lg, t.id)
         return v.roundToInt().coerceIn(1, 99)
     }
 
@@ -124,7 +124,7 @@ object Brand {
         return IntArray(lg.teams.size) { i ->
             val t = lg.teams[i]
             val e = exp.getOrPut(t.confId) { exposure(lg, t.confId) }
-            val v = 0.45 * t.prestige + 0.15 * t.legacy + 0.10 * e + 0.10 * lg.coachOf(t).rec + 0.10 * proof(t) + 0.10 * t.buzz + Shoes.pullBonus(t)
+            val v = 0.45 * t.prestige + 0.15 * t.legacy + 0.10 * e + 0.10 * lg.coachOf(t).rec + 0.10 * proof(t) + 0.10 * t.buzz + Shoes.pullBonus(t) + WorldEvents.aura(lg, t.id)
             v.roundToInt().coerceIn(1, 99)
         }
     }

@@ -58,10 +58,10 @@ object Recruiting {
 
     fun committedTo(lg: League, teamId: Int) = lg.recruits.count { it.committed == teamId }
 
-    fun openSpots(lg: League, t: Team) = MAX_ROSTER - returning(lg, t) - committedTo(lg, t.id)
+    fun openSpots(lg: League, t: Team) = WorldEvents.cap(lg, t) - returning(lg, t) - committedTo(lg, t.id)
 
     /** Roster room right now (used in the off-season, after departures). */
-    fun openRoom(lg: League, t: Team) = MAX_ROSTER - Tryouts.scholarships(lg, t) - lg.recruits.count { it.committed == t.id }
+    fun openRoom(lg: League, t: Team) = WorldEvents.cap(lg, t) - Tryouts.scholarships(lg, t) - lg.recruits.count { it.committed == t.id }
 
     fun freeNumber(lg: League, t: Team): Int {
         val used = t.roster.map { lg.player(it).number }.toSet() + Legacy.retiredNumbers(t)
@@ -583,6 +583,7 @@ object Recruiting {
         }
         val t = lg.team(tid)
         Memories.committed(lg, r, t)
+        if (tid != u && wasTarget && u >= 0 && r.p.stars >= 4 && (r.interest[u] ?: 0) >= 50) WorldEvents.stolen(lg, r, lg.team(u), t)
         if (!r.transfer && r.p.stars >= 5 && t.prestige < 60) Timeline.record(lg, "commit", "Five-star ${r.p.name} picks ${t.school}",
             "${r.p.name}, the No. ${r.p.recruitRank} recruit, chose ${t.school} over bigger programs.", t.id, r.p.id, weight = 3)
         if (tid == u || r.p.stars >= 5 || (r.transfer && r.p.ovr >= 80)) {

@@ -97,6 +97,7 @@ object Season {
         Rankings.refresh(lg)
         Fans.drift(lg)
         Morale.tick(lg)
+        runCatching { WorldEvents.daily(lg) }
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
         // Practice: everyone improves a little, bench players included — up to their ceiling, not past it.
         // Academic redshirts lean on practice — a small XP bump for the year of development.
@@ -353,6 +354,7 @@ object Season {
         }
         runCatching { Memories.seasonEnd(lg, champ.id, runnerUp) }
         runCatching { Timeline.seasonEnd(lg, champ.id, runnerUp, f4) }
+        runCatching { WorldEvents.seasonEnd(lg) }
         val coty = lg.coaches.firstOrNull { it.id == lg.cotyCoachId }
         lg.history += SeasonSummary(
             lg.season, champ.id, runnerUp, f4, lg.seasonAwards.toList(),
