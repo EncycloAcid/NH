@@ -160,6 +160,7 @@ object WorldEvents {
         runCatching { RecruitRivals.seasonEnd(lg) }
         runCatching { HomeCourt.seasonEnd(lg) }
         runCatching { RivalryTrophies.seasonEnd(lg) }
+        runCatching { Challenges.seasonEnd(lg) }
         records(lg)
         dynasties(lg)
         unbeatenRegularSeasons(lg)

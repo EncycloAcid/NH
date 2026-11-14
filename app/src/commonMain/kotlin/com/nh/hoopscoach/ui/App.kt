@@ -147,6 +147,8 @@ private fun BusyCover(vm: GameViewModel) {
 @Composable
 private fun Shell(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    // Schools wearing a designed kit (the uniform designer).
+    SpriteSheets.customKits = lg.teams.filter { it.customKit }.map { it.abbr.uppercase() }.toSet()
     PlatformBackHandler(enabled = vm.guide != null || vm.sheet != null || vm.stack.isNotEmpty()) { vm.back() }
     // A career moment (his retirement, his introduction as a coach) takes the whole screen until he moves on.
     lg.ceremony?.let { CeremonyScreen(vm, lg, it); return }
@@ -280,6 +282,10 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Mixtape -> MixtapeScreen(vm, lg)
         is Route.Web -> ConnectionsScreen(vm, lg, com.nh.hoopscoach.game.WebNode(r.kind, r.id))
         is Route.Calendar -> CalendarScreen(vm, lg)
+        is Route.Cinderella -> CinderellaScreen(vm, lg)
+        is Route.Designer -> DesignerScreen(vm, lg)
+        is Route.SeasonCard -> SeasonCardScreen(vm, lg)
+        is Route.Challenges -> ChallengesScreen(vm, lg)
         is Route.Explore -> ExploreScreen(vm, lg)
         is Route.ConfPage -> ConferencePage(vm, lg, r.confId)
     }

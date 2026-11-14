@@ -98,6 +98,7 @@ object Season {
         Fans.drift(lg)
         Morale.tick(lg)
         runCatching { WorldEvents.daily(lg) }
+        if (lg.phase == Phase.NCAA) runCatching { Cinderella.current(lg) }
         if (lg.phase == Phase.REGULAR) Recruiting.tick(lg)
         // Practice: everyone improves a little, bench players included — up to their ceiling, not past it.
         // Academic redshirts lean on practice — a small XP bump for the year of development.

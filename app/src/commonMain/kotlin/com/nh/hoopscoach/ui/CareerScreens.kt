@@ -164,6 +164,22 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
         }
         item { TrophyRoomLink(vm, lg) }
         item { ConnectionsCard(vm, lg) }
+        item {
+            Section("Make it yours")
+            GroupList(listOf(
+                Triple("Uniforms & court", "Your colors, the kit your players wear, the court", Route.Designer),
+                Triple("Season card", "A picture of your season to save or post", Route.SeasonCard),
+                Triple("Challenges", lg.challenge?.let { c -> com.nh.hoopscoach.game.Challenges.def(c.id)?.name?.let { "Playing: $it" } } ?: "Medals from challenge careers", Route.Challenges),
+            )) { (title, sub, route) ->
+                ListRow(onClick = { vm.push(route) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = T.bodyB, color = P.ink)
+                        Text(sub, style = T.small, color = P.sub)
+                    }
+                    Chevron()
+                }
+            }
+        }
         item { CoachRivalsCard(lg) }
         item {
             Section("Archive")
@@ -799,6 +815,21 @@ fun NewGameScreen(vm: GameViewModel) {
                     Spacer(Modifier.height(8.dp))
                     Text(era.rulesSummary(), style = T.small, color = P.ink)
                 }
+                if (!lg.pro) {
+                    Section("Or take a challenge")
+                    GroupList(com.nh.hoopscoach.game.Challenges.ALL) { c ->
+                        val tid = com.nh.hoopscoach.game.Challenges.teamFor(lg, c.id)
+                        val sel = vm.pendingChallenge == c.id
+                        ListRow(onClick = { vm.pendingChallenge = c.id; pick = tid }, modifier = if (sel) Modifier.background(P.accentSoft) else Modifier) {
+                            Column(Modifier.weight(1f)) {
+                                Text(c.name + (lg.teams.getOrNull(tid)?.let { " · ${it.school}" } ?: ""), style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(c.goal, style = T.small, color = P.sub)
+                            }
+                            val won = com.nh.hoopscoach.game.Challenges.medals().filter { it.id == c.id }.map { it.medal }
+                            if (won.isNotEmpty()) Tag(won.maxBy { listOf("bronze", "silver", "gold").indexOf(it) }.uppercase(), P.gold, filled = true)
+                        }
+                    }
+                }
                 Section("Choose a school")
                 OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Search ${lg.teams.size} schools", color = P.faint) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Gutter), colors = fieldColors())
@@ -812,7 +843,7 @@ fun NewGameScreen(vm: GameViewModel) {
                 if (teams.isEmpty()) Empty("No schools match.")
                 GroupList(teams.take(if (conf < 0 && query.isBlank()) 60 else 400), inset = 66.dp) { t ->
                     val sel = pick == t.id
-                    ListRow(onClick = { pick = t.id }, modifier = if (sel) Modifier.background(P.accentSoft) else Modifier) {
+                    ListRow(onClick = { pick = t.id; vm.pendingChallenge = null }, modifier = if (sel) Modifier.background(P.accentSoft) else Modifier) {
                         TeamBadge(t, 40.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {

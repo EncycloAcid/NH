@@ -147,3 +147,102 @@ fun MidnightMadnessCard(vm: GameViewModel, lg: League) {
         }
     }
 }
+
+/** The summer tour, every four years, before the season's first game. */
+@Composable
+fun SummerTourCard(vm: GameViewModel, lg: League) {
+    if (!com.nh.hoopscoach.game.Tours.available(lg)) return
+    val t = lg.user
+    com.nh.hoopscoach.game.Business.ensure(lg, t)
+    Section("Summer foreign tour", action = "Not this year", onAction = { vm.act { it.tourDeclined = it.season } })
+    Panel {
+        Text("Once every four years, the NCAA lets a team travel abroad: a few games, extra practice, and a trip the players never forget. Upgrade budget: ${money(t.cash.toInt())}.",
+            style = T.small, color = P.sub)
+        for (tour in com.nh.hoopscoach.game.Tours.ALL) {
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${tour.place} · ${money(tour.cost.toInt())}", style = T.bodyB, color = P.ink)
+                    Text(tour.blurb, style = T.small, color = P.sub)
+                }
+                Spacer(Modifier.width(8.dp))
+                SmallButton("Go", primary = true, enabled = t.cash >= tour.cost) {
+                    var note: String? = null
+                    vm.act { note = com.nh.hoopscoach.game.Tours.go(it, tour.id) }
+                    vm.toast(note ?: "Not enough in the upgrade budget")
+                }
+            }
+        }
+    }
+}
+
+/** Cinderella watch, on the tournament's Today screen. */
+@Composable
+fun CinderellaCard(vm: GameViewModel, lg: League) {
+    val r = com.nh.hoopscoach.game.Cinderella.peek(lg) ?: return
+    Section("Cinderella watch", action = "The story", onAction = { vm.push(Route.Cinderella) })
+    Panel(onClick = { vm.push(Route.Cinderella) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TeamBadge(r.team, 44.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("No. ${r.seed} ${r.team.school}", style = T.head, color = P.ink)
+                Text(when {
+                    lg.ncaa?.champion == r.team.id -> "National champions"
+                    r.out != null -> "Out after ${r.wins.size} win${if (r.wins.size == 1) "" else "s"}"
+                    else -> "${r.wins.size} win${if (r.wins.size == 1) "" else "s"} and still dancing"
+                }, style = T.small, color = if (r.out == null) P.gold else P.sub)
+            }
+            Chevron()
+        }
+    }
+}
+
+/** The Cinderella's own story page. */
+@Composable
+fun CinderellaScreen(vm: GameViewModel, lg: League) {
+    val r = com.nh.hoopscoach.game.Cinderella.peek(lg)
+    androidx.compose.foundation.lazy.LazyColumn(androidx.compose.ui.Modifier.fillMaxWidth()) {
+        item { BackBar("Cinderella watch", r?.let { "No. ${it.seed} ${it.team.school}" } ?: "", onBack = { vm.back() }) }
+        if (r == null) {
+            item { Panel { Empty("No Cinderella yet. A low seed has to win a game first.") } }
+            return@LazyColumn
+        }
+        item {
+            Panel(color = P.hero, onClick = { vm.push(Route.TeamPage(r.team.id)) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TeamBadge(r.team, 56.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("A ${r.seed} SEED IN MARCH", style = T.label, color = heroKicker)
+                        Text(r.team.school.uppercase(), style = T.title, color = P.onHero, maxLines = 2)
+                        Text("${r.team.record} · ${lg.coachOf(r.team).name}", style = T.small, color = P.onHero.copy(alpha = 0.85f))
+                    }
+                }
+            }
+        }
+        item {
+            Section("The story")
+            Panel {
+                com.nh.hoopscoach.game.Cinderella.story(lg, r).forEachIndexed { i, para ->
+                    if (i > 0) Spacer(Modifier.height(10.dp))
+                    Text(para, style = T.body, color = P.ink)
+                }
+            }
+        }
+        val games = (r.wins + listOfNotNull(r.out)).sortedBy { it.day }
+        if (games.isNotEmpty()) item {
+            Section("The run")
+            GroupList(games) { g ->
+                val o = lg.team(g.opp(r.team.id))
+                val won = g.winner() == r.team.id
+                ListRow(onClick = { vm.push(Route.Box(g.id)) }) {
+                    TeamBadge(o, 28.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text("${lg.ncaa?.seeds?.get(o.id)?.let { "No. $it " } ?: ""}${o.school}", style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${if (won) "W" else "L"} ${g.scoreFor(r.team.id)}-${g.scoreFor(o.id)}", style = T.numSm, color = if (won) P.good else P.bad)
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}

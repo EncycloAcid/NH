@@ -85,6 +85,26 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
     val lv = vm.live ?: run { Column { BackBar("Game", onBack = { vm.back() }) }; return }
     val e = lv.engine
     @Suppress("UNUSED_VARIABLE") val tick = lv.tick
+    // The crowd: a murmur most of the night, louder as a close game gets late; the horn at the end.
+    val soundOn = lg.soundOn
+    LaunchedEffect(tick, soundOn, lv.speed) {
+        if (!soundOn || lv.speed == 0 || e.finished) { if (!e.finished || !soundOn) com.nh.hoopscoach.GameSounds.crowd(0f); return@LaunchedEffect }
+        val margin = kotlin.math.abs(e.score[0] - e.score[1])
+        val late = e.finalPeriod && e.clock < 300 && margin <= 6
+        val level = 0.16f + (if (late) ((300 - e.clock) / 300).toFloat() * 0.55f else 0f) + (if (margin <= 3) 0.08f else 0f)
+        com.nh.hoopscoach.GameSounds.crowd(level.coerceAtMost(0.85f))
+    }
+    var horn by remember(lv) { mutableStateOf(false) }
+    LaunchedEffect(e.finished, soundOn) {
+        if (e.finished && !horn && soundOn) {
+            horn = true
+            com.nh.hoopscoach.GameSounds.crowd(0.9f)
+            com.nh.hoopscoach.GameSounds.buzzer()
+            kotlinx.coroutines.delay(1600)
+            com.nh.hoopscoach.GameSounds.crowd(0f)
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(lv) { onDispose { com.nh.hoopscoach.GameSounds.crowd(0f) } }
     LaunchedEffect(lv) {
         while (!e.finished) {
             // In player mode the game stops for big moments until the user picks a play.
@@ -179,6 +199,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Segmented(listOf(if (lv.speed == 0) "▶" else "❚❚", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it }, Modifier.weight(1f).padding(horizontal = 0.dp))
                     if (e.coachSide >= 0) SmallButton("Timeout · ${e.timeoutsLeft}", enabled = e.timeoutsLeft > 0) { if (e.callTimeout()) { lv.momentResult = e.lastCall; lv.tick++ } }
+                    SmallButton(if (soundOn) "Sound" else "Muted") { vm.act { it.soundOn = !it.soundOn } }
                     SmallButton("Finish", primary = true) { vm.completeLive() }
                 }
                 Spacer(Modifier.height(8.dp))

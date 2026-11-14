@@ -1,5 +1,7 @@
 package com.nh.hoopscoach
 
+import androidx.compose.ui.graphics.asSkiaBitmap
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -148,6 +150,7 @@ actual fun rememberSaveExporter(
     suggestedName: String,
     getBytes: suspend () -> ByteArray?,
     onResult: (ok: Boolean) -> Unit,
+    mime: String,
 ): () -> Unit {
     val scope = rememberCoroutineScope()
     return remember(suggestedName) {
@@ -198,7 +201,7 @@ actual fun rememberProfilePhotoPicker(
 }
 
 private fun pickSaveFile(suggestedName: String): File? {
-    val dialog = FileDialog(null as Frame?, "Back up dynasty", FileDialog.SAVE)
+    val dialog = FileDialog(null as Frame?, if (suggestedName.endsWith(".png")) "Save image" else "Back up dynasty", FileDialog.SAVE)
     dialog.file = suggestedName
     dialog.isVisible = true
     val dir = dialog.directory ?: return null
@@ -213,3 +216,44 @@ private fun pickOpenFile(): File? {
     val name = dialog.file ?: return null
     return File(dir, name)
 }
+
+actual fun encodePng(image: androidx.compose.ui.graphics.ImageBitmap): ByteArray? = runCatching {
+    org.jetbrains.skia.Image.makeFromBitmap(image.asSkiaBitmap()).encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)?.bytes
+}.getOrNull()
+
+actual object GameSounds {
+    private val format = javax.sound.sampled.AudioFormat(SoundSynth.RATE.toFloat(), 16, 1, true, false)
+    private var crowdClip: javax.sound.sampled.Clip? = null
+
+    private fun gain(clip: javax.sound.sampled.Clip, level: Float) = runCatching {
+        val c = clip.getControl(javax.sound.sampled.FloatControl.Type.MASTER_GAIN) as javax.sound.sampled.FloatControl
+        val db = (20 * kotlin.math.log10(level.coerceIn(0.01f, 1f).toDouble())).toFloat()
+        c.value = db.coerceIn(c.minimum, c.maximum)
+    }
+
+    actual fun crowd(level: Float) {
+        runCatching {
+            if (level <= 0f) { crowdClip?.stop(); crowdClip?.close(); crowdClip = null; return }
+            val clip = crowdClip ?: javax.sound.sampled.AudioSystem.getClip().also { c ->
+                val b = SoundSynth.bytes(SoundSynth.crowd)
+                c.open(format, b, 0, b.size)
+                c.loop(javax.sound.sampled.Clip.LOOP_CONTINUOUSLY)
+                crowdClip = c
+            }
+            gain(clip, level)
+        }
+    }
+
+    actual fun buzzer() {
+        runCatching {
+            val c = javax.sound.sampled.AudioSystem.getClip()
+            val b = SoundSynth.bytes(SoundSynth.buzzer)
+            c.open(format, b, 0, b.size)
+            gain(c, 0.8f)
+            c.addLineListener { e -> if (e.type == javax.sound.sampled.LineEvent.Type.STOP) c.close() }
+            c.start()
+        }
+    }
+}
+
+actual fun updateHomeWidget(title: String, line1: String, line2: String) {}

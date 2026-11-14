@@ -1,5 +1,7 @@
 package com.nh.hoopscoach
 
+import androidx.compose.ui.graphics.asAndroidBitmap
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -118,11 +120,12 @@ actual fun rememberSaveExporter(
     suggestedName: String,
     getBytes: suspend () -> ByteArray?,
     onResult: (ok: Boolean) -> Unit,
+    mime: String,
 ): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream"),
+        ActivityResultContracts.CreateDocument(mime),
     ) { uri ->
         if (uri == null) {
             onResult(false)
@@ -206,5 +209,55 @@ actual fun rememberProfilePhotoPicker(
             }.onFailure { onResult(null) }
             Unit
         }
+    }
+}
+
+actual fun encodePng(image: androidx.compose.ui.graphics.ImageBitmap): ByteArray? = runCatching {
+    val out = java.io.ByteArrayOutputStream()
+    image.asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+    out.toByteArray()
+}.getOrNull()
+
+actual object GameSounds {
+    private var crowdTrack: android.media.AudioTrack? = null
+
+    private fun track(data: ShortArray, loop: Boolean): android.media.AudioTrack {
+        val t = android.media.AudioTrack.Builder()
+            .setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_GAME)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            .setAudioFormat(android.media.AudioFormat.Builder().setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(SoundSynth.RATE).setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO).build())
+            .setTransferMode(android.media.AudioTrack.MODE_STATIC)
+            .setBufferSizeInBytes(data.size * 2)
+            .build()
+        t.write(data, 0, data.size)
+        if (loop) t.setLoopPoints(0, data.size, -1)
+        return t
+    }
+
+    actual fun crowd(level: Float) {
+        runCatching {
+            if (level <= 0f) { crowdTrack?.stop(); crowdTrack?.release(); crowdTrack = null; return }
+            val t = crowdTrack ?: track(SoundSynth.crowd, true).also { it.play(); crowdTrack = it }
+            t.setVolume(level.coerceIn(0f, 1f))
+        }
+    }
+
+    actual fun buzzer() {
+        runCatching {
+            val t = track(SoundSynth.buzzer, false)
+            t.setVolume(0.8f)
+            t.play()
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ runCatching { t.release() } }, 1500)
+        }
+    }
+}
+
+actual fun updateHomeWidget(title: String, line1: String, line2: String) {
+    runCatching {
+        val ctx = AndroidAssets.appContext ?: return
+        ctx.getSharedPreferences("hoops_widget", android.content.Context.MODE_PRIVATE).edit()
+            .putString("title", title).putString("line1", line1).putString("line2", line2).apply()
+        HoopsWidget.refresh(ctx)
     }
 }

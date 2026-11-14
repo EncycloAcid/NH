@@ -730,15 +730,10 @@ private fun LazyListScope.careerStep(vm: GameViewModel, lg: League) {
                     Text(o.note, style = T.small, color = P.accent, maxLines = 1)
                     Text(com.nh.hoopscoach.game.CoachContracts.pitch(lg, t), style = T.small, color = P.good, maxLines = 1)
                 }
-                SmallButton("Talk") { ask = true }
+                if (o.withdrawn) Tag("WITHDRAWN", P.bad)
+                else SmallButton(if (o.score >= 0) "Offer" else "Interview") { ask = true }
             }
-            if (ask) AlertDialog(
-                onDismissRequest = { ask = false }, containerColor = P.surface,
-                title = { Text("Take the ${t.school} job?", style = T.head, color = P.ink) },
-                text = { Text("You'll leave ${u.school} and take over the ${t.mascot}: their roster, budget and recruiting class.", style = T.body, color = P.sub) },
-                confirmButton = { TextButton({ ask = false; vm.act { Coaching.acceptOffer(it, t.id) }; vm.toast("Welcome to ${t.school}") }) { Text("Accept", color = P.accent) } },
-                dismissButton = { TextButton({ ask = false }) { Text("Not now", color = P.sub) } },
-            )
+            if (ask) InterviewDialog(vm, lg, o) { ask = false }
         }
     }
 }

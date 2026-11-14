@@ -126,7 +126,11 @@ object SpriteSheets {
      * - NBA: [slot] (franchise id) → `lakers`, `celtics`, …
      * - College: [abbr] → numbered college art (`01_duke`, …); else null (default jersey).
      */
+    /** Schools wearing their designed kit instead of their jersey art (see the uniform designer). */
+    @Volatile var customKits: Set<String> = emptySet()
+
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
+        if (abbr != null && abbr.uppercase() in customKits) return null
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
         if (s != null) JERSEY_BY_ABBR[s]?.let { return it }
         val a = abbr?.uppercase()?.takeIf { it.isNotBlank() } ?: return null

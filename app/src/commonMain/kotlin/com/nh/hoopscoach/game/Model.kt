@@ -448,6 +448,9 @@ class Team(
     var captains: MutableList<Int> = mutableListOf(),
     var captainVotes: MutableList<Int> = mutableListOf(),
     var captainSeason: Int = 0,
+    /** Designer: wear the team-colored kit instead of the school's jersey art, and the court's paint (0 team color, 1 second color, 2 natural wood). */
+    var customKit: Boolean = false,
+    var courtPaint: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -1019,7 +1022,16 @@ class Bubble(
 class Driver(val label: String, val detail: String, val value: String, val good: Boolean)
 
 @Serializable
-class JobOffer(val teamId: Int, val note: String)
+class JobOffer(
+    val teamId: Int,
+    val note: String,
+    /** The interview (see [Interviews]): its score (-1 until done), the terms on the table, and whether he's pushed for more. */
+    var score: Int = -1,
+    var salary: Int = 0,
+    var years: Int = 0,
+    var pushed: Boolean = false,
+    var withdrawn: Boolean = false,
+)
 
 enum class CoachSkill(val label: String, val blurb: String) {
     OFF_TACTICIAN("Off Tactician", "Gives a small boost to your offensive tactics."),
@@ -1704,6 +1716,16 @@ class League(
     /** Midnight Madness: the season it was held and how it went. */
     var madnessSeason: Int = 0,
     var madnessNote: String = "",
+    /** The summer foreign tour: the last season one was taken, and the season the user passed on it. */
+    var tourSeason: Int = 0,
+    var tourDeclined: Int = 0,
+    /** The Cinderella the league is following this March (see [Cinderella]). */
+    var cinderellaId: Int = -1,
+    var cinderellaSeason: Int = 0,
+    /** The challenge this career is playing (see [Challenges]), if any. */
+    var challenge: ChallengeRun? = null,
+    /** Crowd and horn in live games. */
+    var soundOn: Boolean = true,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

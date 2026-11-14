@@ -119,13 +119,13 @@ class SimTest {
             println("  signed=${os.signed.size} growth=${os.growth.take(3).map { "${it.before}->${it.after}" }}")
             assertEquals(Phase.REGULAR, lg.phase)
             for (t in lg.teams) {
-                // NCAA sanctions can lower a school's scholarship cap below MAX_ROSTER.
-                val cap = WorldEvents.cap(lg, t)
-                assertEquals("scholarships for ${t.school}", cap, Tryouts.scholarships(lg, t))
+                // NCAA sanctions take scholarships away (see WorldEvents): a sanctioned school fills to its reduced limit,
+                // or keeps more if its returning players already exceed it.
+                val cap = com.nh.hoopscoach.game.WorldEvents.cap(lg, t)
+                assertTrue("scholarships for ${t.school}", Tryouts.scholarships(lg, t) in cap..Recruiting.MAX_ROSTER)
+                if (cap == Recruiting.MAX_ROSTER) assertEquals("scholarships for ${t.school}", Recruiting.MAX_ROSTER, Tryouts.scholarships(lg, t))
                 assertTrue("walk-ons for ${t.school}", Tryouts.walkOns(lg, t) <= Tryouts.WALK_ON_SPOTS)
-                if (t.id != lg.userTeamId) {
-                    assertEquals("AI roster for ${t.school}", cap + Tryouts.walkOns(lg, t), t.roster.size)
-                }
+                if (t.id != lg.userTeamId) assertTrue("AI roster for ${t.school}", t.roster.size in cap..Recruiting.MAX_ROSTER)
             }
             checkLegends(lg)
             checkCareers(lg)

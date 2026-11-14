@@ -18,7 +18,7 @@ fun main() {
     val home = File(System.getProperty("user.home"), ".hoopsdynasty").apply { mkdirs() }
     PlatformContext.filesDir = home
     SaveTransfer.host = DesktopTransferHost()
-    PlatformContext.versionName = "3.4-pro.198"
+    PlatformContext.versionName = "3.4-pro.199"
     // A Windows app has no console, so errors go to a log beside the saves (the previous run's is kept).
     runCatching {
         val log = File(home, "hoops-log.txt")

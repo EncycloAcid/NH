@@ -73,6 +73,10 @@ sealed interface Route {
     /** The relationship web around a coach (kind 'C') or a team ('T'). */
     data class Web(val kind: Char, val id: Int) : Route
     data object Calendar : Route
+    data object Cinderella : Route
+    data object Designer : Route
+    data object SeasonCard : Route
+    data object Challenges : Route
     data object Explore : Route
     data class ConfPage(val confId: Int) : Route
 }
@@ -222,6 +226,25 @@ class GameViewModel : ViewModel() {
     private fun bump() {
         rev++
         scheduleSave()
+        refreshWidget()
+    }
+
+    /** The home-screen widget: team and record, the next game, the latest headline (Android only). */
+    private fun refreshWidget() {
+        val lg = league ?: return
+        runCatching {
+            val u = lg.user
+            val g = com.nh.hoopscoach.game.Season.userGameToday(lg) ?: com.nh.hoopscoach.game.Season.nextUserGame(lg)
+            val next = when {
+                lg.phase == Phase.OFFSEASON -> "Offseason"
+                lg.phase == Phase.WRAP_UP -> "Season complete: ${u.history.lastOrNull()?.result ?: ""}".trimEnd(' ', ':')
+                g != null -> "Next: ${if (g.neutral) "vs" else if (g.home == u.id) "vs" else "at"} ${lg.team(g.opp(u.id)).school}" +
+                    (if (!lg.pro) " · " + com.nh.hoopscoach.game.SeasonCalendar.dateOf(lg.season, g.day).let { "${it.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)} ${it.dayOfMonth}" } else "")
+                else -> com.nh.hoopscoach.game.Season.statusLine(lg)
+            }
+            val head = (lg.news.lastOrNull { it.mine } ?: lg.news.lastOrNull())?.text.orEmpty()
+            com.nh.hoopscoach.updateHomeWidget("${if (lg.pro) u.name else u.school} ${u.record}", next, head)
+        }
     }
 
     private var saveJob: Job? = null
@@ -647,12 +670,20 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    /** A challenge picked on the new-game screen, started along with the career. */
+    var pendingChallenge by mutableStateOf<String?>(null)
+
     fun startCareer(teamId: Int, first: String, last: String) {
         val d = draft ?: return
         ensureFreshSlot()
         busy = "Setting up your first season"
+        val challenge = pendingChallenge?.takeIf { com.nh.hoopscoach.game.Challenges.teamFor(d, it) == teamId }
+        pendingChallenge = null
         viewModelScope.launch(failSafe) {
-            withContext(Dispatchers.Default) { Offseason.claimTeam(d, teamId, first, last) }
+            withContext(Dispatchers.Default) {
+                Offseason.claimTeam(d, teamId, first, last)
+                challenge?.let { com.nh.hoopscoach.game.Challenges.begin(d, it) }
+            }
             draft = null
             league = d
             tab = Tab.TODAY

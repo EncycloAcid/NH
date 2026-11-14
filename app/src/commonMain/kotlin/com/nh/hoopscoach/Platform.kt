@@ -8,7 +8,7 @@ import java.io.File
 /** Paths and version strings that differ per platform. */
 object PlatformContext {
     lateinit var filesDir: File
-    var versionName: String = "3.4-pro.198"
+    var versionName: String = "3.4-pro.199"
 
     val saveFile: File get() = File(filesDir, "dynasty.sav")
 }
@@ -49,7 +49,11 @@ expect fun rememberSaveExporter(
     suggestedName: String,
     getBytes: suspend () -> ByteArray?,
     onResult: (ok: Boolean) -> Unit,
+    mime: String = "application/octet-stream",
 ): () -> Unit
+
+/** A picture as PNG bytes (for the shareable season card). */
+expect fun encodePng(image: androidx.compose.ui.graphics.ImageBitmap): ByteArray?
 
 /**
  * Opens an "open file" dialog and returns the file bytes, or null if cancelled.
@@ -68,3 +72,12 @@ expect fun rememberSaveImporter(
 expect fun rememberProfilePhotoPicker(
     onResult: (bytes: ByteArray?) -> Unit,
 ): () -> Unit
+
+/** Live-game sounds: the crowd at [level] 0-1 (0 stops it) and the final horn. Failures are silent. */
+expect object GameSounds {
+    fun crowd(level: Float)
+    fun buzzer()
+}
+
+/** The Android home-screen widget's lines (a no-op on PC). */
+expect fun updateHomeWidget(title: String, line1: String, line2: String)
