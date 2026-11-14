@@ -241,12 +241,9 @@ fun HomeCourtPanel(lg: League, t: com.nh.hoopscoach.game.Team) {
     HC.ensure(lg, t)
     val mine = t.id == lg.userTeamId
     val has = t.traditions.mapNotNull { HC.def(it) }
-    if (has.isEmpty() && !mine) return
     Section("Home court")
-    if (CourtArt.image(t) != null || mine) {
-        CourtPreview(t, Modifier.padding(horizontal = Gutter).fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-    }
+    CourtPreview(t, Modifier.padding(horizontal = Gutter).fillMaxWidth())
+    Spacer(Modifier.height(8.dp))
     Panel {
         if (has.isEmpty()) Text("No traditions yet. A building earns them.", style = T.body, color = P.sub)
         has.forEachIndexed { i, d ->

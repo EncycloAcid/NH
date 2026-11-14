@@ -101,7 +101,15 @@ fun DesignerScreen(vm: GameViewModel, lg: League) {
             if (!t.customKit && CourtArt.image(t) != null)
                 Text("${t.school} plays on its own court. Switch on the designed kit above to design one in your colors.", style = T.small, color = P.sub,
                     modifier = Modifier.padding(horizontal = Gutter + 4.dp))
-            else Chips(listOf("Team color paint", "Second color paint", "Natural wood"), t.courtPaint, { i -> vm.act { it.user.courtPaint = i } })
+            else {
+                Chips(listOf("Team color paint", "Second color paint", "Wood paint"), t.courtPaint, { i -> vm.act { it.user.courtPaint = i } })
+                Spacer(Modifier.height(8.dp))
+                Chips(CourtLook.STYLES, CourtLook.style(t), { i -> vm.act { it.user.courtStyle = i } })
+                Spacer(Modifier.height(8.dp))
+                Chips(CourtLook.FLOORS, CourtLook.floor(t), { i -> vm.act { it.user.courtFloor = i } })
+                Spacer(Modifier.height(8.dp))
+                Chips(CourtLook.APRONS, CourtLook.apron(t), { i -> vm.act { it.user.courtApron = i } })
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -145,29 +153,107 @@ fun CourtBanner(t: Team, modifier: Modifier = Modifier) {
     }
 }
 
-/** A court drawn in the program's colors, its abbreviation at center court. */
+/** How a school's drawn court looks: its own choices, or ones picked from its name so each school differs (and keeps its look). */
+object CourtLook {
+    private fun seed(t: Team) = (t.abbr.hashCode() * 31 + t.school.hashCode()) and 0x7fffffff
+    fun floor(t: Team) = if (t.courtFloor >= 0) t.courtFloor else seed(t) % 3
+    fun style(t: Team) = if (t.courtStyle >= 0) t.courtStyle else (seed(t) / 3) % 3
+    fun apron(t: Team) = if (t.courtApron >= 0) t.courtApron else (seed(t) / 9) % 3
+
+    val FLOORS = listOf("Maple", "Honey", "Dark wood")
+    val STYLES = listOf("Solid lane", "Outlined lane", "Two-tone lane")
+    val APRONS = listOf("Main color border", "Second color border", "Dark border")
+}
+
+/**
+ * A full court drawn for a school: planked wood, a border in its colors with the mascot on it, both lanes,
+ * the arcs and rims, and the abbreviation at center court.
+ */
 @Composable
 fun DrawnCourt(t: Team, modifier: Modifier = Modifier) {
     val primary = Color(t.primary)
     val second = Color(t.secondary)
-    val paint = when (t.courtPaint) { 0 -> primary; 1 -> second; else -> Color(0xFFC8955A) }
-    val label = onColor(primary)
-    Box(modifier.aspectRatio(1.1f).clip(RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+    val (woodA, woodB) = when (CourtLook.floor(t)) {
+        1 -> Color(0xFFD9A35F) to Color(0xFFC98C45)
+        2 -> Color(0xFFA8744A) to Color(0xFF8E5F3A)
+        else -> Color(0xFFE6C08A) to Color(0xFFD7AB70)
+    }
+    val apron = when (CourtLook.apron(t)) { 1 -> second; 2 -> Color(0xFF1A1D24); else -> primary }
+    val paint = when (t.courtPaint) { 1 -> second; 2 -> lerp(woodB, Color.Black, 0.15f); else -> primary }
+    val accent = if (paint == second) primary else second
+    val style = CourtLook.style(t)
+    val center = if (contrast(primary, woodA) >= 1.6f) primary else second
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))) {
+        val hPx = with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
         Canvas(Modifier.fillMaxSize()) {
-            drawRect(Brush.verticalGradient(listOf(Color(0xFFE2B47C), Color(0xFFC8955A))))
             val w = size.width
             val h = size.height
-            val line = Color.White.copy(alpha = 0.85f)
-            val stroke = Stroke(w * 0.012f)
-            // The lane at the bottom, the arc, the center circle at the top.
-            drawRect(paint, Offset(w * 0.34f, h * 0.55f), Size(w * 0.32f, h * 0.45f))
-            drawRect(line, Offset(w * 0.34f, h * 0.55f), Size(w * 0.32f, h * 0.45f), style = stroke)
-            drawArc(line, 180f, 180f, false, Offset(w * 0.08f, h * 0.38f), Size(w * 0.84f, h * 1.1f), style = stroke)
-            drawCircle(primary, w * 0.17f, Offset(w / 2, 0f))
-            drawCircle(line, w * 0.17f, Offset(w / 2, 0f), style = stroke)
-            drawRect(line, Offset.Zero, size, style = stroke)
+            drawRect(apron)
+            // The floor, inset in the border, in planks.
+            val fx = w * 0.05f
+            val fy = h * 0.075f
+            val fw = w - fx * 2
+            val fh = h - fy * 2
+            val rows = 18
+            val rh = fh / rows
+            for (r in 0 until rows) {
+                drawRect(if (r % 2 == 0) woodA else lerp(woodA, woodB, 0.6f), Offset(fx, fy + r * rh), Size(fw, rh + 0.5f))
+                var x = fx + ((r * 37) % 100) / 100f * fw * 0.14f
+                while (x < fx + fw) {
+                    drawLine(woodB, Offset(x, fy + r * rh), Offset(x, fy + (r + 1) * rh), strokeWidth = (h * 0.004f).coerceAtLeast(1f))
+                    x += fw * 0.14f
+                }
+            }
+            val lw = (h * 0.009f).coerceAtLeast(1.5f)
+            val line = Color.White
+            val st = Stroke(lw)
+            drawRect(line, Offset(fx, fy), Size(fw, fh), style = st)
+            drawLine(line, Offset(w / 2, fy), Offset(w / 2, fy + fh), strokeWidth = lw)
+            // Both ends, mirrored.
+            val laneW = fw * 0.19f
+            val laneH = fh * 0.32f
+            val cy = h / 2
+            for (end in 0..1) {
+                val left = end == 0
+                val laneX = if (left) fx else fx + fw - laneW
+                val lane = Offset(laneX, cy - laneH / 2)
+                when (style) {
+                    1 -> {}
+                    2 -> { drawRect(paint, lane, Size(laneW, laneH)); drawRect(accent, Offset(laneX, cy - laneH / 6), Size(laneW, laneH / 3)) }
+                    else -> drawRect(paint, lane, Size(laneW, laneH))
+                }
+                drawRect(line, lane, Size(laneW, laneH), style = st)
+                // Free-throw circle at the top of the key.
+                val ftX = if (left) fx + laneW else fx + fw - laneW
+                drawCircle(line, laneH / 2, Offset(ftX, cy), style = st)
+                // Three-point line: corners, then the arc.
+                val rimX = if (left) fx + fw * 0.055f else fx + fw * 0.945f
+                val arcR = fh * 0.44f
+                val cornerY = fh * 0.06f
+                val cornerLen = fw * 0.1f
+                val cx0 = if (left) fx else fx + fw - cornerLen
+                drawLine(line, Offset(cx0, fy + cornerY), Offset(cx0 + cornerLen, fy + cornerY), strokeWidth = lw)
+                drawLine(line, Offset(cx0, fy + fh - cornerY), Offset(cx0 + cornerLen, fy + fh - cornerY), strokeWidth = lw)
+                drawArc(line, if (left) -68f else 112f, 136f, false, Offset(rimX - arcR, cy - arcR), Size(arcR * 2, arcR * 2), style = st)
+                // Backboard and rim.
+                val bx = if (left) fx + fw * 0.035f else fx + fw * 0.965f
+                drawLine(line, Offset(bx, cy - fh * 0.05f), Offset(bx, cy + fh * 0.05f), strokeWidth = lw * 1.4f)
+                drawCircle(Color(0xFFE8622A), fh * 0.022f, Offset(rimX, cy), style = Stroke(lw * 1.2f))
+            }
+            // Center court.
+            val r = fh * 0.16f
+            drawCircle(center, r, Offset(w / 2, cy))
+            drawCircle(line, r, Offset(w / 2, cy), style = st)
+            drawCircle(accent.copy(alpha = 0.9f), r * 0.82f, Offset(w / 2, cy), style = Stroke(lw * 0.8f))
         }
-        Text(t.abbr, style = T.title.copy(fontSize = 22.sp), color = label, modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp))
+        val abbrSize = with(androidx.compose.ui.platform.LocalDensity.current) { (hPx * 0.12f).toSp() }
+        val sideSize = with(androidx.compose.ui.platform.LocalDensity.current) { (hPx * 0.045f).toSp() }
+        Text(t.abbr, style = T.title.copy(fontSize = abbrSize, lineHeight = abbrSize), color = onColor(center), modifier = Modifier.align(Alignment.Center))
+        val onApron = onColor(apron)
+        Text(t.mascot.uppercase(), style = T.label.copy(fontSize = sideSize, lineHeight = sideSize, letterSpacing = 2.sp), color = onApron,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = with(androidx.compose.ui.platform.LocalDensity.current) { (hPx * 0.012f).toDp() }))
+        Text(t.mascot.uppercase(), style = T.label.copy(fontSize = sideSize, lineHeight = sideSize, letterSpacing = 2.sp), color = onApron,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = with(androidx.compose.ui.platform.LocalDensity.current) { (hPx * 0.012f).toDp() }))
     }
 }
 

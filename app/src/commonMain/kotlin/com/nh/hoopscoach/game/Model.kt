@@ -453,6 +453,10 @@ class Team(
     /** Designer: wear the team-colored kit instead of the school's jersey art, and the court's paint (0 team color, 1 second color, 2 natural wood). */
     var customKit: Boolean = false,
     var courtPaint: Int = 0,
+    /** Designed court: floor (0 maple, 1 honey, 2 dark), lane style (0 solid, 1 outline, 2 two-tone), border (0 main color, 1 second, 2 dark); -1 = the school's own. */
+    var courtFloor: Int = -1,
+    var courtStyle: Int = -1,
+    var courtApron: Int = -1,
     /** A negotiated apparel deal: pay a season ($K, 0 = the brand's standard), the Final Four bonus, and bids waiting on the user, "BRAND|pay|years|bonus". */
     var apparelPay: Int = 0,
     var apparelBonus: Int = 0,
