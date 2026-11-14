@@ -14,6 +14,7 @@ import com.nh.hoopscoach.game.Rng
 import com.nh.hoopscoach.game.SaveIO
 import com.nh.hoopscoach.game.Season
 import com.nh.hoopscoach.game.StatLine
+import com.nh.hoopscoach.game.WorldEvents
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -118,9 +119,13 @@ class SimTest {
             println("  signed=${os.signed.size} growth=${os.growth.take(3).map { "${it.before}->${it.after}" }}")
             assertEquals(Phase.REGULAR, lg.phase)
             for (t in lg.teams) {
-                assertEquals("scholarships for ${t.school}", Recruiting.MAX_ROSTER, Tryouts.scholarships(lg, t))
+                // NCAA sanctions can lower a school's scholarship cap below MAX_ROSTER.
+                val cap = WorldEvents.cap(lg, t)
+                assertEquals("scholarships for ${t.school}", cap, Tryouts.scholarships(lg, t))
                 assertTrue("walk-ons for ${t.school}", Tryouts.walkOns(lg, t) <= Tryouts.WALK_ON_SPOTS)
-                if (t.id != lg.userTeamId) assertEquals("AI roster for ${t.school}", Recruiting.MAX_ROSTER, t.roster.size)
+                if (t.id != lg.userTeamId) {
+                    assertEquals("AI roster for ${t.school}", cap + Tryouts.walkOns(lg, t), t.roster.size)
+                }
             }
             checkLegends(lg)
             checkCareers(lg)
