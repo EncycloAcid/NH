@@ -244,6 +244,22 @@ actual object GameSounds {
         }
     }
 
+    private val shots = HashMap<String, javax.sound.sampled.Clip>()
+
+    actual fun play(name: String, volume: Float) {
+        runCatching {
+            val c = shots[name] ?: run {
+                val data = SoundSynth.sound(name) ?: return
+                val b = SoundSynth.bytes(data)
+                javax.sound.sampled.AudioSystem.getClip().also { it.open(format, b, 0, b.size); shots[name] = it }
+            }
+            c.stop()
+            c.framePosition = 0
+            gain(c, volume)
+            c.start()
+        }
+    }
+
     actual fun buzzer() {
         runCatching {
             val c = javax.sound.sampled.AudioSystem.getClip()

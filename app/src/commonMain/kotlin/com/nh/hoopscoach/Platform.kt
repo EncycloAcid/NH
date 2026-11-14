@@ -8,7 +8,7 @@ import java.io.File
 /** Paths and version strings that differ per platform. */
 object PlatformContext {
     lateinit var filesDir: File
-    var versionName: String = "3.4-pro.204"
+    var versionName: String = "3.4-pro.205"
 
     val saveFile: File get() = File(filesDir, "dynasty.sav")
 }
@@ -77,6 +77,8 @@ expect fun rememberProfilePhotoPicker(
 expect object GameSounds {
     fun crowd(level: Float)
     fun buzzer()
+    /** A one-shot from [SoundSynth.sound] ("swish", "whistle", "chant", "roar"); a repeat restarts it. */
+    fun play(name: String, volume: Float)
 }
 
 /** The Android home-screen widget's lines (a no-op on PC). */

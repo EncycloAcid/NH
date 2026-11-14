@@ -243,6 +243,21 @@ actual object GameSounds {
         }
     }
 
+    private val shots = HashMap<String, android.media.AudioTrack>()
+
+    actual fun play(name: String, volume: Float) {
+        runCatching {
+            val t = shots[name] ?: run {
+                val data = SoundSynth.sound(name) ?: return
+                track(data, false).also { shots[name] = it }
+            }
+            if (t.playState == android.media.AudioTrack.PLAYSTATE_PLAYING) t.stop()
+            t.reloadStaticData()
+            t.setVolume(volume.coerceIn(0f, 1f))
+            t.play()
+        }
+    }
+
     actual fun buzzer() {
         runCatching {
             val t = track(SoundSynth.buzzer, false)

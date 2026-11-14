@@ -94,13 +94,52 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         val level = 0.16f + (if (late) ((300 - e.clock) / 300).toFloat() * 0.55f else 0f) + (if (margin <= 3) 0.08f else 0f)
         com.nh.hoopscoach.GameSounds.crowd(level.coerceAtMost(0.85f))
     }
+    // Plays as they happen: the net on a make, the whistle on a foul, and the student section's
+    // "DE-FENSE!" when the other team gets on a run (at most every 25 seconds, and no faster than the eye).
+    val heard = remember(lv) { intArrayOf(e.events.size) }
+    // Made in code, so build them off the main thread before the first one is needed.
+    LaunchedEffect(lv) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            com.nh.hoopscoach.SoundSynth.let { it.swish; it.whistle; it.chant; it.roar; it.buzzer; it.crowd }
+        }
+    }
+    val lastSwish = remember(lv) { longArrayOf(0L) }
+    val lastChant = remember(lv) { longArrayOf(0L) }
+    LaunchedEffect(tick, soundOn) {
+        val evs = e.events
+        if (!soundOn || lv.speed == 0) { heard[0] = evs.size; return@LaunchedEffect }
+        val now = System.currentTimeMillis()
+        for (k in heard[0].coerceAtMost(evs.size) until evs.size) {
+            val ev = evs[k]
+            if (ev.points >= 1 && now - lastSwish[0] > (if (ev.points == 1) 400 else 250)) {
+                com.nh.hoopscoach.GameSounds.play("swish", if (ev.points == 1) 0.4f else 0.7f)
+                lastSwish[0] = now
+            }
+            if (ev.points == 0 && ev.text.contains("foul", ignoreCase = true)) com.nh.hoopscoach.GameSounds.play("whistle", 0.45f)
+        }
+        heard[0] = evs.size
+        val mine = if (e.teams[0].id == lg.userTeamId) 0 else 1
+        var run = 0
+        for (k in evs.indices.reversed()) {
+            val ev = evs[k]
+            if (ev.points <= 0) continue
+            if (ev.side == mine) break
+            run += ev.points
+        }
+        if (run >= 8 && !e.finished && now - lastChant[0] > 25_000) {
+            com.nh.hoopscoach.GameSounds.play("chant", 0.6f)
+            lastChant[0] = now
+        }
+    }
     var horn by remember(lv) { mutableStateOf(false) }
     LaunchedEffect(e.finished, soundOn) {
         if (e.finished && !horn && soundOn) {
             horn = true
             com.nh.hoopscoach.GameSounds.crowd(0.9f)
             com.nh.hoopscoach.GameSounds.buzzer()
-            kotlinx.coroutines.delay(1600)
+            // A buzzer-beater brings the house down.
+            if (e.buzzerBeater != null) { com.nh.hoopscoach.GameSounds.crowd(1f); com.nh.hoopscoach.GameSounds.play("roar", 1f) }
+            kotlinx.coroutines.delay(if (e.buzzerBeater != null) 3200 else 1600)
             com.nh.hoopscoach.GameSounds.crowd(0f)
         }
     }
