@@ -229,12 +229,16 @@ fun DrawnCourt(t: Team, modifier: Modifier = Modifier) {
                 // Three-point line: corners, then the arc.
                 val rimX = if (left) fx + fw * 0.055f else fx + fw * 0.945f
                 val arcR = fh * 0.44f
-                val cornerY = fh * 0.06f
-                val cornerLen = fw * 0.1f
-                val cx0 = if (left) fx else fx + fw - cornerLen
-                drawLine(line, Offset(cx0, fy + cornerY), Offset(cx0 + cornerLen, fy + cornerY), strokeWidth = lw)
-                drawLine(line, Offset(cx0, fy + fh - cornerY), Offset(cx0 + cornerLen, fy + fh - cornerY), strokeWidth = lw)
-                drawArc(line, if (left) -68f else 112f, 136f, false, Offset(rimX - arcR, cy - arcR), Size(arcR * 2, arcR * 2), style = st)
+                // The straight corner lines run from the baseline to exactly where the arc begins.
+                val half = 68f
+                val rad = Math.toRadians(half.toDouble())
+                val ey = (arcR * kotlin.math.sin(rad)).toFloat()
+                val ex = (arcR * kotlin.math.cos(rad)).toFloat()
+                val from = if (left) fx else rimX - ex
+                val to = if (left) rimX + ex else fx + fw
+                drawLine(line, Offset(from, cy - ey), Offset(to, cy - ey), strokeWidth = lw)
+                drawLine(line, Offset(from, cy + ey), Offset(to, cy + ey), strokeWidth = lw)
+                drawArc(line, if (left) -half else 180f - half, half * 2, false, Offset(rimX - arcR, cy - arcR), Size(arcR * 2, arcR * 2), style = st)
                 // Backboard and rim.
                 val bx = if (left) fx + fw * 0.035f else fx + fw * 0.965f
                 drawLine(line, Offset(bx, cy - fh * 0.05f), Offset(bx, cy + fh * 0.05f), strokeWidth = lw * 1.4f)
