@@ -93,6 +93,13 @@ private fun proLast(lg: League, p: Player): String {
 
 @Composable
 fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
+    // Printed like the college issue: paper, ink, the team's color as the spot color.
+    val paper = remember(lg.user.primary, lg.user.secondary) { paperPalette(Color(lg.user.primary), Color(lg.user.secondary)) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalPalette provides paper, LocalPrint provides true) { NbaPreviewIssue(vm, lg) }
+}
+
+@Composable
+private fun NbaPreviewIssue(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { NbaPreviews.current(lg) }
     if (pv == null) { vm.back(); return }
     val list = nbaPages(lg, pv)
@@ -100,7 +107,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
     val pager = rememberPagerState { list.size }
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, list.lastIndex)) }; Unit }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(P.bg)) {
         BackBar("Preview ${pv.season}", list[pager.currentPage].second, onBack = { vm.back() }, actions = {
         })
         Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -125,7 +132,7 @@ fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
                 // The cover lands with a little spring and a sweep of light; the rest turn like pages.
                 LazyColumn(Modifier.fillMaxSize().background(P.bg).then(if (page == 0) Modifier.popIn(pv.season).sheen() else Modifier)) {
                     val (kicker, title) = list[page]
-                    if (page > 0) item { PageHead(kicker, title, page + 1) }
+                    if (page > 0) item { PageHead(kicker, title, page + 1, "Hoops Dynasty Pro · ${pv.season} Season Preview") }
                     when (val id = ids[page]) {
                         "cover" -> nbaCover(lg, pv, list.size, onRead = { go(1) }, onSkip = { vm.back() })
                         "inside" -> nbaContents(lg, pv, list, go)
@@ -307,54 +314,15 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
     item {
         val top = NbaPreviews.ranked(lg, pv).first()
         val star = NbaPreviews.star(lg, top)
-        val primary = teamCard(top)
-        val secondary = Color(top.secondary)
-        val fg = onColor(primary)
-        val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
         val to = proj(pv, top)
-        val u = lg.user
-        val uo = proj(pv, u)
-        val lines = pv.stories.filter { it.kicker != "Your team" && it.kicker != "Spotlight" && it.teamId != top.id }.take(3)
-        Spacer(Modifier.height(6.dp))
-        Column(
-            Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                .background(Brush.verticalGradient(listOf(primary, lerp(primary, Color.Black, 0.55f)))).padding(20.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("HOOPS DYNASTY PRO", style = T.label, color = fg.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
-                Text("${pv.season} SEASON", style = T.label, color = fg.copy(alpha = 0.85f))
-            }
-            Text("PREVIEW", style = T.hero.copy(fontSize = 56.sp, lineHeight = 54.sp, letterSpacing = 2.sp), color = fg)
-            Box(Modifier.fillMaxWidth().height(3.dp).background(accent))
-            Spacer(Modifier.height(16.dp))
-            Text(pv.headline.ifEmpty { "The team to beat" }.uppercase(), style = T.title.copy(fontSize = 36.sp, lineHeight = 37.sp), color = accent)
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (star != null) PlayerJersey(star, top, 104.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("TITLE FAVORITE · ${odd(to.title)}", style = T.label, color = accent)
-                    Text(top.name.uppercase(), style = T.title.copy(fontSize = 30.sp, lineHeight = 31.sp), color = fg, maxLines = 2)
-                    if (star != null) Text("${star.name} · ${star.posLabel}", style = T.small, color = fg.copy(alpha = 0.85f))
-                    Text("Projected ${to.w}-${to.l} · Finals ${odd(to.finals)}", style = T.small, color = fg.copy(alpha = 0.85f))
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            lines.forEach { CoverLine(it.kicker, it.head, fg, accent) }
-            Spacer(Modifier.height(12.dp))
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.28f)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TeamBadge(u, 40.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.75f))
-                    Text("${u.name}: ${uo.w}-${uo.l}, about ${Previews.ordinal(uo.seed.roundToInt())} in the ${lg.conf(u.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }}", style = T.bodyB, color = Color.White, maxLines = 2)
-                    Text("Playoffs ${odd(uo.playoffs)} · Title ${odd(uo.title)} · ${uo.lo} to ${uo.hi} wins", style = T.small, color = Color.White.copy(alpha = 0.85f))
-                }
-            }
-        }
+        val lines = pv.stories.filter { it.kicker != "Your team" && it.kicker != "Spotlight" && it.teamId != top.id }.take(3).map { it.kicker to it.head }
+        ClassicCover(
+            masthead = "HOOPS DYNASTY PRO", issue = "${pv.season} SEASON PREVIEW", footer = "THE ${pv.season} NBA PREVIEW ISSUE",
+            team = top, star = star, headline = pv.headline.ifEmpty { "The team to beat" },
+            name = top.name, label = "TITLE FAVORITE · ${odd(to.title)}",
+            dek = listOfNotNull(star?.let { "${it.name} · ${it.posLabel}" }, "Projected ${to.w}-${to.l} · Finals ${odd(to.finals)}").joinToString("\n"),
+            sticker = "NO. 1" to "${odd(to.title)} TITLE ODDS", lines = lines,
+        ) { NbaUserBox(lg, pv) }
     }
 }
 
@@ -693,7 +661,7 @@ private fun LazyListScope.offseason(vm: GameViewModel, lg: League) {
         }
         if (moved.isEmpty() && ps.faMoves.isEmpty() && trades.isEmpty() && ps.staffMoves.isEmpty()) {
             Spacer(Modifier.height(8.dp))
-            Panel { Text("A quiet summer: the league starts where it left off.", style = T.body, color = P.sub) }
+            Panel { Text("A quiet summer: the league starts where it left off.", style = bodyCopy, color = P.sub) }
         }
     }
 }
@@ -704,7 +672,7 @@ private fun LazyListScope.rookies(vm: GameViewModel, lg: League, pv: NbaPreview)
     item {
         Deck("The new class, in draft order, with each rookie's Rookie of the Year odds.")
         Spacer(Modifier.height(8.dp))
-        if (class_.isEmpty()) Panel { Text("No rookies this season.", style = T.body, color = P.sub) }
+        if (class_.isEmpty()) Panel { Text("No rookies this season.", style = bodyCopy, color = P.sub) }
         GroupList(class_, inset = 70.dp) { p ->
             val pick = NbaPreviews.draftPick(lg, p)
             val roy = pv.roy.firstOrNull { it.pid == p.id }?.p ?: 0.0
@@ -810,7 +778,7 @@ private fun LazyListScope.nbaTeamReport(vm: GameViewModel, lg: League, pv: NbaPr
         if (!pv.reports.containsKey(u.id)) {
             Section("The bottom line")
             Panel {
-                Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = T.body, color = P.ink)
+                Text(remember(u.id, lg.season) { com.nh.hoopscoach.game.Takes.nbaBottom(lg, pv, u) }, style = bodyCopy, color = P.ink)
             }
         }
     }

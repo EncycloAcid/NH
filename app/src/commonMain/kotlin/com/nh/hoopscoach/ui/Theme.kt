@@ -135,6 +135,29 @@ fun palette(dark: Boolean, primary: Color?, secondary: Color?): Palette {
 }
 
 
+/**
+ * Magazine paper: cream stock, ink-black type, and the school's color as the spot color, the same in
+ * light and dark mode (a magazine is printed). Used by the season previews.
+ */
+fun paperPalette(primary: Color?, secondary: Color?): Palette {
+    val surface = Color(0xFFFAF6EC)
+    val accent = primary?.let { accentFrom(it, secondary ?: it, false) } ?: Color(0xFF9B1C1C)
+    return Palette(
+        dark = false,
+        bg = Color(0xFFF1EBDD), surface = surface, surface2 = Color(0xFFE8E0CE),
+        ink = Color(0xFF1B1813), sub = Color(0xFF5A5246), faint = Color(0xFF948A79), line = Color(0xFFD6CBB5),
+        accent = accent, onAccent = onColor(accent), accentSoft = mix(surface, accent, 0.14f),
+        good = Color(0xFF1E7a3A), bad = Color(0xFFB42318), warn = Color(0xFF9A5B0B), gold = Color(0xFF9C6B12),
+        hero = accent, onHero = onColor(accent),
+    )
+}
+
+/** Inside a printed page (the previews): cards lie flat on the paper and body copy is set in a serif. */
+val LocalPrint = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Body copy: the app's sans, or a book serif on a printed page. */
+val bodyCopy: TextStyle @Composable get() = if (LocalPrint.current) T.body.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp) else T.body
+
 // ---------- type ----------
 
 /** Condensed arena-style face for scores, ratings and titles. */

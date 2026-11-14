@@ -134,6 +134,17 @@ fun BackBar(title: String, sub: String? = null, onBack: () -> Unit, actions: @Co
 fun Section(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
     // With a link the row trades its own padding for the link's taller tap area, so the section sits the same.
     val link = action != null
+    if (LocalPrint.current) {
+        // In print: a full-width rule over small capitals, like a magazine section head.
+        Column(modifier.fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = 20.dp, bottom = if (link) 0.dp else 8.dp)) {
+            Box(Modifier.fillMaxWidth().height(2.dp).background(P.ink))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title.uppercase(), style = T.label.copy(fontSize = 12.sp, letterSpacing = 2.sp), color = P.ink, modifier = Modifier.weight(1f).padding(top = 6.dp))
+                if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
+            }
+        }
+        return
+    }
     Row(modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = if (link) 14.dp else 22.dp, bottom = if (link) 0.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = 3.dp, height = 12.dp).clip(RoundedCornerShape(2.dp)).background(P.accent))
         Spacer(Modifier.width(7.dp))
@@ -147,7 +158,10 @@ fun Section(title: String, modifier: Modifier = Modifier, action: String? = null
 fun Panel(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(16.dp), color: Color = P.surface, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     // Cards rise into place as a screen opens (see [reveal]).
     val hero = color == P.hero
-    val m = modifier.reveal().padding(horizontal = Gutter).fillMaxWidth().clip(CardShape).background(color).then(if (hero) Modifier.sheen() else Modifier)
+    val print = LocalPrint.current
+    // In print the plain cards lie flat on the paper; colored boxes keep their color, with square corners.
+    val m = modifier.reveal().padding(horizontal = Gutter).fillMaxWidth().clip(if (print) androidx.compose.ui.graphics.RectangleShape else CardShape)
+        .background(if (print && color == P.surface) Color.Transparent else color).then(if (hero && !print) Modifier.sheen() else Modifier)
     Column((if (onClick != null) m.hoverClick(onClick, tint = if (hero) Color.White else P.ink) else m).padding(padding), content = content)
 }
 
@@ -155,11 +169,14 @@ fun Panel(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(
 @Composable
 fun <T> GroupList(items: List<T>, modifier: Modifier = Modifier, inset: Dp = 16.dp, row: @Composable (T) -> Unit) {
     if (items.isEmpty()) return
+    val print = LocalPrint.current
     Panel(modifier, padding = PaddingValues(0.dp)) {
+        if (print) Hairline()
         items.forEachIndexed { i, it ->
             row(it)
-            if (i < items.lastIndex) Hairline(Modifier.padding(start = inset))
+            if (i < items.lastIndex) Hairline(Modifier.padding(start = if (print) 0.dp else inset))
         }
+        if (print) Hairline()
     }
 }
 
