@@ -109,7 +109,7 @@ object Season {
                 if (p.ovr >= p.pot && p.id != lg.heroId) continue
                 // Light practice XP: games do most of the growing, so the league doesn't creep up every day.
                 val base = 4 * Ratings.devRate(p, dev)
-                val xp = if (Redshirts.sitting(p)) base * 1.25 else base
+                val xp = (if (Redshirts.sitting(p)) base * 1.25 else base) * Culture.mentorBoost(lg, p)
                 Ratings.addXp(p, xp.roundToInt())
                 Tryouts.checkStar(lg, t, p)
             }

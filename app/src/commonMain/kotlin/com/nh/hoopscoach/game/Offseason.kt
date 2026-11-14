@@ -268,7 +268,11 @@ object Offseason {
                 val before = p.ovr
                 val attrs = p.attrs.copyOf()
                 val brokeOut = Tryouts.summer(p)
-                if (p.id == lg.heroId && lg.road != null) Earned.hero(lg, p, dev) else Ratings.offseasonGrowth(p, dev)
+                // A freshman who had a mentor this season makes a bigger jump.
+                val mentored = Culture.summerBoost(lg, p)
+                if (p.id == lg.heroId && lg.road != null) Earned.hero(lg, p, dev)
+                else if (mentored > 1.0) Ratings.offseasonGrowth(p, dev, (0.18 + Rng.d() * 0.16) * mentored)
+                else Ratings.offseasonGrowth(p, dev)
                 DevPlans.apply(lg, t, p)
                 DevPlans.report(lg, t, p, before)
                 val gains = IntArray(10) { p.attrs[it] - attrs[it] }

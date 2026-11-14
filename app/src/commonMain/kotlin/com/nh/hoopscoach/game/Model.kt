@@ -286,6 +286,9 @@ class Player(
     var highGames: MutableList<String> = mutableListOf(),
     /** What he remembers, and how it ties him to a school or turns him against it (see [Memories]). */
     var memories: MutableList<Memory> = mutableListOf(),
+    /** The upperclassman bringing him along (-1: none), and the last season he had one (see [Culture]). */
+    var mentorId: Int = -1,
+    var mentoredSeason: Int = 0,
     /** For former players: the last school and how he left. */
     var lastTeam: Int = -1,
     var left: String = "",
@@ -441,6 +444,10 @@ class Team(
     /** Home-court traditions (see [HomeCourt]), and whether the building's own have been given yet. */
     var traditions: MutableList<String> = mutableListOf(),
     var traditionsSet: Boolean = false,
+    /** Captains the players voted for, their votes, and the season of the vote (see [Culture]). */
+    var captains: MutableList<Int> = mutableListOf(),
+    var captainVotes: MutableList<Int> = mutableListOf(),
+    var captainSeason: Int = 0,
 ) {
     val name get() = "$school $mascot"
     val gp get() = w + l
@@ -1694,6 +1701,9 @@ class League(
     var recruitRivals: MutableList<RecruitRival> = mutableListOf(),
     /** Every season the user ended holding a rivalry trophy. */
     var trophyShelf: MutableList<TrophyYear> = mutableListOf(),
+    /** Midnight Madness: the season it was held and how it went. */
+    var madnessSeason: Int = 0,
+    var madnessNote: String = "",
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

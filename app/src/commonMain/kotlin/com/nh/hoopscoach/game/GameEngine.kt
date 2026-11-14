@@ -118,6 +118,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val homeEdge = Rankings.homeElo(lg, game) / Rankings.HOME_ELO
     /** The home team's building and its traditions, in a real home game (see [HomeCourt]). */
     private val court: Team? = if (game.neutral) null else teams[0].also { HomeCourt.ensure(lg, it) }
+    /** Each side's chemistry edge: added make chance and turnovers saved (see [Culture]). */
+    private val chem = Array(2) { side -> if (lg.pro) 0.0 to 0.0 else Culture.gameEdge(Culture.chemistry(lg, teams[side])) }
 
     init {
         if (game.att <= 0) game.att = Rivalries.attendance(lg, game)
@@ -181,6 +183,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
         p += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
+        p += chem[o].first
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
@@ -949,6 +952,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         when (def(d)) { Defense.PRESS -> pTo += 0.035; Defense.PACKLINE -> pTo -= 0.012; Defense.ZONE -> pTo -= 0.006; else -> {} }
         when (off(o)) { Offense.UPTEMPO -> pTo += 0.01; Offense.GRIND -> pTo -= 0.012; else -> {} }
         if (o == 1) pTo += HomeCourt.visitorTurnovers(court)
+        pTo -= chem[o].second
         pTo -= (coaches[o].off - 70) * 0.0004 * coaching
         if (lg.pro) pTo *= 0.9
         pTo = pTo.coerceIn(0.07, 0.3)
@@ -1015,6 +1019,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             pMake += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
+            pMake += chem[o].first
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012

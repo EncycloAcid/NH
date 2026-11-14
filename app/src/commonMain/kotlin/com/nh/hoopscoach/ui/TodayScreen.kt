@@ -87,6 +87,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PressCard(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
+        item { MidnightMadnessCard(vm, lg) }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }

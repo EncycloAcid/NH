@@ -93,11 +93,16 @@ object Morale {
 
     /** Daily drift toward the target mood. */
     fun tick(lg: League) {
-        for (t in lg.teams) for (pid in t.roster) {
+        for (t in lg.teams) {
+            if (!lg.pro) Culture.ensureCaptains(lg, t)
+            val chem = if (lg.pro) 50 else Culture.chemistry(lg, t)
+            val lead = if (lg.pro) 0 else Culture.captainLeadership(lg, t)
+            for (pid in t.roster) {
             val p = lg.player(pid)
             if (p.year == 0) continue
-            val tg = target(lg, t, p)
+            val tg = target(lg, t, p) + if (lg.pro) 0.0 else Culture.moodPull(lg, t, p, chem, lead)
             p.happiness = (p.happiness + (tg - p.happiness) * 0.12).roundToInt().coerceIn(0, 100)
+            }
         }
     }
 

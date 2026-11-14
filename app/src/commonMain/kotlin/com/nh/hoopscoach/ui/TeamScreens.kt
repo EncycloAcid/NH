@@ -434,7 +434,11 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
     }
     item {
         val c = lg.coachOf(t)
-        if (t.id == lg.userTeamId && !lg.playerMode) { Spacer(Modifier.height(8.dp)); StaffLink(vm, lg) }
+        if (t.id == lg.userTeamId && !lg.playerMode) {
+            Spacer(Modifier.height(8.dp)); StaffLink(vm, lg)
+            LockerRoomPanel(vm, lg, t)
+            MentorsPanel(vm, lg, t)
+        }
         Section("Coaching staff", action = "Develop", onAction = { vm.push(Route.CoachDev) })
         Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
