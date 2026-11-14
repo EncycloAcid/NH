@@ -813,6 +813,7 @@ class GameViewModel : ViewModel() {
     fun openGuide(g: Guide, tab: Int = guideTab) { guideTab = tab; guide = g }
 
     fun back(): Boolean {
+        if (busy != null) return true       // nothing moves while the league is being worked on
         if (guide != null) { guide = null; return true }
         if (sheet != null) { sheet = null; return true }
         val top = stack.lastOrNull() ?: return false

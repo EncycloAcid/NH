@@ -59,7 +59,7 @@ object Motion {
     val Press = spring<Float>(dampingRatio = 0.72f, stiffness = 700f)
     val Pop = spring<Float>(dampingRatio = 0.78f, stiffness = 420f)
     val Pulse = spring<Float>(dampingRatio = 0.58f, stiffness = Spring.StiffnessMediumLow)
-    val Enter = tween<Float>(520, easing = EmphasizedDecel)
+    val Enter = tween<Float>(420, easing = EmphasizedDecel)
     val EnterQuick = tween<Float>(280, easing = EmphasizedDecel)
 }
 
@@ -69,33 +69,28 @@ val LocalScreenStart = compositionLocalOf { 0L }
 fun now() = System.currentTimeMillis()
 
 /**
- * Card entrance: rises and fades in. During the first ~700ms of a screen open, lower cards
- * wait a beat so the page fills as a wave from the top; later scroll-ins just rise quickly.
+ * Card entrance: rises and fades in as a screen opens, lower cards a beat later so the page fills as a
+ * wave from the top. Only then: a card scrolled into view later, or coming back into view, is simply
+ * there (animating every scroll-in made long lists flicker as you scrolled back up).
  */
 fun Modifier.reveal(): Modifier = composed {
     val start = LocalScreenStart.current
+    val opening = remember { now() - start < 600 }
+    if (!opening) return@composed Modifier
     val screenH = LocalWindowInfo.current.containerSize.height.toFloat().coerceAtLeast(1f)
-    val rise = with(LocalDensity.current) { 22.dp.toPx() }
+    val rise = with(LocalDensity.current) { 16.dp.toPx() }
     val p = remember { Animatable(0f) }
     var y by remember { mutableFloatStateOf(-1f) }
     LaunchedEffect(Unit) {
-        val opening = now() - start < 700
-        if (opening) {
-            val top = withTimeoutOrNullSafe { snapshotFlow { y }.first { it >= 0f } } ?: 0f
-            delay((top / screenH).coerceIn(0f, 1f).times(300).toLong())
-            p.animateTo(1f, Motion.Enter)
-        } else {
-            p.animateTo(1f, Motion.EnterQuick)
-        }
+        val top = withTimeoutOrNullSafe { snapshotFlow { y }.first { it >= 0f } } ?: 0f
+        delay((top / screenH).coerceIn(0f, 1f).times(220).toLong())
+        p.animateTo(1f, Motion.Enter)
     }
-    this.onGloballyPositioned { if (y < 0f) y = it.positionInWindow().y }
+    Modifier.onGloballyPositioned { if (y < 0f) y = it.positionInWindow().y }
         .graphicsLayer {
             val v = p.value
             alpha = v
             translationY = (1f - v) * rise
-            val s = 0.97f + 0.03f * v
-            scaleX = s
-            scaleY = s
         }
 }
 

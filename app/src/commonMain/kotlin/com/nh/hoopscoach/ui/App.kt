@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,8 +95,10 @@ fun App(vm: GameViewModel) {
     HoopsTheme(user?.let { Color(it.primary) }, user?.let { Color(it.secondary) }) {
         Box(Modifier.fillMaxSize().background(P.bg)) {
             val busy = vm.busy
-            // Loading, a long sim and the game itself fade into each other.
-            val mode = when { vm.loading -> 0; busy != null -> 1; lg == null -> 2; else -> 3 }
+            // Loading, building a league and the game itself fade into each other. Work on a league that's
+            // already open (a sim, the offseason) keeps the screen where it is under a cover (see [BusyCover]),
+            // so the page isn't torn down and rebuilt, and its cards don't all animate in again, every sim day.
+            val mode = when { vm.loading -> 0; busy != null && lg == null -> 1; lg == null -> 2; else -> 3 }
             androidx.compose.animation.AnimatedContent(
                 mode, label = "mode",
                 transitionSpec = { (androidx.compose.animation.fadeIn(tween(360, 60)) + androidx.compose.animation.scaleIn(tween(420, 60, easing = Motion.EmphasizedDecel), 0.97f)) togetherWith androidx.compose.animation.fadeOut(tween(160)) },
@@ -110,7 +113,33 @@ fun App(vm: GameViewModel) {
                     else -> vm.league?.let { l -> androidx.compose.runtime.CompositionLocalProvider(LocalRatingScale provides (if (l.pro) com.nh.hoopscoach.game.Ratings::shownPro else { v: Int -> v }), LocalRetroAll provides l.retroAll, LocalPfpSeed provides pfpSeedOf(l)) { Shell(vm, l) } }
                 }
             }
+            if (busy != null && lg != null) BusyCover(vm)
             Toast(vm)
+        }
+    }
+}
+
+/**
+ * While a league is being worked on: swallows every tap at once (the screen underneath mustn't change
+ * while the league does), and only shows the working screen if it takes longer than a quarter second,
+ * so a quick sim day doesn't flash.
+ */
+@Composable
+private fun BusyCover(vm: GameViewModel) {
+    var show by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(250)
+        show = true
+    }
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
+            }
+        },
+    ) {
+        androidx.compose.animation.AnimatedVisibility(show, enter = androidx.compose.animation.fadeIn(tween(200)), exit = androidx.compose.animation.fadeOut(tween(120))) {
+            BusyScreen(vm.busy ?: "Working", vm.progress, vm.progressNote)
         }
     }
 }
