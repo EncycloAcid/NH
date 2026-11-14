@@ -173,6 +173,10 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         // play-by-play step aside and the rest scrolls, so the card and its buttons always fit.
         val focus = !e.finished && (lv.moment != null || lv.call != null)
         Column(if (focus) Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
+        if (!e.game.neutral && !focus) {
+            CourtBanner(home, Modifier.padding(horizontal = Gutter).fillMaxWidth().height(76.dp))
+            Spacer(Modifier.height(6.dp))
+        }
         Scoreboard(away, home, e.score[1], e.score[0], if (e.finished) "FINAL" else clock(e.clock.toInt().coerceAtLeast(0)), if (e.finished) "" else e.periodLabel, lg.userTeamId)
         Spacer(Modifier.height(8.dp))
         CrowdLine(lg, e.game)

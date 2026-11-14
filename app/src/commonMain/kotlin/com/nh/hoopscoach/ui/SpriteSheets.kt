@@ -131,6 +131,11 @@ object SpriteSheets {
 
     fun jerseyKey(abbr: String?, slot: String? = null, name: String? = null): String? {
         if (abbr != null && abbr.uppercase() in customKits) return null
+        return artKey(abbr, slot)
+    }
+
+    /** The school's own art key (jersey and court files share it), whatever kit it's wearing. */
+    fun artKey(abbr: String?, slot: String? = null): String? {
         val s = slot?.uppercase()?.takeIf { it.isNotBlank() }
         if (s != null) JERSEY_BY_ABBR[s]?.let { return it }
         val a = abbr?.uppercase()?.takeIf { it.isNotBlank() } ?: return null

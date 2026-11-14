@@ -98,15 +98,56 @@ fun DesignerScreen(vm: GameViewModel, lg: League) {
                 }
             }
             Section("Court")
-            Chips(listOf("Team color paint", "Second color paint", "Natural wood"), t.courtPaint, { i -> vm.act { it.user.courtPaint = i } })
+            if (!t.customKit && CourtArt.image(t) != null)
+                Text("${t.school} plays on its own court. Switch on the designed kit above to design one in your colors.", style = T.small, color = P.sub,
+                    modifier = Modifier.padding(horizontal = Gutter + 4.dp))
+            else Chips(listOf("Team color paint", "Second color paint", "Natural wood"), t.courtPaint, { i -> vm.act { it.user.courtPaint = i } })
             Spacer(Modifier.height(24.dp))
         }
     }
 }
 
-/** A half court in the program's colors, its abbreviation at center court. */
+/** The program's court: its own art (assets/courts), or, in a designed kit or without art, one drawn in its colors. */
 @Composable
 fun CourtPreview(t: Team, modifier: Modifier = Modifier) {
+    val art = if (t.customKit) null else CourtArt.image(t)
+    if (art != null) {
+        androidx.compose.foundation.Image(art, "${t.school} court", modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp)),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.None)
+        return
+    }
+    DrawnCourt(t, modifier)
+}
+
+/** Court art from assets/courts, by the same key as the jersey art. Decoded once and kept. */
+object CourtArt {
+    private val cache = HashMap<String, androidx.compose.ui.graphics.ImageBitmap?>()
+
+    fun path(t: Team): String? {
+        val key = SpriteSheets.artKey(t.abbr, t.slot) ?: return null
+        return if (com.nh.hoopscoach.assetBytes("courts/nba/$key.png") != null) "courts/nba/$key.png" else "courts/college/$key.png"
+    }
+
+    @Synchronized fun image(t: Team): androidx.compose.ui.graphics.ImageBitmap? {
+        val p = path(t) ?: return null
+        return cache.getOrPut(p) { runCatching { com.nh.hoopscoach.assetBytes(p)?.let { com.nh.hoopscoach.decodeImageBitmap(it) } }.getOrNull() }
+    }
+}
+
+/** The home court across the top of a live game: the center-court strip of the art, or the drawn court. */
+@Composable
+fun CourtBanner(t: Team, modifier: Modifier = Modifier) {
+    val art = if (t.customKit) null else CourtArt.image(t)
+    Box(modifier.clip(RoundedCornerShape(14.dp))) {
+        if (art != null) androidx.compose.foundation.Image(art, "${t.school} court", Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.None)
+        else DrawnCourt(t, Modifier.fillMaxSize())
+    }
+}
+
+/** A court drawn in the program's colors, its abbreviation at center court. */
+@Composable
+fun DrawnCourt(t: Team, modifier: Modifier = Modifier) {
     val primary = Color(t.primary)
     val second = Color(t.secondary)
     val paint = when (t.courtPaint) { 0 -> primary; 1 -> second; else -> Color(0xFFC8955A) }
