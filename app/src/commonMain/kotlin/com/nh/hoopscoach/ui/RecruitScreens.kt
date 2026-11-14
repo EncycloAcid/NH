@@ -298,7 +298,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                     Column(
                         Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (P.dark) Color(0xFF1E262A) else Color(0xFFF0FDF4))
+                            .background(mix(P.surface, P.good, if (P.dark) 0.12f else 0.07f))
                             .padding(12.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -329,7 +329,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                             Column(
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(if (P.dark) Color(0xFF181F22) else Color(0xFFFFFFFF))
+                                    .background(P.surface)
                                     .padding(12.dp)
                             ) {
                                 for (pPara in pitchLetter!!.text.split("\n\n")) {

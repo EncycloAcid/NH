@@ -188,7 +188,7 @@ private fun GameCard(vm: GameViewModel, lg: League, b: Bracket, a: Int, c: Int, 
 @Composable
 fun BracketHeader(lg: League, b: Bracket, ncaa: Boolean) {
     val champ = lg.teams.getOrNull(b.champion)
-    val c = champ?.let { Color(it.primary) } ?: P.hero
+    val c = champ?.let { teamCard(it) } ?: P.hero
     val fg = if (champ != null) onColor(c) else P.onHero
     Column(
         Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(20.dp))

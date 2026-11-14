@@ -128,11 +128,13 @@ fun BackBar(title: String, sub: String? = null, onBack: () -> Unit, actions: @Co
 
 @Composable
 fun Section(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter + 4.dp, top = 22.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    // With a link the row trades its own padding for the link's taller tap area, so the section sits the same.
+    val link = action != null
+    Row(modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = if (link) Gutter - 4.dp else Gutter + 4.dp, top = if (link) 14.dp else 22.dp, bottom = if (link) 0.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = 3.dp, height = 12.dp).clip(RoundedCornerShape(2.dp)).background(P.accent))
         Spacer(Modifier.width(7.dp))
         Text(title.uppercase(), style = T.label, color = P.sub, modifier = Modifier.weight(1f))
-        if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clickable { onAction?.invoke() }.padding(4.dp))
+        if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
     }
 }
 
@@ -638,7 +640,7 @@ fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: St
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("$value", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)
-            if (label != null) Text(label, style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.6.sp), color = P.sub)
+            if (label != null) Text(label, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = P.sub)
         }
     }
 }
@@ -710,6 +712,22 @@ fun teamInk(t: Team): Color {
         contrast(s, bg) >= 1.8f -> s
         else -> P.sub
     }
+}
+
+/**
+ * A team's primary color, deepened just enough to carry white text: for big cards in a team's colors that
+ * fade darker toward the bottom. Black stays black; a gold or white school turns a deep shade of itself
+ * instead of picking dark text that the darker half of the card would swallow.
+ */
+fun teamCard(t: Team): Color {
+    val c = Color(t.primary)
+    var out = c
+    var k = 0f
+    while (contrast(out, Color.White) < 4.5f && k < 0.9f) {
+        k += 0.05f
+        out = mix(c, Color.Black, k)
+    }
+    return out
 }
 
 /** The small gold label on a feature card: gold when it reads on the card's color, soft white when it doesn't (a red or orange team). */

@@ -52,7 +52,7 @@ import com.nh.hoopscoach.game.Tribute
 fun CeremonyScreen(vm: GameViewModel, lg: League, c: Ceremony) {
     PlatformBackHandler(enabled = true) { }
     val team = lg.teams.getOrNull(c.teamId)
-    val base = team?.let { Color(it.primary) } ?: P.hero
+    val base = team?.let { teamCard(it) } ?: P.hero
     val second = team?.let { Color(it.secondary) } ?: P.gold
     val fg = onColor(base)
     val accent = if (contrast(second, lerp(base, Color.Black, 0.5f)) >= 2.2f) second else P.gold

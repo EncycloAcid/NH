@@ -652,7 +652,7 @@ internal fun PlayoffCard(vm: GameViewModel, lg: League) {
             for ((i, g) in games.withIndex()) {
                 val won = g.winner() == u.id
                 Box(Modifier.size(26.dp).clip(CircleShape).background(if (won) P.good else fg.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                    Text("${i + 1}", style = T.label.copy(fontSize = 10.sp), color = if (won) androidx.compose.ui.graphics.Color.White else fg.copy(alpha = 0.8f))
+                    Text("${i + 1}", style = T.label.copy(fontSize = 10.sp), color = if (won) onColor(P.good) else fg.copy(alpha = 0.8f))
                 }
             }
         }

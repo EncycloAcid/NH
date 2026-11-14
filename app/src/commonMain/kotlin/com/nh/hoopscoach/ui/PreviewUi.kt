@@ -323,7 +323,7 @@ internal fun StarterDots(n: Int, color: Color) {
 /** A colored band in a team's colors, for headers. */
 @Composable
 internal fun TeamBand(t: Team, modifier: Modifier = Modifier, content: @Composable (fg: Color, accent: Color) -> Unit) {
-    val primary = Color(t.primary)
+    val primary = teamCard(t)
     val secondary = Color(t.secondary)
     val fg = onColor(primary)
     val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
@@ -397,7 +397,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
     item {
         val top = topTeam(lg, pv)
         val star = Previews.star(lg, top)
-        val primary = Color(top.primary)
+        val primary = teamCard(top)
         val secondary = Color(top.secondary)
         val fg = onColor(primary)
         val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
@@ -917,7 +917,7 @@ private fun RankRow(vm: GameViewModel, lg: League, pv: Preview, t: Team) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(odd(o.f4), style = T.numSm.copy(fontSize = 16.sp), color = P.ink)
-                Text("FINAL 4", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                Text("FINAL 4", style = T.label.copy(fontSize = 9.sp), color = P.faint)
             }
         }
         val last = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }
@@ -1286,7 +1286,7 @@ private fun LazyListScope.midMajors(vm: GameViewModel, lg: League, pv: Preview) 
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(odd(odds(pv, pick).ncaa), style = T.numSm.copy(fontSize = 15.sp), color = P.ink)
-                    Text("NCAA", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                    Text("NCAA", style = T.label.copy(fontSize = 9.sp), color = P.faint)
                 }
             }
         }

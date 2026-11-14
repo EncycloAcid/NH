@@ -223,7 +223,7 @@ fun RivalsList(vm: GameViewModel, lg: League, t: Team) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("$w-$l", style = T.numSm, color = when { w > l -> P.good; w < l -> P.bad; else -> P.ink })
-                Text("SERIES", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                Text("SERIES", style = T.label.copy(fontSize = 9.sp), color = P.faint)
             }
         }
     }

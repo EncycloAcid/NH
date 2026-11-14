@@ -630,7 +630,7 @@ private fun BubbleRow(vm: GameViewModel, lg: League, b: Bubble, id: Int, picks: 
     ListRow(onClick = { onToggle(id) }, modifier = if (mine) Modifier.background(P.accentSoft) else Modifier, padding = PaddingValues(start = 10.dp, end = 12.dp, top = 10.dp, bottom = 10.dp)) {
         Column(Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(seed?.toString() ?: "–", style = T.numSm.copy(fontSize = 18.sp), color = if (seed != null) P.ink else P.faint)
-            Text(if (seed != null) "SEED" else "OUT", style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.5.sp), color = P.faint)
+            Text(if (seed != null) "SEED" else "OUT", style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.faint)
         }
         Spacer(Modifier.width(6.dp))
         TeamBadge(t, 30.dp)
@@ -641,7 +641,7 @@ private fun BubbleRow(vm: GameViewModel, lg: League, b: Bubble, id: Int, picks: 
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 6.dp)) {
             Text("%+.1f".format(s.wab), style = T.numSm.copy(fontSize = 16.sp), color = if (s.wab >= 0) P.good else P.bad)
-            Text("WAB", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+            Text("WAB", style = T.label.copy(fontSize = 9.sp), color = P.faint)
         }
         Spacer(Modifier.width(10.dp))
         PickDot(pick)

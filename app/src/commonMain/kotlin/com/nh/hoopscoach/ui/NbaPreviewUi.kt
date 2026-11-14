@@ -307,7 +307,7 @@ private fun LazyListScope.nbaCover(lg: League, pv: NbaPreview, count: Int, onRea
     item {
         val top = NbaPreviews.ranked(lg, pv).first()
         val star = NbaPreviews.star(lg, top)
-        val primary = Color(top.primary)
+        val primary = teamCard(top)
         val secondary = Color(top.secondary)
         val fg = onColor(primary)
         val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
@@ -489,7 +489,7 @@ private fun LazyListScope.powerRankings(vm: GameViewModel, lg: League, pv: NbaPr
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("${o.w}-${o.l}", style = T.numSm.copy(fontSize = 17.sp), color = P.ink)
-                        Text("TITLE ${odd(o.title)}", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                        Text("TITLE ${odd(o.title)}", style = T.label.copy(fontSize = 9.sp), color = P.faint)
                     }
                 }
                 Text(pv.reports[t.id]?.overview ?: remember(t.id, lg.season) { com.nh.hoopscoach.game.Takes.nba(lg, pv, t, 3) }, style = T.small, color = P.ink, modifier = Modifier.padding(start = 72.dp, top = 4.dp))
@@ -588,7 +588,7 @@ private fun LazyListScope.conference(vm: GameViewModel, lg: League, pv: NbaPrevi
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(odd(o.playoffs), style = T.numSm.copy(fontSize = 16.sp), color = P.ink)
-                            Text("PLAYOFFS", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                            Text("PLAYOFFS", style = T.label.copy(fontSize = 9.sp), color = P.faint)
                         }
                     }
                     Spacer(Modifier.height(5.dp))

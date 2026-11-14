@@ -201,7 +201,7 @@ fun FormerPlayers(vm: GameViewModel, lg: League, t: Team) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(f1(tot.ppg), style = T.numSm, color = P.ink)
-                Text("PPG", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                Text("PPG", style = T.label.copy(fontSize = 9.sp), color = P.faint)
             }
         }
     }

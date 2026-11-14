@@ -595,7 +595,7 @@ private fun ShotMeter(lg: League, choice: com.nh.hoopscoach.game.GameEngine.Mome
             onRelease(grade, bonus)
         }.padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(if (drive) "FINISH" else "RELEASE", style = T.head, color = P.ink) }
+    ) { Text(if (drive) "FINISH" else "RELEASE", style = T.head, color = onColor(P.gold)) }
     Text("Stop the marker in the green. The middle is perfect.", style = T.small, color = P.onHero.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
 }
 

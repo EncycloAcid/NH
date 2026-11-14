@@ -964,7 +964,7 @@ private fun TradeBlockPage(
                                 .background(if (active) P.good else P.surface2)
                                 .clickable { vm.act { Needs.toggleNeedPos(it, it.user, pos) } }
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
-                        ) { Text(pos.label, style = T.bodyB.copy(fontSize = 13.sp), color = if (active) Color.White else P.sub) }
+                        ) { Text(pos.label, style = T.bodyB.copy(fontSize = 13.sp), color = if (active) onColor(P.good) else P.sub) }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -978,7 +978,7 @@ private fun TradeBlockPage(
                                 .background(if (active) P.warn else P.surface2)
                                 .clickable { vm.act { Needs.toggleSurplusPos(it, it.user, pos) } }
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
-                        ) { Text(pos.label, style = T.bodyB.copy(fontSize = 13.sp), color = if (active) Color.White else P.sub) }
+                        ) { Text(pos.label, style = T.bodyB.copy(fontSize = 13.sp), color = if (active) onColor(P.warn) else P.sub) }
                     }
                 }
             }
@@ -1400,7 +1400,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     Panel(color = P.accentSoft, modifier = Modifier.padding(bottom = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(msg, style = T.small, color = P.ink, modifier = Modifier.weight(1f))
-                            Text("✕", style = T.bodyB, color = P.sub, modifier = Modifier.clickable { actionBanner = null }.padding(start = 8.dp))
+                            Text("✕", style = T.bodyB, color = P.sub, modifier = Modifier.clip(CircleShape).clickable { actionBanner = null }.padding(8.dp))
                         }
                     }
                 }
@@ -2145,7 +2145,7 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 ListRow {
                     if (h.teamId >= 0) TeamBadge(lg.team(h.teamId), 32.dp)
                     else Box(Modifier.size(32.dp).background(P.surface2, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("NCAA", style = T.label.copy(fontSize = 8.sp), color = P.sub)
+                        Text("NCAA", style = T.label.copy(fontSize = 9.sp), color = P.sub)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
@@ -2192,7 +2192,7 @@ fun ProjectionLines(lg: League) {
             if (ps.liveDay > 0) "Updated day ${ps.liveDay}" + (pre?.let { " · preseason ${it.w}-${it.l}" } ?: "") else "Preseason projection",
             style = T.small.copy(fontSize = 12.sp), color = P.sub, modifier = Modifier.weight(1f),
         )
-        Text(if (how) "Hide" else "How we project", style = T.small.copy(fontSize = 12.sp), color = P.accent, modifier = Modifier.clickable { how = !how })
+        Text(if (how) "Hide" else "How we project", style = T.small.copy(fontSize = 12.sp), color = P.accent, modifier = Modifier.clickable { how = !how }.padding(vertical = 10.dp))
     }
     if (how) Text(
         "We play the rest of the season 400 times: games already played count as they finished, the rest go by each team's strength now (its best eight players, plus every result so far). It updates every week, and after trades.",

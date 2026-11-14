@@ -656,7 +656,7 @@ fun HeadlineRow(vm: GameViewModel, lg: League, n: News) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 NewsTag(n, Modifier.weight(1f))
-                if (n.needsApproval) Tag("DRAFT", if (P.dark) Color(0xFFF59E0B) else Color(0xFFB45309))
+                if (n.needsApproval) Tag("DRAFT", P.warn)
                 else if (n.approved) Tag("APPROVED", P.good)
             }
             Text(headline(n.text), style = if (n.mine) T.bodyB else T.body, color = if (n.mine) P.ink else P.sub)
@@ -1221,7 +1221,7 @@ private fun WireDeskCard(vm: GameViewModel, lg: League) {
 private fun TopStory(vm: GameViewModel, lg: League, n: News) {
     val t = lg.teams.getOrNull(n.teamId)
     val p = lg.playerOrNull(n.pid)
-    val primary = t?.let { Color(it.primary) } ?: P.hero
+    val primary = t?.let { teamCard(it) } ?: P.hero
     val fg = onColor(primary)
     Column(
         Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))

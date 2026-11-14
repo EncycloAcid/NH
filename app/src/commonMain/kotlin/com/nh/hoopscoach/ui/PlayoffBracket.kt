@@ -193,7 +193,7 @@ fun PlayoffHeader(lg: League) {
     val ps = lg.proState ?: return
     val champ = lg.teams.getOrNull(ps.champion)
     if (champ != null) {
-        val c = Color(champ.primary)
+        val c = teamCard(champ)
         val fg = onColor(c)
         val finals = ps.series.firstOrNull { it.round == 4 }
         Column(

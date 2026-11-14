@@ -159,7 +159,7 @@ private fun PickNumber(slot: Int, mine: Boolean) {
     Box(
         Modifier.size(34.dp).clip(CircleShape).background(if (mine) P.accent else P.surface2),
         contentAlignment = Alignment.Center,
-    ) { Text("$slot", style = T.bodyB.copy(fontSize = 13.sp), color = if (mine) Color.White else P.ink) }
+    ) { Text("$slot", style = T.bodyB.copy(fontSize = 13.sp), color = if (mine) P.onAccent else P.ink) }
 }
 
 @Composable
@@ -177,7 +177,7 @@ private fun DraftHero(vm: GameViewModel, lg: League, dn: DraftState) {
     val clockTeam = lg.teams.getOrNull(dn.order.getOrNull(dn.at) ?: -1)
     val mine = DraftNight.onTheClock(lg)
     val next = DraftNight.nextUserSlot(lg)
-    val base = clockTeam?.let { Color(it.primary) } ?: P.hero
+    val base = clockTeam?.let { teamCard(it) } ?: P.hero
     val fg = onColor(base)
     val accent = if (mine) P.gold else fg.copy(alpha = 0.85f)
     Column(

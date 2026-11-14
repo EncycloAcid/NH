@@ -85,7 +85,7 @@ internal fun FeatureCover(
     masthead: String, season: String, team: Team, player: Player?, kicker: String, headline: String, deck: String,
     lines: List<Pair<String, String>>, count: Int, onRead: () -> Unit, onSkip: (() -> Unit)? = null, userBox: @Composable () -> Unit,
 ) {
-    val primary = Color(team.primary)
+    val primary = teamCard(team)
     val secondary = Color(team.secondary)
     val fg = onColor(primary)
     val accent = if (contrast(secondary, primary) >= 2.2f) secondary else fg
@@ -139,7 +139,7 @@ internal fun VersusCover(
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             for ((t, line) in listOf(a to aLine, b to bLine)) {
-                val c = Color(t.primary)
+                val c = teamCard(t)
                 val fg = onColor(c)
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(c, lerp(c, Color.Black, 0.5f)))).padding(12.dp),

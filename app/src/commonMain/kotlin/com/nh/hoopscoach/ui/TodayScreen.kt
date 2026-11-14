@@ -173,7 +173,7 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (P.dark) Color(0xFF2C1E1B) else Color(0xFFFFF1F0))
+            .background(mix(P.surface, P.bad, if (P.dark) 0.14f else 0.07f))
             .padding(10.dp),
     ) {
         Row(

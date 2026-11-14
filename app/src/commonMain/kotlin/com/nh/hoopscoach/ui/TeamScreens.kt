@@ -218,7 +218,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(44.dp)) {
                 Text("$minutes", style = T.numSm, color = P.ink)
-                Text("START", style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.5.sp), color = P.sub)
+                Text("START", style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.sub)
             }
             HoopsSlider(
                 minutes.toFloat(), { minutes = kotlin.math.round(it).toInt() }, 0f..40f, Modifier.weight(1f), enabled = rs != null,
@@ -226,7 +226,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             )
             Column(Modifier.width(44.dp), horizontalAlignment = Alignment.End) {
                 Text("${40 - minutes}", style = T.numSm, color = P.sub)
-                Text("BENCH", style = T.label.copy(fontSize = 8.sp, letterSpacing = 0.5.sp), color = P.sub)
+                Text("BENCH", style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.sub)
             }
         }
         Expandable("Usage") {
