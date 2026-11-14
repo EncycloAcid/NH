@@ -89,6 +89,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { MidnightMadnessCard(vm, lg) }
         item { SummerTourCard(vm, lg) }
+        item { NcaaCaseCard(vm, lg) }
         item { RadioShowCard(vm, lg) }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }

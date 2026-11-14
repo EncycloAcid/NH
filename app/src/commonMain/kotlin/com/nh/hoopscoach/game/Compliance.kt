@@ -123,9 +123,9 @@ object Compliance {
     fun offseason(lg: League): Boolean {
         if (!active(lg)) return false
         val p = risk(lg)
-        if (p <= 0 || !Rng.chance(p)) return false
+        if (p <= 0 || NcaaCases.open(lg, lg.userTeamId) != null || !Rng.chance(p)) return false
         val major = overpay(lg) >= 1.5 || lg.complianceWarnings >= 4 || Rng.chance(0.25)
-        WorldEvents.scandal(lg, lg.user, lg.userCoach, major, what = "NIL payments above market value")
+        NcaaCases.open(lg, lg.user, major, what = "NIL payments above market value")
         lg.complianceWarnings = 0
         return true
     }

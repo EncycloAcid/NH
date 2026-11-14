@@ -1730,11 +1730,16 @@ class League(
     var cinderellaSeason: Int = 0,
     /** The challenge this career is playing (see [Challenges]), if any. */
     var challenge: ChallengeRun? = null,
+    /** NCAA cases in progress and closed (see [NcaaCases]). */
+    var cases: MutableList<NcaaCase> = mutableListOf(),
     /** Crowd and horn in live games. */
     var soundOn: Boolean = true,
     /** The coach's radio show: the week last done ([RadioShow.week]) and calls answered in the current one. */
     var radioWeek: Int = 0,
     var radioAnswered: Int = 0,
+    /** What the coach has said on the show that callers can throw back at him, and AI-written versions of this week's questions. */
+    var radioLog: MutableList<RadioQuote> = mutableListOf(),
+    var radioAi: MutableMap<String, String> = mutableMapOf(),
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

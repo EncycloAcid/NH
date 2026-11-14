@@ -1,5 +1,9 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.ui.unit.sp
+
+import androidx.compose.foundation.background
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -255,10 +259,22 @@ fun RadioShowCard(vm: GameViewModel, lg: League) {
     val calls = R.calls(lg)
     val i = lg.radioAnswered
     val call = calls.getOrNull(i) ?: return
+    // With AI on, the caller's question is written fresh in his own voice (the answers and what they do stay the game's).
+    val key = R.aiKey(lg, i)
+    val ai = lg.radioAi[key]
+    if (ai == null && lg.ollama.enabled) androidx.compose.runtime.LaunchedEffect(key) {
+        com.nh.hoopscoach.game.Ollama.generate(lg.ollama, R.aiPrompt(lg, call),
+            system = "You write short, natural lines for sports-radio callers. Plain text only.", temperature = 0.8, numPredict = 90)
+            .onSuccess { text ->
+                val clean = text.trim().trim('"').lines().firstOrNull { it.isNotBlank() }?.take(240)
+                if (!clean.isNullOrBlank()) vm.act { it.radioAi[key] = clean; while (it.radioAi.size > 24) it.radioAi.remove(it.radioAi.keys.first()) }
+            }
+    }
     Section("The coach's show · call ${i + 1} of ${calls.size}", action = "Skip this week", onAction = { vm.act { R.skip(it) } })
     Panel {
         Text("ON THE LINE: ${call.caller.uppercase()}", style = T.label, color = P.accent)
-        Text("\"${call.question}\"", style = T.bodyB, color = P.ink, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+        if (call.callback != null) Text("REMEMBERS WHAT YOU SAID: \"${call.callback.text}\"", style = T.label.copy(fontSize = 10.sp), color = P.bad, modifier = Modifier.padding(top = 4.dp))
+        Text("\"${ai ?: call.question}\"", style = T.bodyB, color = P.ink, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
         call.answers.forEachIndexed { ai, a ->
             ListRow(onClick = {
                 var reaction = ""
@@ -269,5 +285,57 @@ fun RadioShowCard(vm: GameViewModel, lg: League) {
             }
         }
         Text("What you say moves the fans, your rivals and your bosses.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** The user's NCAA case, step by step, with the decision that's his at each step. */
+@Composable
+fun NcaaCaseCard(vm: GameViewModel, lg: League) {
+    val N = com.nh.hoopscoach.game.NcaaCases
+    val c = N.mine(lg) ?: return
+    val steps = listOf("rumor" to "Rumors", "investigation" to "Investigation", "ruling" to "Ruling", "appeal" to "Appeal")
+    val at = steps.indexOfFirst { it.first == c.stage }.coerceAtLeast(0)
+    Section("NCAA case")
+    Panel(color = mix(P.surface, P.bad, if (P.dark) 0.14f else 0.07f)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            steps.forEachIndexed { i, (_, label) ->
+                Column(Modifier.weight(1f)) {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(4.dp).background(if (i <= at) P.bad else P.line, androidx.compose.foundation.shape.RoundedCornerShape(2.dp)))
+                    Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = if (i == at) P.bad else P.sub, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text("The NCAA and ${c.what}", style = T.head, color = P.ink)
+        when (c.stage) {
+            "rumor" -> Text("Reports are out there. If the NCAA opens a case about a week into the season, you'll choose how to handle it.", style = T.small, color = P.sub)
+            "investigation" -> if (c.stance.isEmpty()) {
+                Text("The ruling comes in late February. How do you handle the investigation?", style = T.small, color = P.sub)
+                Spacer(Modifier.height(8.dp))
+                ListRow(onClick = { vm.act { N.choose(it, "cooperate") } }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Cooperate fully", style = T.bodyB, color = P.ink)
+                        Text("A small hit to job security now. Half the time a major case is knocked down to a minor one, and appeals go better.", style = T.small, color = P.sub)
+                    }
+                }
+                ListRow(onClick = { vm.act { N.choose(it, "stonewall") } }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Stonewall", style = T.bodyB, color = P.ink)
+                        Text("40% chance the case falls apart with no penalties. Otherwise it's ruled major and your job security takes a big hit.", style = T.small, color = P.sub)
+                    }
+                }
+            } else Text(if (c.stance == "cooperate") "You're cooperating. The ruling comes in late February." else "You're fighting it. The ruling comes in late February.", style = T.small, color = P.sub)
+            "ruling" -> {
+                Text(c.outcome + " " + com.nh.hoopscoach.game.WorldEvents.sanctionLine(lg, lg.user), style = T.small, color = P.bad)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SecondaryButton("Accept it", Modifier.weight(1f)) { vm.act { N.accept(it) } }
+                    PrimaryButton("Appeal", Modifier.weight(1f)) { vm.act { N.appeal(it) } }
+                }
+                Text("An appeal is decided before Selection Sunday: ${if (c.stance == "cooperate") "40" else "25"}% to lift the ban or win a scholarship back; if it fails, one more scholarship is lost.",
+                    style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
+            }
+            "appeal" -> Text("Your appeal is in. A decision comes before Selection Sunday.", style = T.small, color = P.sub)
+        }
     }
 }

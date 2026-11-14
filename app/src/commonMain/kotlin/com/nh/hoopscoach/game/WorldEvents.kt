@@ -66,7 +66,7 @@ object WorldEvents {
         var f = friendsFactor(lg, p)
         val c = lg.coachOf(t)
         if (!lg.humanCoach(t) && c.history.none { it.teamId == t.id }) f *= if (p.has(Trait.LOYAL)) 1.2 else 1.8
-        if (t.banSeason > lg.season) f *= 2.5
+        if (t.banSeason >= lg.season) f *= 2.5
         return f
     }
 
@@ -161,6 +161,7 @@ object WorldEvents {
         if (lg.pro) return
         Brand.ensure(lg)
         runCatching { RecruitRivals.seasonEnd(lg) }
+        runCatching { NcaaCases.seasonEnd(lg) }
         runCatching { HomeCourt.seasonEnd(lg) }
         runCatching { RivalryTrophies.seasonEnd(lg) }
         runCatching { Challenges.seasonEnd(lg) }
@@ -258,6 +259,7 @@ object WorldEvents {
     fun daily(lg: League) {
         if (lg.pro || lg.phase != Phase.REGULAR) return
         if (lg.day % 7 == 0) Compliance.check(lg)
+        runCatching { NcaaCases.daily(lg) }
         if (lg.day != Schedule.REG_DAYS / 2) return
         for (t in lg.teams) {
             val p = lg.rosterOf(t).filter { it.year == 1 && it.stats.gp >= 8 && it.stats.ppg >= 14.0 && it.stars <= 3 }.maxByOrNull { it.stats.ppg } ?: continue
@@ -288,8 +290,8 @@ object WorldEvents {
             if (ratio > 1.4) p += (ratio - 1.4) * 0.03
             if (c.security < 30) p += 0.01
             if (c.has(CoachSkill.CULTURE)) p *= 0.4
-            if (lg.timeline.any { it.teamId == t.id && it.type == "scandal" && lg.season - it.season < 4 }) p = 0.0
-            if (Rng.chance(p.coerceAtMost(0.08))) scandal(lg, t, c, major = ratio > 1.8 || Rng.chance(0.3))
+            if (lg.timeline.any { it.teamId == t.id && it.type == "scandal" && lg.season - it.season < 4 } || NcaaCases.open(lg, t.id) != null) p = 0.0
+            if (Rng.chance(p.coerceAtMost(0.08))) NcaaCases.open(lg, t, major = ratio > 1.8 || Rng.chance(0.3))
         }
         for (t in lg.teams) {
             val round = Awards.tourneyRound(lg, t.id)
@@ -322,9 +324,11 @@ object WorldEvents {
         val already = if (t.sanctionUntil >= lg.season) t.scholarshipsLost else 0
         t.scholarshipsLost = (already + if (major) 3 else Rng.range(1, 2)).coerceAtMost(4)
         t.sanctionUntil = maxOf(t.sanctionUntil, lg.season + if (major) 2 else 1)
-        if (major) t.banSeason = lg.season + 1
+        // A ruling during the season costs this March; one in the offseason, the next.
+        val banFor = if (lg.phase == Phase.REGULAR) lg.season else lg.season + 1
+        if (major) t.banSeason = banFor
         val penalties = listOfNotNull(
-            "a postseason ban for ${lg.season + 1}".takeIf { major },
+            "a postseason ban for $banFor".takeIf { major },
             "${t.scholarshipsLost} scholarship${if (t.scholarshipsLost == 1) "" else "s"} taken away through ${t.sanctionUntil}",
             "players free to transfer without sitting out".takeIf { major },
         )
@@ -351,7 +355,7 @@ object WorldEvents {
     /** Extra odds a coach is fired this offseason because of a scandal on his watch. */
     fun scandalFireChance(lg: League, t: Team): Double {
         val e = lg.timeline.lastOrNull { it.teamId == t.id && it.type == "scandal" && it.season == lg.season } ?: return 0.0
-        return if (t.banSeason == lg.season + 1) 0.7 else 0.3
+        return if (t.banSeason >= lg.season) 0.7 else 0.3
     }
 
     /** A recruit the user was chasing signs with a rival instead. */
