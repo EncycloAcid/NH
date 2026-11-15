@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
@@ -237,7 +238,7 @@ fun LiveCourtView(lg: League, e: GameEngine, home: Team, away: Team, tick: Int, 
     val t by rememberInfiniteTransition(label = "court").animateFloat(0f, (2 * PI).toFloat(), infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "run")
     val homeKit = kit(home, true)
     val awayKit = kit(away, false)
-    val faces = remember(e) { HashMap<Int, Pair<Color, Color?>>() }
+    val looks = remember(e) { HashMap<Int, Look>() }
     val heroId = if (lg.playerMode) lg.heroId else -1
 
     Box(modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFF101318))) {
@@ -254,8 +255,9 @@ fun LiveCourtView(lg: League, e: GameEngine, home: Team, away: Team, tick: Int, 
             val ftx = (fx1 - fx0) / 94f; val fty = (fy1 - fy0) / 50f
             fun px(p: Offset) = Offset(fx0 + p.x * ftx, fy0 + p.y * fty)
             val s = current ?: return@Canvas
-            val unit = fty * 8f / 14f   // one sprite pixel: a figure is 14 of them, drawn a little larger than life so he reads
+            val unit = fty * 8.6f / 21f   // one sprite pixel: a figure is 21 of them, a little larger than life so he reads
             val moving = anims.values.any { it.isRunning }
+            val offense = s.side[s.handler] ?: 0
             // Players, back to front.
             val ids = s.pos.keys.sortedBy { anims[it]?.value?.y ?: s.pos.getValue(it).y }
             var handAt = Offset.Zero
@@ -263,20 +265,23 @@ fun LiveCourtView(lg: League, e: GameEngine, home: Team, away: Team, tick: Int, 
             for (id in ids) {
                 val p = anims[id]?.value ?: s.pos.getValue(id)
                 val sideOf = s.side[id] ?: 0
-                val (skin, hair) = faces.getOrPut(id) {
-                    val pl = lg.playerOrNull(id)
-                    val f = pl?.let { Face.of(it) }
-                    val sk = Color(SkinSwatches[(f?.skin ?: 4).coerceIn(0, SkinSwatches.lastIndex)])
-                    sk to (if (f == null || f.hair == 0) null else Color(HAIR[f.hairColor.coerceIn(0, HAIR.lastIndex)]))
-                }
+                val look = looks.getOrPut(id) { lookOf(lg, id) }
                 val k = if (sideOf == 0) homeKit else awayKit
-                val bob = sin(t + id % 7) * 0.25f * unit
-                val jumpUp = if (id in s.jump && flight.value < 1f) sin(flight.value * PI.toFloat()) * unit * 5f else 0f
-                val runFrame = if (moving && (anims[id]?.isRunning == true)) (if (sin(t * 3 + id) > 0) 1 else -1) else 0
+                val running = moving && (anims[id]?.isRunning == true)
+                val bob = if (running) 0f else sin(t + id % 7) * 0.25f * unit
+                val jumpUp = if (id in s.jump && flight.value < 1f) sin(flight.value * PI.toFloat()) * unit * 6f else 0f
+                val runFrame = if (running) (if (sin(t * 3 + id) > 0) 1 else -1) else 0
+                val pose = when {
+                    id in s.arms && (s.shot || s.jump.contains(id)) && flight.value < 1f -> UP
+                    id in s.arms && !s.shot -> UP
+                    id == s.handler && !s.shot && s.after < 0 -> DRIBBLE
+                    sideOf != offense && !running -> GUARD
+                    else -> STAND
+                }
                 val feet = px(p) + Offset(0f, bob)
-                figure(feet, unit, skin, hair, k.first, k.second, k.third, id in s.arms, jumpUp, runFrame, id == heroId)
-                if (id == s.handler) handAt = feet + Offset(unit * 3.6f, -unit * 6f - jumpUp - if (id in s.arms) unit * 6f else 0f)
-                if (id == s.after) afterAt = feet + Offset(unit * 3.6f, -unit * 6f)
+                val hand = figure(feet, unit, look, k.first, k.second, k.third, pose, jumpUp, runFrame, id == heroId, t)
+                if (id == s.handler) handAt = hand
+                if (id == s.after) afterAt = feet + Offset(5f * unit, -9f * unit)
             }
             // The ball: in his hands, or in the air.
             val rimPx = px(s.rim)
@@ -298,7 +303,7 @@ fun LiveCourtView(lg: League, e: GameEngine, home: Team, away: Team, tick: Int, 
                 s.after >= 0 -> { ball = handAt + (afterAt - handAt) * f; lift = sin(f * PI.toFloat()) * unit * 2f }
                 else -> { ball = handAt; lift = 0f }
             }
-            val r = unit * 1.5f
+            val r = unit * 1.7f
             val bc = ball - Offset(0f, lift)
             drawCircle(Color.Black.copy(alpha = 0.3f), r * 0.9f, ball + Offset(0f, unit * 1.5f))
             drawCircle(Color(0xFFEF7D2B), r, bc)
@@ -327,41 +332,125 @@ private fun kit(t: Team, home: Boolean): Triple<Color, Color, Color> {
     else if (light) Triple(s, p, s) else Triple(p, if (contrast(s, p) < 1.5f) Color.White else s, p)
 }
 
+/** How a player looks on the court, worked out once from his face and build. */
+private class Look(val skin: Color, val shade: Color, val hair: Color?, val hairKind: Int, val band: Color?, val beard: Boolean, val scale: Float, val number: Int)
+
+/** His hairstyle as one of a few shapes a sprite this small can show. */
+private fun hairKind(h: Int) = when (h) {
+    0 -> 0                                    // bald
+    4, 6, 33 -> 2                             // flat-top, high-top: a tall box
+    5, 19, 31 -> 3                            // afros: round and wide
+    9, 10, 16, 17, 37, 38, 41 -> 4            // locs and twists hanging down
+    13, 27, 28, 36 -> 5                       // a bun or puff on top
+    11, 15, 25, 29, 30, 40 -> 6               // mohawks
+    14 -> 7                                   // afro puffs
+    else -> 1                                 // short
+}
+
+private fun lookOf(lg: League, id: Int): Look {
+    val pl = lg.playerOrNull(id)
+    val f = pl?.let { Face.of(it) }
+    val skin = Color(SkinSwatches[(f?.skin ?: 4).coerceIn(0, SkinSwatches.lastIndex)])
+    val hair = if (f == null || f.hair == 0) null else Color(HAIR[f.hairColor.coerceIn(0, HAIR.lastIndex)])
+    val band = when { f == null -> null; f.acc == 1 -> Color.White; f.acc == 2 -> Color(0xFFD63A3A); f.acc == 3 || f.hair == 7 -> Color(0xFF1A1A1E); else -> null }
+    val scale = ((pl?.height ?: 78) / 78f).coerceIn(0.88f, 1.14f)
+    return Look(skin, lerp(skin, Color.Black, 0.22f), hair, hairKind(f?.hair ?: 1), band, (f?.beard ?: 0) >= 2, scale, pl?.number ?: 0)
+}
+
+/** Digits on a 3x5 grid, for the number on his jersey. */
+private val DIGITS = listOf("111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
+    "111100111001111", "111100111101111", "111001010010010", "111101111101111", "111101111001111")
+
+/** Poses: standing, a defensive crouch, arms up to shoot or block, and dribbling. */
+private const val STAND = 0
+private const val GUARD = 1
+private const val UP = 2
+private const val DRIBBLE = 3
+
 /**
- * One player, pixel by pixel, standing on [feet]: shoes, legs, shorts, jersey with trim, arms (up when he
- * shoots or blocks), neck and head with his hair. [jump] lifts him off his shadow; [run] swaps his stride.
+ * One player on [feet], pixel by pixel on a 9x21 grid with a dark outline: shoes in his team's trim,
+ * socks, legs, shorts with a stripe, a jersey with straps, a V-neck and his number, arms set by [pose],
+ * his head with his ears, eyes, beard and hair, a headband if he wears one. [run] is his stride (and arm
+ * swing) while he runs; [jump] lifts him off his shadow. Returns where the ball sits in his hands.
  */
-private fun DrawScope.figure(feet: Offset, u: Float, skin: Color, hair: Color?, jersey: Color, trim: Color, shorts: Color, armsUp: Boolean, jump: Float, run: Int, hero: Boolean) {
-    drawOval(Color.Black.copy(alpha = 0.32f), Offset(feet.x - u * 3.2f, feet.y - u * 0.9f), Size(u * 6.4f, u * 1.8f))
+private fun DrawScope.figure(feet: Offset, unit: Float, look: Look, jersey: Color, trim: Color, shorts: Color, pose: Int, jump: Float, run: Int, hero: Boolean, t: Float): Offset {
+    val u = unit * look.scale
+    drawOval(Color.Black.copy(alpha = 0.3f), Offset(feet.x - u * 4f, feet.y - u * 1f), Size(u * 8f, u * 2f))
     val base = Offset(feet.x, feet.y - jump)
-    fun px(col: Int, row: Int, c: Color, w: Int = 1, h: Int = 1) =
-        drawRect(c, Offset(base.x + (col - 0.5f) * u, base.y - (row + h) * u), Size(u * w + 0.6f, u * h + 0.6f))
-    val shoe = Color(0xFF1E1E22)
-    val outline = Color(0xFF14110F)
-    // Legs and shoes, in stride when running.
-    val l = if (run > 0) -1 else 0
-    val r = if (run < 0) 1 else 0
-    px(-2 + l, 0, shoe, 2); px(1 + r, 0, shoe, 2)
-    px(-1 + l, 1, skin, 1, 2); px(1 + r, 1, skin, 1, 2)
-    // Shorts and jersey with an outline so they read on any floor.
-    px(-3, 3, outline, 7, 7)
-    px(-2, 3, shorts, 5, 2)
-    px(-2, 5, jersey, 5, 5)
-    px(-2, 9, trim); px(2, 9, trim); px(-2, 5, trim, 5, 1)
-    // Arms: down at his sides, or up over his head.
-    if (armsUp) { px(-3, 9, skin, 1, 5); px(3, 9, skin, 1, 5) }
-    else { px(-3, 5, skin, 1, 4); px(3, 5, skin, 1, 4) }
-    // Neck and head.
-    px(0, 10, skin)
-    px(-2, 11, outline, 5, 4)
-    px(-1, 11, skin, 3, 3)
-    if (hair != null) { px(-1, 13, hair, 3, 1); px(-2, 12, hair, 1, 2); px(2, 12, hair, 1, 2) }
+    val cells = ArrayList<Triple<Int, Int, Color>>(220)
+    fun c(col: Int, row: Int, color: Color) { cells += Triple(col, row, color) }
+    fun rect(c0: Int, r0: Int, c1: Int, r1: Int, color: Color) { for (cc in c0..c1) for (rr in r0..r1) c(cc, rr, color) }
+    val skin = look.skin; val shade = look.shade
+    val light = lerp(jersey, Color.White, 0.14f); val dark = lerp(jersey, Color.Black, 0.18f)
+    val sock = Color(0xFFF2F2F2)
+    val shoe = if (contrast(trim, Color(0xFFD9C29A)) > 1.4f) trim else Color(0xFF1C1C20)
+    // Legs: apart in a crouch, one up then the other while he runs.
+    val wide = if (pose == GUARD) 1 else 0
+    val lUp = if (run > 0) 1 else 0
+    val rUp = if (run < 0) 1 else 0
+    rect(-3 - wide, lUp, -1 - wide, lUp, shoe); rect(1 + wide, rUp, 3 + wide, rUp, shoe)
+    rect(-2 - wide, 1 + lUp, -1 - wide, 1 + lUp, sock); rect(1 + wide, 1 + rUp, 2 + wide, 1 + rUp, sock)
+    rect(-2 - wide, 2 + lUp, -1 - wide, 4, skin); rect(1 + wide, 2 + rUp, 2 + wide, 4, shade)
+    // Shorts with a stripe down each side.
+    rect(-3, 5, 3, 7, shorts); rect(-3, 5, -3, 7, trim); rect(3, 5, 3, 7, trim)
+    if (pose == GUARD) rect(-1, 5, 1, 5, lerp(shorts, Color.Black, 0.2f))
+    // The jersey: lit on his left, shaded on his right, straps and a V in the trim, the number on the chest.
+    rect(-3, 8, 3, 14, jersey); rect(-3, 8, -2, 14, light); rect(2, 8, 3, 14, dark)
+    rect(-3, 14, -2, 14, trim); rect(2, 14, 3, 14, trim)
+    c(-1, 14, skin); c(0, 14, skin); c(1, 14, skin); c(0, 13, skin); c(-1, 13, trim); c(1, 13, trim)
+    val num = look.number.coerceIn(0, 99)
+    val digits = if (num >= 10) listOf(num / 10 to -3, num % 10 to 1) else listOf(num to -1)
+    for ((dgt, x0) in digits) {
+        val g = DIGITS[dgt]
+        for (rr in 0 until 5) for (cc in 0 until 3) if (g[rr * 3 + cc] == '1') c(x0 + cc, 12 - rr, trim)
+    }
+    // Arms.
+    val swing = if (run != 0) run else 0
+    when (pose) {
+        UP -> { rect(-4, 13, -4, 21, skin); rect(4, 13, 4, 21, shade) }
+        GUARD -> { rect(-6, 12, -4, 13, skin); rect(4, 12, 6, 13, shade); c(-6, 14, skin); c(6, 14, shade) }
+        DRIBBLE -> { rect(-4, 9 + swing.coerceAtLeast(0), -4, 14, skin); rect(4, 10, 4, 14, shade); rect(5, 9, 5, 10, shade) }
+        else -> { rect(-4, 8 + swing.coerceAtLeast(0), -4, 14, skin); rect(4, 8 + (-swing).coerceAtLeast(0), 4, 14, shade) }
+    }
+    // Neck and head: ears, eyes, a beard.
+    rect(-1, 15, 1, 15, shade)
+    rect(-2, 16, 2, 20, skin); rect(2, 16, 2, 20, shade)
+    c(-3, 18, skin); c(3, 18, shade)
+    c(-1, 18, Color(0xFF15100E)); c(1, 18, Color(0xFF15100E))
+    val hc = look.hair ?: Color(0xFF2E2A2A)
+    if (look.beard) { rect(-1, 16, 1, 16, hc); c(-2, 17, hc); c(2, 17, hc) }
+    // Hair, by its shape.
+    val hl = lerp(hc, Color.White, 0.18f)
+    when (look.hairKind) {
+        1 -> { rect(-2, 20, 2, 21, hc); c(-2, 19, hc); c(2, 19, hc); c(-1, 21, hl) }
+        2 -> { rect(-2, 20, 2, 24, hc); rect(-1, 24, 0, 24, hl); c(-2, 19, hc); c(2, 19, hc) }
+        3 -> { rect(-3, 19, 3, 23, hc); rect(-2, 24, 2, 24, hc); c(-4, 20, hc); c(4, 20, hc); c(-4, 21, hc); c(4, 21, hc); rect(-1, 23, 0, 24, hl) }
+        4 -> { rect(-2, 20, 2, 21, hc); rect(-3, 14, -3, 20, hc); rect(3, 14, 3, 20, hc); c(-2, 19, hc); c(2, 19, hc); c(-1, 21, hl) }
+        5 -> { rect(-2, 20, 2, 21, hc); rect(-1, 22, 1, 24, hc); c(0, 24, hl) }
+        6 -> { rect(-1, 20, 1, 24, hc); c(0, 24, hl); c(-2, 20, lerp(hc, skin, 0.5f)); c(2, 20, lerp(hc, skin, 0.5f)) }
+        7 -> { rect(-2, 20, 2, 21, hc); rect(-5, 21, -3, 23, hc); rect(3, 21, 5, 23, hc) }
+        else -> {}
+    }
+    if (look.hairKind == 0) { rect(-2, 21, 2, 21, skin); c(-1, 21, lerp(skin, Color.White, 0.25f)) }
+    look.band?.let { rect(-2, 19, 2, 19, it); if (look.hairKind == 4) { c(-3, 19, it); c(3, 19, it) } }
+    // Outline first, then the colors over it.
+    val ol = u * 0.42f
+    val outline = Color(0xFF120F0D)
+    for ((col, row, _) in cells) drawRect(outline, Offset(base.x + (col - 0.5f) * u - ol, base.y - (row + 1) * u - ol), Size(u + ol * 2, u + ol * 2))
+    for ((col, row, color) in cells) drawRect(color, Offset(base.x + (col - 0.5f) * u, base.y - (row + 1) * u), Size(u + 0.6f, u + 0.6f))
     if (hero) {
-        val top = base.y - 17f * u
+        val top = base.y - 28f * u
         val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(base.x - u * 1.6f, top); lineTo(base.x + u * 1.6f, top); lineTo(base.x, top + u * 1.8f); close()
+            moveTo(base.x - u * 2f, top); lineTo(base.x + u * 2f, top); lineTo(base.x, top + u * 2.2f); close()
         }
         drawPath(path, Color(0xFFFFC94D))
+        drawPath(path, outline, style = Stroke(u * 0.4f))
+    }
+    // Where the ball is: overhead to shoot, bouncing at his right hand on the dribble, at his hip otherwise.
+    return when (pose) {
+        UP -> base + Offset(0f, -23f * u)
+        DRIBBLE -> base + Offset(6f * u, -(1.5f + kotlin.math.abs(sin(t * 2.6f)) * 7.5f) * u)
+        else -> base + Offset(5f * u, -9f * u)
     }
 }
 
