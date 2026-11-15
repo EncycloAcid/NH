@@ -388,6 +388,10 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
             SmallButton("Sim") { vm.simDay() }
             Spacer(Modifier.width(6.dp))
             SmallButton("Play", primary = true) { vm.startLive() }
+        } else if (lg.phase == Phase.REGULAR && lg.games.any { !it.played && it.involves(lg.userTeamId) }) {
+            SmallButton("Sim day") { vm.simDay() }
+            Spacer(Modifier.width(6.dp))
+            SmallButton("Next game", primary = true) { vm.simToNextGame() }
         } else SmallButton("Sim day", primary = true) { vm.simDay() }
     }
 }

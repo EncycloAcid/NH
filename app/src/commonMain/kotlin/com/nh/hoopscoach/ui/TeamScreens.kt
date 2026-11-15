@@ -646,11 +646,18 @@ fun ScheduleScreen(vm: GameViewModel, lg: League, teamId: Int) {
     val games = Schedule.teamGames(lg, teamId)
     val reg = games.filter { it.day <= Schedule.REG_DAYS }
     val post = games.filter { it.day > Schedule.REG_DAYS }
-    LazyColumn(Modifier.fillMaxSize()) {
-        item { BackBar("Schedule & results", "${t.school} · ${t.record} (${t.confRecord})", onBack = { vm.back() }) }
-        item { Section("Regular season"); GroupList(reg) { g -> GameRow(vm, lg, g, teamId) } }
-        if (post.isNotEmpty()) item { Section("Postseason"); GroupList(post) { g -> GameRow(vm, lg, g, teamId) } }
-        item { Spacer(Modifier.height(24.dp)) }
+    val played = reg.filter { it.played }
+    val left = reg.filter { !it.played }
+    // Open on what's left, with the results a scroll up.
+    val state = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = if (played.isNotEmpty() && left.isNotEmpty()) 1 else 0)
+    Column(Modifier.fillMaxSize()) {
+        BackBar("Schedule & results", "${t.school} · ${t.record} (${t.confRecord})", onBack = { vm.back() })
+        LazyColumn(Modifier.weight(1f), state = state) {
+            if (played.isNotEmpty()) item { Section("Results · ${played.size}"); GroupList(played) { g -> GameRow(vm, lg, g, teamId) } }
+            if (left.isNotEmpty()) item { Section(if (played.isEmpty()) "Regular season" else "Still to play · ${left.size}"); GroupList(left) { g -> GameRow(vm, lg, g, teamId) } }
+            if (post.isNotEmpty()) item { Section("Postseason"); GroupList(post) { g -> GameRow(vm, lg, g, teamId) } }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
     }
 }
 

@@ -425,7 +425,9 @@ class GameViewModel : ViewModel() {
         progressNote = ""
         viewModelScope.launch(failSafe) {
             delay(60) // let the UI leave any screen that reads the league
-            mutex.withLock { withContext(Dispatchers.Default) { block(lg); Reactions.pass(lg) } }
+            try {
+                mutex.withLock { withContext(Dispatchers.Default) { block(lg); Reactions.pass(lg) } }
+            } finally { canStop = false; stopRequested = false }
             busy = null
             progress = null
             progressNote = ""
@@ -751,10 +753,18 @@ class GameViewModel : ViewModel() {
      * Sim day by day until [stop]. With [days] (how many days it should take), the loading screen
      * shows a progress bar; either way it shows the day and the user's record as it goes.
      */
+    /** A multi-day sim can be stopped: [canStop] while one runs, [stopRequested] once the user taps Stop. */
+    var canStop by mutableStateOf(false)
+    var stopRequested by mutableStateOf(false)
+
     fun simUntil(label: String, days: Int? = null, stop: (League) -> Boolean) = heavy(label) { lg ->
         var guard = 0
         var done = 0
+        withContext(Dispatchers.Main) { stopRequested = false; canStop = true }
+        val hadMoment = lg.ceremony != null
         while (!Season.seasonOver(lg) && guard++ < 200) {
+            // Stop after the day in progress if asked, or when a career moment needs the user.
+            if (done > 0 && (stopRequested || (!hadMoment && lg.ceremony != null))) break
             com.nh.hoopscoach.game.Sim.playDay(lg)
             done++
             val note = "Day ${lg.day} · ${lg.user.w}-${lg.user.l}"
@@ -762,6 +772,7 @@ class GameViewModel : ViewModel() {
             withContext(Dispatchers.Main) { progress = p; progressNote = note }
             if (stop(lg)) break
         }
+        withContext(Dispatchers.Main) { canStop = false; stopRequested = false }
     }
 
     fun simDays(n: Int) {
@@ -776,6 +787,14 @@ class GameViewModel : ViewModel() {
             .maxOfOrNull { it.day }?.let { it - lg.day + 1 }?.takeIf { it > 1 }
 
     fun simToPhase(phase: Phase, label: String, days: Int? = null) = simUntil(label, days) { it.phase == phase }
+
+    /** Days off: straight to the user's next game (or the end of the regular season). */
+    fun simToNextGame() {
+        val lg = league ?: return
+        val next = lg.games.filter { !it.played && it.involves(lg.userTeamId) }.minOfOrNull { it.day }
+        val days = next?.let { it - lg.day }?.takeIf { it > 0 }
+        simUntil("Heading to the next game", days) { Season.userGameToday(it) != null || it.phase != Phase.REGULAR }
+    }
 
     fun beginOffseason() = heavy("Heading into the offseason") { Offseason.begin(it) }
 
@@ -812,6 +831,8 @@ class GameViewModel : ViewModel() {
             // Coaching it: timeouts, the closing five and the last plays are his calls.
             if (!lg.playerMode) it.startCoaching(if (g.home == lg.userTeamId) 0 else 1)
         })
+        leaveAsked = false
+        live?.speed = lg.liveSpeed.coerceIn(1, 3)
         stack.add(Route.Live)
     }
 
@@ -836,6 +857,9 @@ class GameViewModel : ViewModel() {
         if (lv.done) return
         viewModelScope.launch(failSafe) { finishLive(lv, lg) }
     }
+
+    /** Back was pressed mid-game: the live screen asks whether to leave (and sim the rest). */
+    var leaveAsked by mutableStateOf(false)
 
     fun closeLive() {
         val lv = live
@@ -864,7 +888,12 @@ class GameViewModel : ViewModel() {
         if (guide != null) { guide = null; return true }
         if (sheet != null) { sheet = null; return true }
         val top = stack.lastOrNull() ?: return false
-        if (top is Route.Live) { closeLive(); return true }
+        if (top is Route.Live) {
+            // Mid-game, back asks first: leaving sims the rest of it.
+            if (live?.let { !it.engine.finished && !it.done } == true && !leaveAsked) { leaveAsked = true; return true }
+            leaveAsked = false
+            closeLive(); return true
+        }
         stack.removeAt(stack.lastIndex)
         return true
     }

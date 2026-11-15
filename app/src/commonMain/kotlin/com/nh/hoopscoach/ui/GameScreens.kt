@@ -179,6 +179,14 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         if (e.finished) list += list.last().first to (if (e.score[0] > e.score[1]) 1f else 0f)
         list
     }
+    if (vm.leaveAsked) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.leaveAsked = false },
+        containerColor = P.surface,
+        title = { Text("Leave the game?", style = T.h2, color = P.ink) },
+        text = { Text("The rest of it gets simulated and the final goes in the books.", style = T.body, color = P.sub) },
+        confirmButton = { TextButton({ vm.back() }) { Text("Leave", style = T.bodyB, color = P.bad) } },
+        dismissButton = { TextButton({ vm.leaveAsked = false }) { Text("Keep watching", style = T.bodyB, color = P.accent) } },
+    )
     Column(Modifier.fillMaxSize()) {
         BackBar(e.game.label.ifEmpty { gameKind(lg, e.game) }, if (e.finished) "Final" else "${e.periodName} · ${clock(e.clock.toInt().coerceAtLeast(0))}", onBack = { vm.back() })
         // A big moment or a coaching call is the whole screen until it's answered: the chart and the
@@ -229,7 +237,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         if (!lv.done) {
             if (lv.moment == null) {
                 // Speed on its own row so every setting has room; the actions below it.
-                Segmented(listOf(if (lv.speed == 0) "Play" else "Pause", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) 2 else it })
+                Segmented(listOf(if (lv.speed == 0) "Play" else "Pause", "1×", "2×", "4×"), lv.speed, { lv.speed = if (it == 0 && lv.speed == 0) lg.liveSpeed.coerceIn(1, 3) else it; if (lv.speed > 0) lg.liveSpeed = lv.speed })
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (e.coachSide >= 0) SmallButton("Timeout · ${e.timeoutsLeft}", Modifier.weight(1f), enabled = e.timeoutsLeft > 0) { if (e.callTimeout()) { lv.momentResult = e.lastCall; lv.tick++ } }

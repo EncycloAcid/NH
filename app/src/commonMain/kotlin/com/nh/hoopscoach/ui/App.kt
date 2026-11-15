@@ -114,6 +114,10 @@ fun App(vm: GameViewModel) {
                 }
             }
             if (busy != null && lg != null) BusyCover(vm)
+            if (busy != null && lg != null && vm.canStop) Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 64.dp), contentAlignment = Alignment.BottomCenter) {
+                if (vm.stopRequested) Text("Stopping after today…", style = T.bodyB, color = P.sub)
+                else SmallButton("Stop") { vm.stopRequested = true }
+            }
             vm.celebration?.let { c -> CelebrationOverlay(c) { if (vm.celebration === c) vm.celebration = null } }
             Toast(vm)
         }
@@ -314,7 +318,8 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
     // On PC, Space/Enter does what the main button says and S sims the day (see Main.kt).
     val offseason = lg.phase == Phase.WRAP_UP || lg.phase == Phase.OFFSEASON
     androidx.compose.runtime.SideEffect {
-        vm.keyPrimary = when { offseason -> { -> vm.select(Tab.TODAY) }; game != null -> { -> vm.startLive() }; else -> { -> vm.simDay() } }
+        val offDay = game == null && lg.phase == Phase.REGULAR && lg.games.any { !it.played && it.involves(lg.userTeamId) && it.day <= Schedule.REG_DAYS }
+        vm.keyPrimary = when { offseason -> { -> vm.select(Tab.TODAY) }; game != null -> { -> vm.startLive() }; offDay -> { -> vm.simToNextGame() }; else -> { -> vm.simDay() } }
         vm.keySim = if (offseason) null else { -> vm.simDay() }
     }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.keyPrimary = null; vm.keySim = null } }
@@ -375,6 +380,10 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
                     SmallButton(if (pc) "Sim  ·  S" else "Sim") { vm.simDay() }
                     Spacer(Modifier.width(8.dp))
                     SmallButton(if (pc) "Play  ·  Space" else "Play", primary = true) { vm.startLive() }
+                } else if (lg.phase == Phase.REGULAR && lg.games.any { !it.played && it.involves(u.id) && it.day <= Schedule.REG_DAYS }) {
+                    SmallButton("Next day") { vm.simDay() }
+                    Spacer(Modifier.width(8.dp))
+                    SmallButton("Next game" + if (pc) "  ·  Space" else "", primary = true) { vm.simToNextGame() }
                 } else SmallButton((if (lg.phase == Phase.REGULAR) "Next day" else "Sim round") + if (pc) "  ·  Space" else "", primary = true) { vm.simDay() }
             }
         }
@@ -467,7 +476,7 @@ private fun Toast(vm: GameViewModel) {
     val msg = vm.message
     LaunchedEffect(msg) {
         if (msg == null) return@LaunchedEffect
-        delay(2600)
+        delay((2200L + msg.length * 35L).coerceIn(2600L, 6500L))
         if (vm.message == msg) vm.message = null
     }
     // Keep the last message on screen while it slides away.

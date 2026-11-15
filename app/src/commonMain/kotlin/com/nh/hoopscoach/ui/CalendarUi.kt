@@ -216,7 +216,10 @@ private fun GameLine(vm: GameViewModel, lg: League, g: Game, compact: Boolean = 
             Text("${if (mine > theirs) "W" else "L"} $mine-$theirs", style = T.numSm, color = if (mine > theirs) P.good else P.bad)
         } else {
             val p = Rankings.winProbFor(lg, g, u.id)
-            Text("${(p * 100).toInt()}%", style = T.numSm, color = P.sub)
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${(p * 100).toInt()}%", style = T.numSm, color = P.sub)
+                Text("WIN", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+            }
         }
     }
 }

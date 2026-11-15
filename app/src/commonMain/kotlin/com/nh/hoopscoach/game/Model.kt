@@ -1830,6 +1830,8 @@ class League(
     var cases: MutableList<NcaaCase> = mutableListOf(),
     /** Crowd and horn in live games. */
     var soundOn: Boolean = true,
+    /** The live game's speed last time (1x, 2x, 4x), so the next game starts the same way. */
+    var liveSpeed: Int = 2,
     /** The coach's radio show: the week last done ([RadioShow.week]) and calls answered in the current one. */
     var radioWeek: Int = 0,
     var radioAnswered: Int = 0,
