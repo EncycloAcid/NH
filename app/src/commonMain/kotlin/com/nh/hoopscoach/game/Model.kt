@@ -1846,6 +1846,12 @@ class League(
     var deskPredSeason: Int = 0,
     var deskPredBet: String = "",
     var deskPredGraded: Int = 0,
+    /** The clubhouse (see [Clubhouse]): the last incident handled, the last pregame speech, and the bracket pick. */
+    var deskIncidentStamp: Int = 0,
+    var deskSpeechGame: Int = -1,
+    var deskBracketSeason: Int = 0,
+    var deskBracketPick: Int = -1,
+    var deskBracketGraded: Int = 0,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

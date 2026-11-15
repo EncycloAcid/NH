@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,6 +19,9 @@ fun CoachDeskCards(vm: GameViewModel, lg: League) {
     if (!CoachDesk.pressActive(lg)) return
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     if (CoachDesk.active(lg) && CoachDesk.predictionDue(lg)) PredictionCard(vm, lg)
+    if (com.nh.hoopscoach.game.Clubhouse.bracketDue(lg)) BracketCard(vm, lg)
+    com.nh.hoopscoach.game.Clubhouse.bigGame(lg)?.let { PregameCard(vm, lg, it) }
+    com.nh.hoopscoach.game.Clubhouse.incident(lg)?.let { IncidentCard(vm, lg, it) }
     for (pr in CoachDesk.current(lg)) DeskPrompt(vm, lg, pr)
 }
 
@@ -71,6 +75,86 @@ private fun PredictionCard(vm: GameViewModel, lg: League) {
                 Text("\"${b.label}.\"", style = T.bodyB, color = P.ink)
                 Text(b.detail, style = T.small, color = P.sub)
             }
+        }
+    }
+}
+
+// ---------- the clubhouse ----------
+
+@Composable
+private fun IncidentCard(vm: GameViewModel, lg: League, inc: com.nh.hoopscoach.game.Clubhouse.Incident) {
+    val C = com.nh.hoopscoach.game.Clubhouse
+    Section("Locker room", action = "Let it go", onAction = { vm.act { C.skipIncident(it) } })
+    Panel(color = mix(P.surface, P.warn, if (P.dark) 0.12f else 0.06f)) {
+        Text(inc.title.uppercase(), style = T.label, color = P.warn)
+        lg.playerOrNull(inc.playerId)?.let { p ->
+            androidx.compose.foundation.layout.Row(Modifier.padding(top = 6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                PlayerJersey(p, lg.user, 40.dp)
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 10.dp))
+                Column {
+                    Text(p.name, style = T.bodyB, color = P.ink)
+                    Text("${p.posLabel} · ${p.cls} · mood ${p.happiness}", style = T.small, color = P.sub)
+                }
+            }
+        }
+        Text(inc.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        inc.options.forEachIndexed { i, op ->
+            ListRow(onClick = {
+                var reaction = ""
+                vm.act { reaction = C.resolve(it, inc, i) }
+                if (reaction.isNotEmpty()) vm.toast(reaction)
+            }) {
+                Column(Modifier.weight(1f)) {
+                    Text(op.text, style = T.body, color = P.ink)
+                    val hints = listOfNotNull(
+                        if (op.suspend > 0) "sits ${op.suspend} game${if (op.suspend == 1) "" else "s"}" else null,
+                        if (op.mood >= 4) "he's happier" else if (op.mood <= -4) "he won't like it" else null,
+                        if (op.team >= 2) "room respects it" else if (op.team <= -2) "room notices" else null,
+                        if (op.security >= 2) "bosses ↑" else if (op.security < 0) "bosses ↓" else null,
+                        if (op.fans >= 2) "fans ↑" else null,
+                    )
+                    if (hints.isNotEmpty()) Text(hints.joinToString(" · "), style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PregameCard(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game.Game) {
+    val C = com.nh.hoopscoach.game.Clubhouse
+    Section("Pregame speech", action = "No speech", onAction = { vm.act { it.deskSpeechGame = g.id } })
+    Panel {
+        Text(C.why(lg, g).uppercase(), style = T.label, color = P.accent)
+        Text("The locker room is quiet. Everybody's looking at you.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp))
+        for (s in C.speeches(lg, g)) ListRow(onClick = {
+            var reaction = ""
+            vm.act { reaction = C.speak(it, g, s) }
+            if (reaction.isNotEmpty()) vm.toast(reaction)
+        }) {
+            Column(Modifier.weight(1f)) {
+                Text(s.label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                Text("\"${s.text}\"", style = T.body, color = P.ink)
+            }
+        }
+        Text("A good speech lifts the room, and a happy room plays better together.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+private fun BracketCard(vm: GameViewModel, lg: League) {
+    val C = com.nh.hoopscoach.game.Clubhouse
+    val b = lg.ncaa ?: return
+    Section("Bracket challenge", action = "Not this year", onAction = { vm.act { it.deskBracketSeason = it.season; it.deskBracketPick = -1 } })
+    Panel {
+        Text("It's Selection Sunday. Everybody in the country is filling out a bracket, the coaches too. Who wins it all?", style = T.small, color = P.sub)
+        Text("Get it right and the fans love it (and the bosses smile).", style = T.small, color = P.faint, modifier = Modifier.padding(bottom = 6.dp))
+        for (t in C.bracketChoices(lg)) ListRow(onClick = { vm.act { C.pickChampion(it, t.id) }; vm.toast("Locked in: ${t.school}.") }) {
+            Text("${b.seeds[t.id] ?: ""}", style = T.numSm, color = if (t.id == lg.userTeamId) P.accent else P.sub, modifier = Modifier.width(28.dp))
+            TeamBadge(t, 28.dp)
+            androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+            Text(t.school, style = T.bodyB, color = if (t.id == lg.userTeamId) P.accent else P.ink, modifier = Modifier.weight(1f))
+            Text(t.record, style = T.small, color = P.sub)
         }
     }
 }

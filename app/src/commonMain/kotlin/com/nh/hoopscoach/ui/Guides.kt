@@ -211,6 +211,12 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "Every card can be skipped. NBA coaching careers get the press conference.",
         ),
         sec(
+            "The clubhouse",
+            "• Locker room incidents: every week or two, something happens: a player late to practice, a viral post, a scuffle, slipping grades, a homesick freshman, a senior asking for one start. Handle it your way. A suspension sits him for games; how you handle it moves his mood, the rest of the room, your bosses and the fans.",
+            "• Pregame speeches: before a rivalry game, a ranked opponent or a tournament game, choose what to say: fire them up, keep them calm, or the game plan. A happier room plays better together.",
+            "• Bracket challenge: on Selection Sunday, pick a national champion from the top seeds (or your own team). Get it right and the fans and the bosses notice.",
+        ),
+        sec(
             "The short version",
             "Prestige is your program's headline number, from 0 to 100. It moves once a season and slowly, so one great year nudges it and one bad year doesn't wreck it.",
             "Four numbers sit next to it. Legacy is how the sport sees your program over the long run. Buzz is short-term national heat. Conference Exposure is how visible your league is. Program Pull blends it all into one attractiveness rating.",
