@@ -235,63 +235,95 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
     val majors = p.awards.count { a -> listOf("MVP", "Champion", "All-NBA", "All-America", "All-American", "Nat MVP", "Finals MVP", "All-Star").any { a.contains(it) } }
     val foil = (hero && lg.legacyTier >= 3) || majors >= 4
     val shoe = if (hero) lg.road?.shoe?.let { com.nh.hoopscoach.game.Shoes.shoeName(lg, it) } else null
-    val shine by rememberInfiniteTransition(label = "foil").animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart), label = "f")
-    val shape = RoundedCornerShape(16.dp)
+    val shine by rememberInfiniteTransition(label = "foil").animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Restart), label = "f")
+    // Everything is sized off the card's width, so a small card is the big one shrunk, not a cramped copy.
+    val k = width.value / 240f
+    fun sz(x: Float) = (x * k).sp
+    val plateH = width * 0.3f
+    val ink = onColor(primary)
+    // The nameplate's spot color: the school's second color if it reads on the first, else the rarity's.
+    val spot = if (contrast(secondary, primary) >= 2.0f) secondary else rar.edge[0]
     Box(
-        modifier.width(width).aspectRatio(0.71f).clip(shape)
+        modifier.width(width).aspectRatio(0.71f).clip(RoundedCornerShape(16.dp * k))
             .background(Brush.linearGradient(rar.edge))
-            .padding(5.dp),
+            .padding(5.dp * k),
     ) {
-        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))) {
-            ArenaBackdrop(t, Modifier.fillMaxSize())
-            // The player, from the waist up, standing in front of the crowd.
-            val face = Face.of(p)
-            Box(Modifier.fillMaxWidth().aspectRatio(1f).align(Alignment.BottomCenter).padding(bottom = width * 0.2f)) {
-                BasketballCharacterCanvas(
-                    face = face, jerseyKey = SpriteSheets.jerseyKey(t?.abbr, t?.slot, t?.name),
-                    primary = (t?.primary ?: 0xFF5C6B7AL).toInt(), secondary = (t?.secondary ?: 0xFFFFFFFFL).toInt(),
-                    number = p.number, gear = Gear.decode(p.gear), label = t?.abbr, background = Color.Transparent, corner = 0.dp,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            // Rating and position, top left; the team's badge, top right.
-            Column(Modifier.align(Alignment.TopStart).padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("$v", style = T.hero.copy(fontSize = (width.value * 0.16f).sp, lineHeight = (width.value * 0.16f).sp), color = Color.White)
-                Text(p.posLabel, style = T.label.copy(fontSize = 11.sp), color = Color.White.copy(alpha = 0.85f))
-            }
-            t?.let { Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) { TeamBadge(it, width * 0.16f) } }
-            // The nameplate.
-            Column(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(primary.copy(alpha = 0.92f), lerp(primary, Color.Black, 0.45f))))
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-            ) {
-                val ink = onColor(primary)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(p.first.uppercase(), style = T.label.copy(fontSize = 10.sp), color = ink.copy(alpha = 0.8f), maxLines = 1)
-                        Text(p.last.uppercase(), style = T.title.copy(fontSize = (width.value * 0.095f).sp, lineHeight = (width.value * 0.1f).sp), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    Text(rar.name, style = T.label.copy(fontSize = 9.sp), color = rar.ink,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Brush.linearGradient(rar.edge)).padding(horizontal = 6.dp, vertical = 2.dp))
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp * k))) {
+            // The art: his arena, a glow in his team's color behind him, and the player from the waist up,
+            // standing on the nameplate so his number shows.
+            Box(Modifier.fillMaxSize().padding(bottom = plateH)) {
+                ArenaBackdrop(t, Modifier.fillMaxSize())
+                Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(Brush.radialGradient(listOf(lerp(primary, Color.White, 0.25f).copy(alpha = 0.55f), Color.Transparent),
+                        Offset(size.width / 2, size.height * 0.62f), size.width * 0.62f), size.width * 0.62f, Offset(size.width / 2, size.height * 0.62f))
+                    // Shade the top-left corner so the rating reads over a bright crowd.
+                    drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent), Offset(0f, 0f), size.width * 0.5f))
                 }
-                val s = p.stats
-                val line = if (s.gp > 0) "%.1f PTS · %.1f REB · %.1f AST".format(s.ppg, s.rpg, s.apg)
-                    else p.career.lastOrNull()?.s?.let { "%.1f PTS · %.1f REB · %.1f AST".format(it.ppg, it.rpg, it.apg) } ?: (t?.let { if (lg.pro) it.name else it.school } ?: "")
-                Text(line, style = T.small.copy(fontSize = 11.sp), color = ink.copy(alpha = 0.9f), maxLines = 1)
-                if (shoe != null) Text("THE ${shoe.uppercase()}", style = T.label.copy(fontSize = 9.sp), color = lerp(secondary, Color.White, 0.3f), maxLines = 1)
+                Box(Modifier.fillMaxWidth(1.02f).aspectRatio(1f).align(Alignment.BottomCenter).offset(y = 2.dp)) {
+                    BasketballCharacterCanvas(
+                        face = Face.of(p), jerseyKey = SpriteSheets.jerseyKey(t?.abbr, t?.slot, t?.name),
+                        primary = (t?.primary ?: 0xFF5C6B7AL).toInt(), secondary = (t?.secondary ?: 0xFFFFFFFFL).toInt(),
+                        number = p.number, gear = Gear.decode(p.gear), label = t?.abbr, background = Color.Transparent, corner = 0.dp,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                // Foil: a slow rainbow band across the art (never over the nameplate's words), and a few glints.
+                if (foil) Canvas(Modifier.fillMaxSize()) {
+                    val x = shine * size.width
+                    drawRect(Brush.linearGradient(
+                        listOf(Color.Transparent, Color(0x2600FFFF), Color(0x30FF66FF), Color(0x26FFFF66), Color.Transparent),
+                        start = Offset(x - size.width * 0.45f, 0f), end = Offset(x + size.width * 0.45f, size.height),
+                    ))
+                    val r = kotlin.random.Random(p.id)
+                    // Small soft glints that twinkle in turn, kept off his face.
+                    repeat(6) {
+                        val gx = r.nextFloat() * size.width
+                        val gy = r.nextFloat() * size.height * 0.45f
+                        val a = (sin((shine * 4f + it * 0.7f) * PI.toFloat())).coerceIn(0f, 1f) * 0.75f
+                        if (a <= 0.02f) return@repeat
+                        val g = size.width * 0.012f
+                        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = a * 0.6f), Color.Transparent), Offset(gx, gy), g * 2.2f), g * 2.2f, Offset(gx, gy))
+                        drawLine(Color.White.copy(alpha = a), Offset(gx - g * 1.6f, gy), Offset(gx + g * 1.6f, gy), strokeWidth = g * 0.28f)
+                        drawLine(Color.White.copy(alpha = a), Offset(gx, gy - g * 1.6f), Offset(gx, gy + g * 1.6f), strokeWidth = g * 0.28f)
+                    }
+                }
             }
-            // Foil: a slow rainbow shine across the whole card.
-            if (foil) Box(Modifier.fillMaxSize().drawWithContent {
-                drawContent()
-                val x = shine * size.width
-                drawRect(Brush.linearGradient(
-                    listOf(Color.Transparent, Color(0x3300FFFF), Color(0x40FF66FF), Color(0x33FFFF66), Color.Transparent),
-                    start = Offset(x - size.width * 0.5f, 0f), end = Offset(x + size.width * 0.5f, size.height),
-                ))
-            })
+            // Rating and position, top left; the badge, top right.
+            Column(Modifier.align(Alignment.TopStart).padding(10.dp * k), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("$v", style = T.hero.copy(fontSize = sz(40f), lineHeight = sz(40f)), color = Color.White)
+                Text(p.posLabel, style = T.label.copy(fontSize = sz(11f)), color = Color.White.copy(alpha = 0.9f))
+            }
+            t?.let { Box(Modifier.align(Alignment.TopEnd).padding(10.dp * k)) { TeamBadge(it, width * 0.16f) } }
+            // The nameplate: a stripe in the spot color, then the name and his line.
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(plateH)
+                .background(Brush.verticalGradient(listOf(primary, lerp(primary, Color.Black, 0.4f))))) {
+                Box(Modifier.fillMaxWidth().height(3.dp * k).background(spot))
+                Column(Modifier.fillMaxSize().padding(horizontal = 10.dp * k, vertical = 5.dp * k), verticalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(p.first.uppercase(), style = T.label.copy(fontSize = sz(9.5f), lineHeight = sz(10f)), color = ink.copy(alpha = 0.8f), maxLines = 1)
+                            Text(p.last.uppercase(), style = T.title.copy(fontSize = sz(22f), lineHeight = sz(23f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text(rar.name + if (foil) " ★" else "", style = T.label.copy(fontSize = sz(8.5f), lineHeight = sz(9f)), color = rar.ink, maxLines = 1,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp * k)).background(Brush.linearGradient(rar.edge)).padding(horizontal = 5.dp * k, vertical = 2.dp * k))
+                    }
+                    // This season's line as three cells, or last season's, or where he plays if he hasn't yet.
+                    val s = p.stats.takeIf { it.gp > 0 } ?: p.career.lastOrNull { it.s.gp > 0 }?.s
+                    if (s != null) Row(Modifier.fillMaxWidth()) {
+                        for ((label, value) in listOf("PTS" to s.ppg, "REB" to s.rpg, "AST" to s.apg)) {
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
+                                Text("%.1f".format(value), style = T.numSm.copy(fontSize = sz(15f), lineHeight = sz(15f)), color = ink, maxLines = 1)
+                                Text(" $label", style = T.label.copy(fontSize = sz(8f), lineHeight = sz(9f)), color = ink.copy(alpha = 0.7f), maxLines = 1, modifier = Modifier.padding(bottom = 1.dp))
+                            }
+                        }
+                    } else Text(listOfNotNull(if (lg.pro) "Rookie" else p.cls, t?.let { if (lg.pro) it.name else it.school }).joinToString(" · "),
+                        style = T.small.copy(fontSize = sz(11f), lineHeight = sz(12f)), color = ink.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (shoe != null) Text("THE ${shoe.uppercase()}", style = T.label.copy(fontSize = sz(8f), lineHeight = sz(9f)), color = spot, maxLines = 1)
+                }
+            }
+            // A thin inner frame, like the print line on a real card.
+            Box(Modifier.fillMaxSize().padding(3.dp * k).border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(10.dp * k)))
         }
-        if (foil) Text("★ FOIL", style = T.label.copy(fontSize = 9.sp), color = rar.ink, modifier = Modifier.align(Alignment.TopCenter).offset(y = (-2).dp))
     }
 }
 
