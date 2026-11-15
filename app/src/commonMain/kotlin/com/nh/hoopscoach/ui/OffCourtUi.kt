@@ -190,7 +190,14 @@ fun GoalCard(vm: GameViewModel, lg: League) {
     }
     C.progress(lg)?.let { line ->
         Section("Your goal")
-        Panel(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp)) { Text(line, style = T.bodyB, color = P.ink) }
+        Panel(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(line, style = T.bodyB, color = P.ink)
+            C.fraction(lg)?.let { f ->
+                Spacer(Modifier.height(6.dp))
+                Bar(f, Modifier.fillMaxWidth(), height = 6.dp)
+                Text(if (f >= 1f) "On pace. Keep it there." else "${(f * 100).roundToInt()}% of the way", style = T.small, color = P.faint, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
     }
 }
 

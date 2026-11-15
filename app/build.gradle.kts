@@ -80,8 +80,8 @@ android {
         applicationId = "com.nh.hoopscoach.pro"
         minSdk = 26
         targetSdk = 35
-        versionCode = 249
-        versionName = "3.8-pro.228"
+        versionCode = 250
+        versionName = "3.9-pro.229"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from
@@ -153,8 +153,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "HoopsDynasty"
-            // jpackage requires a numeric dotted version; UI still shows 3.8-pro.228 via PlatformContext.
-            packageVersion = "3.8.228"
+            // jpackage requires a numeric dotted version; UI still shows 3.9-pro.229 via PlatformContext.
+            packageVersion = "3.9.229"
             description = "College basketball coaching dynasty (Pro)"
             vendor = "DeadBunny Studios"
             copyright = "© 2026 DeadBunny Studios"

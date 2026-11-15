@@ -159,9 +159,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { HeroTodayCard(vm, lg) }
-        item { GoalCard(vm, lg) }
-        item { ShoeDesignCard(vm, lg) }
-        item { LifeCard(vm, lg) }
+        item { PlayerInbox(vm, lg, press = false) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
         item { TopTenCard(vm, lg) }

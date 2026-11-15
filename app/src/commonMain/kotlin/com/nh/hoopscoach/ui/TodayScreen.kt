@@ -85,13 +85,12 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); GoalCard(vm, lg); PressCard(vm, lg); LifeCard(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         item { MidnightMadnessCard(vm, lg) }
         item { SummerTourCard(vm, lg) }
         item { NcaaCaseCard(vm, lg) }
         item { CoachDeskCards(vm, lg) }
-        item { RadioShowCard(vm, lg) }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }
@@ -486,7 +485,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             }
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
-        if (lg.playerMode) item { HeroTodayCard(vm, lg); GoalCard(vm, lg); PressCard(vm, lg); LifeCard(vm, lg) }
+        if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         item { CoachDeskCards(vm, lg) }

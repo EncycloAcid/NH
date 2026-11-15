@@ -7,23 +7,38 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.CoachDesk
 import com.nh.hoopscoach.game.League
 
-/** The coach's desk on Today: the postgame presser, media day, senior night, the mailbag and the preseason call. */
+/**
+ * The coach's inbox on Today: everything waiting on him (the pregame speech, the press conference, media
+ * day, the bracket, a locker room incident, a booster, the mailbag, the radio show, the preseason call).
+ * One opens in full; the rest wait in a short list below it, a tap away, so Today doesn't turn into a
+ * wall of cards.
+ */
 @Composable
 fun CoachDeskCards(vm: GameViewModel, lg: League) {
     if (!CoachDesk.pressActive(lg)) return
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
-    if (CoachDesk.active(lg) && CoachDesk.predictionDue(lg)) PredictionCard(vm, lg)
-    if (com.nh.hoopscoach.game.Clubhouse.bracketDue(lg)) BracketCard(vm, lg)
-    com.nh.hoopscoach.game.Clubhouse.bigGame(lg)?.let { PregameCard(vm, lg, it) }
-    com.nh.hoopscoach.game.Clubhouse.incident(lg)?.let { IncidentCard(vm, lg, it) }
-    com.nh.hoopscoach.game.OffCourt.booster(lg)?.let { BoosterCard(vm, lg, it) }
-    for (pr in CoachDesk.current(lg)) DeskPrompt(vm, lg, pr)
+    val C = com.nh.hoopscoach.game.Clubhouse
+    val entries = mutableListOf<Pair<String, @Composable () -> Unit>>()
+    // Most time-sensitive first: tonight's game, then what just happened, then what can wait.
+    C.bigGame(lg)?.let { g -> entries += "Pregame speech" to { PregameCard(vm, lg, g) } }
+    if (C.bracketDue(lg)) entries += "Bracket challenge" to { BracketCard(vm, lg) }
+    if (CoachDesk.active(lg) && CoachDesk.predictionDue(lg)) entries += "Your preseason call" to { PredictionCard(vm, lg) }
+    for (pr in CoachDesk.current(lg)) {
+        val title = when (pr.kind) { "press" -> "Press conference"; "media" -> "Media day"; "senior" -> "Senior night"; else -> "The mailbag" }
+        entries += title to { DeskPrompt(vm, lg, pr) }
+    }
+    C.incident(lg)?.let { inc -> entries += "Locker room: ${inc.title.lowercase()}" to { IncidentCard(vm, lg, inc) } }
+    com.nh.hoopscoach.game.OffCourt.booster(lg)?.let { rq -> entries += "A booster calls" to { BoosterCard(vm, lg, rq) } }
+    if (!lg.pro && com.nh.hoopscoach.game.RadioShow.due(lg)) entries += "The coach's show" to { RadioShowCard(vm, lg) }
+    InboxStack(entries)
 }
 
 @Composable
@@ -219,6 +234,46 @@ fun LifeCard(vm: GameViewModel, lg: League) {
                         if (mv.mood >= 5) "feels great" else if (mv.mood < 0) "mood ↓" else null,
                     )
                     if (hints.isNotEmpty()) Text(hints.joinToString(" · "), style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The player's inbox on Today: this season's goal, the shoe design, the postgame podium and life off the
+ * court. One opens in full; the rest wait in a short list below it. Once the goal is set, its progress
+ * line shows above the inbox.
+ */
+@Composable
+fun PlayerInbox(vm: GameViewModel, lg: League, press: Boolean = true) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val PC = com.nh.hoopscoach.game.PlayerCareer
+    val entries = mutableListOf<Pair<String, @Composable () -> Unit>>()
+    if (press && lg.road?.press != null) entries += "Postgame press" to { PressCard(vm, lg) }
+    if (PC.goalDue(lg)) entries += "Your goal this season" to { GoalCard(vm, lg) }
+    if (com.nh.hoopscoach.game.Shoes.designPending(lg) != null) entries += "Design your shoe" to { ShoeDesignCard(vm, lg) }
+    com.nh.hoopscoach.game.OffCourt.life(lg)?.let { l -> entries += "Off the court: ${l.title.lowercase()}" to { LifeCard(vm, lg) } }
+    if (!PC.goalDue(lg)) GoalCard(vm, lg)
+    InboxStack(entries)
+}
+
+/** Shows the first entry (or the one tapped) in full, and lists the rest under "Also waiting". */
+@Composable
+fun InboxStack(entries: List<Pair<String, @Composable () -> Unit>>) {
+    if (entries.isEmpty()) return
+    var front by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val ordered = entries.sortedBy { if (it.first == front) 0 else 1 }
+    ordered.first().second()
+    if (ordered.size > 1) {
+        Spacer(Modifier.height(8.dp))
+        Panel(padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+            Text("ALSO WAITING · ${ordered.size - 1}", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 4.dp))
+            ordered.drop(1).forEachIndexed { i, (title, _) ->
+                if (i > 0) Hairline(Modifier.padding(start = 14.dp))
+                ListRow(onClick = { front = title }) {
+                    Text(title, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
+                    Text("Open", style = T.bodyB.copy(fontSize = 13.sp), color = P.accent)
                 }
             }
         }

@@ -68,6 +68,18 @@ object PlayerCareer {
         return "${lg.careerGoalLabel}: $now"
     }
 
+    /** How far along he is, 0..1, for goals with a number to chase (null for award goals). */
+    fun fraction(lg: League): Float? {
+        if (!active(lg) || lg.careerGoalSeason != lg.season || lg.careerGoalTarget <= 0) return null
+        val h = lg.hero ?: return null
+        val now = when (lg.careerGoalKind) {
+            "ppg" -> h.stats.ppg; "rpg" -> h.stats.rpg; "apg" -> h.stats.apg
+            "wins" -> (lg.teams.getOrNull(h.teamId)?.w ?: 0).toDouble()
+            else -> return null
+        }
+        return (now / lg.careerGoalTarget).toFloat().coerceIn(0f, 1f)
+    }
+
     private fun gradeGoal(lg: League) {
         if (lg.careerGoalSeason != lg.season || lg.careerGoalKind.isEmpty() || lg.careerGoalGraded == lg.season) return
         lg.careerGoalGraded = lg.season
