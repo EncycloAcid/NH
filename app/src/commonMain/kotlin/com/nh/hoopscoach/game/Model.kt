@@ -1836,6 +1836,16 @@ class League(
     /** What the coach has said on the show that callers can throw back at him, and AI-written versions of this week's questions. */
     var radioLog: MutableList<RadioQuote> = mutableListOf(),
     var radioAi: MutableMap<String, String> = mutableMapOf(),
+    /** The coach's desk (see [CoachDesk]): the last game with a press conference, media day, senior night, the mailbag and the preseason prediction. */
+    var deskPressGame: Int = -1,
+    var deskMediaSeason: Int = 0,
+    var deskMediaStep: Int = 0,
+    var deskSeniorSeason: Int = 0,
+    var deskMailStamp: Int = 0,
+    var deskMailAnswered: Int = 0,
+    var deskPredSeason: Int = 0,
+    var deskPredBet: String = "",
+    var deskPredGraded: Int = 0,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

@@ -166,6 +166,7 @@ object WorldEvents {
         runCatching { RivalryTrophies.seasonEnd(lg) }
         runCatching { Challenges.seasonEnd(lg) }
         runCatching { Shoes.marchBonuses(lg) }
+        runCatching { CoachDesk.gradePrediction(lg) }
         records(lg)
         dynasties(lg)
         unbeatenRegularSeasons(lg)

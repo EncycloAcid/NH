@@ -160,6 +160,7 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxSize()) {
         item { ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, "Coach ${c.name} · ${teamLine(lg, u)}") { TeamBadge(u, 50.dp) } }
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
+        item { CoachDeskCards(vm, lg) }
         Season.userGameToday(lg)?.let { g ->
             item {
                 val opp = lg.team(g.opp(u.id))

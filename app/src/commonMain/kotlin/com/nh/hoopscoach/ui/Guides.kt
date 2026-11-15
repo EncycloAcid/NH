@@ -201,6 +201,16 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
     ),
     "Program" to listOf(
         sec(
+            "The coach's desk",
+            "Off the floor, the job is talking. Cards on Today ask for your answer, and what you say moves the fans, your bosses (job security), your players' mood, rival coaches' tempers and the recruits on your board. Each answer shows a hint of what it moves.",
+            "• Press conference: after every game, a question about what just happened: a rivalry win, a close loss, a blowout, an upset, a freshman's big night, a streak, a tournament exit.",
+            "• Media day: three questions before the opener about your poll position, your best player or newcomers, and your rival.",
+            "• Senior night: before the last home game, choose how to honor your seniors.",
+            "• The mailbag: two letters every other week, from kids and critics to boosters and the occasional rival fan.",
+            "• Your preseason call: before the first game, put a prediction on the record (win the league, make the tournament, beat last year). It's graded at season's end; hit it and the bosses love you, miss and they remember.",
+            "Every card can be skipped. NBA coaching careers get the press conference.",
+        ),
+        sec(
             "The short version",
             "Prestige is your program's headline number, from 0 to 100. It moves once a season and slowly, so one great year nudges it and one bad year doesn't wreck it.",
             "Four numbers sit next to it. Legacy is how the sport sees your program over the long run. Buzz is short-term national heat. Conference Exposure is how visible your league is. Program Pull blends it all into one attractiveness rating.",
