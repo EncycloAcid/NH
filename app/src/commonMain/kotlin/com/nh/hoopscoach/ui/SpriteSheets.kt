@@ -182,6 +182,14 @@ object SpriteSheets {
         "mohawk",                // 11 Mohawk
         "messy_waves",           // 12 Waves
         "braided_top_bun",       // 13 Man bun / top bun
+        "double_afro_puffs",     // 14 Afro puffs
+        "frohawk",               // 15 Frohawk (the afro's middle over the mohawk's shaved sides)
+        "short_locs",            // 16 Short locs
+        "short_twists",          // 17 Short twists
+        "twists_fade",           // 18 Twist fade
+        "tapered_afro",          // 19 Tapered afro
+        "hard_part",             // 20 Hard part (a buzz with a shaved part)
+        "waves_fade",            // 21 Wave fade
     )
 
     // Face.eyes 0 = default (no overlay); 1..6 map to files.

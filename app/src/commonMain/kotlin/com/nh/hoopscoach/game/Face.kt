@@ -18,7 +18,8 @@ class Face(
         val OPTIONS = listOf(
             listOf("Pale ivory", "Fair peach", "Olive bronze", "Warm caramel", "Medium brown", "Chestnut", "Dark chocolate", "Deep ebony"),
             listOf("Oval", "Round", "Square", "Long"),
-            listOf("Bald", "Buzz", "Slicked", "Fade", "Flat-top", "Afro", "High-top", "Headband", "Cornrows", "Locs", "Twists", "Mohawk", "Waves", "Top bun"),
+            listOf("Bald", "Buzz", "Slicked", "Fade", "Flat-top", "Afro", "High-top", "Headband", "Cornrows", "Locs", "Twists", "Mohawk", "Waves", "Top bun",
+                "Afro puffs", "Frohawk", "Short locs", "Short twists", "Twist fade", "Tapered afro", "Hard part", "Wave fade"),
             listOf("Black", "Dark brown", "Brown", "Auburn", "Blond", "Platinum", "Gray", "Red"),
             listOf("None", "Stubble", "Mustache", "Goatee", "Chin strap", "Full beard"),
             listOf("Default", "Intense", "Clutch", "Swagger", "Alert", "Blue", "Green"),
@@ -56,7 +57,26 @@ class Face(
             val eyes = weighted(r, listOf(0 to 0.55, 1 to 0.12, 2 to 0.1, 3 to 0.08, 4 to 0.07, 5 to 0.04, 6 to 0.04))
             val mouth = weighted(r, listOf(0 to 0.62, 1 to 0.2, 2 to 0.12, 3 to 0.06))
             val acc = weighted(r, listOf(0 to 0.82, 1 to 0.05, 2 to 0.04, 3 to 0.05, 4 to 0.02, 5 to 0.02))
-            return Face(skin, r.nextInt(4), hair, hairColor, beard, eyes, r.nextInt(3), mouth, acc)
+            return Face(skin, r.nextInt(4), variant(p, hair), hairColor, beard, eyes, r.nextInt(3), mouth, acc)
+        }
+
+        /**
+         * The newer cuts for league players: a share of those with a style that has a variant wear the variant
+         * instead. Rolled on its own seed so every other part of an existing player's face stays as it was.
+         */
+        private fun variant(p: Player, hair: Int): Int {
+            val r = kotlin.random.Random(p.look.toLong() * 131 + p.id * 7 + 5)
+            val roll = r.nextDouble()
+            return when (hair) {
+                1 -> if (roll < 0.25) 20 else hair                                   // buzz → hard part
+                3 -> if (roll < 0.2) 19 else hair                                    // fade → tapered afro
+                5 -> if (roll < 0.3) 19 else if (roll < 0.4) 15 else hair            // afro → tapered afro, frohawk
+                9 -> if (roll < 0.35) 16 else hair                                   // locs → short locs
+                10 -> if (roll < 0.3) 17 else if (roll < 0.6) 18 else hair           // twists → short twists, twist fade
+                11 -> if (roll < 0.35) 15 else hair                                  // mohawk → frohawk
+                12 -> if (roll < 0.4) 21 else hair                                   // waves → wave fade
+                else -> hair
+            }
         }
 
         /**
