@@ -934,21 +934,52 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
         }
-        item { TrophyRoomLink(vm, lg) }
+        if (h != null) item { CareerHub(vm, lg, h) }
         if (h != null) item { CareerTotals(h) }
+        if (h != null) item { SeasonBySeason(lg, h) }
+        if (h != null && h.awards.isNotEmpty()) item { HonorBadges(h) }
+        if (r != null) item { EarningsPanel(r) }
+        item { Section("Your highlights"); TrophyRoomLink(vm, lg) }
         item { CareerStory(lg) }
-        if (h != null && h.awards.isNotEmpty()) item {
-            Section("Honors")
-            GroupList(h.awards.reversed()) { a -> Text(a, style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) }
-        }
-        item {
-            if (r != null) Panel(Modifier.padding(top = 14.dp)) {
-                Text("Career NIL earned: ${money(r.earned)}", style = T.bodyB, color = P.good)
-                if (r.spent > 0) Text("Invested in your own team: ${money(r.spent)}", style = T.small, color = P.ink)
-                Text("${Road.count(r.followers)} followers · ${Road.personaLabel(r.persona)}", style = T.small, color = P.ink)
-                if (r.ended) Text(r.ending, style = T.small, color = P.sub)
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** The top of the career tab: his card beside where he stands (legacy, draft stock, following). */
+@Composable
+private fun CareerHub(vm: GameViewModel, lg: League, h: Player) {
+    val r = lg.road
+    val pc = com.nh.hoopscoach.game.PlayerCareer
+    val score = pc.score(lg, h)
+    val ti = pc.tierOf(score)
+    val tier = pc.TIERS[ti]
+    val next = pc.TIERS.getOrNull(ti + 1)
+    Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 6.dp), verticalAlignment = Alignment.Top) {
+        Box(Modifier.clip(RoundedCornerShape(16.dp)).clickable { vm.push(Route.MyPlayer) }) { TradingCard(lg, h, width = 150.dp) }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("LEGACY", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+            Text(tier.name, style = T.title.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.accent)
+            if (next != null) {
+                Spacer(Modifier.height(4.dp))
+                Bar(((score - tier.min).toFloat() / (next.min - tier.min)).coerceIn(0f, 1f), Modifier.fillMaxWidth(), height = 6.dp)
+                Text("${next.min - score} to ${next.name}", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 2.dp))
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
+            if (!lg.pro) {
+                val rank = Offseason.draftBoard(lg)[h.id]
+                Text("DRAFT STOCK", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                Text(Offseason.projection(rank, h.year), style = T.bodyB, color = P.ink)
+                rank?.let { Text("No. $it on the big board", style = T.small, color = P.sub) }
+                Spacer(Modifier.height(12.dp))
+            }
+            if (r != null) {
+                Text("FOLLOWING", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+                Text(Road.count(r.followers), style = T.bodyB, color = P.ink)
+                Text(Road.personaLabel(r.persona), style = T.small, color = P.sub)
+            }
+            Spacer(Modifier.height(10.dp))
+            SmallButton("MyPlayer") { vm.push(Route.MyPlayer) }
         }
     }
 }
@@ -959,11 +990,72 @@ private fun CareerTotals(h: Player) {
     h.career.forEach { tot.add(it.s) }
     tot.add(h.stats)
     if (tot.gp == 0) return
+    Section("Career totals")
     Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
         StatRow(listOf(
             Triple("GP", "${tot.gp}", null), Triple("PPG", "%.1f".format(tot.ppg), null),
             Triple("RPG", "%.1f".format(tot.rpg), null), Triple("APG", "%.1f".format(tot.apg), null),
         ), style = T.numSm)
+        Spacer(Modifier.height(12.dp))
+        StatRow(listOf(
+            Triple("FG%", "%.1f".format(tot.fgPct * 100), null), Triple("3P%", "%.1f".format(tot.tpPct * 100), null),
+            Triple("FT%", "%.1f".format(tot.ftPct * 100), null), Triple("MPG", "%.1f".format(tot.mpg), null),
+        ), style = T.numSm)
+    }
+}
+
+private fun clsShort(c: Int) = when (c) { 1 -> "FR"; 2 -> "SO"; 3 -> "JR"; 4 -> "SR"; com.nh.hoopscoach.game.PRO_YEAR -> "PRO"; else -> "GR" }
+
+/** Every season he's played, a row each, this one last and marked. */
+@Composable
+private fun SeasonBySeason(lg: League, h: Player) {
+    class Row5(val year: String, val team: String, val cls: String, val s: StatLine, val now: Boolean)
+    val rows = h.career.map { Row5("${it.season}", it.team, clsShort(it.cls), it.s, false) }.toMutableList()
+    if (h.stats.gp > 0) rows += Row5("${lg.season}", lg.teams.getOrNull(h.teamId)?.let { if (lg.pro) it.abbr else it.school } ?: "", clsShort(h.year), h.stats, true)
+    if (rows.isEmpty()) return
+    Section("Season by season")
+    Panel(padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        val cols = listOf("GP" to 34.dp, "PPG" to 42.dp, "RPG" to 40.dp, "APG" to 40.dp)
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("SEASON", style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.weight(1f))
+            cols.forEach { (l, w) -> Text(l, style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.width(w), textAlign = TextAlign.End) }
+        }
+        rows.forEach { row ->
+            Hairline()
+            Row(Modifier.fillMaxWidth().then(if (row.now) Modifier.background(P.accentSoft.copy(alpha = 0.5f)) else Modifier).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${row.year} · ${row.cls}" + if (row.now) " · NOW" else "", style = T.label.copy(fontSize = 10.sp), color = if (row.now) P.accent else P.sub)
+                    Text(row.team, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                listOf("${row.s.gp}", "%.1f".format(row.s.ppg), "%.1f".format(row.s.rpg), "%.1f".format(row.s.apg)).zip(cols).forEach { (v, c) ->
+                    Text(v, style = T.numSm.copy(fontSize = 15.sp), color = P.ink, modifier = Modifier.width(c.second), textAlign = TextAlign.End)
+                }
+            }
+        }
+    }
+}
+
+/** His honors as gold badges, newest first. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun HonorBadges(h: Player) {
+    Section("Honors · ${h.awards.size}")
+    Panel {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            h.awards.reversed().forEach { a -> Tag(a.uppercase(), P.gold) }
+        }
+    }
+}
+
+/** What he's earned: the total, counting up, and where it came from. */
+@Composable
+private fun EarningsPanel(r: com.nh.hoopscoach.game.RoadState) {
+    Section("Earnings")
+    Panel {
+        Text("CAREER NIL", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+        CountUpText(r.earned.toLong(), T.title.copy(fontSize = 30.sp, lineHeight = 32.sp), P.good) { money(it.toInt()) }
+        if (r.spent > 0) Text("Invested in your own team: ${money(r.spent)}", style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
+        if (r.ended) Text(r.ending, style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
