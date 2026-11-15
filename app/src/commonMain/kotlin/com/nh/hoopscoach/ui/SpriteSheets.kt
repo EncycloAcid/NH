@@ -60,6 +60,12 @@ object SpriteSheets {
         return bitmap("character/bodies/$file.png")
     }
 
+    /** The top of a bald head for this skin: the bodies stop at the hairline, so without it the skull is cut flat. */
+    fun baldCrown(skin: Int): ArgbBitmap? {
+        val file = BODY_FILES[skin.coerceIn(0, BODY_FILES.lastIndex)]
+        return bitmap("character/bald/$file.png")
+    }
+
     fun hair(style: Int): ArgbBitmap? {
         val file = HAIR_FILES.getOrNull(style) ?: return null
         return bitmap("character/hairstyles/$file.png")

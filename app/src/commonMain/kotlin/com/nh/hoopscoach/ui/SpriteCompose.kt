@@ -50,6 +50,7 @@ object SpriteCompose {
         val mouth = SpriteSheets.mouth(f.mouth)?.let { if (body != null) tintMouth(body, it) else it }
         return composite(listOfNotNull(
             body,
+            if (f.hair == 0) SpriteSheets.baldCrown(f.skin) else null,
             jersey ?: SpriteSheets.bitmap(jerseyPath),
             SpriteSheets.chestNumber(number)?.let { positionNumber(it, jerseyPath) },
             beard,
