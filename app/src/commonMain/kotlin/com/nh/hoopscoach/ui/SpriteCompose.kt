@@ -445,9 +445,16 @@ object SpriteCompose {
                     val r = (s ushr 16) and 255
                     val g = (s ushr 8) and 255
                     val b = s and 255
-                    if (r + g + b >= 40) {
-                        val shade = ((r * 0.35f + g * 0.45f + b * 0.2f) / hairReference).coerceAtMost(1.5f)
-                        val color = hairColors[hairColor]
+                    val color = hairColors[hairColor]
+                    // Light colors (blond, platinum, gray, red) read as patchy when the darkest strands stay black
+                    // and the texture keeps its full contrast: there, outlines take a deep shade of the color itself
+                    // and the strands are evened out a little.
+                    val light = ((color ushr 16 and 255) * 35 + (color ushr 8 and 255) * 45 + (color and 255) * 20) / 100 > 110
+                    val shade = if (r + g + b >= 40) {
+                        val raw = ((r * 0.35f + g * 0.45f + b * 0.2f) / hairReference).coerceAtMost(1.5f)
+                        if (light) (0.42f + raw * 0.58f).coerceAtMost(1.3f) else raw
+                    } else if (light) 0.32f else -1f
+                    if (shade >= 0f) {
                         fun tinted(shift: Int) = (((color ushr shift) and 255) * shade).toInt().coerceIn(0, 255)
                         s = (s and 0xFF000000.toInt()) or (tinted(16) shl 16) or (tinted(8) shl 8) or tinted(0)
                     }

@@ -59,7 +59,7 @@ private enum class CustomTab(val title: String) {
     HAIR("Hair"),
     BEARD("Beard"),
     FACE("Face"),
-    GEAR("Gear"),
+    GEAR("Extras"),
 }
 
 private val CourtBg = Color(0xFF1A1714)
@@ -84,14 +84,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     val dirty = face.encode() != saved.encode()
 
     Column(Modifier.fillMaxSize().background(P.bg)) {
-        BackBar("Edit look", p.name, onBack = { vm.back() }) {
-            IconButton(onClick = {
-                seed++
-                face = Face.random(System.nanoTime() + seed)
-            }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Randomize", tint = P.accent)
-            }
-        }
+        BackBar("Edit look", p.name, onBack = { vm.back() })
 
         // Live hero
         Box(
@@ -120,6 +113,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     secondary = secondary,
                     number = p.number,
                     label = t?.abbr,
+                    gear = com.nh.hoopscoach.game.Gear.decode(p.gear),
                     background = Color.Transparent,
                     corner = 0.dp,
                     modifier = Modifier.fillMaxSize().padding(4.dp),
@@ -127,19 +121,16 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
             }
         }
 
-        Text(
-            buildString {
-                append(p.name)
-                append(" · No. ")
-                append(p.number)
-                t?.let { append(" · "); append(it.name) }
-                if (dirty) append(" · unsaved")
-            },
-            style = T.small,
-            color = if (dirty) P.accent else P.sub,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-        )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (dirty) "Unsaved changes" else "No. ${p.number}" + (t?.let { " · ${if (lg.pro) it.name else it.school}" } ?: ""),
+                style = T.small, color = if (dirty) P.accent else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            SmallButton("Randomize") { seed++; face = Face.random(System.nanoTime() + seed) }
+            Spacer(Modifier.width(6.dp))
+            SmallButton("Default") { face = Face.generated(p) }
+        }
 
         // Tabs
         Row(
@@ -244,7 +235,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                         Spacer(Modifier.height(8.dp))
                         FaceOptionRow(
                             player = p, team = t, jerseyKey = jerseyKey,
-                            labels = Face.OPTIONS[8], selected = face.acc,
+                            labels = listOf("None", "White band", "Red band", "Black band", "Goggles", "Clear mask", "Carbon mask"), selected = face.acc,
                             preview = { face.with(8, it) },
                             onSelect = { face = face.with(8, it) },
                         )
@@ -262,17 +253,15 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton("Reset", Modifier.weight(1f)) { face = Face.generated(p) }
-                SecondaryButton("Undo", Modifier.weight(1f), enabled = dirty) { face = saved }
-            }
-            Spacer(Modifier.height(8.dp))
-            PrimaryButton(if (dirty) "Lock in look" else "Done", Modifier.fillMaxWidth()) {
+            SecondaryButton("Undo", Modifier.weight(1f), enabled = dirty) { face = saved }
+            PrimaryButton(if (dirty) "Lock in look" else "Done", Modifier.weight(2f)) {
                 if (dirty) {
                     vm.act { it.playerOrNull(playerId)?.face = face.encode() }
                     Pixels.clear()
-                    vm.toast("Portrait saved.")
+                    vm.toast("Look saved.")
                 }
                 vm.back()
+            }
             }
         }
     }
@@ -283,13 +272,11 @@ private fun PanelLabel(text: String) {
     Text(text, style = T.small, color = P.sub, fontWeight = FontWeight.SemiBold)
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun OptionChipRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(end = 8.dp),
-    ) {
-        itemsIndexed(labels) { i, label ->
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        labels.forEachIndexed { i, label ->
             val on = selected == i
             Box(
                 Modifier
@@ -348,6 +335,7 @@ private fun FaceOptionRow(
                     label = team?.abbr,
                     background = CourtBg,
                     corner = 10.dp,
+                    headshot = true,
                     modifier = Modifier.size(72.dp),
                 )
                 Text(

@@ -197,13 +197,13 @@ object SpriteSheets {
         "03_athletic_mouthguard",
     )
 
-    // Face.beard 0 = none; pack has stubble / goatee / full.
+    // Face.beard 0 = none; stubble, mustache, goatee, chin strap, full beard.
     private val BEARD_FILES = arrayOf(
         null,
         "03_stubble_shadow", // Stubble
-        "02_trimmed_goatee", // Mustache → closest
+        "04_mustache",       // Mustache (the goatee's top bar)
         "02_trimmed_goatee", // Goatee
-        "02_trimmed_goatee", // Chin strap → closest
+        "05_chin_strap",     // Chin strap (the full beard's jawline)
         "01_full_beard",     // Full beard
     )
 

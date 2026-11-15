@@ -74,7 +74,7 @@ fun LookPicker(face: Face, onFace: (Face) -> Unit, onRandom: () -> Unit, first: 
         Row(verticalAlignment = Alignment.CenterVertically) {
             BasketballCharacterCanvas(
                 face = face, jerseyKey = null, primary = 0xFF3A3F47.toInt(), secondary = 0xFFFFFFFF.toInt(), number = number,
-                background = Color(0xFF1A1714), corner = 16.dp, modifier = Modifier.size(118.dp),
+                background = Color(0xFF1A1714), corner = 16.dp, headshot = true, modifier = Modifier.size(118.dp),
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {

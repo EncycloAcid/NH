@@ -37,6 +37,8 @@ fun BasketballCharacterCanvas(
     corner: androidx.compose.ui.unit.Dp = 16.dp,
     /** The team's abbreviation, worn across the chest when the team has no jersey art of its own. */
     label: String? = null,
+    /** Zoom in on the head and shoulders, for small option thumbnails where a face change has to show. */
+    headshot: Boolean = false,
 ) {
     SpriteSheets.install()
     val image = remember(face.encode(), jerseyKey, primary, secondary, number, gear.encode(), label) {
@@ -58,6 +60,8 @@ fun BasketballCharacterCanvas(
             val oy = ((size.height.toInt() - side) / 2).coerceAtLeast(0)
             drawImage(
                 image = image,
+                srcOffset = if (headshot) IntOffset(HEAD_X, HEAD_Y) else IntOffset.Zero,
+                srcSize = if (headshot) IntSize(HEAD_SIDE, HEAD_SIDE) else IntSize(SpriteCompose.N, SpriteCompose.N),
                 dstOffset = IntOffset(ox, oy),
                 dstSize = IntSize(side, side),
                 filterQuality = FilterQuality.None,
@@ -65,3 +69,8 @@ fun BasketballCharacterCanvas(
         }
     }
 }
+
+/** The head-and-shoulders square of the 512 canvas that [BasketballCharacterCanvas] shows with headshot on. */
+private const val HEAD_X = 128
+private const val HEAD_Y = 40
+private const val HEAD_SIDE = 256
