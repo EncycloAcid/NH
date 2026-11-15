@@ -395,10 +395,10 @@ object Previews {
         val o = odds(pv, top)
         val champ = CollegeHistory.lastChampion(lg)?.id
         return when {
-            champ == top.id && lg.teams.getOrNull(top.id)?.let { TitleDefense.streak(lg, it, lg.season - 1) >= 2 } == true -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question")
-            champ == top.id -> pick(lg, 1, "Repeat?", "Run it back", "Two in a row?")
-            o.title < 0.12 -> pick(lg, 2, "Wide open", "Anyone's year", "Up for grabs")
-            else -> pick(lg, 3, "The team to beat", "Chasing ${top.school}", "${top.school} on top", "Built for March")
+            champ == top.id && lg.teams.getOrNull(top.id)?.let { TitleDefense.streak(lg, it, lg.season - 1) >= 2 } == true -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question", "Is this a dynasty?", "Three straight?", "Kings of the sport")
+            champ == top.id -> pick(lg, 1, "Repeat?", "Run it back", "Two in a row?", "Defending the crown", "Back for more", "Once more, with feeling")
+            o.title < 0.12 -> pick(lg, 2, "Wide open", "Anyone's year", "Up for grabs", "No favorite", "Pick a team, any team", "Chaos season", "Nobody's safe")
+            else -> pick(lg, 3, "The team to beat", "Chasing ${top.school}", "${top.school} on top", "Built for March", "The hunted", "Everybody's target", "Top dog", "Front-runner")
         }
     }
 
@@ -459,11 +459,11 @@ object Previews {
         val uo = odds(pv, u)
         val up = proj(u)
         val head = when {
-            up.nat <= 10 -> pick(lg, 30, "${u.school} has title hopes", "Big expectations at ${u.school}", "${u.school} is built to win now")
-            up.nat <= 25 -> pick(lg, 31, "${u.school} aims for the second weekend", "${u.school} is ranked, now what?")
-            uo.ncaa >= 0.5 -> pick(lg, 32, "${u.school} should go dancing", "March is the goal at ${u.school}")
-            uo.ncaa >= 0.15 -> pick(lg, 33, "${u.school} lives on the bubble", "Every game counts at ${u.school}")
-            else -> pick(lg, 34, "A building year at ${u.school}", "${u.school} is playing for the future")
+            up.nat <= 10 -> pick(lg, 30, "${u.school} has title hopes", "Big expectations at ${u.school}", "${u.school} is built to win now", "Title or bust at ${u.school}", "${u.school} goes all in")
+            up.nat <= 25 -> pick(lg, 31, "${u.school} aims for the second weekend", "${u.school} is ranked, now what?", "${u.school} wants more than one win in March", "Next step: the Sweet 16 for ${u.school}")
+            uo.ncaa >= 0.5 -> pick(lg, 32, "${u.school} should go dancing", "March is the goal at ${u.school}", "${u.school} expects a bid", "A tournament team at ${u.school}?")
+            uo.ncaa >= 0.15 -> pick(lg, 33, "${u.school} lives on the bubble", "Every game counts at ${u.school}", "${u.school} needs some big wins", "Bubble trouble at ${u.school}")
+            else -> pick(lg, 34, "A building year at ${u.school}", "${u.school} is playing for the future", "Patience at ${u.school}", "${u.school} is laying a foundation")
         }
         out += Story(
             if (lg.playerMode) "Your team" else "Your program", head,
@@ -488,8 +488,8 @@ object Previews {
                 "The champs",
                 when {
                     r <= 4 -> pick(lg, 40, "Can ${c.school} repeat?", "${c.school} goes for two", "Back-to-back for ${c.school}?")
-                    r <= 25 -> pick(lg, 41, "${c.school} defends its crown", "The champs reload at ${c.school}")
-                    else -> pick(lg, 42, "${c.school} starts over", "Life after the title at ${c.school}")
+                    r <= 25 -> pick(lg, 41, "${c.school} defends its crown", "The champs reload at ${c.school}", "The champs are back at ${c.school}", "${c.school} wears the target")
+                    else -> pick(lg, 42, "${c.school} starts over", "Life after the title at ${c.school}", "The champs lost a lot at ${c.school}", "A new team defends the title at ${c.school}", "${c.school} reloads after the title")
                 },
                 "${backLine(c)} We have the defending champions at No. $r, with ${NbaPreviews.chance(co.title)} to win it all again.".trim(),
                 c.id,
@@ -507,13 +507,13 @@ object Previews {
                 dynasty != null -> {
                     val t = lg.team(dynasty.key)
                     val years = dynasty.value.map { it.first }.sorted()
-                    out += Story("History", pick(lg, 160, "A ${t.school} dynasty?", "${t.school} is building something", "Can anyone stop ${t.school}?"),
+                    out += Story("History", pick(lg, 160, "A ${t.school} dynasty?", "${t.school} is building something", "Can anyone stop ${t.school}?", "${t.school} is the standard", "The ${t.school} machine"),
                         "${t.school} won it all in ${years.joinToString(" and ")}: ${CollegeHistory.count(CollegeHistory.titles(lg, t).size)} in all now. " +
                             "We have them No. ${proj(t).nat}, with ${NbaPreviews.chance(odds(pv, t).title)} at another.", t.id)
                 }
                 firsts.isNotEmpty() -> {
                     val t = firsts.first()
-                    out += Story("History", pick(lg, 161, "${t.school} chases its first title", "No banner yet at ${t.school}", "Is this ${t.school}'s year?"),
+                    out += Story("History", pick(lg, 161, "${t.school} chases its first title", "No banner yet at ${t.school}", "Is this ${t.school}'s year?", "${t.school} wants its first banner", "Still waiting at ${t.school}", "The empty rafters at ${t.school}"),
                         "${t.school} has never won a national title. This team is good enough to: No. ${proj(t).nat} in our poll, the Final Four ${NbaPreviews.often(odds(pv, t).f4)} " +
                             "and a title ${NbaPreviews.often(odds(pv, t).title)}." +
                             (bluest?.takeIf { it.first.id != t.id }?.let { (b, ts) -> " The blue bloods are waiting: ${b.school} has ${CollegeHistory.count(ts.size)} and is No. ${proj(b).nat}." } ?: ""),
@@ -526,7 +526,7 @@ object Previews {
                 }
                 bluest != null -> {
                     val (t, ts) = bluest
-                    out += Story("History", pick(lg, 163, "Blue blood: ${t.school}", "${t.school} and its banners"),
+                    out += Story("History", pick(lg, 163, "Blue blood: ${t.school}", "${t.school} and its banners", "Royalty: ${t.school}", "${t.school} expects banners", "The weight of history at ${t.school}"),
                         "${CollegeHistory.line(lg, t)} Banner No. ${ts.size + 1}? We give them ${NbaPreviews.chance(odds(pv, t).title)} from No. ${proj(t).nat}.", t.id)
                 }
             }
@@ -554,14 +554,14 @@ object Previews {
         if (known) {
             val top25 = ranked.take(25).mapNotNull { t -> Analysis.turnover(lg, t)?.let { t to it } }
             top25.maxByOrNull { it.second.returning }?.takeIf { it.second.returning >= 0.7 }?.let { (t, tv) ->
-                out += Story("Experience", pick(lg, 310, "${t.school} brings everybody back", "The most experienced contender", "Old heads at ${t.school}"),
+                out += Story("Experience", pick(lg, 310, "${t.school} brings everybody back", "The most experienced contender", "Old heads at ${t.school}", "Continuity at ${t.school}", "Nobody left ${t.school}", "Same five, higher ceiling"),
                     "${t.school} returns ${pct(tv.returning)} of last season's minutes, the most of any team in our Top 25" +
                         " (${"%.1f".format(tv.backPpg)} points a game back). Experience wins in March: we give them the Final Four ${NbaPreviews.often(odds(pv, t).f4)}.",
                     t.id)
             }
             top25.filter { proj(it.first).nat <= 12 }.minByOrNull { it.second.returning }?.takeIf { it.second.returning <= 0.45 }?.let { (t, tv) ->
                 val newbies = tv.arrivals.sortedByDescending { it.ovr }.take(3)
-                out += Story("Reloading", pick(lg, 311, "${t.school} doesn't rebuild; it reloads", "A new team at ${t.school}, same expectations", "Talent over experience"),
+                out += Story("Reloading", pick(lg, 311, "${t.school} doesn't rebuild; it reloads", "A new team at ${t.school}, same expectations", "Talent over experience", "Fresh faces at ${t.school}", "New pieces, old expectations at ${t.school}"),
                     "Only ${pct(tv.returning)} of ${t.school}'s minutes are back, yet we still have them No. ${proj(t).nat}. " +
                         (if (newbies.isNotEmpty()) "The newcomers carry it: ${newbies.joinToString(", ") { "${it.name} (${if (isTransfer(it)) "transfer from ${cameFrom(lg, it)}" else it.cls})" }}. " else "") +
                         "Talent like that usually figures it out by February. The question is November.",
@@ -573,7 +573,7 @@ object Previews {
             val top = ranked.take(25)
             val bestO = top.maxByOrNull { Analysis.offense(lg, it) }
             val bestD = top.maxByOrNull { Analysis.defense(lg, it) }
-            if (bestO != null && bestD != null && bestO.id != bestD.id) out += Story("On paper", pick(lg, 312, "Offense vs. defense", "Points or stops?", "Two ways to win"),
+            if (bestO != null && bestD != null && bestO.id != bestD.id) out += Story("On paper", pick(lg, 312, "Offense vs. defense", "Points or stops?", "Two ways to win", "Buckets or stops?", "Style clash", "Two ways to the title"),
                 "${bestO.school} has the best offense in our Top 25 on paper; its defense ranks ${ordinal(Analysis.rank(top, bestO) { Analysis.defense(lg, it) })}. " +
                     "${bestD.school} is the opposite: the best defense, the ${ordinal(Analysis.rank(top, bestD) { Analysis.offense(lg, it) })}-ranked offense. " +
                     "History says defense travels in March: we give ${bestD.school} the Final Four ${NbaPreviews.often(odds(pv, bestD).f4)}, ${bestO.school} ${NbaPreviews.often(odds(pv, bestO).f4)}.",
@@ -598,7 +598,7 @@ object Previews {
                 val last = lastFor(lg, t)!!
                 out += Story(
                     "Starting over",
-                    pick(lg, 70, "What happened to ${t.school}?", "${t.school} has holes to fill", "A reset at ${t.school}"),
+                    pick(lg, 70, "What happened to ${t.school}?", "${t.school} has holes to fill", "A reset at ${t.school}", "${t.school} has questions", "Rebuilding at ${t.school}", "Thin at ${t.school}"),
                     "No. ${last.ap} at the end of last season (${last.w}-${last.l}), ${t.school} opens at No. ${proj(t).nat}. ${backLine(t)}",
                     t.id,
                 )
@@ -608,7 +608,7 @@ object Previews {
         portalWinners(lg).firstOrNull()?.let { (t, ps) ->
             out += Story(
                 "Transfer portal",
-                pick(lg, 80, "${t.school} wins the portal", "${t.school} shopped well", "New faces at ${t.school}"),
+                pick(lg, 80, "${t.school} wins the portal", "${t.school} shopped well", "New faces at ${t.school}", "${t.school} went shopping", "Transfer haul at ${t.school}"),
                 ps.take(3).joinToString("; ") { "${it.name} (${it.posLabel}) from ${cameFrom(lg, it)}" } + ". " +
                     if (proj(t).nat <= 25) "They open at No. ${proj(t).nat}." else "We pick them ${ordinal(proj(t).confRank)} in the ${lg.conf(t.confId).abbr}.",
                 t.id, ps.first().id,
@@ -633,7 +633,7 @@ object Previews {
             val last = lastFor(lg, t)
             out += Story(
                 "New era",
-                pick(lg, 100, "A new era at ${t.school}", "${c.last} takes over at ${t.school}", "${t.school} turns the page"),
+                pick(lg, 100, "A new era at ${t.school}", "${c.last} takes over at ${t.school}", "${t.school} turns the page", "Fresh start at ${t.school}", "New sheriff at ${t.school}"),
                 "${c.name} inherits a program that went ${last?.let { "${it.w}-${it.l} and ${lastSeason(it.result)}" } ?: "through a rough year"}. " +
                     "We pick his first team ${ordinal(proj(t).confRank)} in the ${lg.conf(t.confId).abbr}.",
                 t.id,
@@ -644,7 +644,7 @@ object Previews {
             val dry = t.history.reversed().takeWhile { it.result !in NCAA_RESULTS }.size
             out += Story(
                 "Hot seat",
-                pick(lg, 110, "${c.name} needs a big year", "Pressure builds at ${t.school}", "March or bust for ${c.last}"),
+                pick(lg, 110, "${c.name} needs a big year", "Pressure builds at ${t.school}", "March or bust for ${c.last}", "Hot seat: ${c.name}", "Win now, ${c.last}", "Clock's ticking for ${c.last}"),
                 "${t.school} has missed the NCAA Tournament ${if (dry >= 2) "$dry straight seasons" else "last season"}. " +
                     "We project ${proj(t).w}-${proj(t).l} and give them ${NbaPreviews.chance(odds(pv, t).ncaa)} to get back.",
                 t.id,
@@ -656,7 +656,7 @@ object Previews {
             val rest = pv.poy.drop(1).take(2).mapNotNull { o -> lg.playerOrNull(o.pid)?.let { "${it.name} (${pct(o.p)})" } }
             out += Story(
                 "Player of the Year",
-                pick(lg, 120, "${p.name} leads the Player of the Year race", "${p.last} is the man to catch", "The race starts with ${p.name}"),
+                pick(lg, 120, "${p.name} leads the Player of the Year race", "${p.last} is the man to catch", "The race starts with ${p.name}", "${p.name} is the best player in the country", "The favorite for every award: ${p.name}"),
                 "${p.name} of ${lg.team(p.teamId).school} heads our Player of the Year odds at ${pct(pv.poy[0].p)}" + (if (rest.isNotEmpty()) ", ahead of ${rest.joinToString(" and ")}." else "."),
                 p.teamId, p.id,
             )
@@ -665,7 +665,7 @@ object Previews {
             val last = p.career.lastOrNull()
             out += Story(
                 "Last dance",
-                pick(lg, 130, "One last ride for ${p.name}", "${p.name} came back for this", "${p.last}'s final chapter"),
+                pick(lg, 130, "One last ride for ${p.name}", "${p.name} came back for this", "${p.last}'s final chapter", "Senior year for ${p.name}", "${p.name} wants a banner before he goes"),
                 (if (last != null && last.season == lg.season - 1 && last.s.gp > 0) "${p.name} (${p.posLabel}) averaged ${"%.1f".format(last.s.ppg)} points last season at ${lg.team(p.teamId).school}. "
                 else "${p.name} (${p.posLabel}) is a senior with one more shot at ${lg.team(p.teamId).school}. ") +
                     "He came back for a senior year, and ${lg.team(p.teamId).school} has ${NbaPreviews.chance(odds(pv, lg.team(p.teamId)).f4)} at the Final Four.",
@@ -678,7 +678,7 @@ object Previews {
             val s = star(lg, t)
             out += Story(
                 "Bracket buster",
-                pick(lg, 140, "Don't sleep on ${t.school}", "${t.school} could bust brackets", "Remember the name: ${t.school}"),
+                pick(lg, 140, "Don't sleep on ${t.school}", "${t.school} could bust brackets", "Remember the name: ${t.school}", "Sleeper: ${t.school}", "Bracket buster alert: ${t.school}", "Keep an eye on ${t.school}"),
                 "${t.school} of the ${lg.conf(t.confId).abbr} has a ${pct(odds(pv, t).ncaa)} chance of making the NCAA Tournament" +
                     (if (odds(pv, t).s16 >= 0.05) " and the Sweet 16 in ${pct(odds(pv, t).s16)}." else ". Nobody will want to see them in the first round.") +
                     (s?.let { " ${it.name} (${it.posLabel}, ${it.cls}) is the reason." } ?: ""),
@@ -695,7 +695,7 @@ object Previews {
             val h = lg.team(g.home)
             out += Story(
                 "Rivalry",
-                pick(lg, 150, "${a.school} at ${h.school}: circle it", "Bad blood: ${a.school} vs ${h.school}"),
+                pick(lg, 150, "${a.school} at ${h.school}: circle it", "Bad blood: ${a.school} vs ${h.school}", "Rivalry day: ${a.school} at ${h.school}", "${a.school} at ${h.school}, again"),
                 "${lg.rivalry(g)!!.title.let { if (it.equals("Rivalry", true)) "The rivalry game" else it }} is game ${g.day} of the season: No. ${proj(a).nat} ${a.school} visits No. ${proj(h).nat} ${h.school}" +
                     Rankings.winProbFor(lg, g, h.id).let { p -> if (p in 0.4..0.6) ", and our numbers call it a coin flip." else ", and we like ${if (p > 0.5) h.school else a.school} at ${(maxOf(p, 1 - p) * 100).toInt()}%." },
                 h.id,

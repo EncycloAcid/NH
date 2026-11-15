@@ -9,13 +9,16 @@ internal class PreviewEditor(season: Int, reports: Map<Int, TeamPreview>) {
         }
     }
 
-    fun text(value: String, context: String): String = value.split(Regex("\\n\\s*\\n")).joinToString("\n\n") { paragraph -> sentences(paragraph).joinToString(" ") { sentence ->
-        if (picker.reserve(sentence)) return@joinToString sentence
-        val body = sentence.replaceFirstChar { it.lowercase() }
-        val label = context.replace(Regex("(?<=\\d)\\.(?=\\s)"), "")
-        picker.pick(listOf("For $label, $body", "Our $label assessment: $body",
-            "The $label angle is this: $body"), label)
-    } }
+    /**
+     * The issue says each thing once: a sentence already printed elsewhere is dropped. (It used to be
+     * reworded with a prefix like "For X, ...", which read like a form letter.) A paragraph keeps its
+     * first sentence if dropping would leave it empty.
+     */
+    fun text(value: String, @Suppress("UNUSED_PARAMETER") context: String): String = value.split(Regex("\\n\\s*\\n")).mapNotNull { paragraph ->
+        val all = sentences(paragraph)
+        val fresh = all.filter { picker.reserve(it) }
+        (fresh.ifEmpty { all.take(1) }).joinToString(" ").takeIf { it.isNotBlank() }
+    }.joinToString("\n\n")
 
     fun story(s: Story, context: String = s.head) = Story(s.kicker, s.head, text(s.body, context), s.teamId, s.pid, s.aiProvider, s.fallbackReason)
 

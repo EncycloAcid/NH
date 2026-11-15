@@ -52,9 +52,8 @@ object PreviewTopics {
             }
     }
 
-    fun stories(lg: League, topics: List<PreviewTopic>) = topics.map {
-        Story(it.kind.replaceFirstChar { c -> c.uppercase() }, it.subject, it.facts + "\n\n" + ArticleWriting.news(lg, News(lg.season, lg.day, it.subject, teamId = it.teamId, pid = it.pid), includeForecast = false), it.teamId, it.pid)
-    }
+    /** The issue's storylines, written for their kind of story (see [StoryDesk]). */
+    fun stories(lg: League, topics: List<PreviewTopic>) = StoryDesk.write(lg, topics)
 
     fun match(lg: League, topics: List<PreviewTopic>, text: String): PreviewTopic? =
         topics.firstOrNull { t -> t.pid >= 0 && lg.playerOrNull(t.pid)?.let { text.contains(it.name, true) } == true } ?:

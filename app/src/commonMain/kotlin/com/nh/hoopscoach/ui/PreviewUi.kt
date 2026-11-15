@@ -381,7 +381,7 @@ private fun LazyListScope.cover(lg: League, pv: Preview, count: Int, onRead: () 
         item {
             val lines = pv.stories.filter { it.head != story.head && it.kicker != "Your team" && it.kicker != "Your program" }.take(3).map { it.kicker to it.head }
             FeatureCover("HOOPS DYNASTY", "PRESEASON ${pv.season}", subject, lg.playerOrNull(story.pid)?.takeIf { it.teamId == subject.id } ?: Previews.star(lg, subject), story.kicker, story.head,
-                story.body.substringBefore(". ").take(220) + ".", lines, count, onRead, onSkip) { CollegeUserBox(lg, pv, onGoReport) }
+                story.body.substringBefore(". ").take(220).trimEnd('.') + ".", lines, count, onRead, onSkip) { CollegeUserBox(lg, pv, onGoReport) }
         }
         return
     }

@@ -306,11 +306,11 @@ object NbaPreviews {
         val champ = NbaHistory.finalists(lg, lg.season - 1).first?.id
         val second = ranked(lg, pv).getOrNull(1)
         return when {
-            champ == top.id && TitleDefense.streak(lg, top, lg.season - 1) >= 2 -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question")
-            champ == top.id -> pick(lg, 1, "Run it back", "Repeat?", "The champs are still the team to beat", "Defending the throne")
+            champ == top.id && TitleDefense.streak(lg, top, lg.season - 1) >= 2 -> pick(lg, 1, "Three-peat?", "Can anyone stop them?", "The dynasty question", "Is this a dynasty?", "Three straight?")
+            champ == top.id -> pick(lg, 1, "Run it back", "Repeat?", "The champs are still the team to beat", "Defending the throne", "Back for more", "Once more, with feeling")
             second != null && o.title - pv.proj.getValue(second.id).title < 0.04 && o.title >= 0.12 -> pick(lg, 4, "Two-horse race", "${top.name.substringAfterLast(' ')} vs. ${second.name.substringAfterLast(' ')}", "Clash of contenders")
-            o.title < 0.16 -> pick(lg, 2, "Wide open", "Anyone's title", "No favorite", "Pick a team, any team")
-            else -> pick(lg, 3, "The team to beat", "Chasing the ${top.name.substringAfterLast(' ')}", "Built for June", "Everyone else is playing for second")
+            o.title < 0.16 -> pick(lg, 2, "Wide open", "Anyone's title", "No favorite", "Pick a team, any team", "Chaos season", "Nobody's safe")
+            else -> pick(lg, 3, "The team to beat", "Chasing the ${top.name.substringAfterLast(' ')}", "Built for June", "Everyone else is playing for second", "The hunted", "Everybody's target", "Front-runner")
         }
     }
 
@@ -401,10 +401,10 @@ object NbaPreviews {
         out += Story(
             "Your team",
             when {
-                uo.title >= 0.12 -> pick(lg, 30, "The ${u.name} are built to win now", "Title or bust for the ${u.name}")
-                uo.playoffs >= 0.7 -> pick(lg, 31, "The ${u.name} should be a playoff team", "A playoff push for the ${u.name}")
-                uo.playoffs >= 0.35 -> pick(lg, 32, "The ${u.name} are on the bubble", "Play-in or bust?")
-                else -> pick(lg, 33, "A rebuilding year for the ${u.name}", "The ${u.name} are playing for the future")
+                uo.title >= 0.12 -> pick(lg, 30, "The ${u.name} are built to win now", "Title or bust for the ${u.name}", "All in for the ${u.name}", "The ${u.name} want a ring")
+                uo.playoffs >= 0.7 -> pick(lg, 31, "The ${u.name} should be a playoff team", "A playoff push for the ${u.name}", "Postseason or bust for the ${u.name}", "The ${u.name} want a top-six seed")
+                uo.playoffs >= 0.35 -> pick(lg, 32, "The ${u.name} are on the bubble", "Play-in or bust?", "Every game counts for the ${u.name}", "The ${u.name} are fighting for a spot")
+                else -> pick(lg, 33, "A rebuilding year for the ${u.name}", "The ${u.name} are playing for the future", "Patience for the ${u.name}", "The ${u.name} are building something")
             },
             "We project the ${u.name} at ${uo.w}-${uo.l} (${uo.lo} to ${uo.hi} wins), around the ${Previews.ordinal(uo.seed.roundToInt())} seed in the ${lg.conf(u.confId).name}. " +
                 "They make the playoffs ${often(uo.playoffs)}" +
@@ -419,7 +419,7 @@ object NbaPreviews {
             val co = pr(c)
             out += Story(
                 "The champs",
-                if (co.title >= 0.1) pick(lg, 40, "Can the ${c.name} repeat?", "The ${c.name} go for two") else pick(lg, 41, "The ${c.name} defend their crown", "Life after the title for the ${c.name}"),
+                if (co.title >= 0.1) pick(lg, 40, "Can the ${c.name} repeat?", "The ${c.name} go for two", "Back-to-back for the ${c.name}?", "The ${c.name} want two") else pick(lg, 41, "The ${c.name} defend their crown", "Life after the title for the ${c.name}", "The champs are back", "The ${c.name} wear the target"),
                 "The defending champions project at ${co.w}-${co.l}, with ${chance(co.title)} to win it all again and ${pct(co.finals)} odds to get back to the Finals.",
                 c.id,
             )
@@ -465,7 +465,7 @@ object NbaPreviews {
         ps.staffMoves.firstNotNullOfOrNull { line -> lg.teams.firstOrNull { line.startsWith("The ${it.name} fire") }?.let { it to line } }?.let { (t, line) ->
             out += Story(
                 "New coach",
-                pick(lg, 80, "A new voice for the ${t.name}", "The ${t.name} start over on the bench"),
+                pick(lg, 80, "A new voice for the ${t.name}", "The ${t.name} start over on the bench", "New coach, new rules for the ${t.name}", "Fresh start on the bench for the ${t.name}", "The ${t.name} hand the clipboard to someone new"),
                 "$line. We project ${pr(t).w}-${pr(t).l} in year one.",
                 t.id,
             )
@@ -484,7 +484,7 @@ object NbaPreviews {
         moves.minByOrNull { it.second }?.takeIf { it.second <= -8 }?.let { (t, d) ->
             out += Story(
                 "Falling back",
-                pick(lg, 100, "Trouble for the ${t.name}", "The ${t.name} take a step back"),
+                pick(lg, 100, "Trouble for the ${t.name}", "The ${t.name} take a step back", "Questions for the ${t.name}", "The ${t.name} slip", "A long year for the ${t.name}?"),
                 "${lastRecord(lg, pv, t).replaceFirstChar { it.uppercase() }} last season, ${pr(t).w}-${pr(t).l} in our projection (${-d} fewer wins), and the playoffs ${often(pr(t).playoffs)}. " +
                     Takes.nba(lg, pv, t, 1, from = 1),
                 t.id,
@@ -494,7 +494,7 @@ object NbaPreviews {
         lg.teams.flatMap { lg.rosterOf(it) }.filter { it.age >= 35 && it.id != lg.heroId }.maxByOrNull { value(lg, it) }?.let { p ->
             out += Story(
                 "Still going",
-                pick(lg, 110, "One more run for ${p.name}", "${p.name} isn't done yet"),
+                pick(lg, 110, "One more run for ${p.name}", "${p.name} isn't done yet", "The last dance for ${p.name}?", "Father Time vs. ${p.name}"),
                 "${p.name} is ${p.age} and still rated ${Ratings.shownPro(p.ovr)} on our board" + (lastLine(lg, p)?.let { ", after ${f1(it.s.ppg)} points a game last season" } ?: "") + ". " +
                     pr(lg.team(p.teamId)).let { o -> when {
                         o.title >= 0.08 -> "The ${lg.team(p.teamId).name} are a real contender with him: a title ${often(o.title)}."
@@ -533,7 +533,7 @@ object NbaPreviews {
                 waiting != null -> {
                     val (t, ts) = waiting
                     out += Story("History",
-                        if (ts.isEmpty()) pick(lg, 192, "The ${t.name} have never won it all", "Still chasing a first title") else pick(lg, 193, "${lg.season - ts.last()} years and counting", "The ${t.name} want to end the wait"),
+                        if (ts.isEmpty()) pick(lg, 192, "The ${t.name} have never won it all", "Still chasing a first title", "No banner yet for the ${t.name}", "Is this the year for the ${t.name}?", "The ${t.name} want their first") else pick(lg, 193, "${lg.season - ts.last()} years and counting", "The ${t.name} want to end the wait"),
                         (if (ts.isEmpty()) "The franchise has never won a championship. " else "The ${t.name}' last title came in ${ts.last()}, ${NbaHistory.titleWords(ts.size)} in all. ") +
                             "This team has a real chance to change that: a title ${often(pr(t).title)}" +
                             (NbaHistory.playoffStreak(lg, t).takeIf { it >= 3 }?.let { ", and it's made the playoffs $it years in a row." } ?: "."),
@@ -676,7 +676,7 @@ object NbaPreviews {
         // A star in a contract year.
         lg.teams.flatMap { lg.rosterOf(it) }.filter { it.contractYears == 1 && it.id != lg.heroId && it.proYears >= 3 }.maxByOrNull { value(lg, it) }
             ?.takeIf { value(lg, it) >= 95 }?.let { p ->
-                extra += Story("Contract year", pick(lg, 170, "${p.name} plays for his next deal", "A big year for ${p.name}, in every way"),
+                extra += Story("Contract year", pick(lg, 170, "${p.name} plays for his next deal", "A big year for ${p.name}, in every way", "Contract year: ${p.name}", "${p.name} bets on himself", "Payday is coming for ${p.name}"),
                     "${p.name} is in the last year of his contract. A big season means a max offer next summer, and the ${lg.team(p.teamId).name} " +
                         (if (pr(lg.team(p.teamId)).playoffs >= 0.6) "want to keep him for a playoff run." else "could decide to move him before the deadline."),
                     p.teamId, p.id)
@@ -703,7 +703,7 @@ object NbaPreviews {
         lg.teams.filter { it.id != u.id }.minByOrNull { pr(it).w }?.let { t ->
             out += Story(
                 "Lottery watch",
-                pick(lg, 120, "The ${t.name} are playing for the lottery", "A long year ahead for the ${t.name}"),
+                pick(lg, 120, "The ${t.name} are playing for the lottery", "A long year ahead for the ${t.name}", "Ping-pong balls and patience", "The ${t.name} are thinking about June"),
                 "We have the ${t.name} at ${pr(t).w}-${pr(t).l}, near the bottom of the league" + (if (pr(t).playoffs < 0.01) ", and a playoff spot would be a shock. " else "; they sneak into the playoffs ${often(pr(t).playoffs)}. ") +
                     Takes.nba(lg, pv, t, 1, from = 1),
                 t.id,

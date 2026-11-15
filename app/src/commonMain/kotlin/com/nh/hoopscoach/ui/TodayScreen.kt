@@ -425,9 +425,23 @@ fun PlayerJersey(p: Player, t: Team?, size: androidx.compose.ui.unit.Dp, plate: 
                     Logos.asset("nba/heads/$slug/$file.webp")
                 }
         }
+        if (img != null && !plate) {
+            // A magazine cover: only a true cut-out (a transparent backdrop) stands on the cover. An action
+            // photo or an archive shot would paste a rectangle onto it, so he's drawn instead.
+            val cutout = remember(img) {
+                runCatching { val px = IntArray(1); img.readPixels(px, 1, 1, 1, 1); (px[0] ushr 24) < 128 }.getOrDefault(false)
+            }
+            if (cutout) {
+                androidx.compose.foundation.Image(img, p.name, Modifier.size(size), contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    alignment = Alignment.BottomCenter, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
+                return
+            }
+            PixelPortrait(p, t, size, plate = false)
+            return
+        }
         if (img != null) {
             // A headshot on a soft team-colored plate, cropped to a circle from the top.
-            Box(if (plate) Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f)) else Modifier.size(size)) {
+            Box(Modifier.size(size).clip(CircleShape).background(primary.copy(alpha = 0.18f))) {
                 androidx.compose.foundation.Image(
                     img, p.name, Modifier.size(size),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter,
