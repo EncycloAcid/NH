@@ -58,7 +58,7 @@ object SpriteCompose {
             hair,
             headband?.let { occludeHeadband(it, rawHair, body) },
             SpriteSheets.eyewear(f.acc),
-        ), f.hairColor, setOfNotNull(beard, hair))
+        ), f.hairColor, setOfNotNull(beard, hair), setOfNotNull(hair), body?.let { skinTone(it) } ?: 0)
     }
 
     // ---------- a jersey in the team's own colors ----------
@@ -254,7 +254,7 @@ object SpriteCompose {
                 path.startsWith("character/headbands/") -> occludeHeadband(bitmap, rawHair, body)
                 else -> bitmap
             }
-        }, look.hairColorIndex, colored)
+        }, look.hairColorIndex, colored, setOfNotNull(hair), body?.let { skinTone(it) } ?: 0)
     }
 
     internal fun softenCheekHighlights(body: ArgbBitmap): ArgbBitmap {
@@ -429,13 +429,29 @@ object SpriteCompose {
         0x2E2A2A, 0x4A2E1E, 0x6E4628, 0xA2562A, 0xDAB458, 0xECE6D4, 0x8E9096, 0xC22E2E,
     )
 
-    internal fun composite(layers: List<ArgbBitmap>, hairColor: Int = 0, coloredLayers: Set<ArgbBitmap> = emptySet()): IntArray {
+    /** The cheek's color, averaged over a small patch: what a faded haircut blends down into. */
+    internal fun skinTone(body: ArgbBitmap): Int {
+        var r = 0; var g = 0; var b = 0; var n = 0
+        for (y in 172..184) for (x in 222..236) {
+            val p = body.getPixel(x, y)
+            if (p ushr 24 == 0) continue
+            r += (p ushr 16) and 255; g += (p ushr 8) and 255; b += p and 255; n++
+        }
+        return if (n == 0) 0 else 0xFF000000.toInt() or ((r / n) shl 16) or ((g / n) shl 8) or (b / n)
+    }
+
+    internal fun composite(
+        layers: List<ArgbBitmap>, hairColor: Int = 0, coloredLayers: Set<ArgbBitmap> = emptySet(),
+        /** Hair whose lighter pixels are a fade: they blend into [skin] instead of brightening the color. */
+        fadeLayers: Set<ArgbBitmap> = emptySet(), skin: Int = 0,
+    ): IntArray {
         val out = IntArray(N * N)
         val src = IntArray(N * N)
         for (layer in layers) {
             require(layer.width == N && layer.height == N) { "Avatar layers must be ${N}x$N" }
             layer.getPixels(src, 0, N, 0, 0, N, N)
             val colorHair = hairColor in 1..hairColors.lastIndex && layer in coloredLayers
+            val fades = colorHair && skin != 0 && layer in fadeLayers
             var hairReference = 80f
             if (colorHair) {
                 val histogram = IntArray(256)
@@ -473,8 +489,19 @@ object SpriteCompose {
                     val shade = if (r + g + b >= 40) {
                         val raw = ((r * 0.35f + g * 0.45f + b * 0.2f) / hairReference).coerceAtMost(1.5f)
                         if (light) (0.42f + raw * 0.58f).coerceAtMost(1.3f) else raw
-                    } else if (light) 0.32f else -1f
-                    if (shade >= 0f) {
+                    } else (if (light) 0.3f else 0.22f) + (r + g + b) / 40f * 0.3f   // near-black strands: a deep shade of the color, not plain black
+                    // A fade: strands lighter than the hair's own range are skin showing through the short sides,
+                    // so they ease from the color into the cheek's tone instead of glowing brighter than the hair.
+                    val raw = if (r + g + b >= 40) (r * 0.35f + g * 0.45f + b * 0.2f) / hairReference else 0f
+                    if (fades && raw > 1.05f) {
+                        val k = ((raw - 1.05f) / 0.5f).coerceIn(0f, 0.85f)
+                        fun mix(shift: Int): Int {
+                            val hc = ((color ushr shift) and 255) * 0.8f
+                            val sk = ((skin ushr shift) and 255) * 0.82f
+                            return (hc + (sk - hc) * k).toInt().coerceIn(0, 255)
+                        }
+                        s = (s and 0xFF000000.toInt()) or (mix(16) shl 16) or (mix(8) shl 8) or mix(0)
+                    } else if (shade >= 0f) {
                         fun tinted(shift: Int) = (((color ushr shift) and 255) * shade).toInt().coerceIn(0, 255)
                         s = (s and 0xFF000000.toInt()) or (tinted(16) shl 16) or (tinted(8) shl 8) or tinted(0)
                     }

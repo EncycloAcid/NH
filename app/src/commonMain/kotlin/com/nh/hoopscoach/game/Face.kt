@@ -59,9 +59,26 @@ class Face(
             return Face(skin, r.nextInt(4), hair, hairColor, beard, eyes, r.nextInt(3), mouth, acc)
         }
 
+        /**
+         * A random face for the Randomize button: any skin and hairstyle, realistic odds for the rest (dyed
+         * hair, light eyes, mouthguards and masks now and then, not on every other roll).
+         */
         fun random(seed: Long): Face {
-            val r = kotlin.random.Random(seed)
-            return from(IntArray(9) { i -> r.nextInt(OPTIONS[i].size) }.also { if (r.nextDouble() < 0.7) it[8] = 0; if (r.nextDouble() < 0.4) it[4] = 0 })
+            // Scramble the seed first: neighboring seeds (taps a moment apart) would otherwise roll alike.
+            var z = seed + -7046029254386353131L
+            z = (z xor (z ushr 30)) * -4658895280553007687L
+            z = (z xor (z ushr 27)) * -7723592293110705685L
+            val r = kotlin.random.Random(z xor (z ushr 31))
+            val skin = r.nextInt(OPTIONS[0].size)
+            val dark = skin >= 4
+            val hair = r.nextInt(OPTIONS[2].size)
+            val hairColor = if (r.nextDouble() < 0.12) weighted(r, listOf(4 to 0.35, 5 to 0.3, 7 to 0.2, 6 to 0.15))
+                else weighted(r, if (dark) listOf(0 to 0.85, 1 to 0.15) else listOf(0 to 0.25, 1 to 0.35, 2 to 0.25, 3 to 0.15))
+            val beard = if (r.nextDouble() < 0.55) 0 else 1 + r.nextInt(OPTIONS[4].size - 1)
+            val eyes = weighted(r, listOf(0 to 0.45, 1 to 0.14, 2 to 0.12, 3 to 0.12, 4 to 0.1) + (if (dark) listOf(5 to 0.03, 6 to 0.02) else listOf(5 to 0.08, 6 to 0.06)))
+            val mouth = weighted(r, listOf(0 to 0.6, 1 to 0.24, 2 to 0.11, 3 to 0.05))
+            val acc = weighted(r, listOf(0 to 0.78, 1 to 0.06, 2 to 0.04, 3 to 0.06, 4 to 0.03, 5 to 0.02, 6 to 0.01))
+            return Face(skin, r.nextInt(OPTIONS[1].size), hair, hairColor, beard, eyes, r.nextInt(OPTIONS[6].size), mouth, acc)
         }
     }
 }
