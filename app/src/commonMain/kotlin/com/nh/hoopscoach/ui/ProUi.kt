@@ -960,6 +960,12 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         }
         // Four pages instead of one long scroll.
         item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
+        if (vm.meTab == 0) item {
+            lg.hero?.let { me ->
+                Section("Your card")
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TradingCard(lg, me, width = 250.dp) }
+            }
+        }
         if (vm.meTab == 0) item { LegacyPanel(lg) }
         if (r.press != null) item { PressCard(vm, lg) }
         if (vm.meTab == 0) item { SituationPanel(vm, lg) }

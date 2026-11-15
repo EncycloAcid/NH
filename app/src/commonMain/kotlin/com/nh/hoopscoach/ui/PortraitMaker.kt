@@ -99,13 +99,10 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     .fillMaxHeight()
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color(0xFF2A2420), CourtBg, Color(0xFF12100E)),
-                        ),
-                    )
+                    .background(CourtBg)
                     .border(2.dp, if (dirty) P.accent.copy(alpha = 0.55f) else P.line, RoundedCornerShape(20.dp)),
             ) {
+                ArenaBackdrop(t, Modifier.fillMaxSize())
                 BasketballCharacterCanvas(
                     face = face,
                     jerseyKey = jerseyKey,

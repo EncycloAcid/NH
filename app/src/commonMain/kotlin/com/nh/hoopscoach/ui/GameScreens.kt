@@ -314,6 +314,14 @@ private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home
     Box(Modifier.padding(horizontal = Gutter).fillMaxWidth().height(232.dp).clip(shape).background(Color(0xFF101318))) {
         // The game itself: the home floor with all ten players on it.
         LiveCourtView(lg, e, home, away, tick, speed, spotlight, Modifier.fillMaxSize())
+        // A win: confetti over the floor and a banner in the user's colors.
+        val mineSide = if (home.id == lg.userTeamId) 0 else if (away.id == lg.userTeamId) 1 else -1
+        if (final && mineSide >= 0 && e.score[mineSide] > e.score[1 - mineSide]) {
+            val ut = if (mineSide == 0) home else away
+            ConfettiBurst(e, listOf(Color(ut.primary), Color(ut.secondary), Color.White, P.gold), Modifier.fillMaxSize(), count = 110)
+            Text("WIN", style = T.hero.copy(fontSize = 40.sp, lineHeight = 40.sp), color = onColor(Color(ut.primary)),
+                modifier = Modifier.align(Alignment.Center).padding(top = 40.dp).popIn(e).clip(RoundedCornerShape(10.dp)).background(Color(ut.primary)).padding(horizontal = 18.dp, vertical = 2.dp))
+        }
         // A dark band behind the score bug and another behind the crowd line, so both read over the floor.
         Box(Modifier.fillMaxWidth().height(78.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.78f), Color.Black.copy(alpha = 0.45f), Color.Transparent))))
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(34.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))

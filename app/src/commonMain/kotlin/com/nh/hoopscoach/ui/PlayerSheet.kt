@@ -97,6 +97,10 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
     val former = if (team == null && p.lastTeam >= 0) lg.team(p.lastTeam) else null
     var tab by remember(p.id) { mutableIntStateOf(if (former != null) 1 else 0) }
     var editNil by remember { mutableStateOf(false) }
+    var showCard by remember(p.id) { mutableStateOf(false) }
+    if (showCard) androidx.compose.ui.window.Dialog(onDismissRequest = { showCard = false }) {
+        Box(Modifier.then(Modifier.hoverClick({ showCard = false })) , contentAlignment = Alignment.Center) { TradingCard(lg, p, Modifier.popIn(p.id), width = 300.dp) }
+    }
     val board = remember(p.id, vm.rev) { Offseason.draftBoard(lg) }
     LazyColumn(modifier.fillMaxWidth()) {
         item {
@@ -110,6 +114,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
+                    SmallButton("Card", Modifier.padding(top = 4.dp)) { showCard = true }
                     if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = injuryColor(p))
                     // A pro's contract.
                     if (lg.pro && team != null) {

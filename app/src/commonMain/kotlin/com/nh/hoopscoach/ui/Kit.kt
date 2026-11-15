@@ -684,7 +684,9 @@ fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: St
             drawArc(c, 135f, 270f * fill.value, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$value", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)
+            // The number counts up with the arc.
+            val counting = if (fill.isRunning) (fill.value * 99f).toInt().coerceAtMost(value) else value
+            Text("$counting", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)
             if (label != null) Text(label, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = P.sub)
         }
     }

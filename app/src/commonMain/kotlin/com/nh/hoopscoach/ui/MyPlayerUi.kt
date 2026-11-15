@@ -83,8 +83,9 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
             BackBar("MyPlayer", h.name, onBack = { vm.back() })
             // The preview: his portrait with the gear he's picking.
             Row(Modifier.fillMaxWidth().padding(horizontal = Gutter + 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.clip(RoundedCornerShape(26.dp)).background(P.surface).padding(6.dp).clickable { vm.push(Route.Portrait(h.id)) }) {
-                    PixelPortrait(h, t, 132.dp, gear = gear)
+                Box(Modifier.clip(RoundedCornerShape(26.dp)).clickable { vm.push(Route.Portrait(h.id)) }) {
+                    ArenaBackdrop(t, Modifier.matchParentSize())
+                    Box(Modifier.padding(6.dp)) { PixelPortrait(h, t, 132.dp, gear = gear, plate = false) }
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {

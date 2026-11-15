@@ -34,7 +34,7 @@ fun ShoeBids(vm: GameViewModel, lg: League, p: Player) {
             Spacer(Modifier.width(8.dp))
             SmallButton("Sign", primary = true) {
                 vm.act { lg2 -> lg2.playerOrNull(p.id)?.let { Shoes.signBid(lg2, it, raw) } }
-                vm.toast("${p.name} signs with ${co.label}")
+                vm.celebrate("SIGNED", "${p.name} · ${co.label}")
             }
         }
     }
@@ -59,7 +59,7 @@ fun ApparelBids(vm: GameViewModel, lg: League, t: Team) {
                     Text("Recruiting pull +${co.pullBonus} · ${Shoes.moneyK(bonus)} Final Four bonus", style = T.small, color = P.sub)
                 }
                 Spacer(Modifier.width(8.dp))
-                SmallButton("Sign", primary = true) { vm.act { Shoes.signApparel(it, it.user, raw) }; vm.toast("${t.school} signs with ${co.label}") }
+                SmallButton("Sign", primary = true) { vm.act { Shoes.signApparel(it, it.user, raw) }; vm.celebrate("SIGNED", "${t.school} · ${co.label}") }
             }
         }
     }

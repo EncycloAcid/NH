@@ -940,7 +940,7 @@ private fun LazyListScope.budgetStep(vm: GameViewModel, lg: League) {
     item {
         Panel {
             Text("NIL ROOM FOR NEW PLAYERS", style = T.label, color = P.sub)
-            Text(money(avail), style = T.hero.copy(fontSize = 52.sp, lineHeight = 52.sp), color = P.ink)
+            CountUpText(avail.toLong(), T.hero.copy(fontSize = 52.sp, lineHeight = 52.sp), P.ink) { money(it.toInt()) }
             val d = total - Finance.budgetAt(lg, t, t.prevPrestige)
             Text(if (d == 0) "Total budget unchanged from last year" else "${if (d > 0) "▲" else "▼"} ${money(kotlin.math.abs(d))} total budget vs last year", style = T.small, color = if (d > 0) P.good else if (d < 0) P.bad else P.sub)
         }

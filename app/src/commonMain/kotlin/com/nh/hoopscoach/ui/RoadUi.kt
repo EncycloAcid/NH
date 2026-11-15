@@ -329,6 +329,12 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
         // Four pages instead of one long scroll; the deal and the press stay on top.
         item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
+        if (vm.meTab == 0) item {
+            lg.hero?.let { me ->
+                Section("Your card")
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TradingCard(lg, me, width = 250.dp) }
+            }
+        }
         if (vm.meTab == 0) item { LegacyPanel(lg) }
         if (lg.road?.press != null) item { PressCard(vm, lg) }
         if (vm.meTab == 0) item { RacePanel(vm, lg) }
@@ -414,7 +420,7 @@ fun DealPicker(vm: GameViewModel, lg: League) {
         for (d in listOf(NilDeal.STEADY, NilDeal.PERFORMANCE, NilDeal.BRAND)) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(P.surface).border(1.dp, P.line, RoundedCornerShape(16.dp))
-                    .clickable { vm.act { Road.chooseDeal(it, d) } }.padding(14.dp),
+                    .clickable { vm.act { Road.chooseDeal(it, d) }; vm.celebrate("DEAL SIGNED", d.label) }.padding(14.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(d.label, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f))
@@ -768,7 +774,7 @@ internal fun StaffPanel(vm: GameViewModel, lg: League) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("IN THE BANK", style = T.label, color = P.sub)
-                Text(money(bank), style = T.title.copy(fontSize = 28.sp), color = P.good)
+                CountUpText(bank.toLong(), T.title.copy(fontSize = 28.sp), P.good) { money(it.toInt()) }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("${r.hired.count { Road.has(lg, it) }} of ${com.nh.hoopscoach.game.Staff.entries.size}", style = T.bodyB, color = P.ink)

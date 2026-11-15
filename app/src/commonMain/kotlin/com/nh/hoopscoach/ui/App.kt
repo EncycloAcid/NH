@@ -114,6 +114,7 @@ fun App(vm: GameViewModel) {
                 }
             }
             if (busy != null && lg != null) BusyCover(vm)
+            vm.celebration?.let { c -> CelebrationOverlay(c) { if (vm.celebration === c) vm.celebration = null } }
             Toast(vm)
         }
     }
@@ -502,6 +503,7 @@ private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
     // Gold for the big honors, the team's color for everything else.
     val tone = if (a.kind in setOf("award", "star", "record", "title", "trophy", "farewell")) P.gold else P.accent
     androidx.compose.ui.window.Dialog(onDismissRequest = { dismiss() }) {
+      Box {
         // The card springs up into place; each new alert gets its own entrance.
         val enter = remember(a) { androidx.compose.animation.core.Animatable(0f) }
         LaunchedEffect(a) { enter.animateTo(1f, Motion.Pop) }
@@ -528,6 +530,9 @@ private fun AlertPopup(vm: GameViewModel, a: com.nh.hoopscoach.game.Alert) {
             Spacer(Modifier.height(20.dp))
             PrimaryButton(if (left > 1) "Next" else "Nice", Modifier.fillMaxWidth()) { dismiss() }
         }
+        // Honors and titles get confetti.
+        if (a.kind in setOf("award", "star", "record", "title", "trophy")) ConfettiBurst(a, listOf(P.gold, P.accent, Color.White, Color(0xFFFF6B6B)), Modifier.matchParentSize())
+      }
     }
 }
 

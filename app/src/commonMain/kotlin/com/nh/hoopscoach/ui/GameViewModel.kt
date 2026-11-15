@@ -400,6 +400,13 @@ class GameViewModel : ViewModel() {
 
     fun toast(text: String) { message = text }
 
+    /** A banner and confetti across the top of the app (a signing, a win, an honor). */
+    var celebration by mutableStateOf<Celebration?>(null)
+    fun celebrate(title: String, sub: String = "", color: androidx.compose.ui.graphics.Color? = null) {
+        val c = color ?: league?.let { androidx.compose.ui.graphics.Color(it.user.primary) } ?: androidx.compose.ui.graphics.Color(0xFF1D428A)
+        celebration = Celebration(title, sub, c)
+    }
+
     /** Quick change to the league; runs on the main thread. */
     fun act(block: (League) -> Unit) {
         val lg = league ?: return
