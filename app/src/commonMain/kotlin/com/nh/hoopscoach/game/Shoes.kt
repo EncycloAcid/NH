@@ -15,9 +15,24 @@ class ShoeDeal(
     var model: Int = 1,
     val sales: MutableList<Int> = mutableListOf(),
     val paid: MutableList<Int> = mutableListOf(),
+    /** This season's buzz from what he does on the floor (big nights and game-winners). */
+    var hype: Double = 0.0,
+    /** Each model's colorway and price (dollars), as he designed them. */
+    val colorways: MutableList<String> = mutableListOf(),
+    val prices: MutableList<Int> = mutableListOf(),
+    /** Performance bonus (thousands) per All-Star or All-NBA nod; more for an MVP or a title. */
+    val bonus: Int = 0,
+    /** The season an extension was last offered. */
+    var extOffered: Int = 0,
 ) {
     val ends get() = start + years - 1
 }
+
+/** A colorway he can drop a model in: what it does to the buzz and to how many pairs move. */
+class Colorway(val name: String, val blurb: String, val hype: Double, val volume: Double)
+
+/** A price point: what a pair costs, and how many more (or fewer) people buy it. */
+class PricePoint(val label: String, val price: Int, val volume: Double, val blurb: String)
 
 /**
  * Real footwear / apparel companies for school kit deals, personal endorsements,
@@ -151,6 +166,120 @@ object Shoes {
         return "$line ${d.model}".trim()
     }
 
+    val COLORWAYS = listOf(
+        Colorway("Home colors", "His team's colors. Safe, and it sells in his city.", 0.2, 1.05),
+        Colorway("Hometown tribute", "A nod to where he grew up. The story sells it.", 0.5, 1.0),
+        Colorway("Blackout", "All black. The one everybody wears off the court.", 0.35, 1.1),
+        Colorway("Retro OG", "Throwback materials and an old-school shape. Collectors line up.", 0.4, 0.95),
+        Colorway("Loud and limited", "Neon, small run. Sells out in minutes, and fewer pairs exist.", 0.8, 0.8),
+    )
+
+    val PRICES = listOf(
+        PricePoint("Takedown", 90, 1.4, "Cheaper materials, in every mall in the country. More pairs, less per pair."),
+        PricePoint("Standard", 140, 1.0, "The usual signature price."),
+        PricePoint("Premium", 200, 0.7, "Top materials, fewer pairs, the most per pair."),
+    )
+
+    /** The model in the stores this season still needs his design: the colorway first, then the price. */
+    fun designPending(lg: League): ShoeDeal? {
+        val d = lg.road?.shoe ?: return null
+        if (!lg.pro || lg.season !in d.start..d.ends || lg.phase != Phase.REGULAR) return null
+        return if (d.prices.size < d.model) d else null
+    }
+
+    fun pickColorway(lg: League, i: Int) {
+        val d = designPending(lg) ?: return
+        val c = COLORWAYS.getOrNull(i) ?: return
+        while (d.colorways.size < d.model - 1) d.colorways += COLORWAYS[0].name
+        if (d.colorways.size < d.model) d.colorways += c.name
+        d.hype += c.hype
+    }
+
+    fun pickPrice(lg: League, i: Int) {
+        val d = designPending(lg) ?: return
+        val p = PRICES.getOrNull(i) ?: return
+        while (d.colorways.size < d.model) d.colorways += COLORWAYS[0].name
+        while (d.prices.size < d.model - 1) d.prices += 140
+        d.prices += p.price
+        val h = lg.hero ?: return
+        lg.news += News(lg.season, lg.day, "The ${shoeName(lg, d)} drops in \"${d.colorways.last()}\"", true, -1, "shoes",
+            "${d.brand} releases ${h.name}'s new model at $${p.price}. ${COLORWAYS.firstOrNull { it.name == d.colorways.last() }?.blurb ?: ""}", d.brand, h.teamId, h.id)
+        Media.post(lg, h.name, h.name.replace(" ", "").replace(".", "").lowercase(), "self", "The ${shoeName(lg, d)} is out now. ${d.colorways.last()}. Go get 'em.", Media.likes(lg, 0.04))
+    }
+
+    /** After each of his games: big nights and game-winners sell shoes. */
+    fun afterGame(lg: League, pts: Int, winner: Boolean, stage: Double) {
+        val d = lg.road?.shoe ?: return
+        val h = lg.hero ?: return
+        if (!lg.pro || lg.season !in d.start..d.ends) return
+        val before = d.hype
+        d.hype += ((pts - 18).coerceAtLeast(0) / 12.0) * 0.35 * stage + (if (winner) 0.9 else 0.0)
+        if (pts >= 40 || winner || (before.toInt() < d.hype.toInt() && pts >= 30)) {
+            val why = if (winner) "his game-winner" else "his $pts-point night"
+            lg.news += News(lg.season, lg.day, "The ${shoeName(lg, d)} sells out after $why", true, -1, "shoes",
+                "Every size, gone in hours. ${d.brand} is rushing a restock.", d.brand, h.teamId, h.id)
+        }
+    }
+
+    /** What his season earned in bonus clauses: All-Star and All-NBA nods, an MVP, a title, a Finals MVP. */
+    private fun bonusPay(lg: League, h: Player, d: ShoeDeal): Pair<Int, List<String>> {
+        if (d.bonus <= 0) return 0 to emptyList()
+        val mine = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
+        val hits = mutableListOf<Pair<String, Int>>()
+        if ("All-Star" in mine) hits += "All-Star" to d.bonus
+        if (mine.any { it.startsWith("All-NBA") }) hits += "All-NBA" to d.bonus
+        if ("MVP" in mine) hits += "MVP" to d.bonus * 3
+        if ("Champion" in mine) hits += "title" to d.bonus * 2
+        if ("Finals MVP" in mine) hits += "Finals MVP" to d.bonus * 2
+        return hits.sumOf { it.second } to hits.map { "${it.first} (${Road.dollars(it.second)})" }
+    }
+
+    /** When he's hot and the deal is a year from ending, the brand wants to lock him up. */
+    private fun maybeExtend(lg: League, h: Player, d: ShoeDeal, heat: Double) {
+        if (lg.season != d.ends - 1 || heat < 1.5 || d.extOffered == lg.season) return
+        d.extOffered = lg.season
+        val per = (d.perYear * 1.4 / 10).roundToInt() * 10
+        val roy = (d.royalty + 0.01).coerceAtMost(0.1)
+        val more = if (heat >= 2.0) 4 else 3
+        Farewell.show(lg, Ceremony(
+            kind = "shoeext", kicker = "SIGNATURE SHOE", title = "${d.brand} wants to extend",
+            sub = "One year left on your deal, and the ${shoeName(lg, d)} is flying. ${d.brand} wants to lock you up now.",
+            teamId = h.teamId, number = h.number,
+            statLabels = listOf("NOW", "EXTENSION", "ROYALTY"),
+            statValues = listOf(Road.dollars(d.perYear) + "/yr", Road.dollars(per) + "/yr", "${(roy * 100).roundToInt()}%"),
+            choices = listOf("Extend: $more more years at ${Road.dollars(per)} a year", "Play it out and test the market"),
+            choiceQuotes = listOf("${d.brand}: \"Family is forever. Let's keep building this.\"", "Your agent: \"Next summer, every brand calls. Let's see what you're worth.\""),
+            choiceReactions = listOf(
+                listOf(Tribute("Sneaker Insider", "Sneakers", "${d.brand} just locked up their franchise player. Smart.")),
+                listOf(Tribute("Sneaker Insider", "Sneakers", "Free agency, but for shoes. This summer's going to be wild.")),
+            ),
+            choiceTitle = "Your call",
+            choicePrompt = "Take the raise now, or bet on yourself and hear every offer next year.",
+            effects = listOf("$more more years · ${Road.dollars(per * (more + 1))} guaranteed from next season", "Offers from three brands when the deal ends (if you keep playing like this)"),
+            badge = "${lg.season} offseason",
+        ))
+    }
+
+    /** His answer to the extension. */
+    fun extend(lg: League, choice: Int) {
+        val r = lg.road ?: return
+        val h = lg.hero ?: return
+        val d = r.shoe ?: return
+        if (choice != 0) {
+            lg.news += News(lg.season, lg.day, "${h.name} turns down an extension from ${d.brand}", true, -1, "shoes",
+                "He'll play out the last year and hear every offer next summer.", d.brand, h.teamId, h.id)
+            return
+        }
+        val heat = heat(lg, h)
+        val more = if (heat >= 2.0) 4 else 3
+        val per = (d.perYear * 1.4 / 10).roundToInt() * 10
+        val roy = (d.royalty + 0.01).coerceAtMost(0.1)
+        // The new money starts next season; this one was paid at the old rate.
+        r.shoe = ShoeDeal(d.brand, d.start, d.years + more, per, roy, d.model, d.sales, d.paid, d.hype, d.colorways, d.prices, (d.bonus * 1.4).roundToInt(), d.extOffered)
+        lg.news += News(lg.season, lg.day, "${h.name} signs an extension with ${d.brand}", true, -1, "shoes",
+            "$more more years at ${Road.dollars(per)} a year and ${(roy * 100).roundToInt()}% of every pair. The ${shoeName(lg, d)} line runs through ${d.ends + more}.", d.brand, h.teamId, h.id)
+    }
+
     /** How hot he is with buyers: 0.4 a quiet year to 2.5 a superstar's. */
     private fun heat(lg: League, h: Player): Double {
         val r = Jerseys.rank(lg, h)
@@ -170,13 +299,24 @@ object Shoes {
         val money = Eras.of(lg).money
         r.shoe?.let { d ->
             if (lg.season in d.start..d.ends) {
-                val pairs = (180_000 * heat(lg, h) * (0.85 + Rng.d() * 0.3)).roundToInt()
-                val royalties = (pairs * 140.0 * d.royalty / 1000 * money).roundToInt()
-                val pay = (d.perYear * money).roundToInt() + royalties
+                // His design: the colorway's pull, the price point's volume and per-pair cut, and the buzz he built on the floor.
+                val price = d.prices.getOrNull(d.model - 1) ?: 140
+                val cw = COLORWAYS.firstOrNull { it.name == d.colorways.getOrNull(d.model - 1) } ?: COLORWAYS[0]
+                val volume = PRICES.firstOrNull { it.price == price }?.volume ?: 1.0
+                val heatNow = heat(lg, h)
+                val buzz = 1 + d.hype.coerceAtMost(5.0) * 0.12
+                val pairs = (180_000 * heatNow * (0.85 + Rng.d() * 0.3) * volume * cw.volume * buzz).roundToInt()
+                val royalties = (pairs * price.toDouble() * d.royalty / 1000 * money).roundToInt()
+                val (bonus, hits) = bonusPay(lg, h, d)
+                val bonusPaid = (bonus * money).roundToInt()
+                val pay = (d.perYear * money).roundToInt() + royalties + bonusPaid
                 d.sales += pairs; d.paid += pay
+                d.hype = 0.0
                 r.earned += pay
                 lg.news += News(lg.season, lg.day, "The ${shoeName(lg, d)} sells ${Road.count(pairs)} pairs", true, -1, "shoes",
-                    "${h.name}'s signature shoe paid ${Road.dollars(pay)} this season: the ${Road.dollars((d.perYear * money).roundToInt())} guarantee and ${Road.dollars(royalties)} in royalties.", d.brand, h.teamId, h.id)
+                    "${h.name}'s signature shoe paid ${Road.dollars(pay)} this season: the ${Road.dollars((d.perYear * money).roundToInt())} guarantee, ${Road.dollars(royalties)} in royalties on the $$price ${cw.name.lowercase()} model" +
+                        (if (hits.isNotEmpty()) ", and ${Road.dollars(bonusPaid)} in bonuses for ${hits.joinToString(", ")}" else "") + ".", d.brand, h.teamId, h.id)
+                maybeExtend(lg, h, d, heatNow)
                 if (lg.season >= d.ends) {
                     lg.news += News(lg.season, lg.day, "${h.name}'s deal with ${d.brand} is up", true, -1, "shoes",
                         "${d.years} years, ${d.model} models, ${Road.count(d.sales.sum())} pairs. The brands will be calling.", d.brand, h.teamId, h.id)
@@ -207,9 +347,9 @@ object Shoes {
             }
             val per = ((base * co.dealMult * (0.82 + Rng.d() * 0.36)) / 10).roundToInt() * 10
             val roy = ((3 + Rng.int(0, 3) + if (co.dealMult >= 1.15) 1 else 0) / 100.0).coerceIn(0.03, 0.08)
-            r.shoeOffers += ShoeDeal(co.label, lg.season + 1, years, per, roy)
+            r.shoeOffers += ShoeDeal(co.label, lg.season + 1, years, per, roy, bonus = (per * (0.12 + Rng.d() * 0.08) / 10).roundToInt() * 10)
         }
-        fun line(d: ShoeDeal) = "${d.brand}: ${d.years} years, ${Road.dollars(d.perYear)} a year, ${(d.royalty * 100).roundToInt()}% royalty"
+        fun line(d: ShoeDeal) = "${d.brand}: ${d.years} years, ${Road.dollars(d.perYear)} a year, ${(d.royalty * 100).roundToInt()}% royalty, ${Road.dollars(d.bonus)} bonuses"
         Farewell.show(lg, Ceremony(
             kind = "shoes", kicker = "SIGNATURE SHOE", title = "Your own shoe",
             sub = "${r.shoeOffers.size} real brands want ${h.name} on a signature line, starting next season.",
@@ -226,8 +366,8 @@ object Shoes {
                 listOf(Tribute("Sneaker Insider", "Sneakers", "The ${shoeName(lg, firstDrop)} is going to fly off the shelves."))
             },
             choiceTitle = "Pick your brand",
-            choicePrompt = "The guarantee is paid every season; the royalty is your cut of every pair sold.",
-            effects = r.shoeOffers.map { "${it.years} years · ${Road.dollars(it.perYear * it.years)} guaranteed · ${(it.royalty * 100).roundToInt()}% of sales" },
+            choicePrompt = "The guarantee is paid every season; the royalty is your cut of every pair sold; the bonuses pay for big seasons. You design every model's colorway and price.",
+            effects = r.shoeOffers.map { "${it.years} years · ${Road.dollars(it.perYear * it.years)} guaranteed · ${(it.royalty * 100).roundToInt()}% of sales · ${Road.dollars(it.bonus)} per All-Star or All-NBA nod (3x for MVP, 2x for a title)" },
             badge = "${lg.season} offseason",
         ))
     }

@@ -123,12 +123,99 @@ fun ShoePanel(lg: League) {
         }
         Text(Shoes.shoeName(lg, d).uppercase(), style = T.label, color = P.accent)
         Text("${d.brand} · ${d.start}–${d.ends}", style = T.head, color = P.ink)
-        Text("${Road.dollars(d.perYear)} a year guaranteed · ${(d.royalty * 100).roundToInt()}% royalty", style = T.small, color = P.sub)
+        Text("${Road.dollars(d.perYear)} a year guaranteed · ${(d.royalty * 100).roundToInt()}% royalty" + (if (d.bonus > 0) " · ${Road.dollars(d.bonus)} bonus per All-Star or All-NBA nod" else ""), style = T.small, color = P.sub)
+        if (lg.season in d.start..d.ends) {
+            Spacer(Modifier.height(8.dp))
+            Text("THIS SEASON'S BUZZ", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+            Bar((d.hype / 5.0).toFloat().coerceIn(0f, 1f), Modifier.fillMaxWidth(), height = 8.dp)
+            Text(when { d.hype >= 4 -> "Sold out everywhere."; d.hype >= 2.5 -> "Flying off the shelves."; d.hype >= 1 -> "Selling well."; else -> "Big nights and game-winners sell shoes." },
+                style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        }
         if (d.sales.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             d.sales.forEachIndexed { i, pairs ->
-                Text("Model ${i + 1}: ${Road.count(pairs)} pairs · ${Road.dollars(d.paid.getOrElse(i) { 0 })}", style = T.small, color = P.ink)
+                val look = listOfNotNull(d.colorways.getOrNull(i), d.prices.getOrNull(i)?.let { "\$" + it }).joinToString(", ")
+                Text("Model ${i + 1}${if (look.isNotEmpty()) " ($look)" else ""}: ${Road.count(pairs)} pairs · ${Road.dollars(d.paid.getOrElse(i) { 0 })}", style = T.small, color = P.ink)
             }
         } else Text("The first model drops this season.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+/** Design the model in stores this season: the colorway, then the price. */
+@Composable
+fun ShoeDesignCard(vm: GameViewModel, lg: League) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val d = Shoes.designPending(lg) ?: return
+    val pickingColor = d.colorways.size < d.model
+    Section("Design the ${Shoes.shoeName(lg, d)}")
+    Panel {
+        Text(if (pickingColor) "STEP 1 OF 2 · THE COLORWAY" else "STEP 2 OF 2 · THE PRICE", style = T.label, color = P.accent)
+        Text(if (pickingColor) "${d.brand} needs your colorway for the launch." else "${d.colorways.lastOrNull() ?: ""}. Now the price: more pairs, or more per pair?",
+            style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp))
+        if (pickingColor) Shoes.COLORWAYS.forEachIndexed { i, c ->
+            ListRow(onClick = { vm.act { Shoes.pickColorway(it, i) } }) {
+                Column(Modifier.weight(1f)) {
+                    Text(c.name, style = T.bodyB, color = P.ink)
+                    Text(c.blurb, style = T.small, color = P.sub)
+                }
+            }
+        } else Shoes.PRICES.forEachIndexed { i, p ->
+            ListRow(onClick = { vm.act { Shoes.pickPrice(it, i) }; vm.toast("The ${Shoes.shoeName(lg, d)} drops at \$${p.price}.") }) {
+                Column(Modifier.weight(1f)) {
+                    Text("${p.label} · \$${p.price}", style = T.bodyB, color = P.ink)
+                    Text(p.blurb, style = T.small, color = P.sub)
+                }
+            }
+        }
+    }
+}
+
+/** Player careers: this season's goal, set before the opener and tracked all season. */
+@Composable
+fun GoalCard(vm: GameViewModel, lg: League) {
+    val C = com.nh.hoopscoach.game.PlayerCareer
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    if (C.goalDue(lg)) {
+        Section("Your goal this season", action = "No goal", onAction = { vm.act { it.careerGoalSeason = it.season; it.careerGoalKind = "" } })
+        Panel {
+            Text("Set a target before the opener. Hit it and it pays off at season's end.", style = T.small, color = P.sub)
+            for (g in C.options(lg)) ListRow(onClick = { vm.act { C.setGoal(it, g) }; vm.toast("Goal set: ${g.label}.") }) {
+                Column(Modifier.weight(1f)) {
+                    Text(g.label, style = T.bodyB, color = P.ink)
+                    Text(g.reward, style = T.small, color = P.faint)
+                }
+            }
+        }
+        return
+    }
+    C.progress(lg)?.let { line ->
+        Section("Your goal")
+        Panel(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp)) { Text(line, style = T.bodyB, color = P.ink) }
+    }
+}
+
+/** Player careers: the legacy meter. */
+@Composable
+fun LegacyPanel(lg: League) {
+    val C = com.nh.hoopscoach.game.PlayerCareer
+    val h = lg.hero ?: return
+    val score = C.score(lg, h)
+    val i = C.tierOf(score)
+    val tier = C.TIERS[i]
+    val next = C.TIERS.getOrNull(i + 1)
+    Section("Legacy")
+    Panel {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(tier.name.uppercase(), style = T.title.copy(fontSize = 26.sp, lineHeight = 27.sp), color = P.accent, modifier = Modifier.weight(1f))
+            Text("$score", style = T.num, color = P.ink)
+        }
+        Text(tier.blurb, style = T.small, color = P.sub)
+        Spacer(Modifier.height(8.dp))
+        if (next != null) {
+            Bar(((score - tier.min).toFloat() / (next.min - tier.min)).coerceIn(0f, 1f), Modifier.fillMaxWidth(), height = 8.dp)
+            Text("${next.min - score} to ${next.name}", style = T.small, color = P.faint, modifier = Modifier.padding(top = 2.dp))
+        } else Text("There's nowhere higher to go.", style = T.small, color = P.faint)
+        Spacer(Modifier.height(8.dp))
+        Text("Built from MVPs, titles, All-Star and All-NBA nods, college honors and every point you score.", style = T.small, color = P.faint)
     }
 }

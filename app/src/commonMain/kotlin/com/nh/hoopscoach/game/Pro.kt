@@ -1298,6 +1298,7 @@ object ProCareer {
         r.earned += endorse
         // His signature shoe: this year's sales, next year's model, or offers once he's a star.
         runCatching { Shoes.seasonEnd(lg) }
+        runCatching { PlayerCareer.seasonEnd(lg) }
         r.contract?.let { it.years-- }
         val s = h.stats
         val honors = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }

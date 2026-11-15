@@ -1855,6 +1855,13 @@ class League(
     /** Off the court (see [OffCourt]): the last booster request and the last life event handled. */
     var deskBoosterStamp: Int = 0,
     var deskLifeStamp: Int = 0,
+    /** A player career's season goal (see [PlayerCareer]) and the legacy tier he's reached. */
+    var careerGoalSeason: Int = 0,
+    var careerGoalKind: String = "",
+    var careerGoalTarget: Double = 0.0,
+    var careerGoalLabel: String = "",
+    var careerGoalGraded: Int = 0,
+    var legacyTier: Int = 0,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

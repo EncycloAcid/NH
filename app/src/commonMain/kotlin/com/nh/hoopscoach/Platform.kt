@@ -8,7 +8,7 @@ import java.io.File
 /** Paths and version strings that differ per platform. */
 object PlatformContext {
     lateinit var filesDir: File
-    var versionName: String = "3.7-pro.227"
+    var versionName: String = "3.8-pro.228"
 
     val saveFile: File get() = File(filesDir, "dynasty.sav")
 }

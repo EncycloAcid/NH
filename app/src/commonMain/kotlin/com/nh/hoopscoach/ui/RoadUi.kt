@@ -321,6 +321,7 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         if (Road.needsDeal(lg)) item { DealPicker(vm, lg) }
         // Four pages instead of one long scroll; the deal and the press stay on top.
         item { Spacer(Modifier.height(10.dp)); Segmented(listOf("You", "Team", "Growth", "Media"), vm.meTab.coerceIn(0, 3), { vm.meTab = it }) }
+        if (vm.meTab == 0) item { LegacyPanel(lg) }
         if (lg.road?.press != null) item { PressCard(vm, lg) }
         if (vm.meTab == 0) item { RacePanel(vm, lg) }
         if (vm.meTab == 0) item { RivalPanel(vm, lg) }

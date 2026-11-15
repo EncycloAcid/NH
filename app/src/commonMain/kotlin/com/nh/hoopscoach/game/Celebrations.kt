@@ -394,6 +394,7 @@ object Celebrations {
     fun speak(lg: League, cer: Ceremony, choice: Int) {
         cer.chosen = choice
         if (cer.kind == "shoes") { Shoes.sign(lg, choice); return }
+        if (cer.kind == "shoeext") { Shoes.extend(lg, choice); return }
         if (cer.kind == "traded") { TradeCall.react(lg, choice); return }
         val r = lg.road
         val hero = lg.hero?.takeIf { playerMode(lg) }
