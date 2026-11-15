@@ -209,7 +209,7 @@ object ProLeague {
         lg.proState!!.step = ProStep.SUMMER
         lg.news += News(lg.season, 0, "${c.name} is the new head coach of the ${u.name}", true)
         RecordBook.seed(lg)
-        Payroll.sign(lg)
+        Payroll.sign(lg, fresh = true)
         Picks.ensure(lg)
         Longevity.assignReal(lg)
         AlternateHistory.seedNba(lg)
@@ -374,7 +374,7 @@ object ProLeague {
         lg.news += News(lg.season, 0, "${h.name} signs with the ${t.name}: ${r.contract!!.years} years, ${Road.dollars(r.contract!!.salary)} a season", true)
         RecordBook.seed(lg)
         // Every pro gets a deal, so payrolls are real from day one, and every team owns its picks.
-        Payroll.sign(lg)
+        Payroll.sign(lg, fresh = true)
         Picks.ensure(lg)
         Longevity.assignReal(lg)
         return lg
@@ -607,7 +607,7 @@ object ProLeague {
         }
         lg.reindex()
         rateTeams(lg)
-        Payroll.sign(lg)
+        Payroll.sign(lg, fresh = true)
     }
 
     /** The position a roster is thinnest at. */
@@ -1249,13 +1249,32 @@ object ProCareer {
 
     fun rookieYears(pick: Int) = if (pick in 1..30) 4 else 2
 
+    /**
+     * Pay by overall, at today's cap (in thousands): a smooth curve set so each tier of the league earns
+     * what that tier earns in the real NBA. The top ten (95+) are max players, the 60th-best (90) about $28M,
+     * the 100th (87) about $17M, the 150th (86) about $13M, the 260th (83) about $5M, the end of the
+     * bench the minimum. That puts most payrolls around the cap, the way real ones are, instead of tens
+     * of millions under it.
+     */
+    private val PAY_CURVE = listOf(
+        79 to 1_100.0, 80 to 1_400.0, 81 to 2_300.0, 82 to 3_300.0, 83 to 5_000.0, 84 to 7_000.0, 85 to 9_400.0,
+        86 to 12_800.0, 87 to 16_500.0, 88 to 20_000.0, 89 to 23_500.0, 90 to 27_500.0, 91 to 31_000.0, 92 to 35_000.0,
+        93 to 39_000.0, 94 to 42_500.0, 95 to 46_000.0, 96 to 49_000.0, 97 to 52_000.0, 99 to 56_000.0,
+    )
+
+    private fun curve(ovr: Double): Double {
+        if (ovr <= PAY_CURVE.first().first) return PAY_CURVE.first().second
+        if (ovr >= PAY_CURVE.last().first) return PAY_CURVE.last().second
+        val i = PAY_CURVE.indexOfLast { it.first <= ovr }
+        val (o0, v0) = PAY_CURVE[i]; val (o1, v1) = PAY_CURVE[i + 1]
+        return v0 + (v1 - v0) * (ovr - o0) / (o1 - o0)
+    }
+
     /** What the league would pay him a season, in thousands. */
     fun marketValue(lg: League, p: Player): Int {
-        val o = p.ovr
-        var v = when {
-            o >= 98 -> 52_000.0; o >= 96 -> 42_000.0; o >= 94 -> 32_000.0; o >= 92 -> 22_000.0
-            o >= 90 -> 14_000.0; o >= 88 -> 8_000.0; o >= 86 -> 4_000.0; o >= 83 -> 2_000.0; else -> 1_100.0
-        }
+        // Young players are paid a little for what they'll become.
+        val upside = if (p.age <= 24) ((p.pot - p.ovr).coerceIn(0, 10) * 0.15) else 0.0
+        var v = curve(p.ovr + upside)
         v *= when { p.age >= 37 -> 0.5; p.age >= 35 -> 0.65; p.age >= 33 -> 0.8; p.age >= 31 -> 0.92; else -> 1.0 }
         val recent = p.awards.filter { it.startsWith("${lg.season} ") || it.startsWith("${lg.season - 1} ") }
         if (recent.any { it.substringAfter(" ") == "MVP" }) v *= 1.15

@@ -121,12 +121,32 @@ object Payroll {
         return true
     }
 
-    /** Every pro without a deal gets one: his market value give or take, for one to four years. */
-    fun sign(lg: League) {
+    /**
+     * Every pro without a deal gets one: his market value give or take, for one to four years. In a [fresh]
+     * league, the young (three seasons or fewer) start on rookie-scale deals instead, ranked by overall into
+     * about three draft classes, so a young star is the bargain he is in real life, not a max player.
+     */
+    fun sign(lg: League, fresh: Boolean = false) {
         if (!lg.pro) return
+        val rookiePick = HashMap<Int, Int>()
+        val assigned = HashSet<Int>()
+        if (fresh) {
+            lg.players.filter { it.teamId >= 0 && it.id != lg.heroId && it.proYears <= 3 && (it.salary <= 0 || it.contractYears <= 0) }
+                .sortedByDescending { it.ovr }.forEachIndexed { i, p -> rookiePick[p.id] = (i / 3 + 1).coerceAtMost(60) }
+        }
         for (t in lg.teams) for (p in lg.rosterOf(t)) {
             if (p.id == lg.heroId || (p.salary > 0 && p.contractYears > 0)) continue
-            p.salary = ((ProCareer.marketValue(lg, p) * (0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10).coerceAtLeast(ProCareer.minSalary(lg, p.proYears))
+            val pick = rookiePick[p.id]
+            if (pick != null) {
+                p.salary = ProCareer.rookieSalary(lg, pick).coerceAtLeast(ProCareer.minSalary(lg, p.proYears))
+                p.contractYears = (ProCareer.rookieYears(pick) - p.proYears).coerceAtLeast(1)
+                p.clause = if (pick <= 30) (if (p.contractYears == 1) "RFA" else "TO") else ""
+                p.structure = "BACK"
+                continue
+            }
+            p.salary = ((ProCareer.marketValue(lg, p) * (0.85 + Rng.d() * 0.3)).roundToInt() / 10 * 10)
+                .coerceIn(ProCareer.minSalary(lg, p.proYears), ProCareer.maxSalary(lg, p.proYears))
+            assigned += p.id
             p.contractYears = Rng.range(1, 4)
             if (p.structure.isEmpty()) p.structure = "FLAT"
             if (p.clause.isEmpty()) {
@@ -137,6 +157,20 @@ object Payroll {
                     p.contractYears >= 2 && Rng.chance(0.18) -> "TO"
                     else -> ""
                 }
+            }
+        }
+        // A new league: a team so deep it would start past the apron has its veterans' deals trimmed back
+        // under it (no one below the minimum), the way real rosters are built to fit.
+        if (fresh) for (t in lg.teams) {
+            val over = total(lg, t) - apron(lg)
+            if (over <= 0) continue
+            val mine = lg.rosterOf(t).filter { it.id in assigned }
+            val pool = mine.sumOf { it.salary - ProCareer.minSalary(lg, it.proYears) }
+            if (pool <= 0) continue
+            val f = (1.0 - over.toDouble() / pool).coerceIn(0.6, 1.0)
+            for (p in mine) {
+                val min = ProCareer.minSalary(lg, p.proYears)
+                p.salary = ((min + (p.salary - min) * f).roundToInt() / 10 * 10).coerceAtLeast(min)
             }
         }
     }
