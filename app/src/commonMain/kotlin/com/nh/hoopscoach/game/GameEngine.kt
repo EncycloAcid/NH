@@ -348,6 +348,17 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val talent = if (lg.pro) PRO_TALENT else TALENT
     private val coaching = if (lg.pro) 0.5 else 1.0
 
+    /**
+     * A rating gap with diminishing returns, in college: ratings there run from blue bloods in the 90s to
+     * low-majors in the 50s, and taken straight a 25-point gap turned a star into a 75% layup machine and a
+     * blowout into 130 points. Small gaps count about as before; big ones count a good deal less. The pros,
+     * whose ratings sit close together, take the gap as it is.
+     */
+    private fun soft(d: Number): Double {
+        val x = d.toDouble()
+        return if (lg.pro) x else x / (1.0 + abs(x) / 24.0)
+    }
+
     /** A past era's style in the pros: pace, threes, two-point shooting and fouls. */
     private val proEra = if (lg.pro) Eras.of(lg) else Era.TODAY
 
@@ -500,10 +511,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun def(side: Int) = halftimeDefense?.takeIf { side == coachSide && secondHalf } ?: teams[side].plan.defense
 
     private fun possLength(o: Int): Double {
+        // Seconds a possession takes: the fastest teams about 75 possessions a game, the slowest about 62.
         var base = when (off(o)) {
-            Offense.UPTEMPO -> 14.0; Offense.GRIND -> 21.0; Offense.PERIMETER -> 16.6; Offense.INSIDE -> 17.6; else -> 17.2
+            Offense.UPTEMPO -> 15.6; Offense.GRIND -> 20.0; Offense.PERIMETER -> 16.8; Offense.INSIDE -> 17.6; else -> 17.2
         }
-        when (def(1 - o)) { Defense.PRESS -> base -= 2.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
+        when (def(1 - o)) { Defense.PRESS -> base -= 1.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
         if (lg.pro) base *= 0.81 * proEra.pace
         else base *= era.pace
         // Nobody holds it past the shot clock (or past the soft max in the stall-ball era).
@@ -561,9 +573,11 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun pickShooter(o: Int, offense: List<Player>): Player {
         val w = offense.map {
             if (lg.pro) usage(o, it).pow(0.8) * (Ratings.offense(it) / skillScale).pow(0.6) * proShotPos(it.pos)
-            else usage(o, it).pow(1.1) * (Ratings.offense(it) / skillScale).pow(1.25)
+            else usage(o, it) * (Ratings.offense(it) / skillScale).pow(0.9)
         }.toMutableList()
-        if (lg.pro && w.size > 1) {
+        // Nobody takes much more than a third of his team's shots while he's on the floor (college too: a
+        // star there was taking 45% and scoring 40 a night).
+        if (w.size > 1) {
             val top = w.indices.maxBy { w[it] }
             val rest = w.sum() - w[top]
             if (w[top] / (w[top] + rest) > SHOT_CAP) w[top] = rest * SHOT_CAP / (1 - SHOT_CAP)
@@ -1033,9 +1047,9 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val pd = if (guard != null) perD * 0.6 + guard[Attr.PER] * 0.4 else perD
             val id = if (guard != null) intD * 0.7 + guard[Attr.IDF] * 0.3 else intD
             var pMake = when (type) {
-                0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (id - n[5]) * 0.0038) * talent
-                1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (pd - n[6]) * 0.003) * talent
-                else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (pd - n[6]) * 0.0026) * talent + (if (lg.pro) 0.0 else era.threeMake)
+                0 -> 0.522 + (soft(shooter[Attr.INS] - n[0]) * 0.0055 - soft(id - n[5]) * 0.0038) * talent
+                1 -> 0.365 + (soft(shooter[Attr.MID] - n[1]) * 0.0047 - soft(pd - n[6]) * 0.003) * talent
+                else -> 0.312 + (soft(shooter[Attr.OUT] - n[2]) * 0.0043 - soft(pd - n[6]) * 0.0026) * talent + (if (lg.pro) 0.0 else era.threeMake)
             }
             if (putback != null) pMake += 0.06
             // Pros finish and shoot a little better than college players at the same ratings.
