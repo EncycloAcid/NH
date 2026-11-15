@@ -190,6 +190,26 @@ object SpriteSheets {
         "tapered_afro",          // 19 Tapered afro
         "hard_part",             // 20 Hard part (a buzz with a shaved part)
         "waves_fade",            // 21 Wave fade
+        "buzz_fade",             // 22 Buzz fade
+        "crew_cut",              // 23 Crew cut
+        "undercut",              // 24 Undercut
+        "faux_hawk",             // 25 Faux hawk
+        "cornrow_fade",          // 26 Cornrow fade
+        "locs_bun",              // 27 Locs bun
+        "twist_bun",             // 28 Twist bun
+        "loc_hawk",              // 29 Loc-hawk
+        "twist_hawk",            // 30 Twist-hawk
+        "big_afro",              // 31 Big afro
+        "slick_part",            // 32 Side part
+        "low_flat_top",          // 33 Low flat-top
+        "part_fade",             // 34 Part fade
+        "waves_part",            // 35 Waves part
+        "high_puff",             // 36 High puff
+        "long_locs",             // 37 Long locs
+        "long_twists",           // 38 Long twists
+        "curly_top",             // 39 Curly top
+        "short_mohawk",          // 40 Short mohawk
+        "locs_half_up",          // 41 Locs half-up
     )
 
     // Face.eyes 0 = default (no overlay); 1..6 map to files.

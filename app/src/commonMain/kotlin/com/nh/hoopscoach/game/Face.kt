@@ -19,7 +19,8 @@ class Face(
             listOf("Pale ivory", "Fair peach", "Olive bronze", "Warm caramel", "Medium brown", "Chestnut", "Dark chocolate", "Deep ebony"),
             listOf("Oval", "Round", "Square", "Long"),
             listOf("Bald", "Buzz", "Slicked", "Fade", "Flat-top", "Afro", "High-top", "Headband", "Cornrows", "Locs", "Twists", "Mohawk", "Waves", "Top bun",
-                "Afro puffs", "Frohawk", "Short locs", "Short twists", "Twist fade", "Tapered afro", "Hard part", "Wave fade"),
+                "Afro puffs", "Frohawk", "Short locs", "Short twists", "Twist fade", "Tapered afro", "Hard part", "Wave fade",
+                "Buzz fade", "Crew cut", "Undercut", "Faux hawk", "Cornrow fade", "Locs bun", "Twist bun", "Loc-hawk", "Twist-hawk", "Big afro", "Side part", "Low flat-top", "Part fade", "Waves part", "High puff", "Long locs", "Long twists", "Curly top", "Short mohawk", "Locs half-up"),
             listOf("Black", "Dark brown", "Brown", "Auburn", "Blond", "Platinum", "Gray", "Red"),
             listOf("None", "Stubble", "Mustache", "Goatee", "Chin strap", "Full beard"),
             listOf("Default", "Intense", "Clutch", "Swagger", "Alert", "Blue", "Green"),
@@ -68,13 +69,16 @@ class Face(
             val r = kotlin.random.Random(p.look.toLong() * 131 + p.id * 7 + 5)
             val roll = r.nextDouble()
             return when (hair) {
-                1 -> if (roll < 0.25) 20 else hair                                   // buzz → hard part
-                3 -> if (roll < 0.2) 19 else hair                                    // fade → tapered afro
-                5 -> if (roll < 0.3) 19 else if (roll < 0.4) 15 else hair            // afro → tapered afro, frohawk
-                9 -> if (roll < 0.35) 16 else hair                                   // locs → short locs
-                10 -> if (roll < 0.3) 17 else if (roll < 0.6) 18 else hair           // twists → short twists, twist fade
-                11 -> if (roll < 0.35) 15 else hair                                  // mohawk → frohawk
-                12 -> if (roll < 0.4) 21 else hair                                   // waves → wave fade
+                1 -> if (roll < 0.2) 20 else if (roll < 0.4) 22 else if (roll < 0.5) 23 else hair   // buzz → hard part, buzz fade, crew cut
+                2 -> if (roll < 0.25) 24 else if (roll < 0.4) 32 else hair           // slicked → undercut, side part
+                3 -> if (roll < 0.2) 19 else if (roll < 0.35) 34 else if (roll < 0.5) 39 else hair   // fade → tapered afro, part fade, curly top
+                4 -> if (roll < 0.3) 33 else hair                                    // flat-top → low flat-top
+                8 -> if (roll < 0.35) 26 else hair                                   // cornrows → cornrow fade
+                5 -> if (roll < 0.3) 19 else if (roll < 0.4) 15 else if (roll < 0.5) 31 else hair   // afro → tapered, frohawk, big afro
+                9 -> if (roll < 0.25) 16 else if (roll < 0.4) 37 else if (roll < 0.5) 27 else if (roll < 0.6) 41 else hair   // locs → short, long, bun, half-up
+                10 -> if (roll < 0.25) 17 else if (roll < 0.5) 18 else if (roll < 0.6) 38 else if (roll < 0.7) 28 else hair   // twists → short, fade, long, bun
+                11 -> if (roll < 0.3) 15 else if (roll < 0.5) 40 else if (roll < 0.6) 25 else hair  // mohawk → frohawk, short, faux hawk
+                12 -> if (roll < 0.35) 21 else if (roll < 0.5) 35 else hair          // waves → wave fade, waves part
                 else -> hair
             }
         }
