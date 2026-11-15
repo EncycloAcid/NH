@@ -217,6 +217,10 @@ private val programTabs: List<Pair<String, List<GSection>>> = listOf(
             "• Bracket challenge: on Selection Sunday, pick a national champion from the top seeds (or your own team). Get it right and the fans and the bosses notice.",
         ),
         sec(
+            "Boosters",
+            "Every couple of weeks your biggest donors may call wanting something: play my son, hire my nephew, schedule my alma mater, name the court, a say in recruiting. Saying yes brings money into the program; saying no can cost a pledge but earns respect from your bosses or players. Each answer shows what it does.",
+        ),
+        sec(
             "The short version",
             "Prestige is your program's headline number, from 0 to 100. It moves once a season and slowly, so one great year nudges it and one bad year doesn't wreck it.",
             "Four numbers sit next to it. Legacy is how the sport sees your program over the long run. Buzz is short-term national heat. Conference Exposure is how visible your league is. Program Pull blends it all into one attractiveness rating.",

@@ -13,6 +13,12 @@ object Clubhouse {
 
     fun active(lg: League) = !lg.pro && !lg.playerMode && lg.userTeamId >= 0
 
+    /** Incidents and speeches also run in an NBA coaching career (the bracket doesn't). */
+    fun roomActive(lg: League) = !lg.playerMode && lg.userTeamId >= 0 && (!lg.pro || NbaCoach.active(lg))
+
+    /** College-only situations, left out of an NBA locker room. */
+    private val COLLEGE_ONLY = setOf("Homesick", "Grades", "An agent calling", "NBA scouts", "Walk-on spark", "Last chance", "Big ego")
+
     private fun o(text: String, suspend: Int = 0, mood: Int = 0, team: Int = 0, security: Int = 0, fans: Double = 0.0, reaction: String) =
         Option(text, suspend, mood, team, security, fans, reaction)
 
@@ -106,16 +112,16 @@ object Clubhouse {
             o("Ask him what's wrong.", mood = 4, reaction = "Something was going on at home. You'll keep an eye on it.")) }),
     )
 
-    private fun stamp(lg: League) = lg.season * 100 + lg.day / 9
+    private fun stamp(lg: League) = lg.season * 100 + lg.day / (if (lg.pro) 20 else 9)
 
     /** This stretch's incident, if one happens (about half the time), the same however often it's drawn. */
     fun incident(lg: League): Incident? {
-        if (!active(lg) || lg.phase != Phase.REGULAR || lg.user.gp < 3 || lg.deskIncidentStamp == stamp(lg)) return null
+        if (!roomActive(lg) || lg.phase != Phase.REGULAR || lg.user.gp < 3 || lg.deskIncidentStamp == stamp(lg)) return null
         val rnd = kotlin.random.Random(stamp(lg) * 7907L + lg.userTeamId)
         if (rnd.nextDouble() > 0.5) return null
         val roster = lg.rosterOf(lg.user).filter { !it.out }
         if (roster.size < 6) return null
-        val kinds = KINDS.shuffled(rnd)
+        val kinds = KINDS.filter { !lg.pro || it.title !in COLLEGE_ONLY }.shuffled(rnd)
         for (k in kinds) {
             val byOvr = roster.sortedByDescending { it.ovr }
             val p = when (k.who) {
@@ -147,7 +153,7 @@ object Clubhouse {
         Fans.ensure(u)
         u.fans = (u.fans + op.fans).coerceIn(5.0, 100.0)
         if (op.suspend > 0 && inc.title !in setOf("Playing hurt", "Family emergency")) lg.playerOrNull(inc.playerId)?.let { p ->
-            lg.news += News(lg.season, lg.day, "${u.school} suspends ${p.name} for ${op.suspend} game${if (op.suspend == 1) "" else "s"}", true, kind = "move", teamId = u.id, pid = p.id,
+            lg.news += News(lg.season, lg.day, "${if (lg.pro) "The ${u.name}" else u.school} suspend${if (lg.pro) "" else "s"} ${p.name} for ${op.suspend} game${if (op.suspend == 1) "" else "s"}", true, kind = "move", teamId = u.id, pid = p.id,
                 body = "${lg.userCoach.name} sat ${p.last} for a violation of team rules. \"${op.text}\"", source = "Hoops Wire")
         }
         lg.deskIncidentStamp = stamp(lg)
@@ -162,16 +168,22 @@ object Clubhouse {
 
     /** Today's game, if it's a big one and the speech hasn't been given. */
     fun bigGame(lg: League): Game? {
-        if (!active(lg)) return null
-        val g = Season.userGameToday(lg) ?: return null
+        if (!roomActive(lg)) return null
+        val g = (if (lg.pro) lg.games.filter { !it.played && it.involves(lg.userTeamId) && it.day == lg.day }.minByOrNull { it.id } else Season.userGameToday(lg)) ?: return null
         if (g.id == lg.deskSpeechGame) return null
         val opp = lg.team(g.opp(lg.userTeamId))
-        val big = lg.rivalry(g) != null || opp.ap in 1..25 || g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY
+        val big = lg.rivalry(g) != null || g.type == GameType.PLAYOFF || (lg.pro && opp.w + opp.l >= 10 && opp.winPct >= 0.65) ||
+            (!lg.pro && (opp.ap in 1..25 || g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY))
         return if (big) g else null
     }
 
     fun why(lg: League, g: Game): String {
         val opp = lg.team(g.opp(lg.userTeamId))
+        if (lg.pro) return when {
+            g.type == GameType.PLAYOFF -> "Playoffs: the ${opp.name}"
+            lg.rivalry(g) != null -> "Rivalry game: the ${opp.name}"
+            else -> "The ${opp.record} ${opp.name}"
+        }
         return when {
             g.type == GameType.NCAA -> "NCAA Tournament: ${opp.school}"
             g.type == GameType.CONF_TOURNEY -> "Conference tournament: ${opp.school}"
@@ -184,7 +196,7 @@ object Clubhouse {
         val rnd = kotlin.random.Random(g.id * 31L + lg.season)
         fun one(vararg o: String) = o[rnd.nextInt(o.size)]
         val opp = lg.team(g.opp(lg.userTeamId))
-        val march = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY
+        val march = g.type == GameType.NCAA || g.type == GameType.CONF_TOURNEY || g.type == GameType.PLAYOFF
         return listOf(
             Speech("Fire them up", one(
                 "Nobody in that building thinks we can win. Go prove every one of them wrong.",
@@ -201,7 +213,7 @@ object Clubhouse {
             Speech("The game plan", one(
                 "Take away their best player. Make anybody else beat us.",
                 "Win the glass, take care of the ball, and we win. That's it.",
-                "${opp.school} wants to run. Make them walk it up all night.",
+                "${if (lg.pro) "The ${opp.name.substringAfterLast(' ')}" else opp.school} want${if (lg.pro) "" else "s"} to run. Make them walk it up all night.",
                 "They can't guard us inside. Feed the post until they prove they can.",
             ), team = 2, security = 2, reaction = "Everybody knew the job."),
         )

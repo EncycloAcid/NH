@@ -1852,6 +1852,9 @@ class League(
     var deskBracketSeason: Int = 0,
     var deskBracketPick: Int = -1,
     var deskBracketGraded: Int = 0,
+    /** Off the court (see [OffCourt]): the last booster request and the last life event handled. */
+    var deskBoosterStamp: Int = 0,
+    var deskLifeStamp: Int = 0,
     var followCoaches: MutableList<Int> = mutableListOf(),
     var complianceWarnings: Int = 0,
     var complianceStamp: Int = 0,

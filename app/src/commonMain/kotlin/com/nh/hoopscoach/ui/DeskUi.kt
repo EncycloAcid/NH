@@ -22,6 +22,7 @@ fun CoachDeskCards(vm: GameViewModel, lg: League) {
     if (com.nh.hoopscoach.game.Clubhouse.bracketDue(lg)) BracketCard(vm, lg)
     com.nh.hoopscoach.game.Clubhouse.bigGame(lg)?.let { PregameCard(vm, lg, it) }
     com.nh.hoopscoach.game.Clubhouse.incident(lg)?.let { IncidentCard(vm, lg, it) }
+    com.nh.hoopscoach.game.OffCourt.booster(lg)?.let { BoosterCard(vm, lg, it) }
     for (pr in CoachDesk.current(lg)) DeskPrompt(vm, lg, pr)
 }
 
@@ -155,6 +156,71 @@ private fun BracketCard(vm: GameViewModel, lg: League) {
             androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
             Text(t.school, style = T.bodyB, color = if (t.id == lg.userTeamId) P.accent else P.ink, modifier = Modifier.weight(1f))
             Text(t.record, style = T.small, color = P.sub)
+        }
+    }
+}
+
+// ---------- off the court ----------
+
+@Composable
+private fun BoosterCard(vm: GameViewModel, lg: League, rq: com.nh.hoopscoach.game.OffCourt.Request) {
+    val O = com.nh.hoopscoach.game.OffCourt
+    Section("A booster calls", action = "Let it ring", onAction = { vm.act { O.skipBooster(it) } })
+    Panel(color = mix(P.surface, P.gold, if (P.dark) 0.12f else 0.07f)) {
+        Text(rq.title.uppercase(), style = T.label, color = P.gold)
+        Text("FROM: ${rq.who.uppercase()}", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 2.dp))
+        Text("\"${rq.text}\"", style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        rq.asks.forEachIndexed { i, a ->
+            ListRow(onClick = {
+                var reaction = ""
+                vm.act { reaction = O.answerBooster(it, rq, i) }
+                if (reaction.isNotEmpty()) vm.toast(reaction)
+            }) {
+                Column(Modifier.weight(1f)) {
+                    Text(a.text, style = T.body, color = P.ink)
+                    val hints = listOfNotNull(
+                        if (a.cash > 0) "+${money(a.cash)}" else if (a.cash < 0) "${money(-a.cash)} less" else null,
+                        if (a.security >= 1) "bosses ↑" else if (a.security < 0) "bosses ↓" else null,
+                        if (a.fans >= 2) "fans ↑" else if (a.fans < 0) "fans ↓" else null,
+                        if (a.mood >= 2) "players ↑" else if (a.mood < 0) "players ↓" else null,
+                        if (a.recruits >= 2) "recruits ↑" else null,
+                    )
+                    if (hints.isNotEmpty()) Text(hints.joinToString(" · "), style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                }
+            }
+        }
+    }
+}
+
+/** Player careers: life off the court. */
+@Composable
+fun LifeCard(vm: GameViewModel, lg: League) {
+    val O = com.nh.hoopscoach.game.OffCourt
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val l = O.life(lg) ?: return
+    Section("Off the court", action = "Ignore", onAction = { vm.act { O.skipLife(it) } })
+    Panel {
+        Text(l.title.uppercase(), style = T.label, color = P.accent)
+        Text(l.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        l.moves.forEachIndexed { i, mv ->
+            ListRow(onClick = {
+                var reaction = ""
+                vm.act { reaction = O.live(it, l, i) }
+                if (reaction.isNotEmpty()) vm.toast(reaction)
+            }) {
+                Column(Modifier.weight(1f)) {
+                    Text(mv.text, style = T.body, color = P.ink)
+                    val hints = listOfNotNull(
+                        if (mv.followers >= 0.03) "followers ↑" else null,
+                        if (mv.leadership >= 2) "leadership ↑" else if (mv.leadership < 0) "leadership ↓" else null,
+                        if (mv.fatigue >= 4) "tired legs" else if (mv.fatigue <= -4) "fresh legs" else null,
+                        if (mv.money > 0) "+${money(mv.money)}" else if (mv.money < 0) "costs ${money(-mv.money)}" else null,
+                        if (mv.mates >= 3) "teammates ↑" else if (mv.mates < 0) "teammates ↓" else null,
+                        if (mv.mood >= 5) "feels great" else if (mv.mood < 0) "mood ↓" else null,
+                    )
+                    if (hints.isNotEmpty()) Text(hints.joinToString(" · "), style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                }
+            }
         }
     }
 }
