@@ -62,13 +62,11 @@ object Celebrations {
         val crowd = ((if (pro) 400_000 else 60_000) * (0.6 + (t.fans.takeIf { it > 0 } ?: 50.0) / 100.0) / 1000).roundToInt() * 1000
         val town = city(lg, t)
         val story = mutableListOf<String>()
-        story += if (pro) pick(
-            "The buses rolled out at ten. By noon, downtown $town was a wall of ${t.mascot} colors, an estimated ${"%,d".format(crowd)} people deep, confetti in the trees and on the rooftops.",
-            "They started lining the route the night before. When the trophy finally came around the corner on the lead bus, $town lost its mind: an estimated ${"%,d".format(crowd)} people, the biggest crowd the city has seen in years.",
-        ) else pick(
-            "The team buses crawled across campus and into town behind a marching band, students on every balcony and an estimated ${"%,d".format(crowd)} fans along the way.",
-            "Back home, ${t.school} turned out: an estimated ${"%,d".format(crowd)} fans, the band, the cheerleaders and the trophy on the hood of the lead bus.",
-        )
+        val ctx = mapOf("town" to town, "school" to t.school, "team" to t.mascot, "season" to "$season", "crowd" to "%,d".format(crowd),
+            "coach" to lg.coachOf(t).last, "star" to (star?.name ?: "our captain"), "runner" to (runnerUp?.let { if (pro) "the ${it.name}" else it.school } ?: "our opponent"))
+        val seed = season * 7919L + t.id
+        fun say(salt: Int, pool: List<String>) = Speeches.pick(seed + salt, pool, ctx)
+        story += say(1, if (pro) Speeches.PARADE_OPEN_PRO else Speeches.PARADE_OPEN_COLLEGE)
         story += buildString {
             append(if (pro) "The ${t.name} won the $season title" else "${t.school} won the $season national title")
             if (finalsLine.isNotEmpty()) append(" $finalsLine")
@@ -84,18 +82,14 @@ object Celebrations {
                 (TitleDefense.lastRepeat(lg, season)?.let { (y, r) -> " The first repeat champions since ${if (pro) "the ${r.name}" else r.school} in $y." } ?: "")
             titles >= 3 -> "It's title No. $titles for the franchise" + (prevTitle?.let { ", the first since $it." } ?: ".")
             titles == 2 -> "Their second" + (prevTitle?.let { ", and the first since $it" } ?: "") + ". The first one was a surprise. This one was a statement."
-            else -> "The first one is the one you never forget."
+            else -> say(2, Speeches.PARADE_FIRST)
         }
         runCatching { GreatTeams.rankOf(lg, t) }.getOrNull()?.takeIf { it in 1..25 }?.let { story += "Where this team ranks: No. $it on our list of the greatest champions ever." }
         story += "At the stage, the microphone came to ${me(lg)}."
 
         // The speech.
-        val choices = listOf("We're coming back for another one.", "This one is for you, $town.", "I want to thank these guys.")
-        val quotes = listOf(
-            "Enjoy it tonight. Tomorrow we start chasing the next one. Nobody's taking this from us. We're coming back for another one!",
-            "You waited for this. You filled that building every night, you traveled, you never stopped believing. This trophy is yours, $town. It belongs to you!",
-            "Look at these guys behind me. Every one of them gave up something for this. I love every one of them. This is their day.",
-        )
+        // One line from each kind of speech (the next one, the city, the team), so it's never the same three.
+        val (choices, quotes) = Speeches.pickSet(seed + 3, ctx, Speeches.PARADE_MORE, Speeches.PARADE_CITY, Speeches.PARADE_TEAM)
         val effects = if (hero != null) listOf("Your following grows (+3%); now everyone expects a repeat.", "The city loves you for it (followers +8%).", "Your teammates won't forget it (teammate happiness +5).")
         else listOf("The bosses like the hunger (job security +3).", "The fans eat it up; no change in the building.", "The locker room won't forget it (player happiness +5).")
         val an = Media.pundit(lg)
@@ -120,13 +114,14 @@ object Celebrations {
         // What people said.
         val trib = mutableListOf<Tribute>()
         trib += Tribute("${Rng.pick(Names.first)} ${Rng.pick(Names.last)}", if (pro) "Owner, ${t.name}" else "Athletic director, ${t.school}",
-            if (pro) "We promised this city a champion. These men delivered." else "This is what we built this program for. Thank you to everyone who made it happen.")
-        trib += Tribute("Mayor ${Rng.pick(Names.last)}", "Mayor of $town", "Today, $town is the capital of basketball. The key to the city is waiting.")
-        if (hero == null) star?.let { trib += Tribute(it.name, "${t.abbr} star", "Coach ${lg.userCoach.last} believed in us before anybody. This ring is for him too.") }
+            say(4, if (pro) Speeches.OWNER_LINES else Speeches.AD_LINES_COLLEGE))
+        trib += Tribute("Mayor ${Rng.pick(Names.last)}", "Mayor of $town", say(5, Speeches.MAYOR_LINES))
+        if (hero == null) star?.let { trib += Tribute(it.name, "${t.abbr} star", say(6, Speeches.STAR_LINES)) }
         else trib += Tribute(lg.coachOf(t).name, "Head coach, ${t.abbr}", "${hero.first} carried us when we needed it. Proud of him.")
-        runnerUp?.let { r -> trib += Tribute(lg.coachOf(r).name, "Head coach, ${if (pro) r.name else r.school}", "Congratulations to them. They were the better team. We'll be back.") }
+        runnerUp?.let { r -> trib += Tribute(lg.coachOf(r).name, "Head coach, ${if (pro) r.name else r.school}", say(7, Speeches.RUNNER_LINES)) }
         trib += Tribute(if (pro) "NBA" else "NCAA March Madness", "League", "Congratulations to ${if (pro) "the ${t.name}" else t.school}, the $season champions!", verified = true)
-        trib += Tribute(Media.fanName(), "${t.abbr} fan", pick("I'll be telling my grandkids about this day.", "Called in sick. Worth it. CHAMPS!", "Nobody believed. We did."))
+        trib += Tribute(Media.fanName(), "${t.abbr} fan", say(8, Speeches.FAN_PARADE))
+        trib += Tribute(Media.fanName(), "${t.abbr} fan", say(9, Speeches.FAN_PARADE))
 
         val head = if (pro) "The ${t.name} celebrate with a parade through $town" else "${t.school} celebrates its title with a parade"
         lg.news += News(season, lg.day, head, true, -1, "parade", story.joinToString("\n\n"), "Hoops Wire", t.id, -1, reactions(trib, 2_000, 80_000))
@@ -157,9 +152,9 @@ object Celebrations {
             ", the lights went down and the $last banner rose to the rafters" + (if (run >= 2) ", the ${run}${if (run == 2) "nd" else if (run == 3) "rd" else "th"} in a row. Now: ${TitleDefense.chasing(run)}." else if ((if (pro) lg.proState?.history?.count { it.champion == t.id } else t.titles) ?: 0 > 1) ", next to the others." else ".")
         lines += "One by one, the rings: ${plural(back.size.coerceAtLeast(1), "player")} still here from the title team" +
             (loudest?.let { ", and the loudest ovation of the night for ${it.name}." } ?: ".")
-        lines += pick("Then the hard part: playing a game after that.", "The visitors watched the whole thing from their bench. They'll be getting everybody's best shot all year, too.", "Now everyone's gunning for them.")
+        lines += Speeches.pick(lg.season * 31L + t.id, Speeches.RING_CLOSERS)
         val trib = mutableListOf<Tribute>()
-        loudest?.let { trib += Tribute(it.name, "${t.abbr}", "Seeing that banner go up... I got chills. Now let's go get another one.") }
+        loudest?.let { trib += Tribute(it.name, "${t.abbr}", Speeches.pick(lg.season * 37L + t.id, Speeches.RING_PLAYER)) }
         back.filter { it.id != loudest?.id }.maxByOrNull { it.ovr }?.let { trib += Tribute(it.name, "${t.abbr}", "Ring fits perfect. Time to go to work.") }
         trib += Tribute(Media.fanName(), "${t.abbr} fan", "Got the ring night replica. Framing it. What a night.")
         val labels = listOf("SEASON", "RECORD", "RESULT")
@@ -258,12 +253,9 @@ object Celebrations {
         } + "\""
 
         // His speech, when it's his.
-        val choices = if (mine) listOf("Thank the team.", "To everyone who doubted me.", "For my family.") else emptyList()
-        val quotes = if (mine) listOf(
-            "This award has my name on it, but it belongs to everybody in that locker room. I don't win anything without them.",
-            "There were a lot of people who said I couldn't. I heard every one of them. I kept every one of those. This is for you.",
-            "Mom, Dad: every early morning, every long drive, every game you sat through. This is yours.",
-        ) else emptyList()
+        val speech = if (mine) Speeches.pickSet(lg.season * 4241L + top.label.hashCode(), emptyMap(), Speeches.AWARD_TEAM, Speeches.AWARD_DOUBTERS, Speeches.AWARD_FAMILY) else null
+        val choices = speech?.first ?: emptyList()
+        val quotes = speech?.second ?: emptyList()
         val effects = if (mine) listOf(if (top.coach) "The players hear it (player happiness +4)." else "Your teammates hear it (teammate happiness +4).", "The doubters get a reply (followers +6%).", "No effect. Just the right thing to say.") else emptyList()
         val an = Media.pundit(lg)
         val mate = lg.rosterOf(t).filter { it.id != top.pid }.maxByOrNull { it.ovr }
@@ -304,7 +296,6 @@ object Celebrations {
         return (here + frozen).distinct().take(3).ifEmpty { List(3) { "${Rng.pick(Names.first)} ${Rng.pick(Names.last)}" } }
     }
 
-    private val HOF_CHOICES = listOf("Thank everyone who got me here.", "Talk about where it all started.", "Settle a few old scores.")
     private fun hofEffects(lg: League) = if (lg.road == null) listOf("Recruits are watching (recruiting +2).", "Your players love it (player happiness +4).", "Your bosses like the fire (job security +2).")
     else listOf("", "", "")
 
@@ -327,11 +318,7 @@ object Celebrations {
             (if (teams.isNotEmpty()) "${plural(pa.proSeasons, "season")} with ${teams.joinToString(", ")}. " else "") + pa.proLine.ifEmpty { pa.collegeLine } + "."
         if (pa.honors.isNotEmpty()) story += "The résumé: ${pa.honors.joinToString(", ")}. ${pa.verdict}."
         story += "$presenter walks him to the podium" + (if (mate != null) ", the way he walked him onto the floor so many nights." else ".") + " The jacket goes on. The room goes quiet."
-        val quotes = listOf(
-            "Nobody gets here alone. My coaches, my teammates, every trainer who taped an ankle at six in the morning, and my family, who sat through every one of them. This is yours.",
-            "There was a gym and a kid who wouldn't go home. If you're that kid tonight: stay a little longer. It's worth it.",
-            "A lot of people said I'd never be here. I wrote every one of their names down. I don't need the list anymore. But I kept it.",
-        )
+        val (hofChoices, quotes) = Speeches.pickSet(lg.season * 977L + pa.name.hashCode(), emptyMap(), Speeches.HOF_THANKS, Speeches.HOF_ROOTS, Speeches.HOF_SCORES)
         val an = Media.pundit(lg)
         val reactions = listOf(
             listOf(Tribute(an.name, "Analyst", "Grace. That's how you give a Hall of Fame speech.", an.avatar, an.verified), Tribute(Media.fanName(), "Fan", "Crying at a speech again. Thank you.")),
@@ -347,7 +334,7 @@ object Celebrations {
         lg.news += News(lg.season, lg.day, head, true, -1, "award", story.joinToString("\n\n"), "Hoops Wire", -1, -1, reactions(trib, 2_000, 70_000))
         Farewell.show(lg, Ceremony(
             "hof", "CLASS OF $year", "HALL OF FAMER", pa.name, -1, 0, labels, values, "Enshrinement night", story, trib, listOf(head),
-            HOF_CHOICES, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. The room is waiting.", effects = hofEffects(lg),
+            hofChoices, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. The room is waiting.", effects = hofEffects(lg),
             badge = "Basketball Hall of Fame",
         ))
     }
@@ -373,11 +360,16 @@ object Celebrations {
         }
         lg.playedAs?.takeIf { it.inducted }?.let { story += "He's already in as a player. Now he's in twice." }
         story += "His former players line the front rows."
-        val quotes = listOf(
-            "Coaches don't win games. Players do. Every one of you in those front rows: this is your night.",
-            "I was a kid with a whistle and a lot of ideas, and somebody gave me a chance. To every young coach out there: keep showing up.",
-            "Some people told me I'd never last in this business. They're not here tonight. I am.",
+        // A coach's induction: a coach's opening line, then one from the roots and the old scores.
+        val coachThanks = listOf(
+            Speeches.Line("Thank everyone who got me here.", "Coaches don't win games. Players do. Every one of you in those front rows: this is your night."),
+            Speeches.Line("To my players.", "I see a lot of faces out there I used to yell at. Thank you for listening. Most of the time."),
+            Speeches.Line("To my assistants.", "Every great assistant I ever had is a head coach now. That's the best thing I ever built."),
+            Speeches.Line("To my family.", "My family moved eleven times for this job. They never once complained. Okay, they complained. But they came."),
+            Speeches.Line("To the players who made me.", "I didn't make the players. The players made me. I just tried not to mess it up."),
+            Speeches.Line("To the young coaches.", "I was a kid with a whistle and a lot of ideas, and somebody gave me a chance. To every young coach out there: keep showing up."),
         )
+        val (hofChoices, quotes) = Speeches.pickSet(lg.season * 983L + c.name.hashCode(), emptyMap(), coachThanks, Speeches.HOF_ROOTS, Speeches.HOF_SCORES)
         val an = Media.pundit(lg)
         val reactions = listOf(
             listOf(Tribute(an.name, "Analyst", "That's why players wanted to play for him.", an.avatar, an.verified)),
@@ -392,7 +384,7 @@ object Celebrations {
         lg.news += News(lg.season, lg.day, head, true, -1, "award", story.joinToString("\n\n"), "Hoops Wire", lg.userTeamId, -1, reactions(trib, 1_000, 40_000))
         Farewell.show(lg, Ceremony(
             "hofcoach", "CLASS OF ${lg.season}", "HALL OF FAME COACH", c.name, lg.userTeamId, 0, labels, values, "Enshrinement night", story, trib, listOf(head),
-            HOF_CHOICES, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. Your players are in the front row.", effects = hofEffects(lg),
+            hofChoices, quotes, reactions, choiceTitle = "Your induction speech", choicePrompt = "The jacket is on. Your players are in the front row.", effects = hofEffects(lg),
             badge = "Basketball Hall of Fame",
         ))
     }

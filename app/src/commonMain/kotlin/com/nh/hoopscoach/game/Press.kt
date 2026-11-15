@@ -308,6 +308,6 @@ object Press {
         if (pick.priority < 30 && Rng.chance(0.5)) return null
         r.pressAsked[pick.topic] = lg.season * 1000 + lg.day
         val reporter = if (pick.national || Rng.chance(0.2)) national() else beat(lg, t)
-        return PressQuestion(lg.season, g.id, pick.topic, pick.prompt, pick.answers, reporter)
+        return PressQuestion(lg.season, g.id, pick.topic, pick.prompt, pick.answers.map { PressLines.vary(pick.topic, it) }, reporter)
     }
 }

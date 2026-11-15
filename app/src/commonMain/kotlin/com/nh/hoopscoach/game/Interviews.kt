@@ -123,9 +123,11 @@ object Interviews {
 
     /** The interview at [t]: two questions from its kind of program, one about the coach's record. */
     fun questionsFor(lg: League, t: Team): List<Question> {
-        val pool = POOLS[kind(lg, t)] ?: POOLS.getValue("steady")
+        val k = kind(lg, t)
+        val pool = (POOLS[k] ?: POOLS.getValue("steady")) + InterviewLines.MORE[k].orEmpty()
         val rnd = java.util.Random(t.id * 31L + lg.season)
-        return pool.shuffled(rnd).take(2) + recordQuestion(lg, lg.userCoach)
+        // One question about this kind of school, one any AD might ask, and the one about his record.
+        return listOf(pool[rnd.nextInt(pool.size)], InterviewLines.GENERAL[rnd.nextInt(InterviewLines.GENERAL.size)]) + recordQuestion(lg, lg.userCoach)
     }
 
     /** The prompt for the athletic director's closing remark (AI on). */

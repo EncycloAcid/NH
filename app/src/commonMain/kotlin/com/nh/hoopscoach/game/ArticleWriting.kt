@@ -75,11 +75,20 @@ object ArticleWriting {
         val deficit = half?.let { it[1 - wi] - it[wi] } ?: 0
         val score = "${g.scoreFor(win.id)}-${g.scoreFor(lose.id)}"
         val shape = when {
-            margin >= 20 -> pick("${win.name} rolled past ${lose.name}", "${win.name} overwhelmed ${lose.name}", "${win.name} pulled away from ${lose.name}")
-            deficit > 0 -> pick("${win.name} overturned a halftime deficit to beat ${lose.name}", "${win.name} came from behind at the break to defeat ${lose.name}", "${win.name} rallied after halftime to beat ${lose.name}")
-            lose.ap in 1..25 && (win.ap !in 1..25 || win.ap > lose.ap) -> "${win.name} knocked off ${lose.name}"
-            margin <= 5 -> pick("${win.name} edged ${lose.name}", "${win.name} narrowly beat ${lose.name}", "${win.name} squeezed past ${lose.name}")
-            else -> pick("${win.name} defeated ${lose.name}", "${win.name} got the better of ${lose.name}", "${win.name} beat ${lose.name}")
+            margin >= 20 -> pick("${win.name} rolled past ${lose.name}", "${win.name} overwhelmed ${lose.name}", "${win.name} pulled away from ${lose.name}",
+                "${win.name} ran ${lose.name} off the floor", "${win.name} cruised past ${lose.name}", "${win.name} buried ${lose.name}", "${win.name} made quick work of ${lose.name}",
+                "${win.name} blew out ${lose.name}", "${win.name} left no doubt against ${lose.name}")
+            deficit > 0 -> pick("${win.name} overturned a halftime deficit to beat ${lose.name}", "${win.name} came from behind at the break to defeat ${lose.name}", "${win.name} rallied after halftime to beat ${lose.name}",
+                "${win.name} climbed out of a first-half hole to beat ${lose.name}", "${win.name} found a second wind and caught ${lose.name}", "${win.name} flipped the game after the break against ${lose.name}",
+                "${win.name} shook off a slow start to top ${lose.name}")
+            lose.ap in 1..25 && (win.ap !in 1..25 || win.ap > lose.ap) -> pick("${win.name} knocked off ${lose.name}", "${win.name} took down No. ${lose.ap} ${lose.name}", "${win.name} upset ${lose.name}",
+                "${win.name} pulled off the upset against ${lose.name}", "${win.name} stunned ${lose.name}")
+            margin <= 5 -> pick("${win.name} edged ${lose.name}", "${win.name} narrowly beat ${lose.name}", "${win.name} squeezed past ${lose.name}",
+                "${win.name} held off ${lose.name}", "${win.name} survived ${lose.name}", "${win.name} outlasted ${lose.name}", "${win.name} hung on against ${lose.name}",
+                "${win.name} escaped with a win over ${lose.name}")
+            else -> pick("${win.name} defeated ${lose.name}", "${win.name} got the better of ${lose.name}", "${win.name} beat ${lose.name}",
+                "${win.name} handled ${lose.name}", "${win.name} took care of ${lose.name}", "${win.name} controlled most of the night against ${lose.name}",
+                "${win.name} put away ${lose.name}", "${win.name} pulled clear of ${lose.name}")
         }
         val paragraphs = mutableListOf("$shape $score${if (g.ot > 0) " in overtime" else ""} on day ${g.day} of the ${lg.season} season. ${top?.let { "${it.name} led the ${win.mascot} with ${it.s.pts} points${if (it.s.reb > 0) ", ${it.s.reb} rebounds" else ""}${if (it.s.ast > 0) " and ${it.s.ast} assists" else ""}." }.orEmpty()}")
         top?.let { p ->
@@ -221,25 +230,68 @@ object ArticleWriting {
         val name = short(lg, t)
         val roster = lg.rosterOf(t)
         val p = lg.playerOrNull(n.pid) ?: roster.maxByOrNull { it.ovr }
-        val paragraphs = mutableListOf("${n.text.trimEnd('.', '!', '?')}. ${if (n.text.contains(t.name)) name else t.name} has a ${t.record} record in ${lg.season}. Coach ${lg.coachOf(t).name} leads the ${t.mascot} in ${lg.conf(t.confId).name}.${if (t.ap in 1..25) " $name is ranked No. ${t.ap}." else ""}")
+        val rnd = kotlin.random.Random(n.text.hashCode().toLong() * 31 + n.day + lg.season)
+        fun pick(vararg o: String) = o[rnd.nextInt(o.size)]
+        val played = t.w + t.l > 0
+        val coach = lg.coachOf(t)
+        val conf = lg.conf(t.confId).name
+        val ranked = if (t.ap in 1..25) " No. ${t.ap}" else ""
+        // Where the team stands: its record once games are played, its outlook before.
+        val standing = if (played) pick(
+            "$name is ${t.record}${if (t.cw + t.cl > 0) ", ${t.cw}-${t.cl} in $conf" else ""}.",
+            "The$ranked ${t.mascot} sit at ${t.record} on the season.",
+            "At ${t.record}, $name ${if (t.w > t.l) "has more to protect than to prove" else "has ground to make up"}.",
+            "$name comes in at ${t.record}${if (t.ap in 1..25) " and ranked No. ${t.ap}" else ""}.",
+        ) else pick(
+            "The season hasn't tipped yet for $name.",
+            "$name opens its ${lg.season} season soon.",
+            "It's still preseason for$ranked $name, and expectations are already set.",
+            "Nobody has played a game yet, but $name is already a talking point.",
+        )
+        val coachLine = pick(
+            "${coach.name} runs the program in $conf.",
+            "Coach ${coach.last} has the ${t.mascot} in $conf.",
+            "${coach.name}'s ${t.mascot} play in $conf.",
+            "It's ${coach.last}'s team, and ${coach.last}'s problem to solve.",
+        )
+        val paragraphs = mutableListOf("$standing $coachLine${if (t.ap in 1..25 && !played) " $name starts the year ranked No. ${t.ap}." else ""}")
         p?.let { player ->
             val prior = player.career.lastOrNull { it.season == lg.season - 1 && it.s.gp > 0 }
-            val s = prior?.s ?: player.stats
-            val production = if (s.gp > 0) "${if (prior != null) "Last season" else "This season"}, ${player.last} averaged ${f1(s.ppg)} points${if (s.rpg > 0) ", ${f1(s.rpg)} rebounds" else ""}${if (s.apg > 0) " and ${f1(s.apg)} assists" else ""} in ${s.gp} games." else "${player.last} has yet to appear this season."
-            paragraphs += "${player.name}, ${if (lg.pro) "age ${player.age}" else player.cls}, plays ${player.posLabel} for $name. $production${if (player.out) " ${player.last} is out with ${player.injury.ifBlank { "an injury" }}." else ""}"
+            val s = if (player.stats.gp > 0) player.stats else prior?.s
+            val who = if (lg.pro) "${player.name}, ${player.age}," else "${player.name}, a ${player.cls.lowercase().let { c -> when (c) { "fr" -> "freshman"; "so" -> "sophomore"; "jr" -> "junior"; "sr" -> "senior"; else -> c } }} ${player.posLabel},"
+            val numbers = s?.let { st -> "${f1(st.ppg)} points${if (st.rpg >= 3) ", ${f1(st.rpg)} rebounds" else ""}${if (st.apg >= 2) " and ${f1(st.apg)} assists" else ""}" }
+            val production = when {
+                player.stats.gp > 0 && numbers != null -> pick("$who is averaging $numbers.", "$who has put up $numbers a night.", "$who is giving $name $numbers per game.")
+                prior != null && numbers != null -> pick("$who averaged $numbers last season.", "$who is coming off a year of $numbers.", "$who returns after averaging $numbers.")
+                !played -> pick("$who is still waiting on his first college minutes.", "$who heads into his first season with a lot to prove.", "$who is one of the names to watch once the season starts.")
+                else -> pick("$who hasn't seen the floor yet this season.", "$who is still waiting for his chance.")
+            }
+            paragraphs += production + (if (player.out) " ${player.last} is out with ${player.injury.ifBlank { "an injury" }}." else "")
         }
         val preview = if (includeForecast) AiTemplates.previewCopy(lg, t, p).split(Regex("(?<=[.!?])\\s+(?=[A-Z])")) else emptyList()
         val outlook = preview.filter { it.contains("projected") || it.contains("win range") || it.contains("joins") || it.contains("has moved on") || it.contains(" is out with ") }
-        val colleagues = roster.filter { it.id != p?.id }.sortedByDescending { it.ovr }.take(2).joinToString(" ") { player ->
-            val s = player.career.lastOrNull { it.season == lg.season - 1 && it.s.gp > 0 }?.s
-            "${player.name} plays ${player.posLabel}${if (!lg.pro) " as a ${player.cls}" else ""}${if (s != null) ", coming off ${f1(s.ppg)} points per game last season" else ""}."
-        }
+        val colleagues = roster.filter { it.id != p?.id }.sortedByDescending { it.ovr }.take(2).mapIndexed { i, player ->
+            val st = player.career.lastOrNull { it.season == lg.season - 1 && it.s.gp > 0 }?.s
+            val cls = if (!lg.pro) " (${player.cls})" else ""
+            if (st != null) pick("${player.name}$cls is back after ${f1(st.ppg)} points a game.", "${player.name}$cls returns at ${player.posLabel}, coming off ${f1(st.ppg)} a night.",
+                "${player.name}$cls gives $name another option at ${player.posLabel}.")
+            else pick("${player.name}$cls adds depth at ${player.posLabel}.", "${if (i == 0) "Also in the mix" else "So is"}: ${player.name}$cls at ${player.posLabel}.", "${player.name}$cls is in the ${player.posLabel} rotation.")
+        }.joinToString(" ")
         paragraphs += outlook.joinToString(" ").ifBlank { colleagues }
         val next = games.filter { !it.played && it.day >= lg.day && it.involves(t.id) }.minByOrNull { it.day }
         val recent = games.filter { it.played && it.day <= lg.day && it.involves(t.id) }.sortedByDescending { it.day }.take(2).joinToString(" ") {
-            "$name ${if (it.winner() == t.id) "beat" else "lost to"} ${short(lg, lg.team(it.opp(t.id)))} ${it.scoreFor(t.id)}-${it.scoreAgainst(t.id)} on day ${it.day}."
+            val won = it.winner() == t.id
+            val o = short(lg, lg.team(it.opp(t.id)))
+            val sc = "${it.scoreFor(t.id)}-${it.scoreAgainst(t.id)}"
+            if (won) pick("$name beat $o $sc on day ${it.day}.", "A $sc win over $o came on day ${it.day}.", "Day ${it.day}: $name ${sc} over $o.")
+            else pick("$name lost to $o $sc on day ${it.day}.", "$o handed $name a $sc loss on day ${it.day}.", "Day ${it.day}: a $sc loss to $o.")
         }
-        paragraphs += listOf(recent, next?.let { "$name ${if (it.neutral) "meets" else if (it.home == t.id) "hosts" else "visits"} ${short(lg, lg.team(it.opp(t.id)))} on day ${it.day}${if (it.neutral) " at a neutral site" else ""}." } ?: "$name has no further game on the published schedule.").filter { it.isNotBlank() }.joinToString(" ")
+        val nextLine = next?.let {
+            val o = short(lg, lg.team(it.opp(t.id)))
+            val where = if (it.neutral) "meets $o at a neutral site" else if (it.home == t.id) "hosts $o" else "visits $o"
+            pick("Next, $name $where on day ${it.day}.", "Up next: $name $where on day ${it.day}.", "Day ${it.day} brings the next test, when $name $where.")
+        } ?: "$name has no further game on the published schedule."
+        paragraphs += listOf(recent, nextLine).filter { it.isNotBlank() }.joinToString(" ")
         return noRepeat(paragraphs)
     }
 
