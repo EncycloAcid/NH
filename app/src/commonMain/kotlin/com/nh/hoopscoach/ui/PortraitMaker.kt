@@ -63,7 +63,7 @@ private enum class CustomTab(val title: String) {
 }
 
 private val CourtBg = Color(0xFF1A1714)
-private val SkinSwatches = listOf(
+internal val SkinSwatches = listOf(
     0xFFEEBCB0L, 0xFFE1A28EL, 0xFFCA8E5CL, 0xFFC27A44L,
     0xFFA85830L, 0xFF8E4826L, 0xFF703A24L, 0xFF4B3930L,
 )
@@ -84,7 +84,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
     val dirty = face.encode() != saved.encode()
 
     Column(Modifier.fillMaxSize().background(P.bg)) {
-        BackBar("Player customizer", p.name, onBack = { vm.back() }) {
+        BackBar("Edit look", p.name, onBack = { vm.back() }) {
             IconButton(onClick = {
                 seed++
                 face = Face.random(System.nanoTime() + seed)
@@ -186,37 +186,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
                     CustomTab.SKIN -> {
                         PanelLabel("Skin tone · ${Face.OPTIONS[0][face.skin]}")
                         Spacer(Modifier.height(10.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            itemsIndexed(Face.OPTIONS[0]) { i, name ->
-                                val on = face.skin == i
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(
-                                        Modifier
-                                            .size(54.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(SkinSwatches[i.coerceIn(0, SkinSwatches.lastIndex)]))
-                                            .border(
-                                                if (on) 3.dp else 1.dp,
-                                                if (on) P.accent else P.line,
-                                                CircleShape,
-                                            )
-                                            .clickable { face = face.with(0, i) },
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (on) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                    }
-                                    Text(
-                                        name.split(" ").last(),
-                                        style = T.small,
-                                        color = if (on) P.accent else P.sub,
-                                        modifier = Modifier.padding(top = 4.dp).width(56.dp),
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
+                        SkinRow(face.skin, { face = face.with(0, it) })
                     }
 
                     CustomTab.HAIR -> {

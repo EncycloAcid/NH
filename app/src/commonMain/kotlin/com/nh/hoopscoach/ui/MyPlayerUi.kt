@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.nh.hoopscoach.game.Gear
 import com.nh.hoopscoach.game.League
 import com.nh.hoopscoach.game.Legacy
@@ -71,8 +73,12 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
         else -> null
     }
     val short = "${h.first.take(1)}. ${h.last}"
+    val dirty = nick.trim() != h.nickname || number != h.number || gear.encode() != Gear.decode(h.gear).encode() ||
+        (town.trim().isNotEmpty() && town.trim() != h.hometown) || (school.trim().isNotEmpty() && school.trim() != h.highSchool) ||
+        dunk != r.sigDunk || move != r.sigMove || shot != r.sigShot || cele != r.celebration
 
-    LazyColumn(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.weight(1f)) {
         item {
             BackBar("MyPlayer", h.name, onBack = { vm.back() })
             // The preview: his portrait with the gear he's picking.
@@ -85,11 +91,11 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
                     Text(h.first.uppercase(), style = T.label, color = P.sub)
                     Text(h.last.uppercase(), style = T.title, color = P.ink, maxLines = 1)
                     if (nick.isNotBlank()) Text("\"${nick.trim()}\"", style = T.bodyB, color = P.accent, maxLines = 1)
-                    Text("No. $number · ${h.posLabel}" + (t?.let { " · ${if (lg.pro) it.name else it.school}" } ?: ""), style = T.small, color = P.sub)
+                    Text("No. $number · ${h.posLabel} · ${com.nh.hoopscoach.game.Ratings.heightLabel(h.height)}" + (t?.let { " · ${if (lg.pro) it.name else it.school}" } ?: ""), style = T.small, color = P.sub)
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SmallButton("Face", primary = true) { vm.push(Route.Portrait(h.id)) }
-                        if (t != null && h.teamId == lg.userTeamId) SmallButton("Body") { vm.push(Route.EditPlayer(h.id)) }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SmallButton("Edit look", primary = true) { vm.push(Route.Portrait(h.id)) }
+                        if (t != null && h.teamId == lg.userTeamId) SmallButton("Body & build") { vm.push(Route.EditPlayer(h.id)) }
                     }
                 }
             }
@@ -140,7 +146,7 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
                     Section(label)
                     // The signature shoe is there once he has a deal.
                     val opts = if (i == 4 && r.shoe == null) Gear.OPTIONS[i].dropLast(1) else Gear.OPTIONS[i]
-                    Chips(opts, gear.parts()[i].coerceAtMost(opts.size - 1), { v -> gear = gear.with(i, v) })
+                    WrapChips(opts, gear.parts()[i].coerceAtMost(opts.size - 1), { v -> gear = gear.with(i, v) })
                 }
                 Spacer(Modifier.height(10.dp))
                 Panel { Text(gear.describe() + ".", style = T.small, color = P.ink) }
@@ -149,25 +155,25 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
                 Text("How you play, in the play-by-play and on social media.", style = T.small, color = P.sub,
                     modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 8.dp))
                 Section("Signature dunk")
-                Chips(Signature.DUNKS, dunk, { dunk = it })
+                WrapChips(Signature.DUNKS, dunk, { dunk = it })
                 Preview("$short ${Signature.dunkVerb[dunk]}!")
                 Section("Go-to move")
-                Chips(Signature.MOVES, move, { move = it })
+                WrapChips(Signature.MOVES, move, { move = it })
                 Preview("$short hits a ${Signature.moveText[move]} jumper")
                 Section("Jumper")
-                Chips(Signature.SHOTS, shot, { shot = it })
+                WrapChips(Signature.SHOTS, shot, { shot = it })
                 Preview("$short knocks down the ${Signature.shotWord[shot]} jumper")
                 Section("Celebration")
-                Chips(Signature.CELEBRATIONS, cele, { cele = it })
+                WrapChips(Signature.CELEBRATIONS, cele, { cele = it })
                 Preview("$short ${Signature.celebrateText[cele]}")
             }
         }
 
-        item {
-            Spacer(Modifier.height(20.dp))
-            Row(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SecondaryButton("Cancel", Modifier.weight(1f)) { vm.back() }
-                PrimaryButton("Save", Modifier.weight(1f), enabled = numberProblem == null) {
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+            Row(Modifier.fillMaxWidth().background(P.bg).navigationBarsPadding().padding(horizontal = Gutter, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryButton(if (dirty) "Discard" else "Close", Modifier.weight(1f)) { vm.back() }
+                PrimaryButton(if (dirty) "Save changes" else "Save", Modifier.weight(1f), enabled = dirty && numberProblem == null) {
                     val n = nick.trim(); val num = number; val g = gear; val tn = town.trim(); val hs = school.trim()
                     val d = dunk; val mv = move; val sh = shot; val ce = cele
                     vm.act {
@@ -179,17 +185,20 @@ fun MyPlayerScreen(vm: GameViewModel, lg: League) {
                         if (hs.isNotEmpty()) pl.highSchool = hs
                         it.road?.let { rd -> rd.sigDunk = d; rd.sigMove = mv; rd.sigShot = sh; rd.celebration = ce }
                     }
-                    vm.toast("Saved")
+                    vm.toast("MyPlayer saved.")
                     vm.back()
                 }
             }
-            Spacer(Modifier.height(30.dp))
-        }
     }
 }
 
 /** A line of the play-by-play, as it'll read. */
 @Composable
 private fun Preview(text: String) {
-    Text("▶ $text", style = T.small, color = P.accent, modifier = Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 6.dp))
+    Row(Modifier.padding(start = Gutter, end = Gutter, top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(P.accentSoft).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text("ON AIR", style = T.label.copy(fontSize = 9.sp), color = P.accent)
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = T.small, color = P.ink)
+    }
 }

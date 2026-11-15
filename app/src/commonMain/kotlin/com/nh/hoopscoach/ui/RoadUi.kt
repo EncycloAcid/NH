@@ -92,6 +92,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     var style by remember { mutableStateOf(saved?.style ?: Arch.SHOT_CREATOR) }
     var stars by remember { mutableIntStateOf(saved?.stars ?: 4) }
     var number by remember { mutableIntStateOf(saved?.number ?: 3) }
+    var look by remember { mutableStateOf(saved?.face?.let { com.nh.hoopscoach.game.Face.decode(it) } ?: com.nh.hoopscoach.game.Face.random(System.nanoTime()).with(8, 0)) }
     val range = heightRange(pos)
     if (pos2 != null && pos2 !in Ratings.secondOptions(pos)) pos2 = null
     val styles = (Ratings.styles(pos) + (pos2?.let { Ratings.styles(it) } ?: emptyList())).distinct().sortedBy { it.group.ordinal }
@@ -126,6 +127,9 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                     OutlinedTextField(last, { last = it.take(18) }, placeholder = { Text("Last name", color = P.faint) }, singleLine = true, modifier = Modifier.weight(1f),
                         colors = fieldColors(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
                 }
+                Spacer(Modifier.height(10.dp))
+                LookPicker(look, { look = it }, { look = com.nh.hoopscoach.game.Face.random(System.nanoTime()).with(8, 0) }, first, last,
+                    "No. $number · $pos${pos2?.let { "/$it" } ?: ""} · ${Ratings.heightLabel(height)} · ${stars}★", number)
                 Section("Position")
                 Segmented(Pos.entries.map { it.name }, pos.ordinal, { pos = Pos.entries[it] })
                 // A second position: none, or a spot next to his.
@@ -166,9 +170,13 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
                 Section("Jersey number")
                 Panel {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        SmallButton("−10") { number = (number - 10).coerceIn(0, 99) }
+                        Spacer(Modifier.width(6.dp))
                         SmallButton("−") { number = (number - 1).coerceIn(0, 99) }
                         Text("$number", style = T.num, color = P.ink, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                         SmallButton("+") { number = (number + 1).coerceIn(0, 99) }
+                        Spacer(Modifier.width(6.dp))
+                        SmallButton("+10") { number = (number + 10).coerceIn(0, 99) }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -176,7 +184,7 @@ fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
         }
         Column(Modifier.fillMaxWidth().background(P.bg).navigationBarsPadding().padding(horizontal = Gutter, vertical = 10.dp)) {
             PrimaryButton("See scholarship offers", Modifier.fillMaxWidth()) {
-                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number, pos2, era))
+                vm.roadFindOffers(Road.Spec(first, last, pos, height, weight, town, state, style, stars, number, pos2, era, look.encode()))
             }
         }
     }

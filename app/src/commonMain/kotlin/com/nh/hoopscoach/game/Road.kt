@@ -21,6 +21,8 @@ object Road {
         val pos2: Pos? = null,
         /** Era mode from the start: his college years are that era's, then he turns pro into its league. */
         val era: Era = Era.TODAY,
+        /** The look picked on the create screen (an encoded [Face]); blank keeps the generated one. */
+        val face: String = "",
     )
 
     /** A typical starting overall for each level (the middle of its range). */
@@ -58,6 +60,7 @@ object Road {
         p.country = null
         p.hometown = "${s.town.trim().ifEmpty { "Hometown" }}, ${s.state}"
         p.number = s.number.coerceIn(0, 99)
+        if (s.face.isNotBlank() && Face.decode(s.face) != null) p.face = s.face
         p.traits = mutableListOf()
         p.year = 1
         // The user's player is the story: a real ceiling at every level, so the league is always in reach.
