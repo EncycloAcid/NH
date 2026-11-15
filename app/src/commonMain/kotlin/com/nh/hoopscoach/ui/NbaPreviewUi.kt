@@ -92,7 +92,10 @@ private fun proLast(lg: League, p: Player): String {
 }
 
 @Composable
-fun NbaPreviewScreen(vm: GameViewModel, lg: League) {
+fun NbaPreviewScreen(vm: GameViewModel, lg: League) = NbaMagazine(vm, lg)
+
+@Composable
+private fun LongNbaPreviewScreen(vm: GameViewModel, lg: League) {
     // Printed like the college issue: paper, ink, the team's color as the spot color.
     val paper = remember(lg.user.primary, lg.user.secondary) { paperPalette(Color(lg.user.primary), Color(lg.user.secondary)) }
     androidx.compose.runtime.CompositionLocalProvider(LocalPalette provides paper, LocalPrint provides true) { NbaPreviewIssue(vm, lg) }

@@ -143,7 +143,11 @@ private fun lastStats(p: Player): String {
 private fun lastAp(lg: League, t: Team): Int = t.history.lastOrNull()?.takeIf { it.season == lg.season - 1 }?.ap ?: -1
 
 @Composable
-fun PreviewScreen(vm: GameViewModel, lg: League) {
+fun PreviewScreen(vm: GameViewModel, lg: League) = CollegeMagazine(vm, lg)
+
+/** The long-form issue this replaced (kept for its parts: the Today card and the features still use them). */
+@Composable
+private fun LongPreviewScreen(vm: GameViewModel, lg: League) {
     val pv = remember(lg, lg.season) { Previews.current(lg) }
     val list = pages(lg, pv)
     val ids = pageIds(lg, pv)
