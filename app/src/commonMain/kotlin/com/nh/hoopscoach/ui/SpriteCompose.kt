@@ -101,17 +101,37 @@ object SpriteCompose {
         val template = SpriteSheets.bitmap(SpriteSheets.TEAM_JERSEY) ?: return null
         if (template.width != N || template.height != N) return null
         val word = label.orEmpty().uppercase().filter { it in LETTERS }.take(5)
-        return SpriteSheets.derived("team:${primary and 0xFFFFFF}:${secondary and 0xFFFFFF}:$word") {
+        return SpriteSheets.derived("team2:${primary and 0xFFFFFF}:${secondary and 0xFFFFFF}:$word") {
             val (cloth, trim) = teamColors(primary, secondary)
             // Black cloth is lifted to charcoal so its folds still show.
             val clothRgb = intArrayOf(maxOf((cloth ushr 16) and 255, 30), maxOf((cloth ushr 8) and 255, 30), maxOf(cloth and 255, 30))
             val trimRgb = intArrayOf((trim ushr 16) and 255, (trim ushr 8) and 255, trim and 255)
             val px = template.pixels.copyOf()
+            fun isTrim(t: Int) = ((t ushr 8) and 255) > 127
+            // The strip of cloth between the piping and the outline at the straps and armholes. On dark cloth it
+            // reads as an edge, but on light cloth it looks like fabric spilling onto the shoulders, with the
+            // piping set in from it; it takes the trim color, so the piping runs to the edge like real jerseys.
+            val band = BooleanArray(N * N)
+            for (y in 0 until N) {
+                val row = y * N
+                var left = -1; var right = -1
+                for (x in 0 until N) if (px[row + x] ushr 24 != 0) { if (left < 0) left = x; right = x }
+                if (left < 0) continue
+                for ((edge, step) in listOf(left to 1, right to -1)) {
+                    for (k in 0 until 24) {
+                        val x = edge + step * k
+                        if (x !in 0 until N || px[row + x] ushr 24 == 0) break
+                        if (isTrim(px[row + x])) { for (j in 0 until k) band[row + edge + step * j] = true; break }
+                    }
+                }
+            }
             for (i in px.indices) {
                 val t = px[i]
                 if (t ushr 24 == 0) { px[i] = 0; continue }
                 val shade = (t ushr 16) and 255
-                val base = if (((t ushr 8) and 255) > 127) trimRgb else clothRgb
+                // The outline stays a clean near-black, not a muddy dark version of the cloth.
+                if (shade < 60 && !isTrim(t)) { px[i] = 0xFF121216.toInt(); continue }
+                val base = if (isTrim(t) || band[i]) trimRgb else clothRgb
                 px[i] = 0xFF000000.toInt() or (shaded(base[0], shade) shl 16) or (shaded(base[1], shade) shl 8) or shaded(base[2], shade)
             }
             if (word.isNotEmpty()) {
