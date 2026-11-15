@@ -18,6 +18,17 @@ class PlayEvent(
     val points: Int,
     /** Player mode: the user's player is in this play. */
     val hero: Boolean = false,
+    /**
+     * For the live court: what happened ("dunk", "layup", "jumper", "three", "miss", "block", "steal",
+     * "ft", "oreb", "tov", "foul"; blank for the rest), who did it ([pid]) and to whom ([pid2]), which side
+     * had the ball ([off]), and for shots where from ([sx] feet from the middle, [sy] feet from the baseline).
+     */
+    val kind: String = "",
+    val pid: Int = -1,
+    val pid2: Int = -1,
+    val off: Int = -1,
+    val sx: Float = 0f,
+    val sy: Float = 0f,
 )
 
 /**
@@ -569,15 +580,24 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val shotLog = mutableListOf<Long>()
 
     /** Where a shot came from: his zones, and the game's chart. */
+    /** The last shot's spot, for the live court. */
+    private var lastSx = 0f
+    private var lastSy = 0f
+
+    /** Who's on the floor for each side, as of the last possession (for the live court). */
+    val floor: Array<List<Int>> = arrayOf(emptyList(), emptyList())
+
     private fun chart(side: Int, p: Player, type: Int, what: String, made: Boolean) {
         val (x, y) = ShotChart.spot(type, what)
+        lastSx = x.toFloat(); lastSy = y.toFloat()
         ShotChart.tally(lg, p, ShotChart.zone(type, x, y), made)
         shotLog += ShotChart.pack(p.id, side, x, y, made, type)
     }
 
-    private fun log(side: Int, text: String, pts: Int) {
+    private fun log(side: Int, text: String, pts: Int, kind: String = "", pid: Int = -1, pid2: Int = -1, off: Int = -1, shot: Boolean = false) {
         if (!pbp) return
-        events += PlayEvent(period, clock.roundToInt().coerceAtLeast(0), side, text, score[0], score[1], pts, heroShort != null && text.contains(heroShort))
+        events += PlayEvent(period, clock.roundToInt().coerceAtLeast(0), side, text, score[0], score[1], pts, heroShort != null && text.contains(heroShort),
+            kind, pid, pid2, off, if (shot) lastSx else 0f, if (shot) lastSy else 0f)
     }
 
     /**
@@ -878,6 +898,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val d = 1 - o
         val offense = lineup(o)
         val defense = lineup(d)
+        if (pbp) { floor[o] = offense.map { it.id }; floor[d] = defense.map { it.id } }
         onFloor[o] = offense
         onFloor[d] = defense
         val trail = score[o] - score[d]
@@ -967,17 +988,17 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 kind < 0.55 -> {
                     val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
                     line(d, stealer).stl++
-                    log(d, "${stealer.short} steals it from ${loser.short}", 0)
+                    log(d, "${stealer.short} steals it from ${loser.short}", 0, "steal", stealer.id, loser.id, o)
                 }
                 // An offensive foul is a personal foul. College counts it as a team foul; the NBA doesn't.
                 kind < 0.67 && !fouledOut(o, loser.id) -> {
                     line(o, loser).pf++
                     if (!lg.pro) teamFouls[o]++
-                    log(o, "Offensive foul on ${loser.short}", 0)
+                    log(o, "Offensive foul on ${loser.short}", 0, "tov", loser.id, -1, o)
                 }
                 kind < 0.69 -> log(o, "Shot clock violation", 0)
-                kind < 0.75 -> log(o, "${loser.short} is called for traveling", 0)
-                else -> log(o, "Turnover by ${loser.short}", 0)
+                kind < 0.75 -> log(o, "${loser.short} is called for traveling", 0, "tov", loser.id, -1, o)
+                else -> log(o, "Turnover by ${loser.short}", 0, "tov", loser.id, -1, o)
             }
             poss = d
             return
@@ -1113,14 +1134,15 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     }
                 }
                 val verb = Signature.made(lg, shooter, type, what) ?: when { countsThree -> "drains a three"; type == 1 || type == 2 -> "hits a $what"; what == "dunk" -> "throws down a dunk"; else -> "scores on a $what" }
-                log(o, "${Signature.nick(lg, shooter)}${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts)
+                val shotKind = when { countsThree -> "three"; what == "dunk" -> "dunk"; type == 0 -> "layup"; else -> "jumper" }
+                log(o, "${Signature.nick(lg, shooter)}${shooter.short} $verb$astText${if (clock <= 1.0) " at the buzzer!" else ""}", pts, shotKind, shooter.id, -1, o, shot = true)
                 // Your player's celebration after a big one.
                 val bigOne = clock <= 1.0 || (clutchTime && before <= 0 && before + pts > 0) || (what == "dunk" && Rng.chance(0.25)) || (countsThree && clutchTime && Rng.chance(0.4))
                 Signature.celebrate(lg, shooter, bigOne)?.let { log(o, "${shooter.short} $it", 0) }
                 if (fouled) {
                     val fouler = pickFouler(d, defense)
                     line(d, fouler).pf++; teamFoul(d)
-                    log(d, "And-one! Foul on ${fouler.short}", 0)
+                    log(d, "And-one! Foul on ${fouler.short}", 0, "andone", fouler.id, shooter.id, o)
                     freeThrows(o, shooter, 1, offense, defense)
                     return
                 }
@@ -1132,7 +1154,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 sl.fga--; if (countsThree) sl.tpa--
                 val fouler = pickFouler(d, defense)
                 line(d, fouler).pf++; teamFoul(d)
-                log(d, "${fouler.short} fouls ${shooter.short} on the $what", 0)
+                log(d, "${fouler.short} fouls ${shooter.short} on the $what", 0, "foul", fouler.id, shooter.id, o)
                 freeThrows(o, shooter, pts, offense, defense)
                 return
             }
@@ -1149,8 +1171,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                 blocked = true
                 if (type == 0) highlight(d, b, "block", Rng.flavorPick(listOf("${b.name} swats ${shooter.name} at the rim", "${b.name} pins ${shooter.name}'s layup off the glass", "${b.name} sends ${shooter.name}'s shot into the stands", "${b.name} meets ${shooter.name} at the rim and rejects it")) +
                     if (clutchTime) " to save the lead" else "", (if (clutchTime) 6.0 else 3.0) + Rng.flavorD() * 2.5)
-                log(d, "${b.short} blocks ${shooter.short}!", 0)
-            } else log(o, "${shooter.short} misses the $what", 0)
+                log(d, "${b.short} blocks ${shooter.short}!", 0, "block", b.id, shooter.id, o, shot = true)
+            } else log(o, "${shooter.short} misses the $what", 0, "miss", shooter.id, -1, o, shot = true)
             val reb = rebound(o, offense, defense, blocked)
             if (reb.first == o) {
                 if (clock <= 1.0) { poss = d; return }
@@ -1229,7 +1251,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (teamRebound) { log(o, "Out of bounds, ${teams[o].abbr} ball", 0); return o to null }
             val r = rebounder(offense)
             line(o, r).orb++
-            log(o, "${r.short} grabs the offensive board", 0)
+            log(o, "${r.short} grabs the offensive board", 0, "oreb", r.id, -1, o)
             o to r
         } else {
             if (teamRebound) return d to null
@@ -1254,7 +1276,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (lastMade) { if (clutchTime) sl.clutch++; sl.ftm++; sl.pts++; scored(o, 1); made++ }
             if (oneAndOne && !lastMade) break
         }
-        log(o, if (oneAndOne && taken == 1) "${shooter.short} misses the front end of the one-and-one" else "${shooter.short} makes $made of $taken free throw${if (taken > 1) "s" else ""}", made)
+        log(o, if (oneAndOne && taken == 1) "${shooter.short} misses the front end of the one-and-one" else "${shooter.short} makes $made of $taken free throw${if (taken > 1) "s" else ""}", made, "ft", shooter.id, -1, o)
         if (!lastMade) {
             val oReb = Rng.chance(0.14)
             if (oReb) {

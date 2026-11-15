@@ -187,7 +187,7 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
         Column(if (focus) Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()) else Modifier) {
         if (!focus) {
             // The broadcast look: the score bug over the home floor, then the win-probability bar.
-            BroadcastHero(lg, e, home, away)
+            BroadcastHero(lg, e, home, away, lv.tick, lv.speed, lg.road?.spotlight == true && lg.playerMode)
             Spacer(Modifier.height(8.dp))
             ProbBar(probs.last().second, home, away, lg.userTeamId)
         } else {
@@ -308,16 +308,17 @@ fun LiveScreen(vm: GameViewModel, lg: League) {
  * abbreviation and score, the clock and period between, and the crowd along the bottom.
  */
 @Composable
-private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home: Team, away: Team) {
+private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home: Team, away: Team, tick: Int, speed: Int, spotlight: Boolean) {
     val final = e.finished
     val shape = RoundedCornerShape(20.dp)
-    Box(Modifier.padding(horizontal = Gutter).fillMaxWidth().height(150.dp).clip(shape).background(Color(0xFF101318))) {
-        if (!e.game.neutral) CourtBanner(home, Modifier.fillMaxSize())
-        else Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color(away.primary), Color(home.primary)))))
-        // Darken the floor so the numbers read, a little more at the edges.
-        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Black.copy(alpha = 0.72f)))))
-        Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+    Box(Modifier.padding(horizontal = Gutter).fillMaxWidth().height(232.dp).clip(shape).background(Color(0xFF101318))) {
+        // The game itself: the home floor with all ten players on it.
+        LiveCourtView(lg, e, home, away, tick, speed, spotlight, Modifier.fillMaxSize())
+        // A dark band behind the score bug and another behind the crowd line, so both read over the floor.
+        Box(Modifier.fillMaxWidth().height(78.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.78f), Color.Black.copy(alpha = 0.45f), Color.Transparent))))
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(34.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+        Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp)) {
+            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 BugSide(away, e.score[1], e.score[1] > e.score[0], final, lg.userTeamId, Modifier.weight(1f), flip = false)
                 Column(Modifier.width(78.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     if (final) Text("FINAL", style = T.h2.copy(fontSize = 22.sp), color = Color.White)
@@ -328,6 +329,7 @@ private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home
                 }
                 BugSide(home, e.score[0], e.score[0] > e.score[1], final, lg.userTeamId, Modifier.weight(1f), flip = true)
             }
+            Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (e.bigNight.isNotEmpty() && !final) { Tag(e.bigNight.uppercase(), P.bad, filled = true); Spacer(Modifier.width(8.dp)) }
                 lg.rivalry(e.game)?.let { Text(it.name.uppercase(), style = T.label.copy(fontSize = 10.sp), color = Color(0xFFFFC94D), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)); Spacer(Modifier.width(8.dp)) }
