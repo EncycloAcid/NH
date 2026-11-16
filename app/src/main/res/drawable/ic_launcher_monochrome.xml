@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed (one-color) icon: the ball in outline with its seams, so the seams still show in one color. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,29a25,25 0 1,1 0,50a25,25 0 1,1 0,-50z M29,54h50 M54,29v50 M36.3,36.3c7.2,5.5 10.9,11.7 10.9,17.7s-3.7,12.2 -10.9,17.7 M71.7,36.3c-7.2,5.5 -10.9,11.7 -10.9,17.7s3.7,12.2 10.9,17.7" />
+</vector>
