@@ -32,6 +32,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.nh.hoopscoach.game.Ratings
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -225,7 +232,7 @@ private fun rarityOf(v: Int) = when {
  * your player, a long list of honors for anyone else.
  */
 @Composable
-fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp = 240.dp) {
+private fun CardFront(lg: League, p: Player, width: Dp, tilt: Float) {
     val t = lg.teams.getOrNull(p.teamId) ?: lg.teams.getOrNull(p.lastTeam)
     val v = shown(p.ovr)
     val rar = rarityOf(v)
@@ -243,11 +250,7 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
     val ink = onColor(primary)
     // The nameplate's spot color: the school's second color if it reads on the first, else the rarity's.
     val spot = if (contrast(secondary, primary) >= 2.0f) secondary else rar.edge[0]
-    Box(
-        modifier.width(width).aspectRatio(0.71f).clip(RoundedCornerShape(16.dp * k))
-            .background(Brush.linearGradient(rar.edge))
-            .padding(5.dp * k),
-    ) {
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp * k)).rarityEdge(rar).padding(5.dp * k)) {
         Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp * k))) {
             // The art: his arena, a glow in his team's color behind him, and the player from the waist up,
             // standing on the nameplate so his number shows.
@@ -259,6 +262,8 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
                     // Shade the top-left corner so the rating reads over a bright crowd.
                     drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent), Offset(0f, 0f), size.width * 0.5f))
                 }
+                // His school's mark, faint, behind him.
+                t?.let { Box(Modifier.align(Alignment.Center).padding(bottom = width * 0.12f).graphicsLayer { alpha = 0.13f }) { TeamBadge(it, width * 0.62f) } }
                 Box(Modifier.fillMaxWidth(1.02f).aspectRatio(1f).align(Alignment.BottomCenter).offset(y = 2.dp)) {
                     BasketballCharacterCanvas(
                         face = Face.of(p), jerseyKey = SpriteSheets.jerseyKey(t?.abbr, t?.slot, t?.name),
@@ -269,7 +274,7 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
                 }
                 // Foil: a slow rainbow band across the art (never over the nameplate's words), and a few glints.
                 if (foil) Canvas(Modifier.fillMaxSize()) {
-                    val x = shine * size.width
+                    val x = (shine + tilt / 40f) * size.width
                     drawRect(Brush.linearGradient(
                         listOf(Color.Transparent, Color(0x2600FFFF), Color(0x30FF66FF), Color(0x26FFFF66), Color.Transparent),
                         start = Offset(x - size.width * 0.45f, 0f), end = Offset(x + size.width * 0.45f, size.height),
@@ -293,6 +298,10 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
                 Text("$v", style = T.hero.copy(fontSize = sz(40f), lineHeight = sz(40f)), color = Color.White)
                 Text(p.posLabel, style = T.label.copy(fontSize = sz(11f)), color = Color.White.copy(alpha = 0.9f))
             }
+            if (p.style != com.nh.hoopscoach.game.Arch.MANUAL) Text(p.style.label.uppercase(), style = T.label.copy(fontSize = sz(7.5f), lineHeight = sz(8f), letterSpacing = 0.8.sp),
+                color = rar.ink, maxLines = 1,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp * k, bottom = plateH + 6.dp * k)
+                    .clip(RoundedCornerShape(4.dp * k)).background(Brush.linearGradient(rar.edge)).padding(horizontal = 5.dp * k, vertical = 1.5.dp * k))
             t?.let { Box(Modifier.align(Alignment.TopEnd).padding(10.dp * k)) { TeamBadge(it, width * 0.16f) } }
             // The nameplate: a stripe in the spot color, then the name and his line.
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(plateH)
@@ -324,6 +333,128 @@ fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp 
             // A thin inner frame, like the print line on a real card.
             Box(Modifier.fillMaxSize().padding(3.dp * k).border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(10.dp * k)))
         }
+    }
+}
+
+/** The card's metal edge; gold and diamond catch the light as it slowly moves across them. */
+@Composable
+private fun Modifier.rarityEdge(rar: Rarity): Modifier {
+    val moving = rar.name == "GOLD" || rar.name == "DIAMOND"
+    val sweep = if (moving) rememberInfiniteTransition(label = "edge").animateFloat(0f, 1f, infiniteRepeatable(tween(4200, easing = LinearEasing), RepeatMode.Reverse), label = "e").value else 0.5f
+    return this.drawBehind {
+        drawRect(Brush.linearGradient(rar.edge, start = Offset(size.width * (sweep - 0.6f), 0f), end = Offset(size.width * (sweep + 0.6f), size.height), tileMode = TileMode.Mirror))
+        if (rar.name == "DIAMOND") drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.45f), Color.Transparent),
+            start = Offset(size.width * (sweep * 1.6f - 0.5f), 0f), end = Offset(size.width * (sweep * 1.6f - 0.2f), size.height)))
+    }
+}
+
+/**
+ * The back of the card: his name and team, the bio (height, weight, age or class, hometown), his best
+ * ratings as bars, his last few seasons, his honors, and the set line with the card number.
+ */
+@Composable
+private fun CardBack(lg: League, p: Player, width: Dp) {
+    val t = lg.teams.getOrNull(p.teamId) ?: lg.teams.getOrNull(p.lastTeam)
+    val rar = rarityOf(shown(p.ovr))
+    val primary = t?.let { Color(it.primary) } ?: Color(0xFF3A3F47)
+    val k = width.value / 240f
+    fun sz(x: Float) = (x * k).sp
+    val ink = Color.White
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp * k)).rarityEdge(rar).padding(5.dp * k)) {
+        Column(
+            Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp * k))
+                .background(Brush.verticalGradient(listOf(lerp(primary, Color.Black, 0.55f), Color(0xFF0D0F14))))
+                .padding(horizontal = 10.dp * k, vertical = 9.dp * k),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(p.name.uppercase(), style = T.title.copy(fontSize = sz(17f), lineHeight = sz(18f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(p.posLabel, t?.let { if (lg.pro) it.name else it.school }).joinToString(" · "), style = T.label.copy(fontSize = sz(8.5f)), color = ink.copy(alpha = 0.7f), maxLines = 1)
+                }
+                t?.let { TeamBadge(it, width * 0.13f) }
+            }
+            Spacer(Modifier.height(6.dp * k))
+            // The bio, four boxes.
+            Row(Modifier.fillMaxWidth()) {
+                listOf("HT" to Ratings.heightLabel(p.height), "WT" to "${p.weight}", (if (lg.pro) "AGE" else "CLASS") to (if (lg.pro) "${p.age}" else p.cls),
+                    "FROM" to p.hometown.substringBefore(",").ifEmpty { "—" }).forEach { (l, v) ->
+                    Column(Modifier.weight(1f)) {
+                        Text(l, style = T.label.copy(fontSize = sz(7f)), color = ink.copy(alpha = 0.55f))
+                        Text(v, style = T.bodyB.copy(fontSize = sz(10.5f), lineHeight = sz(11f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Spacer(Modifier.height(7.dp * k))
+            // His best six ratings.
+            Text("TOP RATINGS", style = T.label.copy(fontSize = sz(7.5f)), color = rar.edge[0])
+            com.nh.hoopscoach.game.Attr.entries.sortedByDescending { p[it] }.take(6).forEach { a ->
+                val r = shown(p[a])
+                Row(Modifier.fillMaxWidth().padding(top = 2.dp * k), verticalAlignment = Alignment.CenterVertically) {
+                    Text(a.label, style = T.small.copy(fontSize = sz(9f), lineHeight = sz(10f)), color = ink.copy(alpha = 0.85f), modifier = Modifier.width(width * 0.33f), maxLines = 1)
+                    Box(Modifier.weight(1f).height(5.dp * k).clip(RoundedCornerShape(3.dp * k)).background(ink.copy(alpha = 0.12f))) {
+                        Box(Modifier.fillMaxWidth((r / 99f).coerceIn(0.05f, 1f)).height(5.dp * k).clip(RoundedCornerShape(3.dp * k)).background(Brush.horizontalGradient(rar.edge)))
+                    }
+                    Text("$r", style = T.numSm.copy(fontSize = sz(11f), lineHeight = sz(11f)), color = ink, modifier = Modifier.width(width * 0.1f).padding(start = 4.dp * k), maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(7.dp * k))
+            // His last seasons.
+            val rows = (p.career.filter { it.s.gp > 0 }.map { Triple("${it.season}", it.team, it.s) } +
+                (if (p.stats.gp > 0) listOf(Triple("${lg.season}", t?.abbr ?: "", p.stats)) else emptyList())).takeLast(3)
+            if (rows.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth()) {
+                    Text("SEASON", style = T.label.copy(fontSize = sz(7f)), color = rar.edge[0], modifier = Modifier.weight(1f))
+                    listOf("PTS", "REB", "AST").forEach { Text(it, style = T.label.copy(fontSize = sz(7f)), color = ink.copy(alpha = 0.55f), modifier = Modifier.width(width * 0.13f)) }
+                }
+                rows.forEach { (yr, team, st) ->
+                    Row(Modifier.fillMaxWidth().padding(top = 1.dp * k)) {
+                        Text("$yr ${team.take(14)}", style = T.small.copy(fontSize = sz(9f), lineHeight = sz(10f)), color = ink.copy(alpha = 0.85f), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        listOf(st.ppg, st.rpg, st.apg).forEach { Text("%.1f".format(it), style = T.numSm.copy(fontSize = sz(10.5f), lineHeight = sz(11f)), color = ink, modifier = Modifier.width(width * 0.13f)) }
+                    }
+                }
+            } else Text("No games yet: his story starts this season.", style = T.small.copy(fontSize = sz(9f)), color = ink.copy(alpha = 0.7f))
+            // The scouting note: how he plays, and who he plays like.
+            Spacer(Modifier.height(8.dp * k))
+            Text("SCOUTING REPORT", style = T.label.copy(fontSize = sz(7.5f)), color = rar.edge[0])
+            Text(p.style.blurb.trimEnd('.') + "." + (p.likeA.takeIf { it.isNotBlank() }?.let { " Plays like $it." } ?: ""),
+                style = T.small.copy(fontSize = sz(9f), lineHeight = sz(11f)), color = ink.copy(alpha = 0.85f), maxLines = 3, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp * k))
+            Spacer(Modifier.weight(1f))
+            if (p.awards.isNotEmpty()) Text("HONORS · ${p.awards.size}  " + p.awards.takeLast(2).reversed().joinToString(" · "), style = T.label.copy(fontSize = sz(7.5f), lineHeight = sz(9f)),
+                color = P.gold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp * k))
+            Text("HOOPS DYNASTY · ${lg.season} · NO. ${(p.id % 499) + 1} · ${rar.name}", style = T.label.copy(fontSize = sz(7f), letterSpacing = 1.sp), color = ink.copy(alpha = 0.45f), maxLines = 1)
+        }
+    }
+}
+
+/**
+ * A collectible card for a player: the front (his picture, rating, nameplate, foil for a legend) and the
+ * back (bio, ratings, seasons, honors). Tap it to flip it over; drag it side to side to tilt it and watch
+ * the foil move. [interactive] off leaves taps to whatever holds it.
+ */
+@Composable
+fun TradingCard(lg: League, p: Player, modifier: Modifier = Modifier, width: Dp = 240.dp, interactive: Boolean = true) {
+    var back by remember(p.id) { mutableStateOf(false) }
+    val flip by androidx.compose.animation.core.animateFloatAsState(if (back) 180f else 0f, tween(560, easing = FastOutSlowInEasing), label = "flip")
+    val tilt = remember(p.id) { Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val gestures = if (!interactive) Modifier else Modifier
+        .pointerInput(p.id) { detectTapGestures { back = !back } }
+        .pointerInput(p.id) {
+            detectHorizontalDragGestures(
+                onDragEnd = { scope.launch { tilt.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 180f)) } },
+                onDragCancel = { scope.launch { tilt.animateTo(0f) } },
+            ) { change, dx -> change.consume(); scope.launch { tilt.snapTo((tilt.value + dx / size.width * 40f).coerceIn(-18f, 18f)) } }
+        }
+    Box(
+        modifier.width(width).aspectRatio(0.71f).then(gestures).graphicsLayer {
+            rotationY = flip + tilt.value
+            cameraDistance = 14f * density
+        },
+    ) {
+        if (flip <= 90f) CardFront(lg, p, width, tilt.value)
+        else Box(Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }) { CardBack(lg, p, width) }
     }
 }
 

@@ -967,7 +967,10 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
         if (vm.meTab == 0) item {
             lg.hero?.let { me ->
                 Section("Your card")
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TradingCard(lg, me, width = 250.dp) }
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    TradingCard(lg, me, width = 250.dp)
+                    Text("Tap to flip", style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
         if (vm.meTab == 0) item { LegacyPanel(lg) }

@@ -332,7 +332,10 @@ fun HeroScreen(vm: GameViewModel, lg: League) {
         if (vm.meTab == 0) item {
             lg.hero?.let { me ->
                 Section("Your card")
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TradingCard(lg, me, width = 250.dp) }
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    TradingCard(lg, me, width = 250.dp)
+                    Text("Tap to flip", style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
         if (vm.meTab == 0) item { LegacyPanel(lg) }
@@ -955,7 +958,7 @@ private fun CareerHub(vm: GameViewModel, lg: League, h: Player) {
     val tier = pc.TIERS[ti]
     val next = pc.TIERS.getOrNull(ti + 1)
     Row(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 6.dp), verticalAlignment = Alignment.Top) {
-        Box(Modifier.clip(RoundedCornerShape(16.dp)).clickable { vm.push(Route.MyPlayer) }) { TradingCard(lg, h, width = 150.dp) }
+        Box(Modifier.clip(RoundedCornerShape(16.dp)).clickable { vm.push(Route.MyPlayer) }) { TradingCard(lg, h, width = 150.dp, interactive = false) }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text("LEGACY", style = T.label.copy(fontSize = 10.sp), color = P.sub)

@@ -99,7 +99,10 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
     var editNil by remember { mutableStateOf(false) }
     var showCard by remember(p.id) { mutableStateOf(false) }
     if (showCard) androidx.compose.ui.window.Dialog(onDismissRequest = { showCard = false }) {
-        Box(Modifier.then(Modifier.hoverClick({ showCard = false })) , contentAlignment = Alignment.Center) { TradingCard(lg, p, Modifier.popIn(p.id), width = 300.dp) }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            TradingCard(lg, p, Modifier.popIn(p.id), width = 300.dp)
+            Text("Tap to flip · drag to tilt", style = T.small, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.padding(top = 10.dp))
+        }
     }
     val board = remember(p.id, vm.rev) { Offseason.draftBoard(lg) }
     LazyColumn(modifier.fillMaxWidth()) {
