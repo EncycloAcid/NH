@@ -849,7 +849,7 @@ private fun LazyListScope.nbaPredictions(vm: GameViewModel, lg: League, pv: NbaP
             }
         }
         if (pv.bold.isNotEmpty()) BoldPredictions(pv.bold, pv.graded, pv.outcomes)
-        Text("See you in June.", style = T.title.copy(fontSize = 26.sp), color = P.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
+        Text("See you in June.", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
     }
 }
 

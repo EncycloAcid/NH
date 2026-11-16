@@ -83,7 +83,7 @@ fun PlayoffBracket(vm: GameViewModel, lg: League) {
     LaunchedEffect(scroll.maxValue > 0) { if (lg.user.confId == 0 && scroll.maxValue > 0) scroll.scrollTo(scroll.maxValue) }
     val line = P.line
     val lit = P.accent
-    Box(Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = Gutter, vertical = 6.dp)) {
+    Box(Modifier.fillMaxWidth().fadeEdges(scroll).horizontalScroll(scroll).padding(horizontal = Gutter, vertical = 6.dp)) {
         Box(
             Modifier.size(totalW, totalH).drawBehind {
                 fun px(d: Dp) = with(density) { d.toPx() }
@@ -257,7 +257,7 @@ fun PlayInStrip(lg: League) {
         val cs = games.filter { it.conf == c }.sortedBy { it.slot }
         if (cs.isEmpty()) continue
         Text(lg.conf(c).name.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(start = Gutter + 4.dp, top = 4.dp, bottom = 4.dp))
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().hScrollFaded().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             for (s in cs) {
                 val g = s.gameIds.lastOrNull()?.let { lg.game(it) }?.takeIf { it.played }
                 Column(

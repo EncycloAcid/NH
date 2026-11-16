@@ -311,7 +311,7 @@ private fun CardFront(lg: League, p: Player, width: Dp, tilt: Float) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(p.first.uppercase(), style = T.label.copy(fontSize = sz(9.5f), lineHeight = sz(10f)), color = ink.copy(alpha = 0.8f), maxLines = 1)
-                            Text(p.last.uppercase(), style = T.title.copy(fontSize = sz(22f), lineHeight = sz(23f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            FitText(p.last.uppercase(), T.title.copy(fontSize = sz(22f), lineHeight = sz(23f)), ink, minScale = 0.55f)
                         }
                         Text(rar.name + if (foil) " ★" else "", style = T.label.copy(fontSize = sz(8.5f), lineHeight = sz(9f)), color = rar.ink, maxLines = 1,
                             modifier = Modifier.clip(RoundedCornerShape(6.dp * k)).background(Brush.linearGradient(rar.edge)).padding(horizontal = 5.dp * k, vertical = 2.dp * k))

@@ -93,7 +93,7 @@ fun FacilitiesScreen(vm: GameViewModel, lg: League) {
         item {
             Section("Home court")
             Panel {
-                Text("+%.1f%% win chance at home".format(Facilities.homeEdgePct(lg, t)), style = T.title.copy(fontSize = 22.sp), color = P.ink)
+                Text("+%.1f%% win chance at home".format(Facilities.homeEdgePct(lg, t)), style = T.title.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
                 Spacer(Modifier.height(6.dp))
                 val crowd = Facilities.winPct(Business.crowdElo(t))
                 val building = Facilities.winPct(Facilities.homeElo(lg, t))
@@ -137,7 +137,7 @@ fun FacilitiesScreen(vm: GameViewModel, lg: League) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
                         Text("BOOSTER MOOD", style = T.label.copy(fontSize = 10.sp), color = P.sub)
-                        Text(Facilities.moodLabel(t.boosterMood), style = T.title.copy(fontSize = 22.sp), color = P.ink)
+                        Text(Facilities.moodLabel(t.boosterMood), style = T.title.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink)
                     }
                     Text("${Business.money(Facilities.weekly(t))} a week", style = T.bodyB, color = P.good)
                 }

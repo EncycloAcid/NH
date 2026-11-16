@@ -202,7 +202,7 @@ private fun GameLine(vm: GameViewModel, lg: League, g: Game, compact: Boolean = 
         TeamBadge(opp, if (compact) 26.dp else 34.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("${if (g.neutral) "vs" else if (g.home == u.id) "vs" else "at"} ${opp.school}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            FitText("${if (g.neutral) "vs" else if (g.home == u.id) "vs" else "at"} ${opp.school}", T.bodyB, P.ink, minScale = 0.82f)
             val bits = listOfNotNull(
                 r?.title?.let { "Rivalry: $it" },
                 g.label.takeIf { it.isNotBlank() }?.substringBefore(" ·"),
@@ -210,6 +210,7 @@ private fun GameLine(vm: GameViewModel, lg: League, g: Game, compact: Boolean = 
             )
             if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = T.small, color = if (r != null) P.bad else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        Spacer(Modifier.width(10.dp))
         if (g.played) {
             val mine = if (g.home == u.id) g.hs else g.aws
             val theirs = if (g.home == u.id) g.aws else g.hs

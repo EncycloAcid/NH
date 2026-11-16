@@ -348,7 +348,7 @@ fun GuideContent(vm: GameViewModel, guide: Guide, modifier: Modifier = Modifier)
             Row(Modifier.padding(start = Gutter + 4.dp, end = Gutter, top = 6.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Info, null, tint = P.sub, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(guide.title, style = T.title.copy(fontSize = 28.sp), color = P.ink)
+                Text(guide.title, style = T.title.copy(fontSize = 28.sp, lineHeight = 30.sp), color = P.ink)
             }
             val sections = when (guide) {
                 Guide.PROGRAM -> {

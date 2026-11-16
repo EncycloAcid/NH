@@ -109,11 +109,15 @@ fun RosterBalance(vm: GameViewModel, lg: League, t: Team) {
         Spacer(Modifier.height(8.dp))
         for (g in com.nh.hoopscoach.game.ArchFit.GROUPS) {
             val who = cover[g].orEmpty().sortedByDescending { it.ovr }
+            // The kind of player on top, who fits it under it, and how many on the right: nothing gets squeezed.
             Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(g.label, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, modifier = Modifier.width(150.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (who.isEmpty()) Text(if (g in gaps) "None — a need" else "None", style = T.small, color = if (g in gaps) P.warn else P.faint, modifier = Modifier.weight(1f))
-                else Text(who.take(3).joinToString(", ") { it.name.substringAfterLast(' ') } + if (who.size > 3) " +${who.size - 3}" else "",
-                    style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(g.label, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink)
+                    if (who.isEmpty()) Text(if (g in gaps) "None — a need" else "None", style = T.small, color = if (g in gaps) P.warn else P.faint)
+                    else Text(who.take(4).joinToString(", ") { it.name.substringAfterLast(' ') } + if (who.size > 4) " +${who.size - 4}" else "",
+                        style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.width(12.dp))
                 Text("${who.size}", style = T.numSm, color = if (who.isEmpty() && g in gaps) P.warn else P.ink)
             }
         }

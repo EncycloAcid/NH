@@ -284,10 +284,10 @@ internal fun VersusCover(
                     TeamBadge(t, 76.dp)
                     Spacer(Modifier.height(6.dp))
                     Text(t.school.uppercase(), style = T.title.copy(fontSize = 20.sp, lineHeight = 21.sp), color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                    Text(odd(if (t.id == a.id) aOdds else bOdds), style = T.hero.copy(fontSize = 34.sp), color = fg)
+                    Text(odd(if (t.id == a.id) aOdds else bOdds), style = T.hero.copy(fontSize = 34.sp, lineHeight = 34.sp), color = fg)
                     Text(line, style = T.small, color = fg.copy(alpha = 0.85f), textAlign = TextAlign.Center, maxLines = 2)
                 }
-                if (i == 0) Text("VS", style = T.hero.copy(fontSize = 26.sp), color = gold, modifier = Modifier.padding(horizontal = 6.dp))
+                if (i == 0) Text("VS", style = T.hero.copy(fontSize = 26.sp, lineHeight = 26.sp), color = gold, modifier = Modifier.padding(horizontal = 6.dp))
             }
         }
         Spacer(Modifier.height(10.dp))

@@ -154,7 +154,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             Section("Trade")
             Panel(color = P.hero) {
                 Text("TRADED", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text(u.name.uppercase(), style = T.hero.copy(fontSize = 28.sp), color = P.onHero)
+                Text(u.name.uppercase(), style = T.hero.copy(fontSize = 28.sp, lineHeight = 28.sp), color = P.onHero)
                 Text(r.tradeNote, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }
@@ -212,7 +212,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             Section("All-time list", action = "See it", onAction = { vm.select(Tab.CAREER) })
             Panel(color = P.hero) {
                 Text("ALL-TIME LIST", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text("NO. ${r.allTimeRank}", style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+                Text("NO. ${r.allTimeRank}", style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
                 Text(r.allTimeNote, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }
@@ -313,7 +313,7 @@ internal fun StandingRow(vm: GameViewModel, lg: League, rank: Int, t: Team, lead
         Text("$rank", style = T.numSm, color = if (rank <= (if (playIn) 6 else 8)) P.accent else if (playIn && rank <= 10) P.gold else P.faint, modifier = Modifier.width(28.dp))
         TeamBadge(t, 32.dp)
         Spacer(Modifier.width(10.dp))
-        Text(t.name, style = if (mine) T.bodyB else T.body, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        FitText(t.name, if (mine) T.bodyB else T.body, P.ink, Modifier.weight(1f), minScale = 0.8f)
         Text("${t.w}-${t.l}", style = T.numSm, color = P.ink, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
         Text(if (gb <= 0) "—" else if (gb % 1.0 == 0.0) "${gb.toInt()}" else "%.1f".format(gb), style = T.small, color = P.sub, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
     }
@@ -599,7 +599,7 @@ internal fun PlayoffCard(vm: GameViewModel, lg: League) {
         val opp = ProSeason.firstRoundOpponent(lg, u.id)
         Panel(color = P.hero, onClick = openBracket) {
             Text("NO. $seed SEED · ${lg.conf(u.confId).name.uppercase()}", style = T.label, color = heroKicker)
-            Text("YOU'RE IN", style = T.hero.copy(fontSize = 34.sp), color = P.onHero)
+            Text("YOU'RE IN", style = T.hero.copy(fontSize = 34.sp, lineHeight = 34.sp), color = P.onHero)
             Text(if (opp != null) "Round 1 against the No. ${9 - seed} seed ${opp.name}, once the play-in is done."
                 else "Round 1 against the play-in winner for the No. ${9 - seed} seed. Seeds 7 to 10 play in first.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
             PlayoffPath(lg, 0)
@@ -741,7 +741,7 @@ private fun LazyListScope.cup(lg: League) {
     if (ps.cupChampion >= 0) item {
         Panel(color = P.hero) {
             Text("NBA CUP CHAMPIONS", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-            Text(lg.team(ps.cupChampion).name.uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+            Text(lg.team(ps.cupChampion).name.uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
             if (ps.cupMvp.isNotEmpty()) Text("Cup MVP: ${ps.cupMvp}", style = T.small, color = P.onHero.copy(alpha = 0.9f))
         }
     }
@@ -785,7 +785,7 @@ private fun AwardsNightCard(vm: GameViewModel, lg: League) {
     val heroWon = top?.pid == lg.heroId
     Panel(color = if (heroWon) P.hero else P.surface) {
         Text("${lg.season} MOST VALUABLE PLAYER", style = T.label, color = if (heroWon) P.onHero.copy(alpha = 0.8f) else P.accent)
-        Text(top?.name ?: "", style = T.hero.copy(fontSize = 26.sp), color = if (heroWon) P.onHero else P.ink)
+        Text(top?.name ?: "", style = T.hero.copy(fontSize = 26.sp, lineHeight = 26.sp), color = if (heroWon) P.onHero else P.ink)
         if (top != null) Text("${lg.team(top.teamId).name} · ${top.firsts} of 100 first-place votes", style = T.small, color = if (heroWon) P.onHero.copy(alpha = 0.9f) else P.sub)
         val finish = AwardsNight.heroFinish(lg)
         if (finish > 1) Text("You finished ${ordinal(finish)} in the voting.", style = T.bodyB, color = P.accent)
@@ -1100,7 +1100,7 @@ internal fun ContenderPanel(vm: GameViewModel, lg: League) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("TITLE ODDS", style = T.label, color = P.sub)
-                Text("%.0f%%".format(odds * 100), style = T.title.copy(fontSize = 28.sp), color = P.accent)
+                Text("%.0f%%".format(odds * 100), style = T.title.copy(fontSize = 28.sp, lineHeight = 30.sp), color = P.accent)
             }
             Text(if (pitch) "Pitch one star\na summer" else if (push) "One push\nbefore the deadline" else "", style = T.small, color = P.sub, textAlign = TextAlign.End)
         }
@@ -1360,7 +1360,7 @@ fun ProCareerScreen(vm: GameViewModel, lg: League) {
                     else "${h.proYears} PRO ${if (h.proYears == 1) "SEASON" else "SEASONS"}",
                     style = T.label, color = P.onHero.copy(alpha = 0.8f),
                 )
-                Text(if (r.draftPick > 0) "NO. ${r.draftPick} PICK" else "UNDRAFTED", style = T.hero.copy(fontSize = 32.sp), color = P.onHero)
+                Text(if (r.draftPick > 0) "NO. ${r.draftPick} PICK" else "UNDRAFTED", style = T.hero.copy(fontSize = 32.sp, lineHeight = 32.sp), color = P.onHero)
                 val track = if (ProCareer.hofScore(lg) >= 18) " · On a Hall of Fame track" else ""
                 Text("${r.rings} ${if (r.rings == 1) "ring" else "rings"} · ${r.allStars} All-Star · ${r.mvps} MVP$track", style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
@@ -1427,7 +1427,7 @@ private fun LazyListScope.reviewStep(vm: GameViewModel, lg: League, h: Player, t
         val s = h.career.lastOrNull { it.season == lg.season && it.cls == PRO_YEAR }?.s ?: h.stats
         Panel(color = P.hero) {
             Text("${lg.season} · ${t.name.uppercase()}", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-            Text(ProSeason.resultFor(lg, t.id).uppercase(), style = T.hero.copy(fontSize = 28.sp), color = P.onHero)
+            Text(ProSeason.resultFor(lg, t.id).uppercase(), style = T.hero.copy(fontSize = 28.sp, lineHeight = 28.sp), color = P.onHero)
             Text("${t.w}-${t.l} · ${f1(s.ppg)} ppg, ${f1(s.rpg)} rpg, ${f1(s.apg)} apg", style = T.small, color = P.onHero.copy(alpha = 0.9f))
         }
         val mine = h.awards.filter { it.startsWith("${lg.season} ") }.map { it.removePrefix("${lg.season} ") }
@@ -1541,7 +1541,7 @@ private fun LazyListScope.contractStep(vm: GameViewModel, lg: League, h: Player,
         if (rookie && c != null) {
             Panel(color = P.hero) {
                 Text("WELCOME TO THE LEAGUE", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text(t.name.uppercase(), style = T.hero.copy(fontSize = 28.sp), color = P.onHero)
+                Text(t.name.uppercase(), style = T.hero.copy(fontSize = 28.sp, lineHeight = 28.sp), color = P.onHero)
                 Text("${c.kind} deal: ${c.years} years, ${money(c.salary)} a season. It lands in your bank when each season starts.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 val r0 = lg.road
                 if (r0 != null && r0.collegeOvr > 0) {
@@ -1685,7 +1685,7 @@ private fun LazyListScope.proSummerStep(vm: GameViewModel, lg: League, h: Player
         val before = ps.before[h.id]
         Panel {
             Text("SUMMER", style = T.label, color = P.accent)
-            if (before != null && before != h.ovr) Text("${shown(before)} → ${shown(h.ovr)} overall", style = T.title.copy(fontSize = 30.sp), color = P.ink)
+            if (before != null && before != h.ovr) Text("${shown(before)} → ${shown(h.ovr)} overall", style = T.title.copy(fontSize = 30.sp, lineHeight = 32.sp), color = P.ink)
             else Text("${shown(h.ovr)} overall at age ${h.age}", style = T.head, color = P.ink)
             Text(if (h.age >= 30) "Thirty-plus: the summer takes a little off the top." else if (h.ovr >= h.pot) "You're at your ceiling. Now it's about winning." else "Still climbing toward ${shown(h.pot)}.", style = T.small, color = P.sub)
             if (r.growthNote.isNotEmpty() && h.age <= 31) Text(r.growthNote, style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
@@ -1748,7 +1748,7 @@ fun ProEnding(vm: GameViewModel, lg: League) {
             Section("Hall of Fame night")
             Panel(color = P.hero) {
                 Text("CLASS OF ${r.hofClass}", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                Text("${h?.name?.uppercase() ?: ""}", style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+                Text("${h?.name?.uppercase() ?: ""}", style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
                 Text(ProCareer.hofVerdict(lg), style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 Spacer(Modifier.height(10.dp))
                 for (line in com.nh.hoopscoach.game.Afterward.highlights(lg)) Text("★ $line", style = T.small, color = P.onHero)
@@ -1865,7 +1865,7 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 ScreenHeader("Road to the League", "Going pro", null)
                 Panel(color = P.hero) {
                     Text(if (pick != null) "NO. ${pick.pick} OVERALL" else "UNDRAFTED FREE AGENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                    Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp), color = P.onHero)
+                    Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
                     Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.Ratings.shownPro(com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr))} on the pro scale and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }

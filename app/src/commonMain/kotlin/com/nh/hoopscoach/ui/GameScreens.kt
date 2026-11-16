@@ -530,7 +530,7 @@ fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
             val hs = rememberScrollState()
             val surface = P.surface
             Box(Modifier.weight(1f)) {
-            Column(Modifier.horizontalScroll(hs).padding(end = 12.dp)) {
+            Column(Modifier.fadeEdges(hs).horizontalScroll(hs).padding(end = 12.dp)) {
                 Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically) {
                     cols.forEachIndexed { i, c -> Text(c, style = T.label, color = P.sub, modifier = Modifier.width(widths[i].dp), textAlign = TextAlign.End) }
                 }

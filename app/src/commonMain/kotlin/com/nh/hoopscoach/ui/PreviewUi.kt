@@ -1368,7 +1368,7 @@ private fun LazyListScope.teamReport(vm: GameViewModel, lg: League, pv: Preview)
         Panel {
             Previews.profile(lg, u, peers).forEach { (area, p) ->
                 Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(area, style = T.small, color = P.ink, modifier = Modifier.width(132.dp), maxLines = 1)
+                    FitText(area, T.small, P.ink, Modifier.width(132.dp), minScale = 0.8f)
                     GrowBar(p.toFloat().coerceAtLeast(0.03f), Modifier.weight(1f), when { p >= 0.66 -> P.good; p >= 0.33 -> P.accent; else -> P.warn }, 8.dp)
                     Text(letter(p), style = T.numSm.copy(fontSize = 16.sp), color = P.ink, textAlign = TextAlign.End, modifier = Modifier.width(38.dp))
                 }
@@ -1699,7 +1699,7 @@ private fun LazyListScope.predictions(vm: GameViewModel, lg: League, pv: Preview
             }
         }
         if (pv.bold.isNotEmpty()) BoldPredictions(pv.bold, pv.graded, pv.outcomes)
-        Text("See you in March.", style = T.title.copy(fontSize = 26.sp), color = P.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
+        Text("See you in March.", style = T.title.copy(fontSize = 26.sp, lineHeight = 28.sp), color = P.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 20.dp))
     }
 }
 

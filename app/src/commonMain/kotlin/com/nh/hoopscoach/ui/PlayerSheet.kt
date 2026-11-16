@@ -112,7 +112,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(p.first.uppercase(), style = T.label, color = P.sub)
-                    Text(p.last.uppercase(), style = T.title, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    FitText(p.last.uppercase(), T.title, P.ink, minScale = 0.55f)
                     Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
                     if (team != null) Text("${team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
@@ -324,7 +324,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
 }
 
 /** What his play style does on the floor, in a line: "Two-Way Guard: hunts threes, creates off the dribble, locks down the perimeter." */
-private fun playsLike(p: Player): String = p.style.label + " (" + p.style.group.label.lowercase() + "): " + p.style.boosts.joinToString(", ") {
+private fun playsLike(p: Player): String = if (p.style.boosts.isEmpty()) "${p.style.label}: ${p.style.blurb.replaceFirstChar { it.lowercase() }}"
+else p.style.label + " (" + p.style.group.label.lowercase() + "): " + p.style.boosts.joinToString(", ") {
     when (it) {
         Attr.OUT -> "hunts threes"; Attr.INS -> "attacks the rim"; Attr.MID -> "pulls up from mid-range"; Attr.PAS -> "sets up teammates"
         Attr.HND -> "creates off the dribble"; Attr.REB -> "crashes the glass"; Attr.PER -> "locks down the perimeter"; Attr.IDF -> "guards the paint"
@@ -358,7 +359,7 @@ private fun RatingsTab(p: Player) {
 @Composable
 private fun AttrBar(label: String, v: Int, gain: Int) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = T.body, color = P.ink, modifier = Modifier.width(104.dp), maxLines = 1)
+        FitText(label, T.body, P.ink, Modifier.width(104.dp), minScale = 0.78f)
         Bar(v / 99f, Modifier.weight(1f), color = tier(v), height = 7.dp)
         Text("$v", style = T.numSm, color = P.ink, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
         Text(if (gain > 0) "+$gain" else "", style = T.small.copy(fontSize = 12.sp), color = P.good, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
@@ -458,7 +459,7 @@ private fun StatTable(rows: List<CareerRow>, totals: Boolean) {
         else listOf(f1(s.mpg), f1(s.ppg), f1(s.rpg), f1(s.apg), f1(s.spg), f1(s.bpg), f1(s.per(s.tov)))
         return listOf(r.year, r.team, r.cls, "${s.gp}") + per + listOf(pct(s.fgPct), pct(s.tpPct), pct(s.ftPct))
     }
-    Column(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
+    Column(Modifier.fillMaxWidth().hScrollFaded().padding(horizontal = 14.dp)) {
         Row { heads.forEachIndexed { i, h -> Text(h, style = T.label, color = P.sub, modifier = Modifier.width(w[i].dp), textAlign = if (i < 3) TextAlign.Start else TextAlign.End) } }
         rows.forEach { r ->
             if (r.total) Box(Modifier.width(w.sum().dp).padding(top = 4.dp).height(1.dp).background(P.line))

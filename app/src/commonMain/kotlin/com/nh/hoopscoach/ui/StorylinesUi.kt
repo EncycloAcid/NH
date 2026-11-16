@@ -52,7 +52,7 @@ fun StoryBeatCard(vm: GameViewModel, lg: League, s: Storyline) {
             Text(b.kicker, style = T.label.copy(fontSize = 10.sp), color = if (s.heat >= 4) P.bad else P.accent, modifier = Modifier.weight(1f))
             StageDots(s)
         }
-        Text(b.head, style = T.title.copy(fontSize = 20.sp), color = P.ink, modifier = Modifier.padding(top = 6.dp))
+        Text(b.head, style = T.title.copy(fontSize = 20.sp, lineHeight = 22.sp), color = P.ink, modifier = Modifier.padding(top = 6.dp))
         Text(b.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
         if (s.log.isNotEmpty()) Text("So far: " + s.log.joinToString(" · ") { it.substringAfter(": ") }, style = T.small, color = P.sub,
             maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 4.dp))

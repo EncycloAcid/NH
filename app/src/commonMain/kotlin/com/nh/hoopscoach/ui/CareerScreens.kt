@@ -682,7 +682,7 @@ fun EditTeamScreen(vm: GameViewModel, lg: League, teamId: Int) {
                     modifier = Modifier.fillMaxWidth(), colors = fieldColors(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters))
             }
             Section("Colors")
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth().hScrollFaded().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 palette.forEach { pair ->
                     val sel = pair == colors
                     Box(

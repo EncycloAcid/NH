@@ -50,6 +50,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.setValue
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,12 +111,43 @@ fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier,
 fun ScreenHeader(eyebrow: String?, title: String, sub: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
     Row(Modifier.reveal().fillMaxWidth().padding(start = Gutter + 4.dp, end = Gutter, top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
-            if (eyebrow != null) Text(eyebrow.uppercase(), style = T.label, color = P.accent)
-            Text(title.uppercase(), style = T.title, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (sub != null) Text(sub, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+            if (eyebrow != null) Text(eyebrow.uppercase(), style = T.label, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // A long name shrinks to fit on one line instead of breaking in two or getting cut off.
+            FitText(title.uppercase(), T.title, P.ink, minScale = 0.6f)
+            if (sub != null) Text(keepTogether(sub), style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = actions)
     }
+}
+
+/**
+ * A "·"-separated line that wraps only between its items: "AP #21" and "0-0 ACC" never break in the middle.
+ * Long items (a sentence) still wrap normally.
+ */
+fun keepTogether(line: String): String =
+    line.split(" · ").joinToString(" · ") { part -> if (part.length <= 24) part.replace(' ', '\u00A0') else part }
+
+/**
+ * One line of text that shrinks (down to [minScale] of its size) to fit the space instead of wrapping or
+ * getting cut off; only past that does it end in an ellipsis. For names and titles.
+ */
+@Composable
+fun FitText(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier, minScale: Float = 0.6f, textAlign: TextAlign? = null) {
+    val max = if (style.fontSize.isSpecified) style.fontSize else 16.sp
+    val min = max.value * minScale
+    // Measure on one unwrapped line; while it runs past the edge, step the size down (nothing is drawn until it
+    // fits). At the smallest size it's allowed, it ends in an ellipsis instead.
+    var size by remember(text, max) { mutableStateOf(max.value) }
+    var ready by remember(text, max) { mutableStateOf(false) }
+    val atMin = size <= min + 0.01f
+    val scale = size / max.value
+    Text(
+        text, modifier.drawWithContent { if (ready) drawContent() },
+        style = style.copy(fontSize = size.sp, lineHeight = if (style.lineHeight.isSpecified) style.lineHeight * scale else style.lineHeight),
+        color = color, textAlign = textAlign ?: style.textAlign,
+        maxLines = 1, softWrap = atMin, overflow = if (atMin) TextOverflow.Ellipsis else TextOverflow.Clip,
+        onTextLayout = { r -> if (!atMin && r.didOverflowWidth) size = (size * 0.92f).coerceAtLeast(min) else ready = true },
+    )
 }
 
 @Composable
@@ -208,8 +242,9 @@ fun Modifier.hoverClick(onClick: () -> Unit, tint: Color = P.ink, enabled: Boole
 @Composable
 fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Color = P.ink, style: TextStyle = T.num) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = style, color = color, maxLines = 1)
-        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, maxLines = 1)
+        // A long number shrinks to fit its cell; a long label takes a second line instead of running into its neighbor.
+        FitText(value, style, color, minScale = 0.65f, textAlign = TextAlign.Center)
+        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 
@@ -269,7 +304,9 @@ fun Segmented(
                 .clickable { onSelect(i) }.padding(horizontal = if (scroll) 14.dp else 4.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, style = T.bodyB.copy(fontSize = if (!scroll && options.size >= 5) 13.sp else 14.sp), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Fixed-width tabs shrink a long label a little before cutting it ("Prospects", "Transfers" on a small phone).
+            if (scroll) Text(label, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1)
+            else FitText(label, T.bodyB.copy(fontSize = if (options.size >= 5) 13.sp else 14.sp), fg, minScale = 0.76f)
         }
     }
     @Composable
@@ -284,7 +321,7 @@ fun Segmented(
         // The strip scrolls to keep the selected tab in view.
         val state = rememberScrollState()
         LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
-        Box(modifier.padding(horizontal = edge).horizontalScroll(state).then(track)) {
+        Box(modifier.padding(horizontal = edge).fadeEdges(state, 22.dp).horizontalScroll(state).then(track)) {
             pill()
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
@@ -301,9 +338,36 @@ fun Segmented(
     }
 }
 
+/**
+ * Fades the edges of a sideways-scrolling strip where there's more to scroll to, so a cut-off tab or chip
+ * reads as "more this way" instead of a layout that doesn't fit. Goes before [horizontalScroll] with the same state.
+ */
+fun Modifier.fadeEdges(state: androidx.compose.foundation.ScrollState, edge: Dp = 28.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val w = edge.toPx().coerceAtMost(size.width / 3)
+        if (state.value > 0) drawRect(
+            Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = w),
+            size = androidx.compose.ui.geometry.Size(w, size.height), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+        if (state.value < state.maxValue) drawRect(
+            Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
+            topLeft = androidx.compose.ui.geometry.Offset(size.width - w, 0f), size = androidx.compose.ui.geometry.Size(w, size.height),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
+
+/** Scrolls sideways, with faded edges where there's more ([fadeEdges]). */
+@Composable
+fun Modifier.hScrollFaded(): Modifier {
+    val state = rememberScrollState()
+    return this.fadeEdges(state).horizontalScroll(state)
+}
+
 @Composable
 fun Chips(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier.fillMaxWidth().hScrollFaded().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { i, l ->
             val sel = i == selected
             Box(
@@ -337,18 +401,18 @@ private fun Modifier.pressable(enabled: Boolean, onClick: () -> Unit): Modifier 
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(if (enabled) P.accent else P.surface2)
-            .pressable(enabled, onClick).padding(horizontal = 18.dp),
+            .pressable(enabled, onClick).padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.onAccent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    ) { FitText(text, T.head.copy(fontSize = 16.sp), if (enabled) P.onAccent else P.faint, minScale = 0.68f) }
 }
 
 @Composable
 fun SecondaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(14.dp)).background(P.accentSoft)
-            .pressable(enabled, onClick).padding(horizontal = 18.dp),
+            .pressable(enabled, onClick).padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = T.head.copy(fontSize = 16.sp), color = if (enabled) P.accent else P.faint, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    ) { FitText(text, T.head.copy(fontSize = 16.sp), if (enabled) P.accent else P.faint, minScale = 0.68f) }
 }
 
 @Composable
@@ -362,11 +426,11 @@ fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = 
             .pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (icon == null) Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1)
+        if (icon == null) FitText(text, T.bodyB.copy(fontSize = 14.sp), fg, minScale = 0.8f)
         else Row(verticalAlignment = Alignment.CenterVertically) {
             androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1)
+            FitText(text, T.bodyB.copy(fontSize = 14.sp), fg, minScale = 0.8f)
         }
     }
 }
@@ -690,11 +754,16 @@ fun Ring(rating: Int, size: Dp = 44.dp, modifier: Modifier = Modifier, label: St
             drawArc(track, 135f, 270f, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
             drawArc(c, 135f, 270f * fill.value, false, Offset(inset, inset), arcSize, style = Stroke(sw, cap = StrokeCap.Round))
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // The ring is a fixed size, so what's inside it is sized to the ring, not to the phone's font setting
+        // (a bigger system font would push the number and label out over the arc).
+        val d = LocalDensity.current
+        val num = with(d) { textSize.value.dp.toSp() }
+        val lab = with(d) { 9.dp.toSp() }
+        Column(Modifier.width(size * 0.74f), horizontalAlignment = Alignment.CenterHorizontally) {
             // The number counts up with the arc.
             val counting = if (fill.isRunning) (fill.value * 99f).toInt().coerceAtMost(value) else value
-            Text("$counting", style = T.numSm.copy(fontSize = textSize, lineHeight = textSize), color = P.ink)
-            if (label != null) Text(label, style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = P.sub)
+            Text("$counting", style = T.numSm.copy(fontSize = num, lineHeight = num), color = P.ink, maxLines = 1)
+            if (label != null) FitText(label, T.label.copy(fontSize = lab, letterSpacing = 0.6.sp), P.sub, minScale = 0.7f)
         }
     }
 }

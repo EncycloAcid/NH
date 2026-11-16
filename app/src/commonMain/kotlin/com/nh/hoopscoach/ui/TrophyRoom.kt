@@ -51,7 +51,7 @@ fun TrophyRoomLink(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Season mixtape", style = T.bodyB, color = P.ink)
-                    Text("${plays.size} plays · best: ${plays.first().text}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${plays.size} play${if (plays.size == 1) "" else "s"} · best: ${plays.first().text}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Chevron()
             }

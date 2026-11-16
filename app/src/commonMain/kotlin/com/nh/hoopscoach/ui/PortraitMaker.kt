@@ -133,7 +133,7 @@ fun PortraitMakerScreen(vm: GameViewModel, lg: League, playerId: Int) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .hScrollFaded()
                 .padding(horizontal = 12.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {

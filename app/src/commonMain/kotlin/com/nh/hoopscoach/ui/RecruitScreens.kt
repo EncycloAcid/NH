@@ -202,7 +202,7 @@ fun RecruitRow(vm: GameViewModel, lg: League, r: Recruit, ctx: Recruiting.Ctx) {
                 r.committed >= 0 -> Text("Signed with ${lg.team(r.committed).school}", style = T.small, color = P.faint)
                 // Your son, outside the recruiting rounds: where you stand with him, all year.
                 !cycle && r.p.id == lg.legacySonId -> Text("Your interest $mine" + (leader?.let { " · next: ${lg.team(it.key).abbr} ${it.value}" } ?: "") + " · he leans your way",
-                    style = T.small.copy(fontSize = 12.sp), color = if (leader == null || mine >= leader.value) P.good else P.warn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    style = T.small.copy(fontSize = 12.sp), color = if (leader == null || mine >= leader.value) P.good else P.warn, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 cycle && (pts > 0 || mine > 0) -> {
                     val proj = Recruiting.project(lg, r, ctx)
                     val next = proj[u.id] ?: mine
@@ -211,12 +211,12 @@ fun RecruitRow(vm: GameViewModel, lg: League, r: Recruit, ctx: Recruiting.Ctx) {
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "$pts pts · You $mine → $next (${ordinal(place)})" + (leader?.let { " · ${lg.team(it.key).abbr} ${proj[it.key] ?: it.value}" } ?: ""),
-                        style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 else -> Text(
                     (if (leader != null) "Leader ${lg.team(leader.key).abbr} ${leader.value} · ${r.interest.size} schools" else "No schools yet") + " · ${r.pref.label}",
-                    style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = T.small.copy(fontSize = 12.sp), color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
             }
         }

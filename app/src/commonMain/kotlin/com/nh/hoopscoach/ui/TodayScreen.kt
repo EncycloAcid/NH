@@ -80,7 +80,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
     val today = Season.userGameToday(lg) ?: Season.nextUserGame(lg)
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
-            ScreenHeader("Season ${lg.season} · Game ${(u.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}", u.school, recordLine(lg, u)) {
+            ScreenHeader("${lg.season} · Game ${(u.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}", u.school, recordLine(lg, u)) {
                 SmallButton("Calendar") { vm.push(Route.Calendar) }
                 TeamBadge(u, 46.dp)
             }
@@ -381,7 +381,7 @@ fun StandingRow(vm: GameViewModel, lg: League, rank: Int, t: Team) {
         Text("$rank", style = T.numSm, color = if (mine) P.accent else P.sub, modifier = Modifier.width(30.dp))
         TeamBadge(t, 28.dp)
         Spacer(Modifier.width(10.dp))
-        Text(teamLabel(t), style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        FitText(teamLabel(t), T.bodyB, P.ink, Modifier.weight(1f), minScale = 0.78f)
         Text(t.confRecord, style = T.numSm.copy(fontSize = 16.sp), color = P.ink, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
         Text(t.record, style = T.numSm.copy(fontSize = 16.sp), color = P.sub, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
     }

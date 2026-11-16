@@ -144,7 +144,7 @@ fun ProgramLegends(t: Team, onOpen: ((Int) -> Unit)? = null) {
     val retired = t.legends.filter { it.retired }.sortedBy { it.inducted }
     if (retired.isNotEmpty()) {
         Section("In the rafters")
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().hScrollFaded().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             retired.forEach { RetiredBanner(t, it) }
         }
     }

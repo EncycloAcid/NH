@@ -903,7 +903,7 @@ private fun PickTradeRow(
         }
         if (picked) {
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
+                Modifier.fillMaxWidth().hScrollFaded().padding(start = 8.dp, top = 4.dp, bottom = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1947,7 +1947,7 @@ private fun ContractNegotiationDialog(
                     GrowBar(eval.pct / 100f, Modifier.fillMaxWidth(), intColor, 9.dp)
                     Spacer(Modifier.height(6.dp))
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        Modifier.fillMaxWidth().hScrollFaded(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         for ((factor, positive) in eval.factors) {
@@ -1987,7 +1987,7 @@ private fun ContractNegotiationDialog(
                     range = minSal.toFloat()..maxSal.coerceAtLeast(minSal + 100).toFloat(),
                 )
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    Modifier.fillMaxWidth().hScrollFaded(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     SmallButton("Min") { salary = minSal }
@@ -2230,8 +2230,8 @@ private fun AutoResignCard(vm: GameViewModel, lg: League) {
             Spacer(Modifier.height(8.dp))
             val keep = exp.filter { Extensions.keeper(lg, u, it) }
             Text(
-                (if (keep.isEmpty()) "No expiring player makes the cut." else "Would keep: " + keep.joinToString(", ") { it.name }) +
-                    exp.filter { it !in keep }.let { if (it.isEmpty()) "" else ". Would let go: " + it.joinToString(", ") { p -> p.name } } + ".",
+                (if (keep.isEmpty()) "No expiring player makes the cut." else "Would keep: " + keep.joinToString(", ") { it.name } + ".") +
+                    exp.filter { it !in keep }.let { if (it.isEmpty()) "" else " Would let go: " + it.joinToString(", ") { p -> p.name } + "." },
                 style = T.small, color = P.ink,
             )
         }

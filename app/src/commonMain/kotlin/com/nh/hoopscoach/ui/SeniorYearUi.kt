@@ -64,7 +64,7 @@ fun SeniorYearFlow(vm: GameViewModel, lg: League, hero: Player, hs: HighSchool, 
                         Section(if (hs.step in S.CIRCUIT) "The summer circuit" else "Senior season · ${hs.school}")
                         Panel {
                             Text(p.kicker, style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                            Text(p.title, style = T.title.copy(fontSize = 22.sp), color = P.ink, modifier = Modifier.padding(top = 4.dp))
+                            Text(p.title, style = T.title.copy(fontSize = 22.sp, lineHeight = 24.sp), color = P.ink, modifier = Modifier.padding(top = 4.dp))
                             Text(p.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
                             p.choices.forEachIndexed { i, ch ->
                                 ListRow(onClick = {
@@ -213,7 +213,7 @@ private fun IntroCard(vm: GameViewModel, hs: HighSchool) {
     Section("Your senior year")
     Panel(color = mix(P.surface, P.accent, if (P.dark) 0.12f else 0.06f)) {
         Text("BEFORE YOU PICK A SCHOOL", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-        Text("${hs.school} ${hs.mascot}", style = T.title.copy(fontSize = 24.sp), color = P.ink, modifier = Modifier.padding(top = 4.dp))
+        Text("${hs.school} ${hs.mascot}", style = T.title.copy(fontSize = 24.sp, lineHeight = 26.sp), color = P.ink, modifier = Modifier.padding(top = 4.dp))
         Text("One more year. Play the summer circuit with ${hs.travelTeam}, your senior season, official visits, and a commitment ceremony. " +
             "Your ranking, your stars and your offers can all still change.", style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(10.dp))
@@ -323,7 +323,7 @@ private fun DecisionDay(vm: GameViewModel, lg: League, hs: HighSchool, hat: Int,
             else vm.toast("Three hats on the table at most. Take one off first.")
             vm.seniorChanged()
         }) {
-            Text(if (on) "✓" else "+", style = T.title.copy(fontSize = 20.sp), color = if (on) P.accent else P.faint)
+            Text(if (on) "✓" else "+", style = T.title.copy(fontSize = 20.sp, lineHeight = 22.sp), color = if (on) P.accent else P.faint)
         }
     }
     if (list.size > shown) Box(Modifier.padding(horizontal = Gutter, vertical = 8.dp)) {
@@ -359,7 +359,7 @@ fun HighSchoolPanel(lg: League) {
     Section("High school")
     Panel {
         Text("${hs.school.uppercase()} ${hs.mascot.uppercase()} · SENIOR YEAR", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-        Text("${hs.w}-${hs.l}" + if (hs.stateResult.isNotEmpty()) " · ${hs.stateResult}" else "", style = T.title.copy(fontSize = 20.sp), color = P.ink, modifier = Modifier.padding(top = 2.dp))
+        Text("${hs.w}-${hs.l}" + if (hs.stateResult.isNotEmpty()) " · ${hs.stateResult}" else "", style = T.title.copy(fontSize = 20.sp, lineHeight = 22.sp), color = P.ink, modifier = Modifier.padding(top = 2.dp))
         Spacer(Modifier.height(8.dp))
         StatRow(listOf(Triple("PPG", "%.1f".format(hs.ppg), null), Triple("RPG", "%.1f".format(hs.rpg), null), Triple("APG", "%.1f".format(hs.apg), null)), style = T.numSm)
         if (hs.honors.isNotEmpty()) {

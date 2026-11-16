@@ -477,7 +477,7 @@ fun HeroTodayCard(vm: GameViewModel, lg: League) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (g.won) "W" else "L", style = T.numSm.copy(fontSize = 17.sp), color = if (g.won) P.good else P.bad)
                         Spacer(Modifier.width(6.dp))
-                        Text("${g.score} ${g.site} ${lg.team(g.oppId).abbr}", style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, maxLines = 1)
+                        FitText("${g.score} ${g.site} ${lg.team(g.oppId).abbr}", T.bodyB.copy(fontSize = 14.sp), P.ink, minScale = 0.72f)
                     }
                 }
                 for ((v, l) in listOf(g.pts to "PTS", g.reb to "REB", g.ast to "AST", g.min to "MIN")) {
@@ -789,7 +789,7 @@ internal fun StaffPanel(vm: GameViewModel, lg: League) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("IN THE BANK", style = T.label, color = P.sub)
-                CountUpText(bank.toLong(), T.title.copy(fontSize = 28.sp), P.good) { money(it.toInt()) }
+                CountUpText(bank.toLong(), T.title.copy(fontSize = 28.sp, lineHeight = 30.sp), P.good) { money(it.toInt()) }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("${r.hired.count { Road.has(lg, it) }} of ${com.nh.hoopscoach.game.Staff.entries.size}", style = T.bodyB, color = P.ink)
@@ -1343,7 +1343,7 @@ private fun LazyListScope.summerStep(vm: GameViewModel, lg: League, h: Player, t
         Panel {
             Text("SUMMER WORKOUTS", style = T.label, color = P.accent)
             if (g != null) {
-                Text("${g.before} → ${h.ovr} overall", style = T.title.copy(fontSize = 30.sp), color = P.ink)
+                Text("${g.before} → ${h.ovr} overall", style = T.title.copy(fontSize = 30.sp, lineHeight = 32.sp), color = P.ink)
                 val gains = com.nh.hoopscoach.game.Attr.entries.mapIndexedNotNull { i, a -> g.gains.getOrNull(i)?.takeIf { it > 0 }?.let { "${a.short} +$it" } }
                 if (gains.isNotEmpty()) Text(gains.joinToString(" · "), style = T.small, color = P.good)
             } else Text("${h.ovr} overall heading into ${classLong(h.year).lowercase()} year.", style = T.head, color = P.ink)

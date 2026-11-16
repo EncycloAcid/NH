@@ -73,7 +73,7 @@ fun TreeBracket(vm: GameViewModel, lg: League, b: Bracket, r0: Int, rounds: Int,
     val line = P.line
     val lit = P.accent
     val winner = slotOf(b, r0 + rounds, start shr rounds)
-    Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter, vertical = 6.dp)) {
+    Box(Modifier.fillMaxWidth().hScrollFaded().padding(horizontal = Gutter, vertical = 6.dp)) {
         Box(
             Modifier.size(totalW, totalH).drawBehind {
                 fun px(d: Dp) = with(density) { d.toPx() }

@@ -1489,7 +1489,7 @@ Panel {
                 "Dynamic recaps, quotes, and storylines — free & cheap models preferred.",
                 style = T.small,
                 color = P.sub,
-                maxLines = 2,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
         }
