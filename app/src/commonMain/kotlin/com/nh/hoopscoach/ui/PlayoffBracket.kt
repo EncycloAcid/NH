@@ -153,7 +153,7 @@ private fun MatchCard(lg: League, s: Series?, feedA: Int, feedB: Int, finals: Bo
             .clickable(enabled = s != null) { onClick() }.padding(horizontal = 8.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        if (finals) Text("🏆 FINALS", style = T.label.copy(fontSize = 9.sp), color = P.gold, modifier = Modifier.padding(bottom = 2.dp))
+        if (finals) IconLabel(GameIcons.Trophy, "FINALS", T.label.copy(fontSize = 9.sp), P.gold, Modifier.padding(bottom = 2.dp))
         for (i in 0..1) {
             val tid = teams[i]
             val t = lg.teams.getOrNull(tid)
@@ -202,7 +202,7 @@ fun PlayoffHeader(lg: League) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("🏆 ${lg.season} NBA CHAMPIONS", style = T.label, color = fg.copy(alpha = 0.85f))
+                    IconLabel(GameIcons.Trophy, "${lg.season} NBA CHAMPIONS", T.label, fg.copy(alpha = 0.85f))
                     Text(champ.name.uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 32.sp), color = fg)
                 }
                 TeamBadge(champ, 64.dp)

@@ -149,8 +149,8 @@ private fun Sidebar(vm: GameViewModel, lg: League) {
         }
         SideHeading("Play")
         Tab.entries.forEachIndexed { i, t ->
-            val icon = when (t) { Tab.TODAY -> NavIcons.Today; Tab.TEAM -> NavIcons.Team; Tab.RECRUIT -> NavIcons.Recruit; Tab.LEAGUE -> NavIcons.League; Tab.CAREER -> NavIcons.Career }
-            NavItem(icon, tabLabel(vm, t), selected = vm.tab == t && vm.stack.isEmpty(), key = if (pc) "${i + 1}" else null) { vm.stack.clear(); vm.select(t) }
+            val on = vm.tab == t && vm.stack.isEmpty()
+            NavItem(GameIcons.tab(tabIconKind(vm, t), on), tabLabel(vm, t), selected = on, key = if (pc) "${i + 1}" else null) { vm.stack.clear(); vm.select(t) }
         }
         SideHeading("More")
         if (!lg.pro) NavItem(MenuIcons.Calendar, "Calendar", selected = vm.stack.lastOrNull() == Route.Calendar) { vm.push(Route.Calendar) }

@@ -330,7 +330,7 @@ fun RecruitDetail(vm: GameViewModel, lg: League, playerId: Int) {
                                 Text("Personalized pitch letter targeting ${r.pref.label}.", style = T.small, color = P.sub)
                             }
                             if (pitchLetter == null) {
-                                SmallButton(if (draftingPitch) "Drafting..." else "Draft Letter ✍️", primary = true, enabled = !draftingPitch) {
+                                SmallButton(if (draftingPitch) "Drafting..." else "Draft letter", primary = true, enabled = !draftingPitch, icon = GameIcons.Sparkle) {
                                     draftingPitch = true
                                     scope.launch {
                                         val res = Ollama.generateRecruitPitchLetter(lg.ollama, lg, r)

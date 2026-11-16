@@ -393,13 +393,26 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
 
 // ---------- bottom navigation ----------
 
+/** Which icon a tab wears: the third tab is recruiting, trades (an NBA coach) or "Me" (a player). */
+internal fun tabIconKind(vm: GameViewModel, t: Tab): String = when (t) {
+    Tab.TODAY -> "today"
+    Tab.TEAM -> "team"
+    Tab.RECRUIT -> when {
+        vm.league?.let { com.nh.hoopscoach.game.NbaCoach.active(it) } == true -> "trades"
+        vm.league?.playerMode == true -> "me"
+        else -> "recruit"
+    }
+    Tab.LEAGUE -> "league"
+    Tab.CAREER -> "career"
+}
+
 @Composable
 internal fun NavBar(vm: GameViewModel) {
     Column(Modifier.fillMaxWidth().background(P.bg)) {
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(top = 4.dp, bottom = 6.dp)) {
             for (t in Tab.entries) {
-                val icon = when (t) { Tab.TODAY -> NavIcons.Today; Tab.TEAM -> NavIcons.Team; Tab.RECRUIT -> NavIcons.Recruit; Tab.LEAGUE -> NavIcons.League; Tab.CAREER -> NavIcons.Career }
                 val sel = vm.tab == t
+                val icon = GameIcons.tab(tabIconKind(vm, t), sel)
                 val label = if (t == Tab.RECRUIT && vm.league?.let { com.nh.hoopscoach.game.NbaCoach.active(it) } == true) "Trades"
                     else if (t == Tab.RECRUIT && vm.league?.playerMode == true) "Me" else t.label
                 // Selected tab pill grows from the middle; icon gets a soft pulse, label settles in.

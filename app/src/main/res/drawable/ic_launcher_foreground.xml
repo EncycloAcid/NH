@@ -1,16 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ball on a dark tile with an arena-orange seam pattern. Safe zone is the middle 66dp. -->
+<!-- A shaded basketball over a warm glow, with its shadow on the floor. The same art as the PC icon (AppIcon.kt).
+     Everything that matters sits inside the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#F2F3F5"
-        android:pathData="M54,28a26,26 0,1 1,0 52a26,26 0,1 1,0 -52z" />
-    <path
-        android:strokeColor="#11141B"
-        android:strokeWidth="2.8"
-        android:fillColor="#00000000"
-        android:pathData="M28,54h52 M54,28v52 M35.6,35.6c7.4,5.6 11.2,12 11.2,18.4s-3.8,12.8 -11.2,18.4 M72.4,35.6c-7.4,5.6 -11.2,12 -11.2,18.4s3.8,12.8 11.2,18.4" />
+    <group
+        android:pivotX="54"
+        android:pivotY="52"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+        <!-- glow -->
+        <path android:pathData="M54,11.25a38.75,38.75 0 1,1 0,77.5a38.75,38.75 0 1,1 0,-77.5z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="54"
+                    android:centerY="50"
+                    android:gradientRadius="38.75">
+                    <item android:offset="0" android:color="#61F07A22" />
+                    <item android:offset="1" android:color="#00F07A22" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- shadow -->
+        <path
+            android:fillColor="#61000000"
+            android:pathData="M38.5,79.5a15.5,2.5 0 1,0 31,0a15.5,2.5 0 1,0 -31,0z" />
+        <!-- ball -->
+        <path android:pathData="M54,25a25,25 0 1,1 0,50a25,25 0 1,1 0,-50z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="45.25"
+                    android:centerY="40"
+                    android:gradientRadius="38.75">
+                    <item android:offset="0" android:color="#FFFFB46B" />
+                    <item android:offset="0.5" android:color="#FFF07A22" />
+                    <item android:offset="1" android:color="#FFA9480C" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <group>
+            <clip-path android:pathData="M54,25a25,25 0 1,1 0,50a25,25 0 1,1 0,-50z" />
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#FF2A1407"
+                android:strokeWidth="1.9"
+                android:strokeLineCap="round"
+                android:pathData="M29,50H79 M54,25V75 M36,32C46,40.5 46,59.5 36,68 M72,32C62,40.5 62,59.5 72,68" />
+            <path
+                android:fillColor="#29FFFFFF"
+                android:pathData="M38.5,33.75a10,5.25 0 1,0 20,0a10,5.25 0 1,0 -20,0z" />
+        </group>
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#8C2A1407"
+            android:strokeWidth="1"
+            android:pathData="M54,25a25,25 0 1,1 0,50a25,25 0 1,1 0,-50z" />
+    </group>
 </vector>

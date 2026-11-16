@@ -326,7 +326,7 @@ fun BracketScreen(vm: GameViewModel, lg: League, confId: Int) {
                 }
             }
         }
-        if (b.done) item { Section("Champion"); GroupList(listOf(lg.team(b.champion))) { t -> RankRow(vm, lg, "🏆", t, t.record) } }
+        if (b.done) item { Section("Champion"); GroupList(listOf(lg.team(b.champion))) { t -> RankRow(vm, lg, "1st", t, t.record) } }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }

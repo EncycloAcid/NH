@@ -217,12 +217,12 @@ private fun IntroCard(vm: GameViewModel, hs: HighSchool) {
         Text("One more year. Play the summer circuit with ${hs.travelTeam}, your senior season, official visits, and a commitment ceremony. " +
             "Your ranking, your stars and your offers can all still change.", style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(10.dp))
-        listOf("☀️" to "Summer circuit · three stops, three chances to move up", "🏀" to "Senior season · the showcase, the rivalry, the playoffs",
-            "✈️" to "Official visits · up to five schools", "🧢" to "Decision day · three hats on the table").forEach { (icon, text) ->
-            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(icon, style = T.body)
-                Spacer(Modifier.width(10.dp))
-                Text(text, style = T.small, color = P.sub)
+        listOf(GameIcons.Sun to "Summer circuit · three stops, three chances to move up", GameIcons.Ball to "Senior season · the showcase, the rivalry, the playoffs",
+            GameIcons.Plane to "Official visits · up to five schools", GameIcons.Cap to "Decision day · three hats on the table").forEach { (icon, text) ->
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconTile(icon, P.accent, 30.dp)
+                Spacer(Modifier.width(12.dp))
+                Text(text, style = T.small, color = P.sub, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(14.dp))

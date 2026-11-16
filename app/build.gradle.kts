@@ -80,8 +80,8 @@ android {
         applicationId = "com.nh.hoopscoach.pro"
         minSdk = 26
         targetSdk = 35
-        versionCode = 273
-        versionName = "3.9-pro.252"
+        versionCode = 274
+        versionName = "3.9-pro.253"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from
@@ -153,16 +153,19 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "HoopsDynasty"
-            // jpackage requires a numeric dotted version; UI still shows 3.9-pro.252 via PlatformContext.
-            packageVersion = "3.9.252"
+            // jpackage requires a numeric dotted version; UI still shows 3.9-pro.253 via PlatformContext.
+            packageVersion = "3.9.253"
             description = "College basketball coaching dynasty (Pro)"
             vendor = "DeadBunny Studios"
             copyright = "© 2026 DeadBunny Studios"
             linux {
                 packageName = "hoops-dynasty"
+                iconFile.set(project.file("icons/hoops.png"))
             }
             windows {
                 menuGroup = "Hoops Dynasty"
+                // The app icon (the same art as AppIcon.kt), for the .exe, the installer and the shortcuts.
+                iconFile.set(project.file("icons/hoops.ico"))
                 upgradeUuid = "b8d4f0a2-5c3e-4f9b-ad2e-7e6f5c4b3d21"
                 shortcut = true
                 dirChooser = true

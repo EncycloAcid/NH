@@ -1217,7 +1217,7 @@ private fun TradeRow(lg: League, t: com.nh.hoopscoach.game.Trade) {
             Text(if (t.offseason) "${t.season} OFFSEASON" else "${t.season} · DAY ${t.day}", style = T.label, color = if (t.hero) P.accent else P.sub, modifier = Modifier.weight(1f))
             if (lg.ollama.enabled && lg.ollama.tradeRumors && analysis == null) {
                 Text(
-                    if (grading) "Grading..." else "Grade with ${lg.ollama.shortActionName} AI ✍️",
+                    if (grading) "Grading..." else "✦ Grade with ${lg.ollama.shortActionName} AI",
                     style = T.small.copy(fontSize = 11.sp),
                     color = P.accent,
                     modifier = Modifier.clickable(enabled = !grading) {

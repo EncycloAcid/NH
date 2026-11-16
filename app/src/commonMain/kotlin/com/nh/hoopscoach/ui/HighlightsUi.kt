@@ -134,9 +134,7 @@ fun MixtapeScreen(vm: GameViewModel, lg: League) {
                 Section("The plays")
                 GroupList(plays, inset = 50.dp) { h ->
                     ListRow(onClick = { if (lg.games.any { it.id == h.gameId && it.box != null }) vm.push(Route.Box(h.gameId)) }) {
-                        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(P.accentSoft), contentAlignment = Alignment.Center) {
-                            Text(when (h.kind) { "dunk", "poster" -> "🔨"; "block" -> "✋"; "winner", "tie" -> "⏱"; else -> "🎯" }, style = T.body)
-                        }
+                        IconTile(GameIcons.highlight(h.kind), P.accent, 36.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(h.text, style = T.bodyB, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)

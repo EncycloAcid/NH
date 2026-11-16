@@ -925,7 +925,7 @@ fun OllamaGameReportCard(vm: GameViewModel, lg: League, g: Game) {
 
     Section(
         "Beat report & quotes",
-        action = if (report == null && !writing) "${lg.ollama.shortActionName} Report ✍️" else if (writing) "Writing..." else "Rewrite",
+        action = if (report == null && !writing) "✦ ${lg.ollama.shortActionName} Report" else if (writing) "Writing..." else "Rewrite",
         onAction = {
             writing = true
             streamingText = ""

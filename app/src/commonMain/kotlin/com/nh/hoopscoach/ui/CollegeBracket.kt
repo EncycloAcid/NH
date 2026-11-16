@@ -133,7 +133,7 @@ fun TreeBracket(vm: GameViewModel, lg: League, b: Bracket, r0: Int, rounds: Int,
                         TeamBadge(wt, 26.dp)
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text("🏆 ${b.seeds[wt.id]?.let { "No. $it" } ?: ""}", style = T.label.copy(fontSize = 9.sp), color = fg.copy(alpha = 0.85f))
+                            IconLabel(GameIcons.Trophy, b.seeds[wt.id]?.let { "No. $it" } ?: "CHAMPION", T.label.copy(fontSize = 9.sp), fg.copy(alpha = 0.85f))
                             Text(wt.school, style = T.bodyB.copy(fontSize = 13.sp), color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -197,7 +197,7 @@ fun BracketHeader(lg: League, b: Bracket, ncaa: Boolean) {
         if (champ != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("🏆 ${lg.season} ${if (ncaa) "NATIONAL CHAMPIONS" else b.name.uppercase() + " CHAMPIONS"}", style = T.label, color = fg.copy(alpha = 0.85f))
+                    IconLabel(GameIcons.Trophy, "${lg.season} ${if (ncaa) "NATIONAL CHAMPIONS" else b.name.uppercase() + " CHAMPIONS"}", T.label, fg.copy(alpha = 0.85f))
                     Text(champ.school.uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 32.sp), color = fg)
                     Text("${champ.record}${b.seeds[champ.id]?.let { " · No. $it seed" } ?: ""}", style = T.small, color = fg.copy(alpha = 0.9f))
                 }

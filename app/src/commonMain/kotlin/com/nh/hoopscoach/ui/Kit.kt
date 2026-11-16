@@ -352,7 +352,7 @@ fun SecondaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolea
 }
 
 @Composable
-fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
     // A risky action is outlined, never filled, so it can't be mistaken for the main one even when the team's color is red.
     val bg = when { !enabled -> P.surface2; danger -> Color.Transparent; primary -> P.accent; else -> P.accentSoft }
     val fg = when { !enabled -> P.faint; danger -> P.bad; primary -> P.onAccent; else -> P.accent }
@@ -361,7 +361,14 @@ fun SmallButton(text: String, modifier: Modifier = Modifier, primary: Boolean = 
         modifier.heightIn(min = 38.dp).clip(shape).background(bg).then(if (danger && enabled) Modifier.border(1.dp, P.bad.copy(alpha = 0.45f), shape) else Modifier)
             .pressable(enabled, onClick).padding(horizontal = 13.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1) }
+    ) {
+        if (icon == null) Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1)
+        else Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(text, style = T.bodyB.copy(fontSize = 14.sp), color = fg, maxLines = 1)
+        }
+    }
 }
 
 @Composable

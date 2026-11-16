@@ -110,7 +110,7 @@ fun FacilitiesScreen(vm: GameViewModel, lg: League) {
             val cost = Facilities.cost(t, k.id)
             Panel(Modifier.padding(bottom = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(k.icon, style = T.title.copy(fontSize = 26.sp))
+                    IconTile(GameIcons.facility(k.id), P.accent, 44.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(Facilities.displayName(t, k.id), style = T.bodyB, color = P.ink)

@@ -531,7 +531,7 @@ fun PressCard(vm: GameViewModel, lg: League) {
 
     Section(
         "Postgame press · ${q.topic}",
-        action = if (lg.ollama.enabled && lg.ollama.pressConference) (if (aiGenerating) "Writing..." else "${lg.ollama.shortActionName} Q&A ✍️") else null,
+        action = if (lg.ollama.enabled && lg.ollama.pressConference) (if (aiGenerating) "Writing..." else "✦ ${lg.ollama.shortActionName} Q&A") else null,
         onAction = {
             val h = lg.hero ?: return@Section
             val line = h.log.lastOrNull() ?: return@Section

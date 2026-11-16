@@ -277,8 +277,8 @@ fun RivalryTrophyShelf(lg: League) {
         val opp = shelf[n]?.lastOrNull()?.oppId?.let { lg.teams.getOrNull(it) }
             ?: lg.rivalsOf(lg.userTeamId).firstOrNull { RT.name(it) == n }?.let { lg.teams.getOrNull(it.other(lg.userTeamId)) }
         ListRow {
-            Text("🏆", style = T.bodyB)
-            Spacer(Modifier.width(10.dp))
+            IconTile(GameIcons.Trophy, P.gold, 34.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(n, style = T.bodyB, color = P.ink)
                 Text((opp?.let { "vs ${it.school} · " } ?: "") + if (years.isEmpty()) "Won it this season" else "Held ${years.size}×: ${years.joinToString(", ")}", style = T.small, color = P.sub)

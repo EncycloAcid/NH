@@ -32,7 +32,7 @@ fun TrophyRoomLink(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(8.dp))
     Panel(onClick = { vm.push(Route.Trophies) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("🏆", style = T.title.copy(fontSize = 26.sp))
+            IconTile(GameIcons.Trophy, P.gold, 42.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Trophy room", style = T.bodyB, color = P.ink)
@@ -47,7 +47,7 @@ fun TrophyRoomLink(vm: GameViewModel, lg: League) {
         Spacer(Modifier.height(8.dp))
         Panel(onClick = { vm.push(Route.Mixtape) }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🎬", style = T.title.copy(fontSize = 26.sp))
+                IconTile(GameIcons.Film, P.accent, 42.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Season mixtape", style = T.bodyB, color = P.ink)
@@ -83,7 +83,7 @@ fun TrophyRoomScreen(vm: GameViewModel, lg: League) {
         }
         if (banners.isNotEmpty()) item {
             Section("Banners")
-            GroupList(banners) { b -> ListRow { Text("🏆", style = T.bodyB); Spacer(Modifier.width(10.dp)); Text(b, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f)) } }
+            GroupList(banners) { b -> ListRow { IconTile(GameIcons.Trophy, P.gold, 32.dp); Spacer(Modifier.width(12.dp)); Text(b, style = T.bodyB, color = P.ink, modifier = Modifier.weight(1f)) } }
         }
         if (h != null) item { TrophyCase(h) }
         if (lg.road == null) item { RivalryTrophyShelf(lg) }
@@ -112,7 +112,7 @@ fun TrophyRoomScreen(vm: GameViewModel, lg: League) {
                     val a = got[d.id]
                     ListRow {
                         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (a != null) P.gold.copy(alpha = 0.22f) else P.surface2), contentAlignment = Alignment.Center) {
-                            Text(if (a != null) "★" else "🔒", style = T.bodyB, color = if (a != null) P.gold else P.faint)
+                            androidx.compose.material3.Icon(if (a != null) GameIcons.Star else GameIcons.Lock, null, tint = if (a != null) P.gold else P.faint, modifier = Modifier.size(20.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {

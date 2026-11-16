@@ -199,14 +199,14 @@ fun AiRivalryHypeCard(vm: GameViewModel, lg: League, g: Game) {
         ) {
             Text("RIVALRY PREVIEW", style = T.label, color = P.bad, modifier = Modifier.weight(1f))
             if (existing != null) {
-                SmallButton("Read Preview 📰") {
+                SmallButton("Read preview", icon = GameIcons.Newspaper) {
                     val idx = lg.news.indexOf(existing)
                     if (idx >= 0) vm.push(Route.Article(idx))
                 }
                 Spacer(Modifier.width(8.dp))
                 AiBadge(com.nh.hoopscoach.game.ArticleWriting.checked(existing), existing.source.substringAfterLast(" · ", ""), fallbackReason = existing.aiFallbackReason)
             } else {
-                SmallButton(if (loading) "Generating..." else "Generate Hype ✍️", primary = true, enabled = !loading) {
+                SmallButton(if (loading) "Generating..." else "Generate hype", primary = true, enabled = !loading, icon = GameIcons.Sparkle) {
                     loading = true
                     scope.launch {
                         val res = Ollama.generatePregameRivalryPreview(lg.ollama, lg, g)
@@ -265,7 +265,7 @@ fun AiScoutingCard(vm: GameViewModel, lg: League, g: Game) {
             AiBadge(keys?.any { it.isAi } == true, lg.ollama.providerDisplayName, fallbackReason = keys?.firstOrNull()?.fallbackReason.orEmpty())
             if (keys == null && !loading) {
                 Text(
-                    "Generate with ${lg.ollama.shortActionName} AI ✍️",
+                    "✦ Generate with ${lg.ollama.shortActionName} AI",
                     style = T.small.copy(fontSize = 11.sp),
                     color = P.accent,
                     modifier = Modifier.clickable {

@@ -18,7 +18,7 @@ fun main() {
     val home = File(System.getProperty("user.home"), ".hoopsdynasty").apply { mkdirs() }
     PlatformContext.filesDir = home
     SaveTransfer.host = DesktopTransferHost()
-    PlatformContext.versionName = "3.9-pro.252"
+    PlatformContext.versionName = "3.9-pro.253"
     // A Windows app has no console, so errors go to a log beside the saves (the previous run's is kept).
     runCatching {
         val log = File(home, "hoops-log.txt")
@@ -51,6 +51,7 @@ private fun androidx.compose.ui.window.ApplicationScope.Game(vm: GameViewModel) 
             exitApplication()
         },
         title = "Hoops Dynasty Pro",
+        icon = androidx.compose.runtime.remember { com.nh.hoopscoach.ui.AppIcon.Art() },
         state = state,
         // Keys a text box doesn't take: Esc back, Space/Enter continue, S sim the day, W sim a week,
         // 1-5 tabs, Ctrl+S save, F1 the list.

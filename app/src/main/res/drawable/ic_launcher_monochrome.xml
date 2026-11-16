@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed (one-color) icon: the ball in outline, its seams, and its shadow. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M54,27a24,24 0 1,1 0,48a24,24 0 1,1 0,-48z M30,51H78 M54,27V75 M37,34C46.5,42 46.5,60 37,68 M71,34C61.5,42 61.5,60 71,68" />
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M40.5,80.5a13.5,2 0 1,0 27,0a13.5,2 0 1,0 -27,0z" />
+    </group>
+</vector>

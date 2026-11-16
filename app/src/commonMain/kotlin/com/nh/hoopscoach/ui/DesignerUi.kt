@@ -376,8 +376,8 @@ fun ChallengesScreen(vm: GameViewModel, lg: League) {
             if (medals.isEmpty()) Panel { Empty("No medals yet.") }
             else GroupList(medals.reversed()) { m ->
                 ListRow {
-                    Text(when (m.medal) { "gold" -> "🥇"; "silver" -> "🥈"; else -> "🥉" }, style = T.head)
-                    Spacer(Modifier.width(10.dp))
+                    IconTile(GameIcons.Medal, when (m.medal) { "gold" -> P.gold; "silver" -> androidx.compose.ui.graphics.Color(0xFFB8C0CC); else -> androidx.compose.ui.graphics.Color(0xFFC77C48) }, 36.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(Challenges.def(m.id)?.name ?: m.id, style = T.bodyB, color = P.ink)
                         Text("${m.school} · ${m.season}", style = T.small, color = P.sub)
