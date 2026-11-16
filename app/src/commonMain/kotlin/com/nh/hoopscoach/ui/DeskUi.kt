@@ -23,8 +23,12 @@ import com.nh.hoopscoach.game.League
  */
 @Composable
 fun CoachDeskCards(vm: GameViewModel, lg: League) {
-    if (!CoachDesk.pressActive(lg)) return
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val stories = if (lg.playerMode) emptyList() else com.nh.hoopscoach.game.Storylines.pending(lg)
+    if (!CoachDesk.pressActive(lg)) {
+        InboxStack(stories.map { s -> com.nh.hoopscoach.game.Storylines.title(s) to @Composable { StoryBeatCard(vm, lg, s) } })
+        return
+    }
     val C = com.nh.hoopscoach.game.Clubhouse
     val entries = mutableListOf<Pair<String, @Composable () -> Unit>>()
     // Most time-sensitive first: tonight's game, then what just happened, then what can wait.
@@ -36,6 +40,7 @@ fun CoachDeskCards(vm: GameViewModel, lg: League) {
         entries += title to { DeskPrompt(vm, lg, pr) }
     }
     C.incident(lg)?.let { inc -> entries += "Locker room: ${inc.title.lowercase()}" to { IncidentCard(vm, lg, inc) } }
+    for (s in stories) entries += com.nh.hoopscoach.game.Storylines.title(s) to { StoryBeatCard(vm, lg, s) }
     com.nh.hoopscoach.game.OffCourt.booster(lg)?.let { rq -> entries += "A booster calls" to { BoosterCard(vm, lg, rq) } }
     if (!lg.pro && com.nh.hoopscoach.game.RadioShow.due(lg)) entries += "The coach's show" to { RadioShowCard(vm, lg) }
     InboxStack(entries)
@@ -254,6 +259,7 @@ fun PlayerInbox(vm: GameViewModel, lg: League, press: Boolean = true) {
     if (PC.goalDue(lg)) entries += "Your goal this season" to { GoalCard(vm, lg) }
     if (com.nh.hoopscoach.game.Shoes.designPending(lg) != null) entries += "Design your shoe" to { ShoeDesignCard(vm, lg) }
     com.nh.hoopscoach.game.OffCourt.life(lg)?.let { l -> entries += "Off the court: ${l.title.lowercase()}" to { LifeCard(vm, lg) } }
+    for (s in com.nh.hoopscoach.game.Storylines.pending(lg)) entries += com.nh.hoopscoach.game.Storylines.title(s) to { StoryBeatCard(vm, lg, s) }
     if (!PC.goalDue(lg)) GoalCard(vm, lg)
     InboxStack(entries)
 }

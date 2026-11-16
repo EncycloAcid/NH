@@ -91,6 +91,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { SummerTourCard(vm, lg) }
         item { NcaaCaseCard(vm, lg) }
         item { CoachDeskCards(vm, lg) }
+        item { StorylinesPanel(vm, lg) }
         item { LatestMyMoment(vm, lg) }
         item { PreviewCard(vm, lg) }
         if (today != null) item { NextUp(vm, lg, today) }

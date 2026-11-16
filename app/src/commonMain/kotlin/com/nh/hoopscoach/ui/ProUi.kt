@@ -160,6 +160,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         item { HeroTodayCard(vm, lg) }
         item { PlayerInbox(vm, lg, press = false) }
+        item { StorylinesPanel(vm, lg) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
         item { TopTenCard(vm, lg) }

@@ -1905,6 +1905,8 @@ object Sim {
         runCatching { Marquee.preview(lg) }
         // The weekly TV debate.
         runCatching { TvShow.daily(lg) }
+        // Season-long storylines.
+        runCatching { Storylines.daily(lg) }
         Reactions.pass(lg)
     }
 }
