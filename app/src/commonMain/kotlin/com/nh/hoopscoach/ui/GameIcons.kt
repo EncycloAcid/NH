@@ -169,6 +169,9 @@ object GameIcons {
         f("M18.5 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z", 1f),
     )
 
+    val Reply = icon("reply", s("M4.5 5.5h15v10h-8.5l-4.5 3.8V15.5H4.5z"))
+    val Repost = icon("repost", s("M7 7.5h10.5l-2.6-2.6 M17.5 7.5v3.5 M17 16.5H6.5l2.6 2.6 M6.5 16.5V13"))
+
     /** A highlight's kind. */
     fun highlight(kind: String) = when (kind) { "dunk", "poster" -> Bolt; "block" -> Shield; "winner", "tie" -> Stopwatch; else -> Target }
 

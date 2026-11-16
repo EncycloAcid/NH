@@ -240,11 +240,11 @@ fun Modifier.hoverClick(onClick: () -> Unit, tint: Color = P.ink, enabled: Boole
 }
 
 @Composable
-fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Color = P.ink, style: TextStyle = T.num) {
+fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Color = P.ink, style: TextStyle = T.num, labelColor: Color = P.sub) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // A long number shrinks to fit its cell; a long label takes a second line instead of running into its neighbor.
         FitText(value, style, color, minScale = 0.65f, textAlign = TextAlign.Center)
-        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), color = labelColor, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 
@@ -256,8 +256,14 @@ fun StatRow(stats: List<Triple<String, String, Color?>>, modifier: Modifier = Mo
 }
 
 @Composable
-fun Empty(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = T.body, color = P.sub, textAlign = TextAlign.Center, modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 22.dp))
+fun Empty(text: String, modifier: Modifier = Modifier, icon: ImageVector? = GameIcons.Ball) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (icon != null) {
+            IconTile(icon, P.faint, 40.dp)
+            Spacer(Modifier.height(10.dp))
+        }
+        Text(text, style = T.body, color = P.sub, textAlign = TextAlign.Center)
+    }
 }
 
 // ---------- controls ----------

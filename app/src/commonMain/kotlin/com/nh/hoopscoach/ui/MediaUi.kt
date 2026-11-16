@@ -160,14 +160,17 @@ fun PostRow(p: Post, onOpen: (() -> Unit)? = null, lg: League? = null) {
                     Spacer(Modifier.width(3.dp))
                     Text(Road.count(p.likes), style = T.small, color = P.sub)
                     Spacer(Modifier.width(12.dp))
-                    Text("💬 ${Road.count(replies)}", style = T.small, color = P.sub)
+                    Icon(GameIcons.Reply, null, tint = P.sub, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text(Road.count(replies), style = T.small, color = P.sub)
                     Spacer(Modifier.width(12.dp))
-                    Text("🔁 ${Road.count(reposts)}", style = T.small, color = P.sub)
+                    Icon(GameIcons.Repost, null, tint = P.sub, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text(Road.count(reposts), style = T.small, color = P.sub)
                     Spacer(Modifier.width(10.dp))
                     Text(kindLabel(p.kind), style = T.small, color = kindColor(p.kind).copy(alpha = 0.85f))
                     if (onOpen != null) { Spacer(Modifier.weight(1f)); Text("Read", style = T.small.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = P.accent) }
                 }
-                Text(vibe(p), style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

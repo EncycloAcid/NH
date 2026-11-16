@@ -1,5 +1,8 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -165,14 +168,19 @@ fun ConferencePage(vm: GameViewModel, lg: League, confId: Int) {
         item {
             BackBar(c.name, "${tierName(lg, c.tier).removeSuffix("s").removeSuffix(" conference")} · ${teams.size} ${if (lg.pro) "teams" else "schools"}", onBack = { vm.back() })
             Section("Standings")
+            Row(Modifier.fillMaxWidth().padding(start = Gutter + 14.dp, end = Gutter + 14.dp, bottom = 4.dp)) {
+                Text("TEAM", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.weight(1f))
+                if (!lg.pro) Text("CONF", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+                Text(if (lg.pro) "W-L" else "ALL", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+            }
             GroupList(Season.standings(lg, confId).withIndex().toList()) { (i, t) ->
-                ListRow(onClick = { vm.push(Route.TeamPage(t.id)) }) {
-                    Text("${i + 1}", style = T.numSm, color = P.faint, modifier = Modifier.width(28.dp))
+                ListRow(onClick = { vm.push(Route.TeamPage(t.id)) }, modifier = if (t.id == lg.userTeamId) Modifier.background(P.accentSoft) else Modifier) {
+                    Text("${i + 1}", style = T.numSm, color = if (t.id == lg.userTeamId) P.accent else P.faint, modifier = Modifier.width(28.dp))
                     TeamBadge(t, 28.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text(nameOf(lg, t), style = T.bodyB, color = if (t.id == lg.userTeamId) P.accent else P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(t.confRecord, style = T.numSm, color = P.ink, modifier = Modifier.width(56.dp))
-                    Text(t.record, style = T.small, color = P.sub)
+                    FitText(nameOf(lg, t), T.bodyB, if (t.id == lg.userTeamId) P.accent else P.ink, Modifier.weight(1f), minScale = 0.8f)
+                    if (!lg.pro) Text(t.confRecord, style = T.numSm.copy(fontSize = 16.sp), color = P.ink, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+                    Text(t.record, style = T.numSm.copy(fontSize = 16.sp), color = if (lg.pro) P.ink else P.sub, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
                 }
             }
         }

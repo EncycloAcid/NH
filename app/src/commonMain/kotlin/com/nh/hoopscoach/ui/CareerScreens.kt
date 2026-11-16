@@ -118,7 +118,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(8.dp))
                 Text("Beat your expected wins and go deep in March to keep the boosters happy.", style = T.small, color = P.sub)
                 com.nh.hoopscoach.game.CoachContracts.ensure(lg)
-                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)} · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
+                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)}" + if (c.earnings > 0) " · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far" else "", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
             }
             ComplianceCard(vm, lg)
             Section("Coaching skills", action = "Develop", onAction = { vm.push(Route.CoachDev) })

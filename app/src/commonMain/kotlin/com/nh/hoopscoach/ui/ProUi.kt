@@ -489,6 +489,11 @@ fun ProLeagueScreen(vm: GameViewModel, lg: League) {
             0 -> for (c in 0..1) item {
                 val st = ProSeason.standings(lg, c)
                 Section(lg.conf(c).name)
+                Row(Modifier.fillMaxWidth().padding(start = Gutter + 14.dp, end = Gutter + 14.dp, bottom = 4.dp)) {
+                    Text("TEAM", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.weight(1f))
+                    Text("W-L", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
+                    Text("GB", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.width(40.dp), textAlign = TextAlign.End)
+                }
                 // Split where the season splits: straight into the playoffs, the play-in, and the lottery.
                 val groups = if (Eras.of(lg).playIn) listOf("Playoffs · top 6" to 0..5, "Play-in · 7 to 10" to 6..9, "Lottery" to 10..14)
                     else listOf("Playoffs · top 8" to 0..7, "Lottery" to 8..14)
@@ -532,8 +537,17 @@ private fun LazyListScope.playoffs(vm: GameViewModel, lg: League) {
                     val eraPlayIn = Eras.of(lg).playIn
                     val mine = st.getOrNull(a)?.id == lg.userTeamId || (!playIn && b < 6 && st.getOrNull(b)?.id == lg.userTeamId)
                     Row(Modifier.fillMaxWidth().then(if (mine) Modifier.background(P.accentSoft) else Modifier).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (playIn) "PLAY-IN" else "ROUND 1", style = T.label.copy(fontSize = 10.sp), color = if (playIn) P.gold else P.accent, modifier = Modifier.width(64.dp))
-                        Text("${a + 1} ${name(a)}  vs  ${b + 1} ${if (eraPlayIn && !playIn && b >= 6) "play-in winner" else name(b)}", style = T.small, color = P.ink)
+                        Text(if (playIn) "PLAY-IN" else "ROUND 1", style = T.label.copy(fontSize = 10.sp), color = if (playIn) P.gold else P.accent, modifier = Modifier.width(60.dp))
+                        // One side of the matchup: the seed, the logo and the name (or who's still to be decided).
+                        @Composable fun side(i: Int, tbd: Boolean, m: Modifier) = Row(m, verticalAlignment = Alignment.CenterVertically) {
+                            Text("${i + 1}", style = T.numSm.copy(fontSize = 14.sp), color = P.sub, modifier = Modifier.width(18.dp))
+                            if (!tbd) st.getOrNull(i)?.let { TeamBadge(it, 22.dp); Spacer(Modifier.width(6.dp)) }
+                            Text(if (tbd) "Play-in winner" else name(i), style = if (tbd) T.small else T.bodyB.copy(fontSize = 14.sp),
+                                color = if (tbd) P.sub else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        side(a, false, Modifier.weight(1f))
+                        Text("vs", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = 6.dp))
+                        side(b, eraPlayIn && !playIn && b >= 6, Modifier.weight(1f))
                     }
                 }
             }
@@ -871,7 +885,7 @@ private fun LeaderRow(vm: GameViewModel, lg: League, rank: Int, p: Player, t: Te
         PlayerJersey(p, t, 36.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(p.name, style = T.bodyB, color = if (me) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            FitText(p.name, T.bodyB, if (me) P.accent else P.ink, minScale = 0.8f)
             Text("${t.name} · ${p.posLabel}", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(value, style = if (value.length > 6) T.small else T.numSm, color = P.ink, textAlign = TextAlign.End, modifier = Modifier.widthIn(value))

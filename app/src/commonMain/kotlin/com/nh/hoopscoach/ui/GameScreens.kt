@@ -331,8 +331,10 @@ private fun BroadcastHero(lg: League, e: com.nh.hoopscoach.game.GameEngine, home
                 modifier = Modifier.align(Alignment.Center).padding(top = 40.dp).popIn(e).clip(RoundedCornerShape(10.dp)).background(Color(ut.primary)).padding(horizontal = 18.dp, vertical = 2.dp))
         }
         // A dark band behind the score bug and another behind the crowd line, so both read over the floor.
-        Box(Modifier.fillMaxWidth().height(78.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.78f), Color.Black.copy(alpha = 0.45f), Color.Transparent))))
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(34.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+        Box(Modifier.fillMaxWidth().height(92.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(
+            0f to Color.Black.copy(alpha = 0.86f), 0.55f to Color.Black.copy(alpha = 0.62f), 1f to Color.Transparent)))
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(44.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(
+            0f to Color.Transparent, 0.45f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.85f))))
         Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp)) {
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 BugSide(away, e.score[1], e.score[1] > e.score[0], final, lg.userTeamId, Modifier.weight(1f), flip = false)

@@ -607,7 +607,7 @@ object Road {
     }
 
     /** Thousands of dollars as "$850K" or "$1.37M". */
-    fun dollars(k: Int) = if (k >= 1000) "$%.2fM".format(k / 1000.0).replace(".00M", "M") else "$${k}K"
+    fun dollars(k: Int) = when { k == 0 -> "$0"; k >= 1000 -> "$%.2fM".format(k / 1000.0).replace(".00M", "M"); else -> "$${k}K" }
 
     // ---------- where he stands ----------
 

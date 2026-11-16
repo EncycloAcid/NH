@@ -224,7 +224,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 // In player mode you only manage yourself, and your NIL comes from your deal.
                 val coaching = mine && !lg.playerMode
                 val yourself = lg.playerMode && p.id == lg.heroId
-                if (coaching) SmallButton("NIL ${money(p.nil)}") { editNil = true }
+                if (coaching && !lg.pro) SmallButton("NIL ${money(p.nil)}") { editNil = true }
                 if (coaching || yourself) SmallButton("Training focus") { vm.sheet = null; vm.push(Route.Focus(p.id)) }
                 if (yourself) SmallButton("Customize", primary = true) { vm.sheet = null; vm.push(Route.MyPlayer) }
                 if (coaching || yourself) SmallButton("Build Lab") { vm.sheet = null; vm.push(Route.BuildLab(p.id)) }

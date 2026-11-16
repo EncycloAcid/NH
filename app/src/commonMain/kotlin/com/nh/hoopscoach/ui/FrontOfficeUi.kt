@@ -50,13 +50,15 @@ fun BusinessPanel(vm: GameViewModel, lg: League, t: Team) {
         style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp),
     )
     Section("Upgrades")
-    GroupList(Business.UPGRADES) { u ->
+    // An NBA team has no recruits: the recruiting office is a college thing, and the wording says franchise.
+    GroupList(Business.UPGRADES.filter { !lg.pro || it.id != "recruiting" }) { u ->
         val owned = Business.has(t, u.id)
         val cost = Business.cost(lg, u)
         ListRow {
             Column(Modifier.weight(1f)) {
                 Text(u.name, style = T.bodyB, color = P.ink)
-                Text(u.what, style = T.small, color = P.sub)
+                Text(if (lg.pro) u.what.replace("; in college, recruits notice too (recruiting +2)", "").replace("the program", "the franchise") else u.what,
+                    style = T.small, color = P.sub)
             }
             Spacer(Modifier.width(8.dp))
             if (owned) Tag("BUILT", P.good)

@@ -83,7 +83,7 @@ fun TopTenScreen(vm: GameViewModel, lg: League) {
                                 Column(Modifier.weight(1f)) {
                                     if (mine) Text("YOUR PLAY", style = T.label.copy(fontSize = 9.sp), color = if (top) heroKicker else P.accent)
                                     Text(h.text, style = if (top) T.head else T.bodyB, color = fg)
-                                    Text("${lg.teams.getOrNull(h.teamId)?.name ?: ""} vs ${lg.teams.getOrNull(h.oppId)?.abbr ?: ""} · ${h.time}", style = T.small, color = if (top) P.onHero.copy(alpha = 0.8f) else P.sub)
+                                    Text("${lg.teams.getOrNull(h.teamId)?.let { if (lg.pro) it.name else it.school } ?: ""} vs ${lg.teams.getOrNull(h.oppId)?.let { if (lg.pro) it.name else it.school } ?: ""} · ${h.time}", style = T.small, color = if (top) P.onHero.copy(alpha = 0.8f) else P.sub)
                                 }
                             }
                         }
@@ -138,7 +138,7 @@ fun MixtapeScreen(vm: GameViewModel, lg: League) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(h.text, style = T.bodyB, color = P.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text("Day ${h.day} · vs ${lg.teams.getOrNull(h.oppId)?.name ?: ""} · ${h.time}", style = T.small, color = P.sub, maxLines = 1)
+                            Text("Day ${h.day} · vs ${lg.teams.getOrNull(h.oppId)?.let { if (lg.pro) it.name else it.school } ?: ""} · ${h.time}", style = T.small, color = P.sub, maxLines = 1)
                         }
                     }
                 }

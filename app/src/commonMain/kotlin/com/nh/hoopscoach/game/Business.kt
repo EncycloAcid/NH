@@ -107,6 +107,7 @@ object Business {
     fun newSeason(t: Team) { t.gate = 0 }
 
     fun money(k: Long): String = when {
+        k == 0L -> "$0"
         k >= 1_000_000 -> "$" + "%.2f".format(k / 1_000_000.0) + "B"
         k >= 1_000 -> "$" + "%.1f".format(k / 1_000.0) + "M"
         else -> "$${k}K"

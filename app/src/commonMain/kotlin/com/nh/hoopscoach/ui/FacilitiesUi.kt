@@ -83,8 +83,8 @@ fun FacilitiesScreen(vm: GameViewModel, lg: League) {
                 CountUpText(t.cash, T.hero.copy(fontSize = 44.sp, lineHeight = 44.sp), fg) { Business.money(it) }
                 Spacer(Modifier.height(8.dp))
                 Row {
-                    Stat("From the gate", Business.money(t.gate / 4), Modifier.weight(1f), color = fg)
-                    Stat("Boosters", Business.money(t.boosterSeason), Modifier.weight(1f), color = fg)
+                    Stat("From the gate", Business.money(t.gate / 4), Modifier.weight(1f), color = fg, labelColor = fg.copy(alpha = 0.75f))
+                    Stat("Boosters", Business.money(t.boosterSeason), Modifier.weight(1f), color = fg, labelColor = fg.copy(alpha = 0.75f))
                 }
                 Text("A quarter of the gate, the boosters' giving and postseason money all go into the fund.", style = T.small, color = fg.copy(alpha = 0.8f),
                     modifier = Modifier.padding(top = 8.dp))

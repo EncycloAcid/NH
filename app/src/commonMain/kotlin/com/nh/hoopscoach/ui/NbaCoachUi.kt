@@ -2083,9 +2083,6 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
             ScreenHeader("Head coach · age ${c.age}", c.name, "${u.name} · ${ordinal(NbaCoach.seasonsHere(lg) + 1)} season") {
                 IconCircle({ vm.push(Route.Settings) }) { Icon(NavIcons.Gear, "Settings", tint = P.sub, modifier = Modifier.size(22.dp)) }
             }
-            TrophyRoomLink(vm, lg)
-            ConnectionsCard(vm, lg)
-            CoachRivalsCard(lg)
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CoachBadge(c.first, c.last, 60.dp)
@@ -2106,6 +2103,9 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                     style = T.numSm,
                 )
             }
+            TrophyRoomLink(vm, lg)
+            ConnectionsCard(vm, lg)
+            CoachRivalsCard(lg)
             Section("Job security")
             Panel {
                 val col = securityColor(c.security)
@@ -2118,7 +2118,7 @@ fun NbaCoachCareer(vm: GameViewModel, lg: League) {
                 Spacer(Modifier.height(8.dp))
                 Text("The owner expects the preseason projection. Wins above it, playoff series and titles raise it; falling short lowers it.", style = T.small, color = P.sub)
                 com.nh.hoopscoach.game.CoachContracts.ensure(lg)
-                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)} · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
+                Text("Contract: ${com.nh.hoopscoach.game.CoachContracts.line(lg)}" + if (c.earnings > 0) " · earned ${com.nh.hoopscoach.game.CoachContracts.money(c.earnings)} so far" else "", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
             }
             Section("Coaching skills")
             Panel {
