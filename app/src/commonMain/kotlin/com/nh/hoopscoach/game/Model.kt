@@ -1183,6 +1183,8 @@ class SchoolOffer(val teamId: Int, val nil: Int, val role: String, val ahead: In
 /** Player-mode state: NIL deal, offseason decisions and how the career ended. */
 @Serializable
 class RoadState(
+    /** His senior year of high school, if he played it ([SeniorYear]). */
+    var hs: HighSchool? = null,
     var startSeason: Int = 0,
     var dealSeason: Int = 0,
     var deal: NilDeal = NilDeal.NONE,

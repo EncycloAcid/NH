@@ -77,7 +77,12 @@ private fun heightRange(pos: Pos) = when (pos) { Pos.PG -> 70..78; Pos.SG -> 72.
 @Composable
 fun RoadNewGame(vm: GameViewModel, lg: League, header: @Composable () -> Unit) {
     val hero = vm.roadHero
-    if (hero != null) { RoadOffers(vm, lg, hero, header); return }
+    if (hero != null) {
+        // Senior year first (unless he skipped it), then the offers.
+        val hs = vm.senior
+        if (hs != null && !hs.skipped) SeniorYearFlow(vm, lg, hero, hs, header) else RoadOffers(vm, lg, hero, header)
+        return
+    }
     // Start from the last player made here, so going back from the offers keeps every choice (the era above all).
     val saved = vm.roadSpec
     var first by remember { mutableStateOf(saved?.first ?: "") }
@@ -947,6 +952,7 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
         if (h != null) item { CareerHub(vm, lg, h) }
         if (h != null && lg.lineage.isNotEmpty()) item { FamilyPanel(lg) }
         if (h != null) item { CareerTotals(h) }
+        if (lg.road?.hs != null) item { HighSchoolPanel(lg) }
         if (h != null) item { SeasonBySeason(lg, h) }
         if (h != null && h.awards.isNotEmpty()) item { HonorBadges(h) }
         if (r != null) item { EarningsPanel(r) }

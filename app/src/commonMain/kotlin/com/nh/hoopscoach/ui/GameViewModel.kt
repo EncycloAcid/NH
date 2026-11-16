@@ -469,6 +469,10 @@ class GameViewModel : ViewModel() {
     /** The player being created on the new game screen, and the schools offering him. */
     var roadHero by mutableStateOf<com.nh.hoopscoach.game.Player?>(null)
     var roadOffers by mutableStateOf<List<com.nh.hoopscoach.game.SchoolOffer>>(emptyList())
+    /** His senior year, played on the new game screen before he signs ([com.nh.hoopscoach.game.SeniorYear]). */
+    var senior by mutableStateOf<com.nh.hoopscoach.game.HighSchool?>(null)
+    /** The senior year changed (it lives outside the league, so this redraws the screen). */
+    fun seniorChanged() { rev++ }
 
     /** Draft Night: how many picks are in so far, for [revealSeason]. Lives here so a tab switch doesn't restart the night. */
     var reveal by mutableIntStateOf(0)
@@ -493,24 +497,28 @@ class GameViewModel : ViewModel() {
             }
             roadHero = h
             roadOffers = o
+            senior = com.nh.hoopscoach.game.SeniorYear.begin(h)
             busy = null
         }
     }
 
-    fun roadBack() { roadHero = null; roadOffers = emptyList() }
+    fun roadBack() { roadHero = null; roadOffers = emptyList(); senior = null }
 
     fun startRoad(teamId: Int) {
         val d = draft ?: return
         val h = roadHero ?: return
+        val hs = senior?.takeIf { !it.skipped && it.step > com.nh.hoopscoach.game.SeniorYear.INTRO }
         ensureFreshSlot()
-        busy = "Signing your scholarship"
+        busy = if (hs != null) "Putting on the hat" else "Signing your scholarship"
         viewModelScope.launch(failSafe) {
             withContext(Dispatchers.Default) {
                 com.nh.hoopscoach.game.Road.start(d, h, teamId)
+                if (hs != null) runCatching { com.nh.hoopscoach.game.SeniorYear.apply(d, h, hs) }
                 runCatching { com.nh.hoopscoach.game.LegacyMode.onStart(d, h) }
             }
             draft = null
             roadHero = null
+            senior = null
             roadOffers = emptyList()
             roadSpec = null
             league = d
@@ -574,6 +582,7 @@ class GameViewModel : ViewModel() {
             roadSpec = spec
             roadHero = pair.first
             roadOffers = pair.second
+            senior = com.nh.hoopscoach.game.SeniorYear.begin(pair.first)
             league = null
             busy = null
         }
@@ -746,6 +755,7 @@ class GameViewModel : ViewModel() {
             }
             draft = null
             roadHero = null
+            senior = null
             league = lg
             tab = Tab.TODAY
             stack.clear()
