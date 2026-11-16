@@ -33,7 +33,7 @@ object Business {
     fun ticket(lg: League, t: Team): Int = ((if (lg.pro) 95.0 else 35.0) * PRICE_MULT[t.price.coerceIn(0, 4)] * Eras.of(lg).money.coerceAtLeast(0.2).let { if (lg.pro) it else 1.0 }).roundToInt()
 
     /** How much fuller (or emptier) the building is for the price and the upgrades. NBA buildings run fuller than college ones. */
-    fun fillBonus(lg: League, t: Team): Double = PRICE_FILL[t.price.coerceIn(0, 4)] + (if (has(t, "board")) 0.02 else 0.0) + (if (lg.pro) 0.24 else 0.0)
+    fun fillBonus(lg: League, t: Team): Double = PRICE_FILL[t.price.coerceIn(0, 4)] + (if (has(t, "board") && lg.pro) 0.02 else 0.0) + (if (lg.pro) 0.24 else 0.0) + Facilities.fill(lg, t)
 
     /** The starting upgrade budget, the first time anyone looks. */
     fun ensure(lg: League, t: Team) { if (t.cash < 0) t.cash = if (lg.pro) 10_000 else 2_000 }

@@ -32,7 +32,7 @@ object Assistants {
     fun bonus(lg: League, t: Team, skill: String): Double = if (!mine(lg, t)) 0.0 else lg.staff.filter { it.skill == skill }.sumOf { points(it) }
 
     /** Development points for [t]'s player growth. */
-    fun dev(lg: League, t: Team): Int = bonus(lg, t, "dev").roundToInt()
+    fun dev(lg: League, t: Team): Int = bonus(lg, t, "dev").roundToInt() + Facilities.dev(lg, t)
 
     /** Offense and defense as a make-chance edge, like a coach rating. */
     fun off(lg: League, t: Team): Double = bonus(lg, t, "off") * 0.0006 * (if (lg.pro) 0.5 else 1.0)

@@ -507,6 +507,12 @@ class Team(
     var cash: Long = -1,
     var gate: Long = 0,
     var upgrades: MutableList<String> = mutableListOf(),
+    /** College program building ([Facilities]): each facility's level (1-5), donors' names on them, the boosters' mood (5-100), this season's giving and the season of the last gala. */
+    var facilities: MutableMap<String, Int> = mutableMapOf(),
+    var facilityNames: MutableMap<String, String> = mutableMapOf(),
+    var boosterMood: Int = 60,
+    var boosterSeason: Long = 0,
+    var galaSeason: Int = 0,
     /** Home arena capacity, set once when the league is created (or an old save loads). */
     var arena: Int = 0,
     /** Prestige won or lost in rivalry games this season. */

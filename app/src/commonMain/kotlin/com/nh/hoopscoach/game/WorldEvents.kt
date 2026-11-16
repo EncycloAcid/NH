@@ -166,6 +166,7 @@ object WorldEvents {
         runCatching { RivalryTrophies.seasonEnd(lg) }
         runCatching { Challenges.seasonEnd(lg) }
         runCatching { Shoes.marchBonuses(lg) }
+        runCatching { Facilities.seasonEnd(lg) }
         runCatching { CoachDesk.gradePrediction(lg) }
         runCatching { Clubhouse.gradeBracket(lg) }
         records(lg)
@@ -259,6 +260,7 @@ object WorldEvents {
 
     /** Daily: a freshman nobody saw coming, recognised once he has a real body of work. */
     fun daily(lg: League) {
+        runCatching { Facilities.daily(lg) }
         if (lg.pro || lg.phase != Phase.REGULAR) return
         if (lg.day % 7 == 0) Compliance.check(lg)
         runCatching { NcaaCases.daily(lg) }

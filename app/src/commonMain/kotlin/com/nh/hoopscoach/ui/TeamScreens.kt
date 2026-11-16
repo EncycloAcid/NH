@@ -433,7 +433,7 @@ private fun LazyListScope.program(vm: GameViewModel, lg: League, t: Team) {
     item {
         ProgramNumbers(vm, lg, t)
         FanPanel(t)
-        if (t.id == lg.userTeamId && !lg.playerMode) BusinessPanel(vm, lg, t)
+        if (t.id == lg.userTeamId && !lg.playerMode) { if (lg.pro) BusinessPanel(vm, lg, t) else FacilitiesCard(vm, lg, t) }
         RivalsList(vm, lg, t)
         Section("Apparel")
         Panel {
