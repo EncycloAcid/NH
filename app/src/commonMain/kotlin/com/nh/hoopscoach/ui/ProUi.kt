@@ -1727,6 +1727,7 @@ fun ProEnding(vm: GameViewModel, lg: League) {
                 Text(r.ending, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }
+        if (r.retired) item { NextGeneration(vm, lg) }
         if (r.jerseys.isNotEmpty()) item {
             Section("Jersey night")
             for (j in r.jerseys) {

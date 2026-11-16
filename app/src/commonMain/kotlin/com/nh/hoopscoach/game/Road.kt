@@ -157,7 +157,8 @@ object Road {
     fun join(lg: League, p: Player, t: Team) {
         p.teamId = t.id
         p.walkOn = false
-        val used = t.roster.map { lg.player(it).number }.toSet() + Legacy.retiredNumbers(t)
+        // A son can wear his father's retired number at his father's school.
+        val used = t.roster.map { lg.player(it).number }.toSet() + (Legacy.retiredNumbers(t) - LegacyMode.familyNumbers(lg, t))
         if (p.number in used) p.number = Recruiting.freeNumber(lg, t)
         t.roster += p.id
         while (Tryouts.scholarships(lg, t) > Recruiting.MAX_ROSTER) {

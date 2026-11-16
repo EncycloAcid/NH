@@ -263,7 +263,11 @@ private fun OfferBrowser(lg: League, offers: List<SchoolOffer>, hero: Player, se
         2 -> compareByDescending { it.nil }
         3 -> compareByDescending<SchoolOffer> { it.closeness }.thenByDescending { lg.team(it.teamId).prestige }
         else -> compareByDescending { lg.team(it.teamId).prestige }
-    })
+    }).let { sorted ->
+        // Legacy: his father's school stays pinned at the top.
+        val dad = com.nh.hoopscoach.game.LegacyMode.father(lg)?.school
+        if (dad == null) sorted else sorted.sortedByDescending { lg.team(it.teamId).school == dad }
+    }
     if (list.isEmpty()) Panel { Text("No school matches \"$query\".", style = T.body, color = P.sub) }
     GroupList(list.take(shown), inset = 64.dp) { o -> OfferRow(lg, o, hero, selected == o.teamId) { onPick(o) } }
     if (list.size > shown) Box(Modifier.padding(horizontal = Gutter, vertical = 8.dp)) {
@@ -278,7 +282,10 @@ private fun OfferRow(lg: League, o: SchoolOffer, hero: Player, selected: Boolean
         TeamBadge(t, 40.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(t.school, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(t.school, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (com.nh.hoopscoach.game.LegacyMode.father(lg)?.school == t.school) { Spacer(Modifier.width(6.dp)); Tag("DAD'S SCHOOL", P.gold, filled = true) }
+            }
             Text("${lg.conf(t.confId).abbr} · ${prestigeLabel(t.prestige)}" + closenessLabel(o.closeness).let { if (it.isEmpty()) "" else " · $it" },
                 style = T.small, color = P.sub, maxLines = 1)
             Text("${o.role} · ${if (o.ahead == 0) "nobody" else "${o.ahead}"} ahead at ${hero.pos}", style = T.small,
@@ -938,6 +945,7 @@ fun HeroCareerScreen(vm: GameViewModel, lg: League) {
             }
         }
         if (h != null) item { CareerHub(vm, lg, h) }
+        if (h != null && lg.lineage.isNotEmpty()) item { FamilyPanel(lg) }
         if (h != null) item { CareerTotals(h) }
         if (h != null) item { SeasonBySeason(lg, h) }
         if (h != null && h.awards.isNotEmpty()) item { HonorBadges(h) }
@@ -1368,6 +1376,7 @@ fun RoadEnding(vm: GameViewModel, lg: League) {
                 Text(r.ending, style = T.small, color = P.onHero.copy(alpha = 0.9f))
             }
         }
+        item { NextGeneration(vm, lg) }
         if (h != null) item { Spacer(Modifier.height(10.dp)); CareerTotals(h) }
         item { CareerStory(lg) }
         item {

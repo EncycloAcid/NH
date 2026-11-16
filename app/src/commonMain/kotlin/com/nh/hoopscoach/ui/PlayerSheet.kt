@@ -172,6 +172,8 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (p.shoePay > 0) Tag(com.nh.hoopscoach.game.Shoes.ofPlayer(p)?.short?.uppercase() ?: "SHOE", P.gold)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
+                if (p.id == lg.legacySonId) Tag("YOUR SON", P.gold, filled = true)
+                if (p.id == lg.heroId) com.nh.hoopscoach.game.LegacyMode.father(lg)?.let { Tag("SON OF ${it.name.uppercase()}", P.gold) }
                 if (p.id == lg.heroId && com.nh.hoopscoach.game.Hometown.active(lg)) Tag("HOMETOWN KID", P.gold, filled = true)
                 com.nh.hoopscoach.game.Jerseys.rank(lg, p).takeIf { it > 0 }?.let { Tag("NO. $it IN JERSEY SALES", P.gold) }
                 if (p.id == lg.heroId) lg.road?.shoe?.let { Tag("THE ${com.nh.hoopscoach.game.Shoes.shoeName(lg, it).uppercase()}", P.accent) }

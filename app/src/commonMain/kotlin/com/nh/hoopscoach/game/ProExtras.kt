@@ -352,11 +352,11 @@ object Afterward {
     }
 
     /** The coach he becomes: a recruiter who sells his name, and a teacher of the game he played. */
-    fun becomeCoach(pro: League, college: League, school: String): League {
+    fun becomeCoach(pro: League, college: League, school: String, years: Int = yearsAway(pro)): League {
         val r = pro.road!!
         val h = pro.hero!!
         val t = college.teams.first { it.school == school }
-        val away = yearsAway(pro)
+        val away = years
         val past = Lifetime.fromPlayer(pro)
         college.season = pro.season + away
         Offseason.claimTeam(college, t.id, h.first, h.last)

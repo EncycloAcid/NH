@@ -134,6 +134,7 @@ fun CareerScreen(vm: GameViewModel, lg: League) {
             }
             Section("Coaching history")
         }
+        item { YourSonPanel(vm, lg) }
         item {
             val rows = mutableListOf<@Composable () -> Unit>()
             if (lg.phase != Phase.WRAP_UP && lg.phase != Phase.OFFSEASON) rows += {
@@ -776,7 +777,8 @@ fun NewGameScreen(vm: GameViewModel) {
                 Text(
                     when (mode) {
                         0 -> "Take over any of ${lg.teams.size} Division I programs. Recruit, coach, develop and build a dynasty."
-                        1 -> "Road to the League: create a high school senior, pick a school, earn your minutes and chase the draft."
+                        1 -> lg?.lineage?.lastOrNull()?.let { dad -> "The next generation: the son of ${dad.name}. ${dad.school} wants him back where his father played. Pick his school." }
+                            ?: "Road to the League: create a high school senior, pick a school, earn your minutes and chase the draft."
                         else -> "Coach an NBA team: today's league or any season since 1986-87, with that year's real rosters. Set the rotation, make trades, win over the owner."
                     },
                     style = T.body, color = P.sub,

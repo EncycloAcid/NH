@@ -370,6 +370,8 @@ private fun CardBack(lg: League, p: Player, width: Dp) {
                 Column(Modifier.weight(1f)) {
                     Text(p.name.uppercase(), style = T.title.copy(fontSize = sz(17f), lineHeight = sz(18f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(listOfNotNull(p.posLabel, t?.let { if (lg.pro) it.name else it.school }).joinToString(" · "), style = T.label.copy(fontSize = sz(8.5f)), color = ink.copy(alpha = 0.7f), maxLines = 1)
+                    if (p.id == lg.heroId) com.nh.hoopscoach.game.LegacyMode.father(lg)?.let { Text("SON OF ${it.name.uppercase()}", style = T.label.copy(fontSize = sz(8f)), color = P.gold, maxLines = 1) }
+                    if (p.id == lg.legacySonId) Text("THE COACH'S SON", style = T.label.copy(fontSize = sz(8f)), color = P.gold, maxLines = 1)
                 }
                 t?.let { TeamBadge(it, width * 0.13f) }
             }

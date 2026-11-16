@@ -504,7 +504,10 @@ class GameViewModel : ViewModel() {
         ensureFreshSlot()
         busy = "Signing your scholarship"
         viewModelScope.launch(failSafe) {
-            withContext(Dispatchers.Default) { com.nh.hoopscoach.game.Road.start(d, h, teamId) }
+            withContext(Dispatchers.Default) {
+                com.nh.hoopscoach.game.Road.start(d, h, teamId)
+                runCatching { com.nh.hoopscoach.game.LegacyMode.onStart(d, h) }
+            }
             draft = null
             roadHero = null
             roadOffers = emptyList()
@@ -531,6 +534,75 @@ class GameViewModel : ViewModel() {
             live = null
             tab = Tab.TODAY
             league = pro
+            busy = null
+            bump()
+        }
+    }
+
+    // ---------- legacy mode ----------
+
+    /**
+     * Play as his son: a college world years later with the father's career in it, the son created from him,
+     * and his scholarship offers (his father's school among them). The new-career screen picks it up from there,
+     * and the father's career stays in its own save.
+     */
+    fun legacyPlay(first: String, pos: com.nh.hoopscoach.game.Pos) {
+        val old = league ?: return
+        if (busy != null || !com.nh.hoopscoach.game.LegacyMode.available(old)) return
+        val years = com.nh.hoopscoach.game.LegacyMode.gap(old)
+        busy = "$years years later"
+        viewModelScope.launch(failSafe) {
+            delay(60)
+            val made = runCatching {
+                mutex.withLock {
+                    withContext(Dispatchers.Default) {
+                        val L = com.nh.hoopscoach.game.LegacyMode
+                        val dad = L.ancestorOf(old) ?: error("No career to hand down")
+                        val world = L.newWorld(old, dad)
+                        val spec = L.sonSpec(dad, first, pos)
+                        val son = com.nh.hoopscoach.game.Road.createHero(world, spec).also { L.inherit(it, dad) }
+                        Triple(world, spec, son to L.withFatherOffer(world, son, dad, com.nh.hoopscoach.game.Road.offers(world, son)))
+                    }
+                }
+            }.getOrElse { e ->
+                e.printStackTrace(); busy = null; toast("Couldn't start the next generation: ${e.message ?: e.javaClass.simpleName}"); return@launch
+            }
+            val (world, spec, pair) = made
+            stack.clear(); sheet = null; live = null
+            draft = world
+            roadSpec = spec
+            roadHero = pair.first
+            roadOffers = pair.second
+            league = null
+            busy = null
+        }
+    }
+
+    /** Coach his son: his old school's job, years later, with his son in this year's recruiting class. A new save. */
+    fun legacyCoach() {
+        val old = league ?: return
+        if (busy != null || !com.nh.hoopscoach.game.LegacyMode.available(old)) return
+        busy = "${com.nh.hoopscoach.game.LegacyMode.gap(old)} years later"
+        viewModelScope.launch(failSafe) {
+            delay(60)
+            val college = runCatching {
+                mutex.withLock {
+                    withContext(Dispatchers.Default) {
+                        val dad = com.nh.hoopscoach.game.LegacyMode.ancestorOf(old) ?: error("No career to hand down")
+                        com.nh.hoopscoach.game.LegacyMode.coachSon(old, dad)?.also {
+                            if (old.pro) it.proWorld = runCatching { com.nh.hoopscoach.game.SaveIO.pack(old) }.getOrDefault("")
+                        } ?: error("His old school isn't in this world")
+                    }
+                }
+            }.getOrElse { e ->
+                e.printStackTrace(); busy = null; toast("Couldn't take the job: ${e.message ?: e.javaClass.simpleName}"); return@launch
+            }
+            stack.clear(); sheet = null; live = null
+            // A new save: the father's playing career stays where it was.
+            league = null
+            ensureFreshSlot()
+            tab = Tab.TODAY
+            league = college
             busy = null
             bump()
         }

@@ -30,7 +30,7 @@ object Press {
     }
 
     /** Topics that only come up once in a while (the season's storylines), and the rest (a week or so apart). */
-    private val RARE = setOf("Draft night", "Rookie race", "Contract year", "Contender", "NIL", "Draft stock", "Freshman year", "Rookie year", "Pressure", "All-Star", "Playoff race", "Award race")
+    private val RARE = setOf("Draft night", "Rookie race", "Contract year", "Contender", "NIL", "Draft stock", "Freshman year", "Rookie year", "Pressure", "All-Star", "Playoff race", "Award race", "Your father")
 
     private fun coolingDown(lg: League, r: RoadState, topic: String): Boolean {
         val last = r.pressAsked[topic] ?: return false
@@ -105,6 +105,21 @@ object Press {
             humble("My teammates kept finding me. I just had to finish."),
             brash("Honestly? I expected it. There's more where that came from.", mates = -1),
             even("Felt good from warmups. I just kept shooting."))
+
+        // 4b. His father: everyone asks, now and then.
+        LegacyMode.father(lg)?.let { dad ->
+            val atDadsSchool = t.school == dad.school
+            ask(60, "Your father", Rng.pick(listOfNotNull(
+                "Everybody compares you to your dad. Does that ever get old?",
+                "What would ${dad.first} ${dad.last.substringBefore(" Jr.")} say about a night like this?",
+                if (atDadsSchool) "You're playing in the same gym your father did. Do you feel him in this place?" else "You picked ${t.school} over your father's school. Any second thoughts?",
+                if (dad.played.allStars > 0) "Your father was a ${dad.played.allStars}-time All-Star. Is that the bar?" else null,
+                "Is your dad still giving you notes after games?",
+            )),
+                humble("He's the reason I play. I'm just trying to make my own name.", fans = 2, mates = 2),
+                brash("He was great. I'm going to be better. He'd tell you that himself.", mates = 0, fans = 1),
+                even("I'm not him. I'm me. We just share a last name."))
+        }
 
         // 5. The postseason: where the series stands, or the end of a season (and maybe of college).
         if (g.type == GameType.PLAYOFF) {

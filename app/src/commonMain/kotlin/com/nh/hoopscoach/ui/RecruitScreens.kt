@@ -194,11 +194,15 @@ fun RecruitRow(vm: GameViewModel, lg: League, r: Recruit, ctx: Recruiting.Ctx) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(r.p.style.label, style = T.small.copy(fontSize = 12.sp), color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (r.committed < 0 && r.p.style.group in ctx.needs) { Spacer(Modifier.width(6.dp)); Tag("FILLS A NEED", P.good) }
+                if (r.p.id == lg.legacySonId) { Spacer(Modifier.width(6.dp)); Tag("YOUR SON", P.gold, filled = true) }
             }
             Spacer(Modifier.height(5.dp))
             when {
                 r.committed == u.id -> Text("Committed to you" + if (r.round in 1..Recruiting.ROUNDS) " in round ${r.round}" else "", style = T.small, color = P.good)
                 r.committed >= 0 -> Text("Signed with ${lg.team(r.committed).school}", style = T.small, color = P.faint)
+                // Your son, outside the recruiting rounds: where you stand with him, all year.
+                !cycle && r.p.id == lg.legacySonId -> Text("Your interest $mine" + (leader?.let { " · next: ${lg.team(it.key).abbr} ${it.value}" } ?: "") + " · he leans your way",
+                    style = T.small.copy(fontSize = 12.sp), color = if (leader == null || mine >= leader.value) P.good else P.warn, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 cycle && (pts > 0 || mine > 0) -> {
                     val proj = Recruiting.project(lg, r, ctx)
                     val next = proj[u.id] ?: mine

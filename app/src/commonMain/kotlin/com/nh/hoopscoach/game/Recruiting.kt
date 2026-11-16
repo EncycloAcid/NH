@@ -587,6 +587,7 @@ object Recruiting {
         }
         val t = lg.team(tid)
         Memories.committed(lg, r, t)
+        runCatching { LegacyMode.onCommit(lg, r, t) }
         if (tid != u && wasTarget && u >= 0 && r.p.stars >= 4 && (r.interest[u] ?: 0) >= 50) WorldEvents.stolen(lg, r, lg.team(u), t)
         // Recruiting rivals: who beats the user for the recruits he was really in on, and whom he beats.
         if (u >= 0 && !r.transfer) runCatching {
