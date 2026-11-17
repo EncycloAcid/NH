@@ -312,7 +312,8 @@ class Highlight(
 
 @Serializable
 class Player(
-    val id: Int,
+    /** Unique in its league. A var only so a player arriving from another world can be given a free one. */
+    var id: Int,
     var first: String,
     var last: String,
     var pos: Pos,
@@ -1894,6 +1895,11 @@ class League(
     var storylines: MutableList<Storyline> = mutableListOf(),
     /** The NBA league he played in, packed (SaveIO.pack) while he coaches in college, so a later NBA job returns to the same world. */
     var proWorld: String = "",
+    /**
+     * Legacy mode: the NBA league his father played in, packed (SaveIO.pack) through the son's college years.
+     * When the son is drafted, it's carried forward to that summer and he joins it, instead of a fresh league.
+     */
+    var heirPro: String = "",
     /** A big moment that takes the whole screen until it's dismissed: his retirement, or his introduction as a coach. */
     var ceremony: Ceremony? = null,
     /** Moments waiting their turn behind [ceremony]. */

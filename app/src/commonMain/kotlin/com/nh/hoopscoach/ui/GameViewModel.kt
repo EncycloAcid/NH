@@ -542,7 +542,13 @@ class GameViewModel : ViewModel() {
         busy = "Welcome to the league"
         viewModelScope.launch(failSafe) {
             delay(60)
-            val pro = mutex.withLock { withContext(Dispatchers.Default) { com.nh.hoopscoach.game.ProLeague.create(lg, era) } }
+            val pro = mutex.withLock {
+                withContext(Dispatchers.Default) {
+                    // A son started before his father's league rode along: find it in his father's save.
+                    runCatching { com.nh.hoopscoach.game.LegacyMode.linkFather(filesDir, lg) }
+                    com.nh.hoopscoach.game.ProLeague.create(lg, era)
+                }
+            }
             stack.clear()
             sheet = null
             live = null

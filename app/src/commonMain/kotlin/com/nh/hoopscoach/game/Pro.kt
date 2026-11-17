@@ -244,6 +244,8 @@ object ProLeague {
         val hero = college.hero!!
         if (r.proOrder.isEmpty()) planDraft(college)
         val order = r.proOrder.toList()
+        // Legacy mode: the son is drafted into the league his father played in, years on, not a fresh one.
+        fatherLeague(college, era)?.let { return arrive(college, it, era != Era.TODAY && college.era == era.name && college.season >= era.year, order, hero, r, fromFather = true) }
         val confs = listOf(
             Conference(0, "Eastern Conference", "EAST", 0, mutableListOf()),
             Conference(1, "Western Conference", "WEST", 0, mutableListOf()),
@@ -327,6 +329,79 @@ object ProLeague {
         val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
         val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
         if (inEra && !RealSeasons.has(arrive)) for (y in (base ?: era.year)..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
+        return arrive(college, lg, inEra, order, hero, r, fromFather = false)
+    }
+
+    /**
+     * Legacy mode: the league his father played in ([League.heirPro]), carried forward to the summer his son is
+     * drafted. Everyone the father played with and against is older now or retired; the draft classes since
+     * (that era's real ones while the data lasts) have come in. Its champions, record book and Hall of Fame stay.
+     * Null when there's none.
+     */
+    private fun fatherLeague(college: League, era: Era): League? {
+        if (college.heirPro.isEmpty()) return null
+        val f = runCatching { SaveIO.unpack(college.heirPro) }.onFailure { it.printStackTrace() }.getOrNull() ?: return null
+        val fps = f.proState ?: return null
+        val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
+        val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
+        val skip = heroClass + stillInSchool + (college.hero?.name ?: "")
+        val lg = League(
+            season = f.season, teams = f.teams, players = f.players, coaches = f.coaches, confs = f.confs,
+            userTeamId = 0, userCoachId = 0, nextPlayerId = maxOf(f.nextPlayerId, college.nextPlayerId + 1), nextCoachId = f.nextCoachId,
+        )
+        // The league's memory: its seasons, drafts, Hall of Fame, all-time list and record book (his father's marks in it).
+        lg.alumni += f.alumni
+        lg.history += f.history
+        lg.timeline += f.timeline
+        lg.draftHistory += f.draftHistory
+        lg.hallOfFame += f.hallOfFame
+        lg.records += f.records
+        lg.eraIds += f.eraIds
+        lg.altNbaTitles += f.altNbaTitles
+        lg.universeSeed = f.universeSeed
+        lg.pfpSeed = f.pfpSeed
+        lg.nextGameId = f.nextGameId
+        lg.mode = GameMode.PLAYER
+        lg.level = Level.PRO
+        lg.heroId = -1
+        lg.road = college.road
+        lg.lineage += college.lineage
+        lg.proState = ProState(era = fps.era, realTeams = fps.realTeams).also { ps ->
+            ps.history += fps.history
+            ps.records += fps.records
+            ps.frozen += fps.frozen
+            ps.expandAt = fps.expandAt
+            ps.expandWith += fps.expandWith
+            ps.moveAt = fps.moveAt
+            ps.moveTeam = fps.moveTeam
+        }
+        for (c in lg.coaches) c.isUser = false
+        lg.reindex()
+        // The years between his father's last season and his son's draft (a father who retired before the
+        // draft hadn't seen that summer yet).
+        val start = if (fps.step == ProStep.REVIEW) f.season else f.season + 1
+        for (y in start..college.season) yearOn(lg, y, era, skip, draft = y < college.season)
+        lg.season = college.season
+        lg.reindex()
+        return lg
+    }
+
+    /** One summer for a league before the user arrives: that year's real draft class where there is one, otherwise a generated one. */
+    private fun yearOn(lg: League, y: Int, era: Era, skip: Set<String>, draft: Boolean) {
+        if (era != Era.TODAY && EraData.draft(y).isNotEmpty()) pastYear(lg, y, skip, draft) else genYear(lg, draft, y)
+    }
+
+    /** The draft class, the user's player and his rival join [lg]; his first contract; the league opens its summer. */
+    private fun arrive(college: League, lg: League, inEra: Boolean, order: List<Int>, hero: Player, r: RoadState, fromFather: Boolean): League {
+        // Joining a league from another world (his father's), each newcomer gets an id that's free in it.
+        val renamed = HashMap<Int, Int>()
+        fun own(p: Player) {
+            if (!fromFather || p.id in renamed.values) return
+            val old = p.id
+            p.id = lg.nextPlayerId++
+            renamed[old] = p.id
+            if (old == college.heroId) lg.heroId = p.id
+        }
         // Picks go by the order planned on Draft Night, to the team in that franchise's place.
         val eraList = if (inEra) EraData.teams(college.season + 1) else null
         fun teamFor(pick: Int): Team {
@@ -338,16 +413,22 @@ object ProLeague {
         val picks = college.draftHistory.filter { it.season == college.season }.sortedBy { it.pick }
         for (d in picks) {
             val p = college.anyPlayer(d.pid) ?: continue
+            own(p)
             if (lg.playerOrNull(p.id) != null) continue
             joinPro(lg, p, teamFor(d.pick), d.cls)
         }
+        own(hero)
         if (lg.playerOrNull(hero.id) == null) {
             // Undrafted: the team that called him (the long way), or a two-way deal with one of the weaker teams.
             val t = r.signSlot.takeIf { it.isNotEmpty() }?.let { s -> lg.teams.firstOrNull { it.slot == s } } ?: teamFor(Rng.int(1, 10))
             r.signSlot = ""
             joinPro(lg, hero, t, hero.year)
         }
-        importRival(college, lg, order)
+        importRival(college, lg, order, ::own)
+        if (fromFather) {
+            lg.heroId = hero.id
+            r.rivalId = renamed[r.rivalId] ?: r.rivalId
+        }
         for (t in lg.teams) {
             trim(lg, t)
             while (t.roster.size < ROSTER) makePro(lg, Rng.pick(Pos.entries), Rng.range(84, 88), Rng.range(26, 33), t)
@@ -385,13 +466,15 @@ object ProLeague {
         Picks.ensure(lg)
         Longevity.assignReal(lg)
         runCatching { LegacyMode.checkMarks(lg) }
+        if (fromFather) runCatching { LegacyMode.inFathersLeague(lg) }
         return lg
     }
 
     /** The rival follows him: drafted earlier (he's already in the league), or still in college (he enters next year). */
-    private fun importRival(college: League, lg: League, order: List<Int>) {
+    private fun importRival(college: League, lg: League, order: List<Int>, own: (Player) -> Unit = {}) {
         val r = lg.road ?: return
         val rv = Rival.player(college) ?: return
+        own(rv)
         if (lg.playerOrNull(rv.id) != null) return
         val inCollege = college.playerOrNull(rv.id)?.teamId?.let { it >= 0 } == true
         when {
@@ -575,38 +658,44 @@ object ProLeague {
         lg.reindex()
     }
 
-    /** [years] seasons pass for a league before the user arrives: aging, growth, retirements and new draftees. */
-    fun ageForward(lg: League, years: Int) {
-        repeat(years.coerceIn(0, 80)) {
-            for (p in lg.players) p.age++
-            for (t in lg.teams) {
-                val dev = Coaching.devOf(lg.coachOf(t))
-                for (pid in t.roster.toList()) {
-                    val p = lg.player(pid)
-                    p.proYears++
-                    val go = Longevity.retires(p)
-                    if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
-                    ProCareer.develop(p, dev)
-                }
+    /** One generated year: everyone ages and develops, the old retire, a two-round draft (summer of [year], when given, on their record). */
+    private fun genYear(lg: League, draft: Boolean, year: Int? = null) {
+        for (p in lg.players) p.age++
+        for (t in lg.teams) {
+            val dev = Coaching.devOf(lg.coachOf(t))
+            for (pid in t.roster.toList()) {
+                val p = lg.player(pid)
+                p.proYears++
+                val go = Longevity.retires(p)
+                if (go) { AllTime.freeze(lg, p); t.roster.remove(pid); lg.removePlayer(p); continue }
+                ProCareer.develop(p, dev)
             }
-            // A full two-round draft, weakest rosters first, with real ceilings: tomorrow's stars.
+        }
+        // A full two-round draft, weakest rosters first, with real ceilings: tomorrow's stars.
+        val firstRound = mutableSetOf<Int>()
+        if (draft) {
             val order = lg.teams.sortedBy { t -> lg.rosterOf(t).map { it.ovr }.sortedDescending().take(8).average() }
-            val firstRound = mutableSetOf<Int>()
             for (pick in 1..minOf(60, 2 * lg.teams.size)) {
                 val t = order[(pick - 1) % order.size]
                 val age = Rng.range(19, 22)
                 val p = makePro(lg, scarcest(lg, t), draftOverall(pick), age, t)
                 p.proYears = 0
                 p.pot = Balance.rookieCeiling(p.ovr, age)
+                if (year != null) p.awards += "$year Draft #$pick"
                 if (pick <= lg.teams.size) firstRound += p.id
             }
-            for (t in lg.teams) {
-                trim(lg, t, firstRound)
-                while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 82), Rng.range(22, 27), t)
-            }
-            Balance.pro(lg)
-            lg.reindex()
         }
+        for (t in lg.teams) {
+            trim(lg, t, firstRound)
+            while (t.roster.size < REAL_ROSTER) makePro(lg, scarcest(lg, t), Rng.range(76, 82), Rng.range(22, 27), t)
+        }
+        Balance.pro(lg)
+        lg.reindex()
+    }
+
+    /** [years] seasons pass for a league before the user arrives: aging, growth, retirements and new draftees. */
+    fun ageForward(lg: League, years: Int) {
+        repeat(years.coerceIn(0, 80)) { genYear(lg, draft = true) }
         lg.season += years.coerceIn(0, 80)
         for (t in lg.teams) {
             trim(lg, t)

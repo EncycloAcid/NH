@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.268**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.269**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.268.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.269.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.268)
+## What's new (3.9-pro.243 to 3.9-pro.269)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **A son plays in his father's league**: in Legacy mode, the NBA league the father played in goes with the son's save. When the son is drafted, that league has carried on to his year (everyone the father played with is older or retired, and the draft classes since have arrived, real ones for a past era while the data lasts), and the son joins it, not a fresh league built from real rosters. The champions, the record book, the Hall of Fame and the father's career stay in it, and the press notes when the son lands on his father's old team. A son already in college from an earlier version is linked to his father's save automatically when he's drafted.
 - **A real medical room**: every injury now has a body part and a grade (minor, moderate, severe, season-ending) and a recovery clock. For your own players (or yourself in a player career) you pick the recovery plan on the injury report and can change it mid-recovery: rest fully (slower, back at 100%), standard, or rush back (sooner, but below 100% for longer and far likelier to get hurt again). Questionable or doubtful with a minor injury, you can play through it. Players back from an injury are listed as limited and shoot a little worse; an injury while still limited can aggravate the same spot and come back worse; repeat injuries make a player injury-prone; and a season-ending knee, foot or Achilles injury costs some quickness and defense for good. Each player's sheet keeps his medical history, and in a player career a Medical card on Today shows how your body is.
 - **The draft combine**: every prospect measured (height without shoes, wingspan, standing reach, weight), tested (max vertical, lane agility, three-quarter sprint) and shooting (spot-up out of 25, off the dribble out of 15), all from his body and ratings with a test-day swing, ranked against the class. On NBA Draft Night a Combine tab shows the standouts, the risers and fallers (the board moves on the results) and every result, sortable; each prospect's card has his combine line, and four interviews tell you what the room made of him and narrow his ceiling. In a player career, once you're in the draft you go through it yourself: measured, then the vertical, lane agility and sprint on a timing meter, ten spot-up threes on the shot meter, and interviews with three teams (a contender, a rebuilding team, a numbers-first front office, each wanting a different answer). Your percentiles in the class and the interviews move you on the big board, and that's where you go on Draft Night.
 - **Weekly Pick'em**: each week, pick the winners of the three biggest games that don't involve your team (ranked teams, rivalries, the postseason). Three right pays two card packs, two right one, and every five right in a row a bonus pack; the streak and the season's record stay on the card on Today.

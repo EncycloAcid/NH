@@ -182,7 +182,68 @@ object LegacyMode {
         runCatching { Trophies.carry(old, w) }
         w.tree += old.tree
         enshrine(w, a)
+        // His NBA goes on too: the league he played in rides along, and his son is drafted into it, years on.
+        if (old.pro) w.heirPro = runCatching { heirOf(old) }.onFailure { it.printStackTrace() }.getOrDefault("")
         return w
+    }
+
+    /**
+     * The father's NBA league, packed to ride along in his son's save: a copy, without what only his own career
+     * needed (the news, the schedule, game logs, highlights), so the son's save stays small.
+     */
+    fun heirOf(pro: League): String {
+        val f = SaveIO.unpack(SaveIO.pack(pro))
+        f.news.clear(); f.games.clear(); f.moments.clear(); f.alerts.clear(); f.storylines.clear()
+        f.dayPlays.clear(); f.myPlays.clear(); f.dispatch.clear(); f.crystal.clear(); f.radioLog.clear()
+        f.events.clear(); f.ceremonyQueue.clear(); f.ceremony = null; f.tv = null
+        f.heirPro = ""; f.proWorld = ""; f.shadowPros.clear()
+        for (p in f.players) { p.log = mutableListOf(); p.memories = mutableListOf(); p.highGames = mutableListOf() }
+        for (p in f.alumni) { p.log = mutableListOf(); p.memories = mutableListOf() }
+        return SaveIO.pack(f)
+    }
+
+    /**
+     * A son's career started before his father's league rode along in the save: find his father's save (his
+     * finished player career, or the college job he took after it) and carry that league, so the son is still
+     * drafted into it. Run before the son goes pro; does nothing when there's no such save.
+     */
+    fun linkFather(root: java.io.File, son: League) {
+        if (son.heirPro.isNotEmpty() || !son.playerMode || son.pro) return
+        val dad = father(son) ?: return
+        val dir = SaveManager.getSavesDir(root)
+        val files = dir.listFiles { f -> f.extension == "sav" }?.sortedByDescending { it.lastModified() } ?: return
+        for (file in files) {
+            val lg = runCatching { SaveIO.decode(file.readBytes()) }.getOrNull() ?: continue
+            val world = when {
+                lg.pro && lg.playerMode && lg.road?.ended == true && lg.anyPlayer(lg.heroId)?.name == dad.name -> lg
+                lg.proWorld.isNotEmpty() && lg.playedAs?.name == dad.name -> runCatching { SaveIO.unpack(lg.proWorld) }.getOrNull()
+                else -> null
+            } ?: continue
+            son.heirPro = runCatching { heirOf(world) }.getOrDefault("")
+            if (son.heirPro.isNotEmpty()) return
+        }
+    }
+
+    /** The son arrives in the league his father played in: the headline, and his father's old team if it drafted him. */
+    fun inFathersLeague(lg: League) {
+        val dad = father(lg) ?: return
+        val h = lg.hero ?: return
+        val t = lg.teams.getOrNull(h.teamId) ?: return
+        val old = lg.alumni.lastOrNull { it.name == dad.name }
+        val proLines = old?.career?.filter { it.cls == PRO_YEAR }.orEmpty()
+        val dadTeams = proLines.mapNotNull { l -> lg.teams.getOrNull(l.teamId)?.takeIf { l.teamId >= 0 } }.distinct()
+        val last = proLines.maxOfOrNull { it.season }
+        val ago = last?.let { lg.season - it }?.takeIf { it > 0 }
+        val home = t in dadTeams
+        // Players still active who were in the league in his father's time.
+        val left = if (last == null) 0 else lg.players.count { p -> p.teamId >= 0 && p.id != h.id && p.career.any { it.cls == PRO_YEAR && it.season <= last } }
+        lg.news += News(lg.season, 0,
+            if (home) "${h.name} joins the ${t.name}, his father's old team" else "${h.name} enters the league his father played in",
+            true, kind = "legacy", teamId = t.id, pid = h.id, source = "Hoops Wire",
+            body = "${dad.name} " + (if (dadTeams.isNotEmpty()) "played for the ${dadTeams.joinToString(" and the ") { it.name }}" else "played in this league") +
+                (if (ago != null) " and retired $ago ${if (ago == 1) "year" else "years"} ago." else ".") +
+                (if (home) " Now his son wears the same colors." else " Now his son gets his turn.") +
+                when { left >= 10 -> " Some of the players he faced are still around."; left > 0 -> " A few of the players he faced are still hanging on; most are long gone."; else -> " The players he faced are long gone." })
     }
 
     /** The father in his old school's Hall of Fame: a star there gets his number retired. */
