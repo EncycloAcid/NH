@@ -266,14 +266,18 @@ fun GettingStartedCard(vm: GameViewModel, lg: League) {
     }
 }
 
+/** A round icon button for a screen header (the calendar, help). */
+@Composable
+fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(38.dp).clip(CircleShape).background(P.surface).clickable(onClick = onClick).semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = P.sub, modifier = Modifier.size(21.dp)) }
+}
+
 /** The round ? on Today's header: opens Help. */
 @Composable
-fun HelpButton(vm: GameViewModel) {
-    Box(
-        Modifier.size(38.dp).clip(CircleShape).background(P.surface).clickable { vm.push(Route.Help("")) }.semantics { contentDescription = "Help" },
-        contentAlignment = Alignment.Center,
-    ) { Icon(MenuIcons.Help, null, tint = P.sub, modifier = Modifier.size(22.dp)) }
-}
+fun HelpButton(vm: GameViewModel) = HeaderIcon(MenuIcons.Help, "Help") { vm.push(Route.Help("")) }
 
 /** How this mode is played, and every term in the game, searchable. [focus] opens with that term searched. */
 @Composable

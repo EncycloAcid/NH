@@ -108,6 +108,7 @@ fun ShootaroundCard(vm: GameViewModel, lg: League) {
     if (!lg.playerMode || Shootaround.todaysGame(lg) == null || lg.hero?.out == true) return
     val done = r.shootSeason == lg.season && r.shootDay == lg.day
     val hot = Shootaround.edge(lg) > 0
+    Spacer(Modifier.height(CardGap))
     Panel(onClick = if (done) null else ({ vm.push(Route.Shootaround) })) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

@@ -277,7 +277,7 @@ fun InboxStack(entries: List<Pair<String, @Composable () -> Unit>>) {
     val ordered = entries.sortedBy { if (it.first == front) 0 else 1 }
     ordered.first().second()
     if (ordered.size > 1) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(CardGap))
         Panel(padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
             Text("ALSO WAITING · ${ordered.size - 1}", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 4.dp))
             ordered.drop(1).forEachIndexed { i, (title, _) ->

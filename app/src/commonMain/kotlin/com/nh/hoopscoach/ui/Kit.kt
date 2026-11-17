@@ -143,7 +143,9 @@ fun ScreenHeader(eyebrow: String?, title: String, sub: String? = null, actions: 
  * Long items (a sentence) still wrap normally.
  */
 fun keepTogether(line: String): String =
-    line.split(" · ").joinToString(" · ") { part -> if (part.length <= 24) part.replace(' ', '\u00A0') else part }
+    // The dot stays with the item before it, so a wrapped line never starts with a dot or a stray space.
+    line.split(Regex("\\s*·\\s*")).map { it.trim() }.filter { it.isNotEmpty() }
+        .joinToString("\u00A0· ") { part -> if (part.length <= 24) part.replace(' ', '\u00A0') else part }
 
 /**
  * One line of text that shrinks (down to [minScale] of its size) to fit the space instead of wrapping or
@@ -206,6 +208,9 @@ fun Section(title: String, modifier: Modifier = Modifier, action: String? = null
         if (action != null) Text(action, style = T.bodyB.copy(fontSize = 14.sp), color = P.accent, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 8.dp, vertical = 8.dp))
     }
 }
+
+/** The gap above a card that has no section title of its own, so it never sits flush against the card above. */
+val CardGap = 12.dp
 
 /** A rounded surface on the page background. */
 @Composable

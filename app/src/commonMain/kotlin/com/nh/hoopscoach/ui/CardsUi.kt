@@ -108,6 +108,7 @@ fun BinderTodayCard(vm: GameViewModel, lg: League) {
     val b = lg.binder
     if (!b.started && Cards.myTeam(lg) == null) return
     val current = b.sets.filter { it.season == lg.season }
+    Spacer(Modifier.height(CardGap))
     Panel(onClick = { vm.push(Route.Binder) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

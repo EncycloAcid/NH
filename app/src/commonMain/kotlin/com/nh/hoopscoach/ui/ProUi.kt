@@ -146,7 +146,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
     val ps = lg.proState
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { HelpButton(vm); Spacer(Modifier.width(6.dp)); TeamBadge(u, 50.dp) }
+            ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { HelpButton(vm); TeamBadge(u, 50.dp) }
         }
         item { GettingStartedCard(vm, lg) }
         // In the playoffs, where your series stands comes first.

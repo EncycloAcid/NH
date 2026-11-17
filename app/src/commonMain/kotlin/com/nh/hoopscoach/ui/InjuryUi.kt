@@ -253,7 +253,7 @@ fun TitleDefenseCard(lg: League) {
     val d = com.nh.hoopscoach.game.TitleDefense.userDefending(lg) ?: return
     if (lg.phase != com.nh.hoopscoach.game.Phase.REGULAR && lg.phase != com.nh.hoopscoach.game.Phase.PLAYOFFS && lg.phase != com.nh.hoopscoach.game.Phase.CONF_TOURNEY && lg.phase != com.nh.hoopscoach.game.Phase.NCAA) return
     val u = lg.user
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(CardGap))
     Panel(color = P.hero) {
         Text(if (d.streak >= 2) "${com.nh.hoopscoach.game.TitleDefense.runWords(d.streak).uppercase()} · DEFENDING CHAMPIONS" else "DEFENDING CHAMPIONS", style = T.label, color = heroKicker)
         Text("Chasing ${com.nh.hoopscoach.game.TitleDefense.chasing(d.streak)}", style = T.head, color = P.onHero)

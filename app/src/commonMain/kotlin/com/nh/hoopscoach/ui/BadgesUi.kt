@@ -150,14 +150,14 @@ fun HeroBadgesCard(vm: GameViewModel, lg: League) {
         val x = h.badgeXp[b.name] ?: 0
         Triple(b, t, x.toFloat() / b.xp[t])
     }.maxByOrNull { it.third }
+    Spacer(Modifier.height(CardGap))
     Panel(onClick = { vm.openPlayer(h.id) }) {
+        // The link sits on the label's line, never in the middle of the sentence under it.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("YOUR BADGES · ${have.size}", style = T.label.copy(fontSize = 10.sp), color = P.accent)
-                if (have.isEmpty()) Text("Earn them in games: made threes, rebounds, assists, stops.", style = T.small, color = P.sub)
-            }
+            Text("YOUR BADGES · ${have.size}", style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.weight(1f))
             Text("All ›", style = T.small, color = P.sub)
         }
+        if (have.isEmpty()) Text("Earn them in games: made threes, rebounds, assists, stops.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
         if (have.isNotEmpty()) { Spacer(Modifier.height(8.dp)); BadgeRow(lg, h, max = 11) }
         next?.let { (b, t, f) ->
             Text("Next: ${b.label} ${Badges.TIERS[t + 1]} · ${(h.badgeXp[b.name] ?: 0)}/${b.xp[t]} ${b.unit}", style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp))

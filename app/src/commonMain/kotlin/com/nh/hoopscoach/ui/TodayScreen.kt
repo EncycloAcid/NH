@@ -66,12 +66,12 @@ fun recordLine(lg: League, t: Team): String {
     if (lg.pro) {
         val conf = lg.conf(t.confId).abbr.lowercase().replaceFirstChar { it.uppercase() }
         val pos = com.nh.hoopscoach.game.ProSeason.standings(lg, t.confId).indexOfFirst { it.id == t.id } + 1
-        return listOfNotNull(t.record, "${t.confRecord} $conf", if (t.gp > 0 && pos > 0) "${ordinal(pos)} in the $conf" else null).joinToString("  ·  ")
+        return listOfNotNull(t.record, "${t.confRecord} $conf", if (t.gp > 0 && pos > 0) "${ordinal(pos)} in the $conf" else null).joinToString(" · ")
     }
     val parts = mutableListOf("${t.record}", "${t.confRecord} ${lg.conf(t.confId).abbr}")
     if (t.ap > 0) parts += "AP #${t.ap}"
     if (t.gp > 0) parts += "NET ${t.net}"
-    return parts.joinToString("  ·  ")
+    return parts.joinToString(" · ")
 }
 
 @Composable
@@ -81,10 +81,8 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxWidth()) {
         item {
             ScreenHeader("${lg.season} · Game ${(u.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}", u.school, recordLine(lg, u)) {
-                SmallButton("Calendar") { vm.push(Route.Calendar) }
-                Spacer(Modifier.width(6.dp))
+                HeaderIcon(MenuIcons.Calendar, "Calendar") { vm.push(Route.Calendar) }
                 HelpButton(vm)
-                Spacer(Modifier.width(6.dp))
                 TeamBadge(u, 46.dp)
             }
         }
@@ -94,7 +92,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
         if (lg.playerMode) item { HeroBadgesCard(vm, lg) }
         if (lg.playerMode && lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
-        Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
+        Rivalries.latestUserRivalry(lg)?.let { g -> item { Spacer(Modifier.height(CardGap)); NewspaperBanner(vm, lg, g) } }
         item { MidnightMadnessCard(vm, lg) }
         item { SummerTourCard(vm, lg) }
         item { NcaaCaseCard(vm, lg) }
@@ -497,14 +495,14 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
                 isNcaa -> Season.regionOf(lg, u.id)?.let { "$it Region · No. ${b.seeds[u.id]} seed" } ?: "${u.school} missed the field"
                 else -> "No. ${b.seeds[u.id] ?: "–"} seed · ${recordLine(lg, u)}"
             }
-            ScreenHeader(eyebrow, roundName, sub) { HelpButton(vm); Spacer(Modifier.width(6.dp)); TeamBadge(u, 46.dp) }
+            ScreenHeader(eyebrow, roundName, sub) { HelpButton(vm); TeamBadge(u, 46.dp) }
         }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         if (lg.playerMode) item { HeroMedicalCard(vm, lg) }
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
         if (lg.playerMode) item { HeroBadgesCard(vm, lg) }
         if (lg.playerMode && lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
-        Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(4.dp)); NewspaperBanner(vm, lg, g) } }
+        Rivalries.latestUserRivalry(lg)?.takeIf { it.day > Schedule.REG_DAYS }?.let { g -> item { Spacer(Modifier.height(CardGap)); NewspaperBanner(vm, lg, g) } }
         if (inEvent) item { PathStepper(b, u.id) }
         item { CoachDeskCards(vm, lg) }
         item { CinderellaCard(vm, lg) }

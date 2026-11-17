@@ -207,7 +207,7 @@ fun SocialStrip(vm: GameViewModel, lg: League) {
     GroupList(posts, inset = 60.dp) { p -> PostRow(p, lg = lg) }
     // The latest big story around the league, a tap away from that tab.
     r.leagueFeed.lastOrNull { it.kind == "news" && it.season == lg.season }?.let { n ->
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(CardGap))
         GroupList(listOf(n)) { p ->
             ListRow(onClick = { vm.socialTab = 1; vm.push(Route.Social) }) {
                 Column(Modifier.weight(1f)) {
