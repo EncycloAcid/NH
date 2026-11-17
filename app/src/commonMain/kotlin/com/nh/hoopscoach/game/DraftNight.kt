@@ -72,9 +72,21 @@ object DraftNight {
             else trueValue(p) + (pr.noiseO + pr.noiseP) / 2.0 + Rng.gauss() * 1.0
             made += pr to score
         }
-        val ranked = made.sortedByDescending { it.second }.mapIndexed { i, (pr, _) -> Prospect(pr.p, i + 1, pr.school, pr.line, pr.noiseO, pr.noiseP) }
+        // The combine: everyone measured, tested and shooting. It tells the truth, mostly, and standing out (or
+        // flopping) moves a prospect up or down the board.
+        val results = made.map { (pr, _) -> Combine.measure(pr.p) }
+        Combine.standings(results)
+        val byPid = results.associateBy { it.pid }
+        val before = made.sortedByDescending { it.second }.withIndex().associate { (i, m) -> m.first.p.id to i + 1 }
+        val ranked = made.map { (pr, s) -> pr to s + (byPid[pr.p.id]?.score ?: 0.0) * 1.3 }.sortedByDescending { it.second }
+            .mapIndexed { i, (pr, _) -> Prospect(pr.p, i + 1, pr.school, pr.line, pr.noiseO, pr.noiseP) }
+        for (pr in ranked) byPid[pr.p.id]?.let { it.move = (before[pr.p.id] ?: pr.rank) - pr.rank }
         val coach = runCatching { lg.coachOf(lg.user) }.getOrNull()
-        ps.draftNight = DraftState(lg.season, order, ranked.toMutableList(), scoutPoints = 8 + (coach?.rec ?: 60) / 15)
+        ps.draftNight = DraftState(lg.season, order, ranked.toMutableList(), scoutPoints = 8 + (coach?.rec ?: 60) / 15).also { it.combine += results }
+        results.filter { it.move >= 6 }.maxByOrNull { it.move }?.let { r ->
+            lg.news += News(lg.season, lg.day, "Combine riser: ${r.name} climbs ${r.move} spots", false, kind = "draft",
+                body = (r.notes.firstOrNull { !it.startsWith("Shaky") && !it.startsWith("Short") } ?: Combine.line(r)) + ". He's No. ${ranked.firstOrNull { it.p.id == r.pid }?.rank ?: "?"} on the board now.")
+        }
         val mine = order.withIndex().filter { it.value == lg.userTeamId }.map { it.index + 1 }
         lg.news += News(lg.season, lg.day, "Draft night: " + if (mine.isEmpty()) "you have no picks tonight, but the phones are on" else "you pick at ${mine.joinToString(" and ") { "No. $it" }}", true)
     }
@@ -100,10 +112,12 @@ object DraftNight {
 
     fun estimate(pr: Prospect): Est {
         val k = 1.0 - pr.scout / 3.0
+        // A combine interview is the best look at how far he'll grow: it narrows the ceiling.
+        val kP = k * (if (pr.interviewed) 0.4 else 1.0)
         val o = pr.p.ovr + pr.noiseO * k
-        val pt = maxOf(o, pr.p.pot + pr.noiseP * k)
+        val pt = maxOf(o, pr.p.pot + pr.noiseP * kP)
         val wO = 1 + 3 * k
-        val wP = 2 + 5 * k
+        val wP = 2 + 5 * kP
         fun s(v: Double) = Ratings.shownPro(v.roundToInt())
         return Est(s(o - wO), s(o + wO), s(pt - wP), s(pt + wP), Ratings.shownPro(o.roundToInt()).toDouble(), Ratings.shownPro(pt.roundToInt()).toDouble())
     }
@@ -114,6 +128,32 @@ object DraftNight {
         if (dn.scoutPoints <= 0 || pr.scout >= 3) return
         dn.scoutPoints--
         pr.scout++
+    }
+
+    /** A combine interview: one of a handful. What the room came away with, and a narrower ceiling. */
+    fun interview(lg: League, pid: Int) {
+        val dn = lg.proState?.draftNight ?: return
+        val pr = dn.prospects.firstOrNull { it.p.id == pid } ?: return
+        if (dn.interviews <= 0 || pr.interviewed) return
+        dn.interviews--
+        pr.interviewed = true
+        val p = pr.p
+        val who = when {
+            p.has(Trait.GYM_RAT) -> "A gym rat: asked for film of our sets before he left the room."
+            p.has(Trait.TEAM_PLAYER) -> "All about the team: talked more about his old teammates than himself."
+            p.has(Trait.CLUTCH) -> "Wants the last shot, and told us so."
+            p.has(Trait.AMBITIOUS) -> "Ambitious: said he'll be an All-Star by year three."
+            p.has(Trait.BAG_CHASER) -> "Asked about his second contract before his first."
+            p.has(Trait.LOYAL) -> "Loyal: wants to be somewhere a long time."
+            p.has(Trait.DISLOYAL) -> "Guarded. Wouldn't say much about his college coaches."
+            else -> "Polite, a little guarded, said the right things."
+        }
+        val read = when {
+            pr.noiseP <= -2 -> "The room left thinking his ceiling is higher than the board has it."
+            pr.noiseP >= 3 -> "The room left with doubts about how much more he'll grow."
+            else -> "Nothing in the room changed the read on him."
+        }
+        pr.note = "$who $read"
     }
 
     /** His two best ratings and his weakest, for the scouting report. */

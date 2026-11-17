@@ -1228,6 +1228,13 @@ class RoadState(
     val abroadPast: MutableList<String> = mutableListOf(),
     var signSlot: String = "",
     var signTeam: String = "",
+    /** His draft combine ([PlayerCombine]): the results, the season, and what it did to his draft stock. */
+    var combine: CombineResult? = null,
+    var combineSeason: Int = 0,
+    var combineBoost: Double = 0.0,
+    var combineBefore: Int = 0,
+    var combineAfter: Int = 0,
+    val combineTalks: MutableList<String> = mutableListOf(),
     /** The pregame shootaround ([Shootaround]): the day it was shot, the last and best scores, and a hot hand for tonight. */
     var shootSeason: Int = 0,
     var shootDay: Int = -1,
@@ -1451,6 +1458,9 @@ class Prospect(
     val noiseO: Int, val noiseP: Int,
     /** 0 to 3 visits by the user's scouts. */
     var scout: Int = 0,
+    /** Sat down with him at the combine, and what the room came away with. */
+    var interviewed: Boolean = false,
+    var note: String = "",
 )
 
 /** One pick made on Draft Night, with its grade (where he was on the board against where he went). */
@@ -1467,6 +1477,9 @@ class DraftState(
     val log: MutableList<DraftPickMade> = mutableListOf(),
     var scoutPoints: Int = 10,
     var done: Boolean = false,
+    /** The combine: every prospect's results, and the interviews left. */
+    val combine: MutableList<CombineResult> = mutableListOf(),
+    var interviews: Int = 4,
 )
 
 /** Pro league state that the college game doesn't have. */

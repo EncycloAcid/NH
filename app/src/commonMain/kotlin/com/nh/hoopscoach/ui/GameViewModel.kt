@@ -82,6 +82,7 @@ sealed interface Route {
     data object Facilities : Route
     data object Binder : Route
     data object Shootaround : Route
+    data object PlayerCombine : Route
 }
 
 /** A game being watched possession by possession. */

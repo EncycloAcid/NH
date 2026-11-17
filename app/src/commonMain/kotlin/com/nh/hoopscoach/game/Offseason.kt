@@ -37,9 +37,13 @@ object Offseason {
 
     private fun draftValue(p: Player) = p.ovr + (p.pot - p.ovr) * 0.5 - (p.year - 1) * 1.2
 
+    /** The user's player's combine this year: up or down the board ([PlayerCombine]). */
+    private fun combine(lg: League, p: Player): Double =
+        if (p.id == lg.heroId) lg.road?.takeIf { it.combineSeason == lg.season }?.combineBoost ?: 0.0 else 0.0
+
     /** Ranks every player by draft stock, 1 = best. Used for projections. */
     fun draftBoard(lg: League): Map<Int, Int> {
-        val ranked = lg.players.filter { it.teamId >= 0 && it.year >= 1 }.sortedByDescending { draftValue(it) }
+        val ranked = lg.players.filter { it.teamId >= 0 && it.year >= 1 }.sortedByDescending { draftValue(it) + combine(lg, it) }
         return ranked.withIndex().associate { (i, p) -> p.id to i + 1 }
     }
 
@@ -196,7 +200,7 @@ object Offseason {
     private fun runDraft(lg: League, os: OffseasonState) {
         val entrants = os.entrants.toSet()
         val pool = lg.players.filter { it.teamId >= 0 && (it.year >= 4 || it.id in entrants) }
-            .map { it to draftValue(it) + Rng.gauss() * 2 }
+            .map { it to draftValue(it) + combine(lg, it) + Rng.gauss() * 2 }
             .sortedByDescending { it.second }
             .map { it.first }
         val picks = pool.take(60)

@@ -1137,6 +1137,8 @@ private fun LazyListScope.decisionStep(vm: GameViewModel, lg: League, h: Player,
             ChoiceCard("Enter the transfer portal", "Pick a new school this summer. You keep your eligibility.", choice == 2) { vm.act { r.portal = true; r.declared = false } }
         }
     }
+    // In the draft (declared, or out of eligibility): the combine before Draft Night.
+    item { PlayerCombineCard(vm, lg) }
 }
 
 @Composable

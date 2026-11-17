@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nh.hoopscoach.game.Combine
 import com.nh.hoopscoach.game.DraftNight
 import com.nh.hoopscoach.game.DraftState
 import com.nh.hoopscoach.game.League
@@ -53,6 +54,8 @@ class DraftUi {
     var tab by mutableIntStateOf(0)
     var pos by mutableIntStateOf(0)
     var open by mutableIntStateOf(-1)
+    /** How the combine results are sorted. */
+    var sort by mutableIntStateOf(0)
 }
 
 @Composable
@@ -76,7 +79,7 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
         val offers = DraftNight.offers(lg)
         Spacer(Modifier.height(4.dp))
         Segmented(
-            listOf("Big board", "Mock", "Picks · ${dn.log.size}", if (offers.isEmpty()) "Trades" else "Trades · ${offers.size}"),
+            listOf("Big board", "Combine", "Mock", "Picks · ${dn.log.size}", if (offers.isEmpty()) "Trades" else "Trades · ${offers.size}"),
             ui.tab, { ui.tab = it },
         )
         Spacer(Modifier.height(8.dp))
@@ -104,7 +107,8 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
                 ProspectCard(vm, lg, dn, pr, pr.p.pos in needs || pr.p.pos2 in needs, ui.open == pr.p.id) { ui.open = if (ui.open == pr.p.id) -1 else pr.p.id }
             }
         }
-        1 -> item {
+        1 -> item { CombineTab(lg, dn, ui) }
+        2 -> item {
             val mock = DraftNight.mock(lg, 12)
             Text("The next ${mock.size} picks as the league's front offices see it right now. It changes with every pick and every trade.",
                 style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
@@ -124,7 +128,7 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
                 }
             }
         }
-        2 -> item {
+        3 -> item {
             if (dn.log.isEmpty()) Panel { Text("No picks yet. The first team is on the clock.", style = T.body, color = P.sub) }
             GroupList(dn.log.reversed(), inset = 66.dp) { m ->
                 val t = lg.team(m.teamId)
@@ -265,6 +269,12 @@ private fun ProspectCard(vm: GameViewModel, lg: League, dn: DraftState, pr: Pros
             Column(Modifier.padding(start = 52.dp, end = 14.dp, bottom = 12.dp)) {
                 Text("${heightText(p.height)} · ${p.weight} lb · ${p.style.label}", style = T.small, color = P.sub)
                 Text("Last season: ${pr.line}", style = T.small, color = P.sub)
+                dn.combine.firstOrNull { it.pid == p.id }?.let { c ->
+                    Text("Combine: ${Combine.line(c)}" + if (c.move != 0) " · ${if (c.move > 0) "up" else "down"} ${kotlin.math.abs(c.move)} on the board" else "",
+                        style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp))
+                    c.notes.take(2).forEach { n -> Text(n, style = T.small, color = if (n.startsWith("Shaky") || n.startsWith("Short")) P.bad else P.good) }
+                }
+                if (pr.interviewed && pr.note.isNotEmpty()) Text("Interview: ${pr.note}", style = T.small, color = P.ink, modifier = Modifier.padding(top = 4.dp))
                 if (pr.scout == 0) {
                     Text("Your scouts haven't seen him up close. A visit narrows his ranges and tells you what he does best.", style = T.small, color = P.ink, modifier = Modifier.padding(top = 6.dp))
                 } else {
@@ -288,6 +298,7 @@ private fun ProspectCard(vm: GameViewModel, lg: League, dn: DraftState, pr: Pros
                 Spacer(Modifier.height(8.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (pr.scout < 3) SmallButton("Scout him (${dn.scoutPoints} left)", enabled = dn.scoutPoints > 0) { vm.act { DraftNight.scout(it, p.id) } }
+                    if (!pr.interviewed && dn.combine.isNotEmpty()) SmallButton("Interview (${dn.interviews} left)", enabled = dn.interviews > 0) { vm.act { DraftNight.interview(it, p.id) } }
                     if (canDraft) SmallButton("Draft ${p.last.ifEmpty { p.name }}", primary = true) { vm.act { DraftNight.pick(it, p.id) } }
                 }
             }
@@ -432,4 +443,66 @@ internal fun DraftRecap(vm: GameViewModel, lg: League, dn: DraftState) {
             Text("Steal: ${it.name} at No. ${it.pick} (board No. ${it.rank})", style = T.small, color = P.sub)
         }
     }
+}
+
+/** The combine: what stood out, who rose and fell, and every result (sortable). Tap a row to open him on the board. */
+@Composable
+private fun CombineTab(lg: League, dn: DraftState, ui: DraftUi) {
+    val left = dn.prospects.associateBy { it.p.id }
+    val res = dn.combine.filter { it.pid in left }
+    if (res.isEmpty()) { Panel { Text("No combine results for this class.", style = T.body, color = P.sub) }; return }
+    Text("Measured, tested and shooting. The numbers tell the truth about a prospect, mostly; the board moved on them. " +
+        "Interviews (${dn.interviews} left, on a prospect's card) tell you how far he'll grow.",
+        style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 4.dp))
+    val standouts = res.flatMap { r -> r.notes.filter { it.contains("best in the class") }.map { r to it.substringBefore(", best") } }
+    if (standouts.isNotEmpty()) {
+        Section("Standouts")
+        GroupList(standouts, inset = 16.dp) { (r, n) ->
+            ListRow(onClick = { ui.tab = 0; ui.open = r.pid }) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${n.substringBefore(':')} · No. ${left[r.pid]?.rank ?: "?"} on the board", style = T.small, color = P.sub)
+                }
+                Text(n.substringAfter(": "), style = T.bodyB, color = P.good)
+            }
+        }
+    }
+    val risers = res.filter { it.move > 0 }.sortedByDescending { it.move }.take(4)
+    val fallers = res.filter { it.move < 0 }.sortedBy { it.move }.take(4)
+    if (risers.isNotEmpty() || fallers.isNotEmpty()) {
+        Section("Risers and fallers")
+        GroupList(risers + fallers, inset = 16.dp) { r ->
+            ListRow(onClick = { ui.tab = 0; ui.open = r.pid }) {
+                Text(if (r.move > 0) "+${r.move}" else "${r.move}", style = T.numSm, color = if (r.move > 0) P.good else P.bad, modifier = Modifier.width(40.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("${r.name} · No. ${left[r.pid]?.rank ?: "?"}", style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(r.notes.firstOrNull() ?: Combine.line(r), style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+    Section("Every result")
+    Chips(listOf("Board", "Wingspan", "Vertical", "Lane", "Sprint", "Shooting"), ui.sort, { ui.sort = it })
+    Spacer(Modifier.height(6.dp))
+    val sorted = when (ui.sort) {
+        1 -> res.sortedByDescending { it.wingspan }
+        2 -> res.sortedByDescending { it.vert }
+        3 -> res.sortedBy { it.lane }
+        4 -> res.sortedBy { it.sprint }
+        5 -> res.sortedByDescending { it.spotUp + it.offDribble * 0.5 }
+        else -> res.sortedBy { left[it.pid]?.rank ?: 999 }
+    }
+    GroupList(sorted.take(40), inset = 16.dp) { r ->
+        val pr = left[r.pid]
+        ListRow(onClick = { ui.tab = 0; ui.open = r.pid }) {
+            Text("${pr?.rank ?: ""}", style = T.small, color = P.faint, modifier = Modifier.width(28.dp))
+            Column(Modifier.weight(1f)) {
+                Text("${r.name} · ${pr?.p?.posLabel ?: ""}", style = T.bodyB.copy(fontSize = 14.sp), color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${Combine.feet(r.height)} · ${Combine.feet(r.wingspan)} wing · ${Combine.f1(r.vert)}\" · ${Combine.f2(r.lane)} · ${Combine.f2(r.sprint)} · ${r.spotUp}/25 · ${r.offDribble}/15",
+                    style = T.small.copy(fontSize = 11.sp), color = P.sub, maxLines = 2)
+            }
+        }
+    }
+    Text("Height without shoes · wingspan · max vertical · lane agility · ¾-court sprint · spot-up · off the dribble",
+        style = T.small.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
 }

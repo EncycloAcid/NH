@@ -301,6 +301,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Calendar -> CalendarScreen(vm, lg)
         is Route.Binder -> BinderScreen(vm, lg)
         is Route.Shootaround -> ShootaroundScreen(vm, lg)
+        is Route.PlayerCombine -> PlayerCombineScreen(vm, lg)
         is Route.Facilities -> FacilitiesScreen(vm, lg)
         is Route.Cinderella -> CinderellaScreen(vm, lg)
         is Route.Designer -> DesignerScreen(vm, lg)
