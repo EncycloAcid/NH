@@ -43,7 +43,7 @@ object PreviewTopics {
         }
         lg.games.filter { !it.played && lg.rivalry(it) != null }.sortedWith(compareByDescending<Game> { it.involves(lg.userTeamId) }.thenBy { it.day }).firstOrNull()?.let { g ->
             out += PreviewTopic("rivalry", g.home, subject = "${lg.team(g.home).school} and ${lg.team(g.away).school}: a date to circle",
-                facts = "On day ${g.day}, ${lg.team(g.away).name} and ${lg.team(g.home).name} meet ${if (g.neutral) "at a neutral site" else "on ${lg.team(g.home).school}'s floor"} in the ${lg.rivalry(g)!!.name}.", priority = 3.6)
+                facts = "On day ${g.day}, ${lg.team(g.away).name} and ${lg.team(g.home).name} meet ${if (g.neutral) "at a neutral site" else "on ${lg.team(g.home).school}'s floor"} ${lg.rivalry(g)!!.name.takeIf { it.isNotBlank() }?.let { "in the $it" } ?: "in their rivalry game"}.", priority = 3.6)
         }
         return out.sortedWith(compareByDescending<PreviewTopic> { it.priority }.thenBy { it.teamId }.thenBy { it.kind })
             .distinctBy { it.kind to it.teamId }.let { all ->

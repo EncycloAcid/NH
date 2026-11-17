@@ -137,7 +137,7 @@ object StoryDesk {
                 val head = pen.head("rivalry", listOf(
                     "{home} and {away}: a date to circle", "Circle day {day}: {away} at {home}", "{rivalry}: the renewal", "Bad blood: {away} vs. {home}",
                     "The {rivalry} is back", "Mark your calendar: {away} at {home}",
-                )) { fill(it, mapOf("home" to home.school, "away" to away.school, "day" to "${g.day}", "rivalry" to rv.name)) }
+                )) { fill(it, mapOf("home" to home.school, "away" to away.school, "day" to "${g.day}", "rivalry" to rv.name.ifBlank { "${home.school}-${away.school} rivalry" })) }
                 Story(pen.one("Rivalry", "Circle it", "Bad blood", "Grudge match"), head, listOf(
                     tp.facts,
                     pen.one("The series stands at ${rv.winsFor(home.id)}-${rv.winsFor(away.id)} in ${home.school}'s favor, at least by our count.", "All-time: ${home.school} ${rv.winsFor(home.id)}, ${away.school} ${rv.winsFor(away.id)}.",

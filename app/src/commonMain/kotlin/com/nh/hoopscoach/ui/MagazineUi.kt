@@ -56,8 +56,8 @@ import kotlinx.coroutines.launch
 
 /** The shell every issue shares: a back bar, the page tabs, the pages, and prev/next at the bottom. */
 @Composable
-private fun Issue(vm: GameViewModel, title: String, tabs: List<String>, page: @Composable (Int, (Int) -> Unit) -> Unit) {
-    val pager = rememberPagerState { tabs.size }
+private fun Issue(vm: GameViewModel, title: String, tabs: List<String>, start: Int = 0, page: @Composable (Int, (Int) -> Unit) -> Unit) {
+    val pager = rememberPagerState(initialPage = start.coerceIn(0, tabs.lastIndex)) { tabs.size }
     val scope = rememberCoroutineScope()
     val go = { i: Int -> scope.launch { pager.animateScrollToPage(i.coerceIn(0, tabs.lastIndex)) }; Unit }
     Column(Modifier.fillMaxSize().background(P.bg)) {
@@ -105,31 +105,41 @@ private fun MagCover(team: Team, star: Player?, masthead: String, issue: String,
     Column {
         BoxWithConstraints(Modifier.padding(horizontal = Gutter).fillMaxWidth().clip(RoundedCornerShape(22.dp))) {
             val w = maxWidth
-            Box(Modifier.fillMaxWidth().height(w * 1.28f)) {
+            val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+            // A narrow phone or big text: fewer, shorter cover lines, and a taller cover, so nothing is cut and the flap always shows.
+            val tight = w < 380.dp || fontScale > 1.15f
+            val tall = 1.28f + (fontScale - 1f).coerceIn(0f, 0.6f) * 0.7f + (if (w < 380.dp) 0.08f else 0f)
+            Box(Modifier.fillMaxWidth().height(w * tall)) {
                 ArenaBackdrop(team, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(base.copy(alpha = 0.55f), base.copy(alpha = 0.25f), Color.Black.copy(alpha = 0.75f)))))
                 // The star, big, in the right half.
                 Box(Modifier.align(Alignment.BottomEnd).offset(x = w * 0.28f).wrapContentSize(unbounded = true, align = Alignment.BottomEnd)) {
                     if (star != null) PlayerJersey(star, team, w * 1.05f, plate = false) else TeamBadge(team, w * 0.5f)
                 }
+                // A shade down the left, so the headline and cover lines read over the star.
+                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.6f), 0.55f to Color.Black.copy(alpha = 0.25f), 0.75f to Color.Transparent)))
                 Column(Modifier.fillMaxSize().padding(16.dp)) {
                     androidx.compose.foundation.text.BasicText(
                         masthead, style = T.hero.copy(color = Color.White, lineHeight = 1.0.em), maxLines = 1,
                         autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 28.sp, maxFontSize = 96.sp, stepSize = 2.sp),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text(issue, style = T.label.copy(fontSize = 10.sp, letterSpacing = 1.5.sp), color = accent)
-                    Spacer(Modifier.height(18.dp))
-                    Column(Modifier.fillMaxWidth(0.5f)) {
-                        Text(headline.uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = Color.White, maxLines = 4)
-                        Spacer(Modifier.height(14.dp))
-                        lines.take(3).forEach { l ->
-                            Box(Modifier.width(24.dp).height(3.dp).background(accent))
-                            Text(l, style = T.bodyB.copy(fontSize = 14.sp, lineHeight = 17.sp), color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                    FitText(issue, T.label.copy(fontSize = 10.sp, letterSpacing = 1.5.sp), accent, Modifier.fillMaxWidth(), minScale = 0.7f)
+                    Spacer(Modifier.height(if (tight) 12.dp else 18.dp))
+                    // The cover lines take what room there is; the flap below always has its place.
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth(if (tight) 0.6f else 0.52f)) {
+                            Text(headline.uppercase(), style = T.hero.copy(fontSize = if (tight) 26.sp else 30.sp, lineHeight = if (tight) 26.sp else 30.sp), color = Color.White,
+                                maxLines = if (tight) 3 else 4, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.height(if (tight) 10.dp else 14.dp))
+                            lines.take(if (tight) 2 else 3).forEach { l ->
+                                Box(Modifier.width(24.dp).height(3.dp).background(accent))
+                                Text(l, style = T.bodyB.copy(fontSize = 14.sp, lineHeight = 17.sp), color = Color.White, maxLines = if (tight) 2 else 3, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = if (tight) 8.dp else 12.dp))
+                            }
                         }
                     }
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.height(8.dp))
                     yours()
                 }
             }
@@ -147,7 +157,7 @@ private fun CoverFlap(t: Team, line1: String, line2: String) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("YOUR TEAM", style = T.label.copy(fontSize = 9.sp), color = Color.White.copy(alpha = 0.7f))
-            Text(line1, style = T.bodyB, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(line1, style = T.bodyB, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(line2, style = T.small, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -253,7 +263,7 @@ private fun Story.mine() = kicker == "Your team" || kicker == "Your program" || 
 private val NoOdds = Odds(0.0, 0.0, 0.0, 0.0, 0.0, 0, 0)
 
 @Composable
-fun CollegeMagazine(vm: GameViewModel, lg: League) {
+fun CollegeMagazine(vm: GameViewModel, lg: League, start: Int = 0) {
     val pv = remember(lg, lg.season) { Previews.current(lg) }
     fun o(t: Team) = pv.odds[t.id] ?: NoOdds
     val ranked = remember(pv) { pv.proj.entries.sortedBy { it.value.nat }.map { lg.team(it.key) } }
@@ -261,7 +271,7 @@ fun CollegeMagazine(vm: GameViewModel, lg: League) {
     val mine = pv.proj.getValue(u.id)
     val hero = lg.hero?.takeIf { lg.playerMode && it.teamId >= 0 }
     val tabs = listOf("Cover", if (hero != null) "You" else "Your team", "Top 25", "Stories", "Players", "Picks")
-    Issue(vm, "Preview ${pv.season}", tabs) { page, go ->
+    Issue(vm, "Preview ${pv.season}", tabs, start) { page, go ->
         Page {
             when (page) {
                 0 -> item {
@@ -290,10 +300,10 @@ fun CollegeMagazine(vm: GameViewModel, lg: League) {
                             Spacer(Modifier.height(10.dp))
                             Panel {
                                 Text("THE STRENGTH", style = T.label.copy(fontSize = 10.sp), color = P.good)
-                                Text(r.strength, style = T.body, color = P.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(r.strength, style = T.body, color = P.ink, maxLines = 6, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(10.dp))
                                 Text("THE CONCERN", style = T.label.copy(fontSize = 10.sp), color = P.bad)
-                                Text(r.concern, style = T.body, color = P.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(r.concern, style = T.body, color = P.ink, maxLines = 6, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -411,7 +421,7 @@ fun CollegeMagazine(vm: GameViewModel, lg: League) {
 // ---------- the NBA issue ----------
 
 @Composable
-fun NbaMagazine(vm: GameViewModel, lg: League) {
+fun NbaMagazine(vm: GameViewModel, lg: League, start: Int = 0) {
     val pv: NbaPreview = remember(lg, lg.season) { NbaPreviews.current(lg) } ?: run { vm.back(); return }
     val ranked = remember(pv) { pv.proj.entries.sortedWith(compareByDescending<Map.Entry<Int, com.nh.hoopscoach.game.NbaProj>> { it.value.w }.thenByDescending { it.value.title }).map { lg.team(it.key) } }
     val u = lg.user
@@ -420,7 +430,7 @@ fun NbaMagazine(vm: GameViewModel, lg: League) {
     val hero = lg.hero?.takeIf { lg.playerMode && it.teamId >= 0 }
     val tabs = listOf("Cover", if (hero != null) "You" else "Your team", "Rankings", "Stories", "Awards", "Picks")
     fun name(t: Team) = t.name
-    Issue(vm, "NBA Preview ${pv.season}", tabs) { page, go ->
+    Issue(vm, "NBA Preview ${pv.season}", tabs, start) { page, go ->
         Page {
             when (page) {
                 0 -> item {
@@ -446,10 +456,10 @@ fun NbaMagazine(vm: GameViewModel, lg: League) {
                             Spacer(Modifier.height(10.dp))
                             Panel {
                                 Text("THE STRENGTH", style = T.label.copy(fontSize = 10.sp), color = P.good)
-                                Text(r.strength, style = T.body, color = P.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(r.strength, style = T.body, color = P.ink, maxLines = 6, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(10.dp))
                                 Text("THE CONCERN", style = T.label.copy(fontSize = 10.sp), color = P.bad)
-                                Text(r.concern, style = T.body, color = P.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                Text(r.concern, style = T.body, color = P.ink, maxLines = 6, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }

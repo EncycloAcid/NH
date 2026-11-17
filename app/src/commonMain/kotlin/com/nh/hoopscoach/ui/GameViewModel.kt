@@ -81,6 +81,7 @@ sealed interface Route {
     data class ConfPage(val confId: Int) : Route
     data object Facilities : Route
     data object Binder : Route
+    data object Shootaround : Route
 }
 
 /** A game being watched possession by possession. */

@@ -213,13 +213,21 @@ object PreviewWriting {
 
     internal fun scouting(lg: League, t: Team, picker: IssuePhrases = IssuePhrases(lg.season), profile: List<Pair<String, Double>> = Previews.profile(lg, t)): Pair<String, String> {
         val areas = profile.sortedByDescending { it.second }
-        val name = if (lg.pro) t.name else t.school
-        fun detail(area: Pair<String, Double>): String = "${area.first.lowercase()} at the ${Previews.ordinal((area.second * 100).roundToInt())} national percentile"
-        val good = detail(areas.first())
-        val bad = detail(areas.last())
+        val name = if (lg.pro) "the ${t.mascot.ifBlank { t.name }}" else t.school
+        // Plain words for where it ranks: in the league (the NBA) or the country (college).
+        val scope = if (lg.pro) "the league" else "the country"
+        fun pct(area: Pair<String, Double>) = (area.second * 100).roundToInt().coerceIn(0, 100)
+        val good = areas.first().let { a -> "${a.first.lowercase()}, " + if (pct(a) >= 97) "among the very best in $scope" else "better than ${pct(a)}% of teams in $scope" }
+        val bad = areas.last().let { a ->
+            "${a.first.lowercase()}, " + when {
+                pct(a) <= 3 -> "near the bottom of $scope"
+                pct(a) < 50 -> "ahead of only ${pct(a)}% of teams in $scope"
+                else -> "still better than ${pct(a)}% of teams, but the least of its strengths"
+            }
+        }
         val strengths = listOf("The clearest edge", "The reliable weapon", "The foundation", "The strongest card", "The pressure point", "The bankable skill", "The best route", "The distinguishing trait", "The positive signal", "The matchup lever", "The starting advantage", "The dependable piece")
         val worries = listOf("opponents will test", "the thin margin comes from", "the toughest adjustment is", "the weak link remains", "the first repair must address", "the risk centers on", "the evidence is weakest in", "the least reliable tool is", "the vulnerability lies in", "close games may expose", "the difficult trade-off is", "the staff must protect")
         return picker.pick(strengths.map { "$it for $name is $good." }, name) to
-            picker.pick(worries.map { "The worry: at $name, $it $bad." }, name)
+            picker.pick(worries.map { "The worry: for $name, $it $bad." }, name)
     }
 }

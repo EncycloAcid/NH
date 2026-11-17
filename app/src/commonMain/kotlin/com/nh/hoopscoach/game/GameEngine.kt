@@ -159,7 +159,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** His hometown crowd: a lift on every shot at home when he plays for his city's team. */
     private val heroHome = if (heroId >= 0) Hometown.shotBonus(lg, game) else 0.0
     /** His father in the stands for a big game, and the gym his father made famous ([LegacyMode]). */
-    private val family = if (heroSide >= 0) runCatching { LegacyMode.heroEdge(lg, game) }.getOrDefault(0.0) else 0.0
+    private val family = if (heroSide >= 0) runCatching { LegacyMode.heroEdge(lg, game) + Shootaround.edge(lg) }.getOrDefault(0.0) else 0.0
 
     /** Everyone's badge tiers tonight, by player id ([Badges]). */
     private val badgeTiers: Map<Int, IntArray> = runCatching { (rosters[0] + rosters[1]).associate { it.id to Badges.tiers(lg, it) } }.getOrDefault(emptyMap())
@@ -436,6 +436,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val a = teams[1]; val h = teams[0]
             log(-1, "Tip-off: ${a.school} at ${h.school}${if (game.neutral) " (neutral site)" else ""}", 0)
             if (family > 0) runCatching { LegacyMode.standsLine(lg, game) }.getOrNull()?.let { log(-1, it, 0) }
+            if (heroSide >= 0 && Shootaround.edge(lg) > 0) log(-1, "$heroShort shot it well at the morning shootaround. He's feeling it.", 0)
             if (!lg.pro && era != CollegeEra.MODERN) log(-1, "Era rules: ${era.rulesSummary()}", 0)
         }
     }
@@ -1471,6 +1472,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (heroSide >= 0) runCatching { lg.playerOrNull(heroId)?.let { h -> lines[heroSide][heroId]?.let { Badges.afterGame(lg, h, it, heroMakes) } } }
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
         runCatching { Cards.afterGame(lg, game) }
+        runCatching { Pickem.afterGame(lg, game) }
         if (userInvolved) Ollama.maybeAutoGenerateInterviews(lg.ollama, lg, game)
     }
 

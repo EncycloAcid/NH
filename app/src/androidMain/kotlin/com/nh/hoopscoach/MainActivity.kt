@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         PlatformContext.filesDir = filesDir
         PlatformContext.versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull() ?: "3.9-pro.265"
+        }.getOrNull() ?: "3.9-pro.266"
         AndroidAssets.appContext = applicationContext
         if (com.nh.hoopscoach.game.OnDeviceAi.engine == null) com.nh.hoopscoach.game.OnDeviceAi.engine = GeminiNanoEngine()
         lifecycleScope.launch { runCatching { com.nh.hoopscoach.game.OnDeviceAi.refresh() } }

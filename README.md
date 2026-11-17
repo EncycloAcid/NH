@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.265**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.266**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.265.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.266.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.265)
+## What's new (3.9-pro.243 to 3.9-pro.266)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,9 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **Weekly Pick'em**: each week, pick the winners of the three biggest games that don't involve your team (ranked teams, rivalries, the postseason). Three right pays two card packs, two right one, and every five right in a row a bonus pack; the streak and the season's record stay on the card on Today.
+- **Pregame shootaround** (player career): on a game day, ten shots on a timing meter from around the floor. The green is wider the better you shoot from that spot (ratings and badges), and a deep three moves fastest. Every three makes is a badge point (up to three a day), and eight or better means you're feeling it: a little extra on your shots that night.
+- **The preseason magazine, fixed**: on a narrow phone or with large text the cover no longer cuts off its cover lines or loses your team's flap (it grows to fit, with a shade so the lines read over the star), the strength and concern read in plain words and in full ("better than 89% of teams in the country"; "near the bottom of the league" for the NBA, not a "0th national percentile"), and an unnamed rivalry no longer leaves a headline starting with a colon.
 - **The long way** (player career): going undrafted isn't the end. Your agent has calls from an NBA team's G League side (a small salary, every game a tryout, and a mid-season call-up on a two-way deal if you play your way into one) and from clubs overseas (Spain, Turkey, Greece, Serbia, Israel, Italy, Germany, Lithuania, France, Australia, Japan, China: better money, a bigger role, NBA scouts watching). Play the season a week at a time; your stats, rating growth and badge points count, and each summer a young player grows toward his ceiling. At season's end NBA teams call if you've earned it, and signing puts you on that team in your era's league; if not, go again or call it a career.
 - **Card collection**: packs from playing (one every three wins, one more for an upset, a rivalry or a postseason win, one a season and three for a title, three to start), five cards a pack from the league's players, Bronze to Diamond by rating. Each season brings three sets to finish (your team, the best player on every team in your conference, the league's twelve best), each worth two packs and a bigger following or more fan interest; five duplicates trade in for a pack. The binder is on Today.
 - **Player badges**: eleven badges in four tiers (Bronze, Silver, Gold, Legend), each with a real effect in games: Sniper (threes), Pull-Up Artist (mid-range), Ice Water (late in close games), Rim Wrecker and And-One (finishing, through contact), Floor General (better looks for teammates), Tight Handles (fewer turnovers), Lockdown (his man's jumpers), Rim Protector, Ball Hawk and Glass Cleaner. Everyone's come from where his ratings rank in his league; in a player career you earn yours by doing it in games (badge points from your box scores, a progress bar to each tier), with your ratings setting how high each can go, and the pros raise the bar. They're on every player card and on Today.

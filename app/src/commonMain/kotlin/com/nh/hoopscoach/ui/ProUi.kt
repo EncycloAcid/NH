@@ -160,12 +160,14 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         item { HeroTodayCard(vm, lg) }
         item { PlayerInbox(vm, lg, press = false) }
+        item { ShootaroundCard(vm, lg) }
         item { HeroBadgesCard(vm, lg) }
         if (lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
         item { StorylinesPanel(vm, lg) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
         item { DispatchCard(vm, lg) }
+        item { PickemCard(vm, lg) }
         item { BinderTodayCard(vm, lg) }
         item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }

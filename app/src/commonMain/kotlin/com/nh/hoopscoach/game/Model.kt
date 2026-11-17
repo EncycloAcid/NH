@@ -1228,6 +1228,13 @@ class RoadState(
     val abroadPast: MutableList<String> = mutableListOf(),
     var signSlot: String = "",
     var signTeam: String = "",
+    /** The pregame shootaround ([Shootaround]): the day it was shot, the last and best scores, and a hot hand for tonight. */
+    var shootSeason: Int = 0,
+    var shootDay: Int = -1,
+    var shootLast: Int = 0,
+    var shootBest: Int = 0,
+    var hotSeason: Int = 0,
+    var hotDay: Int = -1,
     var startSeason: Int = 0,
     var dealSeason: Int = 0,
     var deal: NilDeal = NilDeal.NONE,
@@ -1840,6 +1847,8 @@ class League(
     var playedAs: PlayedAs? = null,
     /** The card collection ([Cards]). */
     val binder: Binder = Binder(),
+    /** The weekly Pick'em ([Pickem]). */
+    val pickem: PickemState = PickemState(),
     /** Legacy mode: the generations this career descends from, oldest first (the last is his father). */
     var lineage: MutableList<Ancestor> = mutableListOf(),
     /** Legacy mode, coaching: the user's son (a recruit, then a player), or -1. */
