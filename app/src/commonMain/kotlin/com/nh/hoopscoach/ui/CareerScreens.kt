@@ -294,6 +294,17 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             BackBar("Settings", onBack = { vm.back() })
+            Panel(onClick = { vm.push(Route.Help("")) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(MenuIcons.Help, null, tint = P.accent, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Help", style = T.bodyB, color = P.ink)
+                        Text("How to play, and what every term means", style = T.small, color = P.sub)
+                    }
+                    Chevron()
+                }
+            }
             Section("Dynasty Saves & Slots")
             Panel {
                 val active = vm.activeSlot ?: vm.saveSlots.firstOrNull { it.id == vm.activeSlotId }

@@ -146,8 +146,9 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
     val ps = lg.proState
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { TeamBadge(u, 50.dp) }
+            ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { HelpButton(vm); Spacer(Modifier.width(6.dp)); TeamBadge(u, 50.dp) }
         }
+        item { GettingStartedCard(vm, lg) }
         // In the playoffs, where your series stands comes first.
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         if (r.tradedSeason == lg.season && r.tradeNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day - r.tradedDay in 0..7) item {
@@ -389,6 +390,8 @@ fun ProContinueBar(vm: GameViewModel, lg: League) {
                 AppMenuItem("Sim to the end of the season", "Through the Finals", MenuIcons.Trophy) {
                     pick { vm.simUntil("Simulating the rest of the season") { it.phase == Phase.OFFSEASON } }
                 }
+                AppMenuDivider()
+                AppMenuItem("Help", "How to play, and what every term means", MenuIcons.Help) { pick { vm.push(Route.Help("")) } }
             }
         }
         Spacer(Modifier.width(4.dp))

@@ -158,7 +158,8 @@ fun NbaCoachToday(vm: GameViewModel, lg: League) {
     val ps = lg.proState ?: return
     val c = lg.userCoach
     LazyColumn(Modifier.fillMaxSize()) {
-        item { ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, "Coach ${c.name} · ${teamLine(lg, u)}") { TeamBadge(u, 50.dp) } }
+        item { ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, "Coach ${c.name} · ${teamLine(lg, u)}") { HelpButton(vm); Spacer(Modifier.width(6.dp)); TeamBadge(u, 50.dp) } }
+        item { GettingStartedCard(vm, lg) }
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         item { CoachDeskCards(vm, lg) }
         item { StorylinesPanel(vm, lg) }

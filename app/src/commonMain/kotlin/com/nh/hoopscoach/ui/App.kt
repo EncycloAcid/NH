@@ -300,6 +300,7 @@ private fun RouteScreen(vm: GameViewModel, lg: League, r: Route) {
         is Route.Web -> ConnectionsScreen(vm, lg, com.nh.hoopscoach.game.WebNode(r.kind, r.id))
         is Route.Calendar -> CalendarScreen(vm, lg)
         is Route.Binder -> BinderScreen(vm, lg)
+        is Route.Help -> HelpScreen(vm, lg, r.term)
         is Route.Shootaround -> ShootaroundScreen(vm, lg)
         is Route.PlayerCombine -> PlayerCombineScreen(vm, lg)
         is Route.Facilities -> FacilitiesScreen(vm, lg)
@@ -376,6 +377,8 @@ internal fun ContinueBar(vm: GameViewModel, lg: League) {
                         AppMenuItem("Sim to the end of the season", "Through the national championship", MenuIcons.Trophy) {
                             pick { vm.simToPhase(Phase.WRAP_UP, "Simulating the rest of the season") }
                         }
+                        AppMenuDivider()
+                        AppMenuItem("Help", "How to play, and what every term means", MenuIcons.Help) { pick { vm.push(Route.Help("")) } }
                     }
                 }
                 Spacer(Modifier.width(4.dp))

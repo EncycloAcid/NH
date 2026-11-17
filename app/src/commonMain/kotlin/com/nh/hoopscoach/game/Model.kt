@@ -1900,6 +1900,9 @@ class League(
      * When the son is drafted, it's carried forward to that summer and he joins it, instead of a fresh league.
      */
     var heirPro: String = "",
+    /** The getting-started list on Today: the steps done by tapping through, and whether it's hidden. */
+    var tipsDone: MutableList<String> = mutableListOf(),
+    var tipsHidden: Boolean = false,
     /** A big moment that takes the whole screen until it's dismissed: his retirement, or his introduction as a coach. */
     var ceremony: Ceremony? = null,
     /** Moments waiting their turn behind [ceremony]. */

@@ -82,9 +82,13 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader("${lg.season} · Game ${(u.gp + 1).coerceAtMost(Schedule.REG_DAYS)} of ${Schedule.REG_DAYS}", u.school, recordLine(lg, u)) {
                 SmallButton("Calendar") { vm.push(Route.Calendar) }
+                Spacer(Modifier.width(6.dp))
+                HelpButton(vm)
+                Spacer(Modifier.width(6.dp))
                 TeamBadge(u, 46.dp)
             }
         }
+        item { GettingStartedCard(vm, lg) }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         if (lg.playerMode) item { HeroMedicalCard(vm, lg) }
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
@@ -493,7 +497,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
                 isNcaa -> Season.regionOf(lg, u.id)?.let { "$it Region · No. ${b.seeds[u.id]} seed" } ?: "${u.school} missed the field"
                 else -> "No. ${b.seeds[u.id] ?: "–"} seed · ${recordLine(lg, u)}"
             }
-            ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
+            ScreenHeader(eyebrow, roundName, sub) { HelpButton(vm); Spacer(Modifier.width(6.dp)); TeamBadge(u, 46.dp) }
         }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         if (lg.playerMode) item { HeroMedicalCard(vm, lg) }

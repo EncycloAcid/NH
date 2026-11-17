@@ -509,6 +509,7 @@ object MenuIcons {
     }.build()
 
     val Week = line("week", "M4 6.5l7 5.5-7 5.5z M13 6.5l7 5.5-7 5.5z")
+    val Help = line("help", "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.4 9.3a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.3-2.6 4 M12 17.6v.2")
     val Calendar = line("calendar", "M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z M4 10h16 M8 3v4 M16 3v4")
     val Star = line("star", "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z")
     val Trophy = line("trophy", "M8 4h8v5a4 4 0 0 1-8 0z M8 5.5H5.5a3 3 0 0 0 2.8 4 M16 5.5h2.5a3 3 0 0 1-2.8 4 M12 13v3.5 M8.5 20h7 M10 16.5h4V20h-4z")

@@ -83,6 +83,8 @@ sealed interface Route {
     data object Binder : Route
     data object Shootaround : Route
     data object PlayerCombine : Route
+    /** Help: how to play and the glossary, opened searching [term] (blank for all). */
+    data class Help(val term: String = "") : Route
 }
 
 /** A game being watched possession by possession. */
