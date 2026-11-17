@@ -832,7 +832,7 @@ class OllamaConfig(
     /** Show rough write-time estimates next to each AI writing desk in Settings. */
     var showAiWriteEta: Boolean = false,
     // Multi-Provider AI (Local, Gemini, ChatGPT, Claude, Groq, DeepSeek, OpenRouter, Cerebras, Mistral)
-    var provider: String = "ollama", // "ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral"
+    var provider: String = "ollama", // "ollama", "nano" (Gemini Nano on the phone), "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral"
     /** When on, keep the free/cheap recommended model for the active provider (re-applied on enable, provider change, and model fetch). */
     var autoPickModel: Boolean = false,
     var googleApiKey: String = "",
@@ -866,6 +866,10 @@ class OllamaConfig(
     var mistralApiKey: String = "",
     var mistralModel: String = "mistral-small-latest",
     var mistralAccountEmail: String = "",
+    /** Dialogue (press conferences, interviews, speeches, posts, letters) on Gemini Nano when it's ready, whatever the provider. */
+    var nanoForDialogue: Boolean = false,
+    /** Gemini Nano: the faster, smaller model where the phone has both. */
+    var nanoFast: Boolean = false,
 ) {
     val isGoogleSignedIn: Boolean
         get() = googleApiKey.isNotBlank()
@@ -925,6 +929,7 @@ class OllamaConfig(
             "openrouter" -> openRouterModel.ifBlank { "meta-llama/llama-3.3-70b-instruct:free" }
             "cerebras" -> cerebrasModel.ifBlank { "llama3.1-8b" }
             "mistral" -> mistralModel.ifBlank { "mistral-small-latest" }
+            "nano" -> OnDeviceAi.label()
             else -> model.ifBlank { "llama3.2:1b" }
         }
 
@@ -938,6 +943,7 @@ class OllamaConfig(
             "openrouter" -> if (isOpenRouterSignedIn && openRouterAccountEmail.isNotBlank()) "OpenRouter (${openRouterAccountEmail.substringBefore("@")})" else "OpenRouter"
             "cerebras" -> if (isCerebrasSignedIn && cerebrasAccountEmail.isNotBlank()) "Cerebras (${cerebrasAccountEmail.substringBefore("@")})" else "Cerebras"
             "mistral" -> if (isMistralSignedIn && mistralAccountEmail.isNotBlank()) "Mistral (${mistralAccountEmail.substringBefore("@")})" else "Mistral"
+            "nano" -> "Gemini Nano (on device)"
             else -> "Local Ollama"
         }
 
@@ -951,6 +957,7 @@ class OllamaConfig(
             "openrouter" -> "OpenRouter $activeModelName"
             "cerebras" -> "Cerebras $activeModelName"
             "mistral" -> "Mistral $activeModelName"
+            "nano" -> "${OnDeviceAi.label()} on device"
             else -> "Ollama $activeModelName"
         }
 
@@ -964,6 +971,7 @@ class OllamaConfig(
             "openrouter" -> "OpenRouter"
             "cerebras" -> "Cerebras"
             "mistral" -> "Mistral"
+            "nano" -> "Gemini Nano"
             else -> "Ollama"
         }
 }

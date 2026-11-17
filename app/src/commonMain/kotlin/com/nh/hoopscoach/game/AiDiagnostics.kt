@@ -42,6 +42,7 @@ object AiDiagnostics {
         "openrouter" -> if (config.openRouterApiKey.isBlank()) "Add an OpenRouter key from openrouter.ai. Prefer models ending in :free." else "OpenRouter is connected — free (:free) and paid models use your key."
         "cerebras" -> if (config.cerebrasApiKey.isBlank()) "Add a free Cerebras key from cloud.cerebras.ai." else "Cerebras is connected — free-tier Llama is very fast for dynasty copy."
         "mistral" -> if (config.mistralApiKey.isBlank()) "Add a free Mistral key from console.mistral.ai." else "Mistral is connected — free-tier Small / Nemo work well for short recaps."
+        "nano" -> if (!OnDeviceAi.supported) OnDeviceAi.NOT_HERE else listOf("Gemini Nano: ${OnDeviceAi.stateLabel().removeSuffix("…")}.", OnDeviceAi.last.detail, "It only answers while the game is on screen.").filter { it.isNotBlank() }.joinToString(" ")
         else -> "Ollama must run separately. Localhost means this phone, not your computer. Use the computer's LAN IP and port 11434 on the same network; bind Ollama to that LAN address and allow the port through its firewall. 10.0.2.2 is emulator-only."
     }
     fun networkReason(error: Throwable?, config: OllamaConfig): String {
@@ -60,6 +61,8 @@ object AiDiagnostics {
             else -> false
         }
         if (missingKey) return setupHint(config)
+        // Gemini Nano explains itself (on screen only, the daily allowance, not downloaded yet).
+        if (config.provider.lowercase() == "nano" || error?.message?.contains("Gemini Nano", true) == true) return error?.message ?: setupHint(config)
         val code = Regex("\\b(400|401|403|404|408|429|500|502|503|504)\\b").find(error?.message.orEmpty())?.value
         return when (code) {
             "401", "403" -> "Provider rejected account access (HTTP $code). Reconnect and check the access key from your account."

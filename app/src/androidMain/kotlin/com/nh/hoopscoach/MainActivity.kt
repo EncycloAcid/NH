@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.nh.hoopscoach.ui.App
 import com.nh.hoopscoach.ui.GameViewModel
 
@@ -16,8 +18,10 @@ class MainActivity : ComponentActivity() {
         PlatformContext.filesDir = filesDir
         PlatformContext.versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull() ?: "3.9-pro.257"
+        }.getOrNull() ?: "3.9-pro.258"
         AndroidAssets.appContext = applicationContext
+        if (com.nh.hoopscoach.game.OnDeviceAi.engine == null) com.nh.hoopscoach.game.OnDeviceAi.engine = GeminiNanoEngine()
+        lifecycleScope.launch { runCatching { com.nh.hoopscoach.game.OnDeviceAi.refresh() } }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val trace = CrashReporter.pending(filesDir)

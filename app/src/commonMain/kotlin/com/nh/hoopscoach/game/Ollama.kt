@@ -505,6 +505,7 @@ object Ollama {
 
     /** Writes [pickBestModel] into the active provider's model field on [config]. */
     fun applyAutoPick(config: OllamaConfig, available: List<String> = emptyList()): String {
+        if (config.provider.equals("nano", true)) return OnDeviceAi.NAME
         val pick = pickBestModel(config.provider, available)
         when (config.provider.lowercase()) {
             "google" -> config.googleModel = pick
@@ -1560,20 +1561,70 @@ object Ollama {
         temperature: Double = 0.7,
         numPredict: Int = 350,
         onToken: ((String) -> Unit)? = null,
+        dialogue: Boolean = false,
     ): Result<String> = withContext(Dispatchers.IO) {
         generateGate.withLock {
-            when (config.provider.lowercase()) {
-                "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
-                "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
-                "anthropic" -> generateAnthropic(config, prompt, system, temperature, numPredict, onToken)
-                "groq" -> generateGroq(config, prompt, system, temperature, numPredict, onToken)
-                "deepseek" -> generateDeepseek(config, prompt, system, temperature, numPredict, onToken)
-                "openrouter" -> generateOpenRouter(config, prompt, system, temperature, numPredict, onToken)
-                "cerebras" -> generateCerebras(config, prompt, system, temperature, numPredict, onToken)
-                "mistral" -> generateMistral(config, prompt, system, temperature, numPredict, onToken)
-                else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
+            val first = route(config, dialogue)
+            val result = byProvider(first, config, prompt, system, temperature, numPredict, onToken)
+            // Gemini Nano couldn't answer (the app went to the background, today's allowance is used up):
+            // the provider picked for everything else writes it instead.
+            val main = config.provider.lowercase()
+            if (result.isFailure && first == "nano" && main != "nano") {
+                lastRoute = main
+                byProvider(main, config, prompt, system, temperature, numPredict, onToken)
+            } else {
+                lastRoute = first
+                result
             }
         }
+    }
+
+    /** The provider that answered the last request (for the AI badge). */
+    @Volatile private var lastRoute: String = ""
+
+    private suspend fun byProvider(
+        provider: String, config: OllamaConfig, prompt: String, system: String, temperature: Double, numPredict: Int, onToken: ((String) -> Unit)?,
+    ): Result<String> = when (provider) {
+        "nano" -> generateNano(config, prompt, system, temperature, numPredict, onToken)
+        "google" -> generateGoogle(config, prompt, system, temperature, numPredict, onToken)
+        "openai" -> generateOpenAi(config, prompt, system, temperature, numPredict, onToken)
+        "anthropic" -> generateAnthropic(config, prompt, system, temperature, numPredict, onToken)
+        "groq" -> generateGroq(config, prompt, system, temperature, numPredict, onToken)
+        "deepseek" -> generateDeepseek(config, prompt, system, temperature, numPredict, onToken)
+        "openrouter" -> generateOpenRouter(config, prompt, system, temperature, numPredict, onToken)
+        "cerebras" -> generateCerebras(config, prompt, system, temperature, numPredict, onToken)
+        "mistral" -> generateMistral(config, prompt, system, temperature, numPredict, onToken)
+        else -> generateOllama(config, prompt, system, temperature, numPredict, onToken)
+    }
+
+    /** Which provider answers: dialogue goes to Gemini Nano on the phone when that's on and it's ready. */
+    fun route(config: OllamaConfig, dialogue: Boolean = false): String =
+        if (dialogue && config.nanoForDialogue && OnDeviceAi.ready) "nano" else config.provider.lowercase()
+
+    /** Who wrote it, for the AI badge: Gemini Nano for dialogue it answered, else the provider's model. */
+    fun writerName(config: OllamaConfig, dialogue: Boolean = false): String =
+        if ((dialogue || config.provider.equals("nano", true)) && lastRoute == "nano") "${OnDeviceAi.label()} on device" else config.fullModelDisplayName
+
+    /** Gemini Nano on the phone (AICore). Fails like any provider when it can't answer, so the game's own writing fills in. */
+    suspend fun generateNano(
+        config: OllamaConfig,
+        prompt: String,
+        system: String,
+        temperature: Double = 0.7,
+        numPredict: Int = 350,
+        onToken: ((String) -> Unit)? = null,
+    ): Result<String> = runCatching {
+        val engine = OnDeviceAi.engine ?: throw Exception(OnDeviceAi.NOT_HERE)
+        if (OnDeviceAi.last.state != OnDeviceAi.State.READY) OnDeviceAi.refresh()
+        if (OnDeviceAi.last.state != OnDeviceAi.State.READY) throw Exception("Gemini Nano: ${OnDeviceAi.stateLabel()}. ${OnDeviceAi.last.detail}".trim())
+        engine.generate(prompt, system, temperature, numPredict, config.nanoFast, onToken).trim()
+            .also { check(it.isNotEmpty()) { "Empty response from Gemini Nano" } }
+    }
+
+    /** A short test line from Gemini Nano. */
+    suspend fun testNano(config: OllamaConfig): Result<String> = withContext(Dispatchers.IO) {
+        generateNano(config, "In one short sentence, as a college basketball coach, tell your team what you expect tonight.",
+            "You are a college basketball coach. Answer in one sentence, no quotation marks.", 0.8, 60)
     }
 
     /** Low-level generate call using Ollama's /api/generate endpoint with streaming to prevent socket timeouts. */
@@ -1708,6 +1759,7 @@ object Ollama {
         validateDraft: (String) -> List<String> = { emptyList() },
         articleCopy: String = "",
         eventGame: Game? = null,
+        dialogue: Boolean = false,
     ): Result<AiText> {
         val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
         val subject = LeagueLists.teams(lg).filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
@@ -1726,14 +1778,14 @@ object Ollama {
         val longForm = wantsArticle
         val writingPrompt = prompt + if (longForm) "\n${ArticleWriting.instruction(config)}" else ""
         val result = AiGrounding.generate(facts, writingPrompt, { raw -> validateDraft(raw) + if (longForm) ArticleWriting.errors(raw, config) else emptyList() }) { grounded ->
-            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config) * (if (prompt.contains("Format each storyline as:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")) 3 else 1) else numPredict, onToken = onToken).also {
+            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config) * (if (prompt.contains("Format each storyline as:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")) 3 else 1) else numPredict, onToken = onToken, dialogue = dialogue).also {
                 gotResponse = it.isSuccess
                 if (it.isFailure) providerError = it.exceptionOrNull()
             }
         }
         val reason = if (gotResponse) "Fact check failed: " + result.exceptionOrNull()?.message.orEmpty().substringAfter('(').substringBefore(").") else AiDiagnostics.networkReason(providerError, config)
         AiDiagnostics.finish(requestId, if (result.isSuccess) "success" else if (gotResponse) "validation failure" else "network error", if (result.isFailure) reason else "Verified against game facts")
-        val draft = result.fold({ AiText(it, true, config.fullModelDisplayName) }, { return runCatching { AiTemplates.create(facts, prompt, fallbackCopy).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
+        val draft = result.fold({ AiText(it, true, writerName(config, dialogue)) }, { return runCatching { AiTemplates.create(facts, prompt, fallbackCopy).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
         return Result.success(draft)
     }
 
@@ -1886,7 +1938,7 @@ object Ollama {
             append("\nWrite a 3-paragraph persuasive personal recruiting letter from Coach $coachName to ${p.name}. Directly address his priority of '${r.pref.label}'. Explain why our system, culture, and track record will prepare him for the NBA while competing for national championships. End with a coach sign-off.")
         }
 
-        return groundedGenerate(config, lg, prompt, numPredict = 320, extraPlayers = listOf(p), extraFacts = "Recruit ${p.name}: ${p.stars} stars; hometown ${p.hometown}; school ${p.highSchool}; priority ${r.pref.label}: ${r.pref.blurb}")
+        return groundedGenerate(config, lg, prompt, numPredict = 320, extraPlayers = listOf(p), extraFacts = "Recruit ${p.name}: ${p.stars} stars; hometown ${p.hometown}; school ${p.highSchool}; priority ${r.pref.label}: ${r.pref.blurb}", dialogue = true)
     }
 
     /** Generates a pregame rivalry preview building maximum hype and bad blood before a showdown. */
@@ -3046,6 +3098,7 @@ object Ollama {
             numPredict = 320,
             eventGame = g,
             extraPlayers = candidates.map { it.first },
+            dialogue = true,
         )
         val byId = candidates.associate { it.first.id to it.first }
         result.map { draft ->
@@ -3111,6 +3164,7 @@ object Ollama {
             prompt,
             system = "You are a professional basketball beat writer conducting a post-game press conference. Strictly use the provided stats, scores, and names. Never alter the statistics.",
             numPredict = 260,
+            dialogue = true,
         ).map { draft ->
             val raw = draft.text
             var topic = if (winner) "Game-Winner" else if (rivalry) "Rivalry" else if (won) "Postgame Win" else "Tough Loss"
@@ -3200,6 +3254,7 @@ object Ollama {
             prompt,
             system = "You write realistic, engaging basketball social media posts. Strictly reflect the exact provided game statistics without altering numbers.",
             numPredict = 260,
+            dialogue = true,
         ).map { draft ->
             val raw = draft.text
             val posts = mutableListOf<Post>()
@@ -3602,7 +3657,7 @@ object Ollama {
             appendLine("MEDIA_TRIBUTE: <Columnist editorial celebrating their historic season>")
         }
 
-        groundedGenerate(config, lg, prompt, onToken = onToken, extraFacts = "Award ${honor.award}; winner ${honor.name}; season ${honor.season}; ${honor.line}").map { draft ->
+        groundedGenerate(config, lg, prompt, onToken = onToken, extraFacts = "Award ${honor.award}; winner ${honor.name}; season ${honor.season}; ${honor.line}", dialogue = true).map { draft ->
             val text = draft.text
             val lines = text.lines()
             val title = lines.firstOrNull { it.startsWith("AWARD_TITLE:") }?.removePrefix("AWARD_TITLE:")?.trim() ?: "${honor.award} · ${honor.name}"
@@ -3639,7 +3694,7 @@ object Ollama {
             appendLine("TACTICAL_ADJUSTMENT: <Specific on-court tactical adjustments for second half>")
         }
 
-        groundedGenerate(config, lg, prompt, onToken = onToken, extraFacts = "HALFTIME, not a final result: ${lg.user.name} $usScore-${themScore} ${lg.team(g.opp(lg.userTeamId)).name}; margin ${kotlin.math.abs(usScore - themScore)}; second half not played.").map { draft ->
+        groundedGenerate(config, lg, prompt, onToken = onToken, extraFacts = "HALFTIME, not a final result: ${lg.user.name} $usScore-${themScore} ${lg.team(g.opp(lg.userTeamId)).name}; margin ${kotlin.math.abs(usScore - themScore)}; second half not played.", dialogue = true).map { draft ->
             val text = draft.text
             val lines = text.lines()
             val speech = lines.firstOrNull { it.startsWith("HALFTIME_SPEECH:") }?.removePrefix("HALFTIME_SPEECH:")?.trim()

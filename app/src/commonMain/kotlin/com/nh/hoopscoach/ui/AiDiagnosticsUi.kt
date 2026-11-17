@@ -103,7 +103,7 @@ fun AiDiagnosticsPanel(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.weight(1f)) {
+            if (!config.provider.equals("nano", true)) Box(Modifier.weight(1f)) {
                 SecondaryButton(
                     if (fetching) "Fetching…" else "Fetch models",
                     Modifier.fillMaxWidth(),
@@ -223,7 +223,7 @@ fun AiDiagnosticsPanel(
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(
+        if (!config.provider.equals("nano", true)) Row(
             Modifier
                 .fillMaxWidth()
                 .clickable { showCustomId = !showCustomId }
@@ -236,7 +236,7 @@ fun AiDiagnosticsPanel(
                 color = P.sub,
             )
         }
-        if (showCustomId) {
+        if (showCustomId && !config.provider.equals("nano", true)) {
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 model,

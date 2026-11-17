@@ -473,6 +473,8 @@ class GameViewModel : ViewModel() {
     var senior by mutableStateOf<com.nh.hoopscoach.game.HighSchool?>(null)
     /** The senior year changed (it lives outside the league, so this redraws the screen). */
     fun seniorChanged() { rev++ }
+    /** Something outside the league changed (Gemini Nano's status): redraw. */
+    fun redraw() { rev++ }
 
     /** Draft Night: how many picks are in so far, for [revealSeason]. Lives here so a tab switch doesn't restart the night. */
     var reveal by mutableIntStateOf(0)

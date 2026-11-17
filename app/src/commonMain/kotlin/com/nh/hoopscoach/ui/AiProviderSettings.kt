@@ -68,6 +68,7 @@ fun AiProviderConfigSection(
     onShowMistralLogin: () -> Unit,
 ) {
     when (lg.ollama.provider.lowercase()) {
+        "nano" -> NanoProviderPanel(vm, lg, scope, testing, onTesting, onTestStatus, onTestSuccess)
         "google" -> GoogleAiProviderPanel(
             vm, lg, scope, testing, onTesting, onTestStatus, onTestSuccess,
             onShowLogin = onShowGoogleLogin,
@@ -1518,10 +1519,11 @@ Panel {
 
     if (lg.ollama.enabled) {
         Spacer(Modifier.height(14.dp))
-        val providers = listOf("ollama", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral")
-        val providerLabels = listOf("Local", "Gemini", "ChatGPT", "Claude", "Groq", "DeepSeek", "OpenRouter", "Cerebras", "Mistral")
+        val providers = listOf("ollama", "nano", "google", "openai", "anthropic", "groq", "deepseek", "openrouter", "cerebras", "mistral")
+        val providerLabels = listOf("Local", "Gemini Nano", "Gemini", "ChatGPT", "Claude", "Groq", "DeepSeek", "OpenRouter", "Cerebras", "Mistral")
         val providerBlurbs = listOf(
-            "On-device Ollama — free, no account needed.",
+            "Ollama on a computer you run it on — free, no account needed.",
+            "On this phone through AICore (Pixel 9+): private, free, no key.",
             "Free Gemini flash models in the cloud.",
             "Cheap ChatGPT models (mini / 3.5).",
             "Anthropic Claude — Haiku cheap, Sonnet richer.",
@@ -1546,9 +1548,14 @@ Panel {
         }
         Spacer(Modifier.height(6.dp))
         Text(providerBlurbs[providerIdx], style = T.small, color = P.sub)
+        // Another provider for articles, Gemini Nano on the phone for dialogue.
+        if (!lg.ollama.provider.equals("nano", true) && com.nh.hoopscoach.game.OnDeviceAi.supported) {
+            Spacer(Modifier.height(12.dp))
+            NanoDialogueRow(vm, lg, scope)
+        }
 
         Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!lg.ollama.provider.equals("nano", true)) Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Auto-pick model", style = T.bodyB, color = P.ink)
                 Text(

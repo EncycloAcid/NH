@@ -47,6 +47,9 @@ kotlin {
                 implementation("androidx.activity:activity-compose:1.9.3")
                 implementation("androidx.core:core-ktx:1.15.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+                // Gemini Nano on the phone through AICore (ML Kit GenAI Prompt API). beta2 is the newest
+                // release built for Kotlin 2.1; later ones need Kotlin 2.3+.
+                implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
             }
         }
         val desktopMain by getting {
@@ -80,8 +83,8 @@ android {
         applicationId = "com.nh.hoopscoach.pro"
         minSdk = 26
         targetSdk = 35
-        versionCode = 278
-        versionName = "3.9-pro.257"
+        versionCode = 279
+        versionName = "3.9-pro.258"
     }
 
     // Release signing comes from keystore.properties (kept out of git) or from
@@ -153,8 +156,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "HoopsDynasty"
-            // jpackage requires a numeric dotted version; UI still shows 3.9-pro.257 via PlatformContext.
-            packageVersion = "3.9.257"
+            // jpackage requires a numeric dotted version; UI still shows 3.9-pro.258 via PlatformContext.
+            packageVersion = "3.9.258"
             description = "College basketball coaching dynasty (Pro)"
             vendor = "DeadBunny Studios"
             copyright = "© 2026 DeadBunny Studios"
