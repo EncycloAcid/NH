@@ -59,6 +59,7 @@ fun RecruitScreen(vm: GameViewModel, lg: League) {
                 },
             ) { GuideButton { vm.openGuide(Guide.RECRUITING) } }
         }
+        if (Recruiting.inCycle(lg)) item { CrystalBallCard(vm, lg) }
         recruitBoard(vm, lg)
         item { Spacer(Modifier.height(24.dp)) }
     }

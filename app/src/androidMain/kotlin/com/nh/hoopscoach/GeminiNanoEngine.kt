@@ -8,6 +8,7 @@ import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.ModelPreference
 import com.google.mlkit.genai.prompt.ModelReleaseStage
+import com.google.mlkit.genai.prompt.PromptPrefix
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
 import com.google.mlkit.genai.prompt.generationConfig
@@ -31,6 +32,8 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
     /** The phone didn't take a model preference: use its default model for everything. */
     private var usePlain = false
     private var tokenLimit = 0
+    /** AICore takes the instructions as a cached prefix; off if this phone's AICore refuses prefixes. */
+    private var prefixOk = true
 
     private fun preferred(fastMode: Boolean): GenerativeModel {
         if (usePlain) return plain ?: Generation.getClient().also { plain = it }
@@ -95,13 +98,17 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
         val m = client(fast)
         if (tokenLimit <= 0) tokenLimit = runCatching { m.getTokenLimit() }.getOrDefault(4000).takeIf { it > 0 } ?: 4000
         val out = maxTokens.coerceIn(32, 1024)
-        // About 3 characters a token, leaving room for the reply.
-        val budget = ((tokenLimit - out - 96).coerceAtLeast(500) * 3.0).toInt()
-        var input = OnDeviceAi.fit("$system\n\n$prompt", budget)
+        // About 3 characters a token, leaving room for the instructions and the reply.
+        val budget = ((tokenLimit - out - 96).coerceAtLeast(500) * 3.0).toInt() - system.length
+        var input = OnDeviceAi.fit(prompt, budget.coerceAtLeast(1200))
         var attempt = 0
         while (true) {
             try {
-                val request = generateContentRequest(TextPart(input)) {
+                // The instructions are word for word the same every time for each desk (the weekly Dispatch, the
+                // press conference...), so AICore's prefix cache reuses them and only the new facts are processed.
+                val cached = prefixOk
+                val request = generateContentRequest(TextPart(if (cached) input else "$system\n\n$input")) {
+                    if (cached) promptPrefix = PromptPrefix(system)
                     this.temperature = temperature.toFloat().coerceIn(0f, 1f)
                     topK = 40
                     maxOutputTokens = out
@@ -116,6 +123,11 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
                 return@withLock response.candidates.firstOrNull()?.text.orEmpty().ifBlank { streamed.toString() }
             } catch (e: GenAiException) {
                 attempt++
+                // A phone that won't take a cached prefix: send the instructions in the prompt from now on.
+                if (prefixOk && e.errorCode in listOf(GenAiException.ErrorCode.CACHE_PROCESSING_ERROR, GenAiException.ErrorCode.REQUEST_PROCESSING_ERROR, GenAiException.ErrorCode.UNKNOWN)) {
+                    prefixOk = false
+                    continue
+                }
                 when (e.errorCode) {
                     // AICore is serving another request: back off and try again.
                     GenAiException.ErrorCode.BUSY -> if (attempt <= 3) { delay(400L shl attempt); continue }

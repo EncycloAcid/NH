@@ -336,6 +336,10 @@ class Player(
     var xp: Int = 0,
     var banked: Int = 0,
     var seasonLevels: Int = 0,
+    /** Skill points to spend in his archetype's skill tree, and the skills he's unlocked ([SkillTree]). */
+    var skillPts: Int = 0,
+    var skills: MutableList<String> = mutableListOf(),
+    var skillInit: Boolean = false,
     var careerLevels: Int = 0,
     var seasonGains: IntArray = IntArray(10),
     var ovrHistory: MutableList<Int> = mutableListOf(),
@@ -870,6 +874,11 @@ class OllamaConfig(
     var nanoForDialogue: Boolean = false,
     /** Gemini Nano: the faster, smaller model where the phone has both. */
     var nanoFast: Boolean = false,
+    /**
+     * One AI call a week (the Hoops Dispatch) instead of a story desk every night. Always on for Gemini Nano,
+     * whose daily allowance is small.
+     */
+    var weeklyBatch: Boolean = false,
 ) {
     val isGoogleSignedIn: Boolean
         get() = googleApiKey.isNotBlank()
@@ -1016,6 +1025,12 @@ class Rivalry(
     var bWins: Int = 0,
     /** Who holds the rivalry trophy (named rivalries; -1 until the first meeting). See [RivalryTrophies]. */
     var holder: Int = -1,
+    /** Who's won the last [streak] meetings in a row ([RivalryPsyche]). */
+    var streakTeam: Int = -1,
+    var streak: Int = 0,
+    /** The last meeting: the winner and the margin. */
+    var lastWinner: Int = -1,
+    var lastMargin: Int = 0,
 ) {
     fun involves(t: Int) = a == t || b == t
     fun other(t: Int) = if (a == t) b else a
@@ -1807,6 +1822,14 @@ class League(
     var lineage: MutableList<Ancestor> = mutableListOf(),
     /** Legacy mode, coaching: the user's son (a recruit, then a player), or -1. */
     var legacySonId: Int = -1,
+    /** Your stance for upcoming rivalry games, by game id ([RivalryPsyche.Stance] ordinal). */
+    val rivalryStance: MutableMap<Int, Int> = mutableMapOf(),
+    /** The Hoops Dispatch: the last few weeks' editions ([WeeklyDispatch]). */
+    val dispatch: MutableList<DispatchEdition> = mutableListOf(),
+    /** The last week the Dispatch was written for, as season * 100 + week. */
+    var dispatchWeek: Int = -1,
+    /** Recruiting crystal balls, one per round ([WeeklyDispatch.maybeCrystalBall]). */
+    val crystal: MutableList<CrystalBall> = mutableListOf(),
     /** This season's storylines and past ones ([Storylines]). */
     var storylines: MutableList<Storyline> = mutableListOf(),
     /** The NBA league he played in, packed (SaveIO.pack) while he coaches in college, so a later NBA job returns to the same world. */

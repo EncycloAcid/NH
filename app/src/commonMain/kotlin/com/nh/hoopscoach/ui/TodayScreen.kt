@@ -97,6 +97,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         if (today != null) item { NextUp(vm, lg, today) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
+        item { DispatchCard(vm, lg) }
         item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
@@ -130,6 +131,8 @@ fun NextUp(vm: GameViewModel, lg: League, g: Game, title: String? = null) {
     Panel {
         if (rivalry != null) {
             RivalryPreview(lg, g, rivalry)
+            Spacer(Modifier.height(10.dp))
+            RivalryMindPanel(vm, lg, g)
             Spacer(Modifier.height(12.dp))
         }
         val big = com.nh.hoopscoach.game.Marquee.label(lg, g)

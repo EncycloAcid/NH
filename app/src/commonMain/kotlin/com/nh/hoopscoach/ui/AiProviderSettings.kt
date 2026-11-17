@@ -1548,6 +1548,21 @@ Panel {
         }
         Spacer(Modifier.height(6.dp))
         Text(providerBlurbs[providerIdx], style = T.small, color = P.sub)
+        // One batched call a week instead of nightly story desks (always that way on Gemini Nano).
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Weekly batch", style = T.bodyB, color = P.ink)
+                Text(
+                    if (lg.ollama.provider.equals("nano", true)) "On for Gemini Nano: the week's news is written in one request (the Hoops Dispatch) instead of a story desk every night. Dialogue is still written as it happens."
+                    else "Write the week's news in one request (the Hoops Dispatch) instead of a story desk every night. Fewer calls, fewer rate limits.",
+                    style = T.small, color = P.sub,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            AppSwitch(lg.ollama.weeklyBatch || lg.ollama.provider.equals("nano", true), { on -> vm.act { it.ollama.weeklyBatch = on } },
+                enabled = !lg.ollama.provider.equals("nano", true))
+        }
         // Another provider for articles, Gemini Nano on the phone for dialogue.
         if (!lg.ollama.provider.equals("nano", true) && com.nh.hoopscoach.game.OnDeviceAi.supported) {
             Spacer(Modifier.height(12.dp))

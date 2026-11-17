@@ -82,6 +82,9 @@ object NewsDesk {
         }
         if (lg.pro && lg.phase == Phase.PLAYOFFS) seriesStories(lg)
         runCatching { Columns.notebook(lg) }
+        // The Hoops Dispatch: the week's news in one batched AI call (and the game's own edition at once).
+        runCatching { WeeklyDispatch.maybeRun(lg) }
+        if (Ollama.batchOnly(lg.ollama)) return
         Ollama.maybeAutoGenerateJournalism(lg.ollama, lg)
         if (lg.day >= 10 && lg.day % 10 == 0) Ollama.maybeAutoGenerateCoachingCareers(lg.ollama, lg)
         Ollama.maybeAutoGeneratePlayerStorylines(lg.ollama, lg)

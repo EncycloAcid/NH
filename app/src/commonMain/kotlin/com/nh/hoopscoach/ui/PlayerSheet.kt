@@ -285,7 +285,11 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             when (tab) {
                 0 -> RatingsTab(p)
                 1 -> CareerTab(vm, lg, p)
-                2 -> GrowthTab(p)
+                2 -> {
+                    val canSpend = (!lg.playerMode && p.teamId == lg.userTeamId) || p.id == lg.heroId
+                    SkillTreePanel(vm, lg, p, canSpend)
+                    GrowthTab(p)
+                }
                 else -> BioTab(lg, p)
             }
             Spacer(Modifier.height(30.dp))

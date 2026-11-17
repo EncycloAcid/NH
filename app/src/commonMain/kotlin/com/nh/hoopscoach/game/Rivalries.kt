@@ -155,6 +155,7 @@ object Rivalries {
         val w = lg.team(g.winner())
         val l = lg.team(g.loser())
         if (w.id == r.a) r.aWins++ else r.bWins++
+        RivalryPsyche.afterGame(r, g)
         val swing = swingFor(w, l)
         g.swing = swing
         val wb = w.prestige

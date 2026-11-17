@@ -2162,9 +2162,25 @@ object Ollama {
         }
     }
 
+    /**
+     * Batch mode: one AI call a week (the Hoops Dispatch) instead of the nightly story desks and a rewrite of every
+     * article. Always on for Gemini Nano, whose daily allowance is small; dialogue still gets written as it happens.
+     */
+    fun batchOnly(config: OllamaConfig) = config.weeklyBatch || config.provider.equals("nano", true)
+
+    /**
+     * Batch mode, during a fast sim: wait a beat, and skip if the sim has moved on, so only the game the sim stops on
+     * gets its dialogue written (Gemini Nano's daily allowance isn't spent on games nobody reads).
+     */
+    private suspend fun settled(config: OllamaConfig, lg: League, day: Int): Boolean {
+        if (!batchOnly(config)) return true
+        kotlinx.coroutines.delay(1500)
+        return lg.day <= day + 1
+    }
+
     /** Fire-and-forget generation if auto-generate is enabled. */
     fun maybeAutoGenerate(config: OllamaConfig, lg: League, news: News) {
-        if (!config.enabled || !config.autoGenerate) return
+        if (!config.enabled || !config.autoGenerate || batchOnly(config)) return
         aiScope.launch {
             try {
                 generateArticle(config, lg, news).onSuccess { it.applyTo(news) }
@@ -2905,7 +2921,9 @@ object Ollama {
     fun maybeAutoGenerateInterviews(config: OllamaConfig, lg: League, g: Game) {
         if (!config.enabled || !config.playerInterviews || !config.autoGenerate) return
         if (!g.involves(lg.userTeamId) || g.box == null) return
+        val settleDay = lg.day
         aiScope.launch {
+            if (!settled(config, lg, settleDay)) return@launch
             generatePlayerInterviews(config, lg, g).onSuccess { list ->
                 if (list.isNotEmpty()) {
                     g.interviews.clear()
@@ -2927,7 +2945,9 @@ object Ollama {
         winner: Boolean = false,
     ) {
         if (!config.enabled || !config.pressConference || !config.autoGenerate) return
+        val settleDay = lg.day
         aiScope.launch {
+            if (!settled(config, lg, settleDay)) return@launch
             generatePressConference(config, lg, g, player, line, won, rivalry, winner).onSuccess { aiQ ->
                 if (lg.road?.press?.gameId == g.id) {
                     lg.road?.press = aiQ
@@ -2946,7 +2966,9 @@ object Ollama {
         won: Boolean,
     ) {
         if (!config.enabled || !config.socialFeed || !config.autoGenerate) return
+        val settleDay = lg.day
         aiScope.launch {
+            if (!settled(config, lg, settleDay)) return@launch
             generateSocialTakes(config, lg, g, player, line, won).onSuccess { posts ->
                 lg.road?.feed?.addAll(posts)
             }

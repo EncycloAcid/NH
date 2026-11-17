@@ -572,6 +572,7 @@ object Recruiting {
         os.round++
         lg.recruitPoints = (lg.recruitPoints + 20).coerceAtMost(SCOUT_CAP)
         if (os.round <= ROUNDS) aiMoves(lg)
+        if (os.round <= ROUNDS) runCatching { WeeklyDispatch.maybeCrystalBall(lg) }
     }
 
     private fun commit(lg: League, r: Recruit, tid: Int, round: Int, room: IntArray?, rep: RoundReport?) {

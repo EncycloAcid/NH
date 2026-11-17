@@ -1180,6 +1180,7 @@ object ProSeason {
             t.homeGames = 0; t.homeAtt = 0; t.sellouts = 0
             Tactics.autoAllocate(lg, t)
         }
+        runCatching { SkillTree.seasonEnd(lg) }
         for (p in lg.players) {
             p.stats = StatLine(); p.tourney = StatLine(); p.log = mutableListOf()
             p.seasonGains = IntArray(10); p.seasonLevels = 0

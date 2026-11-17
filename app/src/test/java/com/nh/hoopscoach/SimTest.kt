@@ -22,6 +22,11 @@ import kotlin.random.Random
 
 class SimTest {
 
+    @org.junit.Before
+    fun noModel() {
+        com.nh.hoopscoach.game.WeeklyDispatch.generator = com.nh.hoopscoach.game.TemplateNewsGenerator
+    }
+
     /** A hidden gem who tries out as a freshman should usually be a star by his junior or senior year. */
     @Test
     fun gemsBecomeStars() {

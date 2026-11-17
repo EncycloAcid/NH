@@ -163,6 +163,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item { StorylinesPanel(vm, lg) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
+        item { DispatchCard(vm, lg) }
         item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
