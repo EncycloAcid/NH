@@ -117,7 +117,7 @@ object WeeklyDispatch {
         val names: Set<String>, val numbers: Set<String>, val lines: List<String>, val rumorLines: List<String>,
     )
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + AiTraffic.Lane(AiTraffic.Priority.BACKGROUND))
     @Volatile private var pendingWeek: Job? = null
     @Volatile private var pendingRound: Job? = null
 

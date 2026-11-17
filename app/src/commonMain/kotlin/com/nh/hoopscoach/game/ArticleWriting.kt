@@ -5,8 +5,24 @@ object ArticleWriting {
     fun small(config: OllamaConfig) = config.provider.lowercase() == "ollama" && (config.speedMode == "turbo" || Regex("(?i)(1b|3b|small)").containsMatchIn(config.model))
     /** Gemini Nano on the phone: 256 tokens a reply, so a short article. */
     fun tiny(config: OllamaConfig) = config.provider.equals("nano", true)
-    fun budget(config: OllamaConfig) = if (tiny(config)) OnDeviceAi.MAX_OUTPUT else if (small(config)) 850 else 1800
-    fun instruction(config: OllamaConfig) = "Write ${if (tiny(config)) "3-5 short paragraphs, 100-160" else "4-7 substantial paragraphs, " + (if (small(config)) "160-240" else "250-450")} words. Separate paragraphs with blank lines. Finish every sentence. Cover the lede, exact game lines for both teams, recorded period scoring or a recorded decisive event, records and standings context, and the next scheduled game when supplied. For other article types develop the relevant event, evidence, implications and what comes next. Omit unavailable details. Never invent a run or a quote; no quotations unless explicitly supplied as recorded dialogue."
+    fun budget(config: OllamaConfig, tiny: Boolean = tiny(config)) = if (tiny) OnDeviceAi.MAX_OUTPUT else if (small(config)) 850 else 1800
+
+    /** For Gemini Nano on a format of short blocks (a package of beats): what fits in one short reply. */
+    const val SHORT_ROOM = "Room is short (about 170 words in all): keep every body to two or three sentences, write at most three blocks where the format lets you leave some out, and finish every sentence."
+
+    /**
+     * How long to write. [tiny]: Gemini Nano answers (about 180 words a reply). [items]: several stories in one reply
+     * (three scoops, rumors or preview storylines), each sized so all of them fit.
+     */
+    fun instruction(config: OllamaConfig, tiny: Boolean = tiny(config), items: Int = 1): String {
+        val size = when {
+            tiny && items > 1 -> "one short paragraph of 20-30 words"
+            tiny -> "3-5 short paragraphs, 100-160 words"
+            small(config) -> "4-7 substantial paragraphs, 160-240 words"
+            else -> "4-7 substantial paragraphs, 250-450 words"
+        }
+        return (if (items > 1) "Write each of the $items items as $size." else "Write $size.") + " Separate paragraphs with blank lines. Finish every sentence. Cover the lede, exact game lines for both teams, recorded period scoring or a recorded decisive event, records and standings context, and the next scheduled game when supplied. For other article types develop the relevant event, evidence, implications and what comes next. Omit unavailable details. Never invent a run or a quote; no quotations unless explicitly supplied as recorded dialogue."
+    }
 
     fun bodies(raw: String): List<String> {
         if (Regex("(?m)^SCOOP \\d+:").containsMatchIn(raw)) return briefs(raw, "SCOOP").map { it.second }
@@ -26,11 +42,14 @@ object ArticleWriting {
         }.filter { it.first.isNotBlank() && it.second.isNotBlank() }
     }
 
-    fun errors(raw: String, config: OllamaConfig): List<String> = bodies(raw).flatMap { body ->
+    /** What's wrong with an article (or with each of [items] stories in one reply), by the same sizes [instruction] asks for. */
+    fun errors(raw: String, config: OllamaConfig, tiny: Boolean = tiny(config), items: Int = 1): List<String> = bodies(raw).flatMap { body ->
         val paragraphs = body.split(Regex("\\n\\s*\\n")).filter { it.isNotBlank() }
+        val brief = tiny && items > 1
+        val range = if (brief) 1..3 else if (tiny) 3..7 else 4..7
         buildList {
-            if (paragraphs.size !in (if (tiny(config)) 3..7 else 4..7)) add("article requires ${if (tiny(config)) "3-7" else "4-7"} paragraphs")
-            if (Regex("\\S+").findAll(body).count() < if (tiny(config)) 90 else if (small(config)) 140 else 220) add("article is too short")
+            if (paragraphs.size !in range) add("article requires ${range.first}-${range.last} paragraphs")
+            if (Regex("\\S+").findAll(body).count() < if (brief) 15 else if (tiny) 90 else if (small(config)) 140 else 220) add("article is too short")
             if (paragraphs.any { !Regex("[.!?][\\\"'’”)]*$").containsMatchIn(it.trim()) }) add("unfinished article sentence")
             if (Regex("(?i)\\b(to|with|and|the|a|an|of|for|in|at|by|from|or|but|because)[.!?][\\\"'’”)]*$").containsMatchIn(body.trim())) add("unfinished article sentence")
         }

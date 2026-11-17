@@ -89,6 +89,16 @@ import com.nh.hoopscoach.game.Team
 val Gutter = 16.dp
 private val CardShape = RoundedCornerShape(20.dp)
 
+/** Why the game's own version is showing, as one or two plain sentences. */
+fun gameWrittenNote(reason: String): String {
+    val r = reason.trim().trimEnd('.', ' ')
+    return when {
+        r.isBlank() -> "Written by the game."
+        r.contains("the game wrote", true) -> r.replaceFirstChar { it.uppercase() } + "."
+        else -> "Written by the game. " + r.replaceFirstChar { it.uppercase() } + "."
+    }
+}
+
 @Composable
 fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier, fallbackReason: String = "") {
     if (!isAi && fallbackReason.isBlank()) return
@@ -105,7 +115,7 @@ fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier,
             Icon(Icons.Filled.Check, contentDescription = "AI-generated", tint = Color.White, modifier = Modifier.size(16.dp))
         }
         DropdownMenu(expanded = details, onDismissRequest = { details = false }) {
-            Text(if (!isAi) "Written by the game. $fallbackReason." else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider",
+            Text(if (!isAi) gameWrittenNote(fallbackReason) else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider",
                 style = T.small, color = P.ink, modifier = Modifier.widthIn(max = 280.dp).padding(horizontal = 14.dp, vertical = 10.dp))
         }
     }

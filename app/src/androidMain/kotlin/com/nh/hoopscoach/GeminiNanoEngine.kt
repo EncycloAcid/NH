@@ -121,7 +121,10 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
                         onToken?.invoke(text)
                     }
                 })
-                return@withLock response.candidates.firstOrNull()?.text.orEmpty().ifBlank { streamed.toString() }
+                val candidate = response.candidates.firstOrNull()
+                val text = candidate?.text.orEmpty().ifBlank { streamed.toString() }
+                // Stopped at the token cap (FinishReason.MAX_TOKENS): don't end on half a sentence.
+                return@withLock if (candidate?.finishReason == 1) OnDeviceAi.tidy(text) else text
             } catch (e: GenAiException) {
                 attempt++
                 // A phone that won't take a cached prefix: send the instructions in the prompt from now on.
@@ -130,23 +133,34 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
                     continue
                 }
                 when (e.errorCode) {
-                    // AICore is serving another request: back off and try again.
-                    GenAiException.ErrorCode.BUSY -> if (attempt <= 3) { delay(400L shl attempt); continue }
+                    // AICore is serving another request: one short pause, then the game's traffic control takes over.
+                    GenAiException.ErrorCode.BUSY -> if (attempt <= 1) { delay(1_500); continue }
                     // Too long for the window after all: cut the middle further.
                     GenAiException.ErrorCode.REQUEST_TOO_LARGE -> if (attempt <= 2) { input = OnDeviceAi.fit(input, (input.length * 0.6).toInt()); continue }
                 }
-                throw Exception(describe(e), e)
+                throw refusal(e)
             }
         }
         @Suppress("UNREACHABLE_CODE") ""
     }
 
+    /** AICore's error as a refusal the game's traffic control understands (rest a moment, rest for the day...). */
+    private fun refusal(e: GenAiException): OnDeviceAi.Refused = OnDeviceAi.Refused(
+        when (e.errorCode) {
+            GenAiException.ErrorCode.BUSY -> OnDeviceAi.Refused.Kind.BUSY
+            GenAiException.ErrorCode.PER_APP_BATTERY_USE_QUOTA_EXCEEDED -> OnDeviceAi.Refused.Kind.QUOTA
+            GenAiException.ErrorCode.BACKGROUND_USE_BLOCKED -> OnDeviceAi.Refused.Kind.OFF_SCREEN
+            else -> OnDeviceAi.Refused.Kind.OTHER
+        },
+        describe(e), e,
+    )
+
     private fun mb(bytes: Long) = if (bytes >= 1_000_000_000) "%.1f GB".format(bytes / 1e9) else "${bytes / 1_000_000} MB"
 
     private fun describe(e: GenAiException): String = when (e.errorCode) {
-        GenAiException.ErrorCode.BACKGROUND_USE_BLOCKED -> "Gemini Nano only answers while the game is on screen. The game's own writing filled in."
-        GenAiException.ErrorCode.BUSY -> "Gemini Nano is busy with another request. Try again in a moment."
-        GenAiException.ErrorCode.PER_APP_BATTERY_USE_QUOTA_EXCEEDED -> "This app has used today's on-device AI allowance. It resets on its own; the game's own writing fills in until then."
+        GenAiException.ErrorCode.BACKGROUND_USE_BLOCKED -> "Gemini Nano only writes while the game is on screen, so the game wrote this one"
+        GenAiException.ErrorCode.BUSY -> "Gemini Nano was busy, so the game wrote this one"
+        GenAiException.ErrorCode.PER_APP_BATTERY_USE_QUOTA_EXCEEDED -> "Gemini Nano has used this app's on-device allowance for now, so the game wrote this one. It resets on its own"
         GenAiException.ErrorCode.NOT_AVAILABLE -> "Gemini Nano isn't available on this phone yet. Update AICore and Google Play services, then check again."
         GenAiException.ErrorCode.NEEDS_SYSTEM_UPDATE, GenAiException.ErrorCode.AICORE_INCOMPATIBLE -> "AICore needs an update. Update it (and Android System Intelligence) from the Play Store, then check again."
         GenAiException.ErrorCode.NOT_ENOUGH_DISK_SPACE -> "Not enough free storage for Gemini Nano."

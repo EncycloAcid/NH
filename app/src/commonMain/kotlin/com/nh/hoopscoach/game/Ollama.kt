@@ -28,13 +28,11 @@ object Ollama {
      * Where the fire-and-forget AI writers run. One failing (a network error, a league caught mid-change by
      * the sim) only skips that batch of stories; it never takes the app down with it.
      */
-    private val aiScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+    private val aiScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + AiTraffic.Lane(AiTraffic.Priority.BACKGROUND) + CoroutineExceptionHandler { _, e ->
         runCatching { System.err.println("AI background job skipped: ${e::class.simpleName}: ${e.message}") }
     })
 
     private val json = Json { ignoreUnknownKeys = true }
-    /** Free-tier keys get hammered when every desk launches at once — queue cloud/local generates. */
-    private val generateGate = Mutex()
 
     data class ModelPreset(
         val id: String,
@@ -617,6 +615,13 @@ object Ollama {
             "does not have access" in m || "not eligible" in m || "unsupported" in m
     }
 
+    /** A provider saying "slow down" (or "out of quota"): retrying at once only makes it worse; [AiTraffic] rests instead. */
+    internal fun isRateLimit(message: String?): Boolean {
+        val m = message?.lowercase().orEmpty()
+        return "429" in m || "rate limit" in m || "rate_limit" in m || "ratelimit" in m || "resource_exhausted" in m ||
+            "too many requests" in m || "quota" in m
+    }
+
     /** Rate limits, overloads, and socket blips — retry same model before giving up. */
     internal fun isTransientProviderError(message: String?): Boolean {
         val m = message?.lowercase().orEmpty()
@@ -627,15 +632,16 @@ object Ollama {
             "socket" in m || "broken pipe" in m
     }
 
-    private suspend fun <T> retryTransient(attempts: Int = 3, block: suspend (attempt: Int) -> T): T {
+    private suspend fun <T> retryTransient(attempts: Int = 2, block: suspend (attempt: Int) -> T): T {
         var last: Exception? = null
         repeat(attempts) { i ->
             try {
                 return block(i)
             } catch (e: Exception) {
                 last = e
-                if (!isTransientProviderError(e.message) || i == attempts - 1) throw e
-                delay(400L * (1L shl i)) // 400ms, 800ms
+                // A server blip gets one more try after a pause; a rate limit doesn't (it would only extend it).
+                if (!isTransientProviderError(e.message) || isRateLimit(e.message) || i == attempts - 1) throw e
+                delay(1_200L * (1L shl i))
             }
         }
         throw (last ?: Exception("Provider request failed"))
@@ -1131,6 +1137,7 @@ object Ollama {
             var lastErr: Exception? = null
             var text: String? = null
             var used: String? = null
+            var limited = 0
 
             for (cand in candidates) {
                 try {
@@ -1183,6 +1190,8 @@ object Ollama {
                 } catch (e: Exception) {
                     lastErr = e
                     when {
+                        // Each Gemini model has its own free allowance: one other model may answer; more would hammer.
+                        isRateLimit(e.message) -> if (++limited >= 2) throw e
                         isModelAccessError(e.message) -> rememberFailedModel(cand)
                         isTransientProviderError(e.message) -> { /* already retried; try next model */ }
                         else -> throw e // auth / hard failures
@@ -1223,6 +1232,7 @@ object Ollama {
             var lastErr: Exception? = null
             var text: String? = null
             var used: String? = null
+            var limited = 0
             for (model in candidates) {
                 try {
                     val content = retryTransient {
@@ -1267,6 +1277,7 @@ object Ollama {
                 } catch (e: Exception) {
                     lastErr = e
                     when {
+                        isRateLimit(e.message) -> if (++limited >= 2) throw e
                         isModelAccessError(e.message) -> rememberFailedModel(model)
                         isTransientProviderError(e.message) -> { /* already retried; try next model */ }
                         else -> throw e
@@ -1494,6 +1505,7 @@ object Ollama {
             var lastErr: Exception? = null
             var text: String? = null
             var used: String? = null
+            var limited = 0
             for (model in candidates) {
                 try {
                     val content = retryTransient {
@@ -1535,6 +1547,7 @@ object Ollama {
                 } catch (e: Exception) {
                     lastErr = e
                     when {
+                        isRateLimit(e.message) -> if (++limited >= 2) throw e
                         isModelAccessError(e.message) -> rememberFailedModel(model)
                         isTransientProviderError(e.message) -> { /* already retried */ }
                         else -> throw e
@@ -1564,20 +1577,21 @@ object Ollama {
         dialogue: Boolean = false,
         desk: OnDeviceAi.Desk? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
-        generateGate.withLock {
-            val first = route(config, dialogue || desk != null)
-            val result = if (first == "nano") generateNano(config, prompt, system, temperature, numPredict, onToken, desk)
-                else byProvider(first, config, prompt, system, temperature, numPredict, onToken)
-            // Gemini Nano couldn't answer (the app went to the background, today's allowance is used up):
-            // the provider picked for everything else writes it instead.
-            val main = config.provider.lowercase()
-            if (result.isFailure && first == "nano" && main != "nano") {
-                lastRoute = main
-                byProvider(main, config, prompt, system, temperature, numPredict, onToken)
-            } else {
-                lastRoute = first
-                result
-            }
+        // One request at a time, in priority order, paced per provider; see [AiTraffic].
+        val first = route(config, dialogue || desk != null)
+        val result = AiTraffic.run(first) {
+            if (first == "nano") generateNano(config, prompt, system, temperature, numPredict, onToken, desk)
+            else byProvider(first, config, prompt, system, temperature, numPredict, onToken)
+        }
+        // Gemini Nano couldn't answer (the app went to the background, it's resting, the allowance is used up):
+        // the provider picked for everything else writes it instead.
+        val main = config.provider.lowercase()
+        if (result.isFailure && first == "nano" && main != "nano") {
+            lastRoute = main
+            AiTraffic.run(main) { byProvider(main, config, prompt, system, temperature, numPredict, onToken) }
+        } else {
+            lastRoute = first
+            result
         }
     }
 
@@ -1601,7 +1615,7 @@ object Ollama {
 
     /** Which provider answers: dialogue goes to Gemini Nano on the phone when that's on and it's ready. */
     fun route(config: OllamaConfig, dialogue: Boolean = false): String =
-        if (dialogue && config.nanoForDialogue && OnDeviceAi.ready) "nano" else config.provider.lowercase()
+        if (dialogue && config.nanoForDialogue && OnDeviceAi.usable) "nano" else config.provider.lowercase()
 
     /** Who wrote it, for the AI badge: Gemini Nano for dialogue it answered, else the provider's model. */
     fun writerName(config: OllamaConfig, dialogue: Boolean = false): String =
@@ -1618,6 +1632,8 @@ object Ollama {
         desk: OnDeviceAi.Desk? = null,
     ): Result<String> = runCatching {
         val engine = OnDeviceAi.engine ?: throw Exception(OnDeviceAi.NOT_HERE)
+        // AICore refuses apps that aren't on screen; don't spend a request finding that out.
+        if (!OnDeviceAi.onScreen) throw OnDeviceAi.Refused(OnDeviceAi.Refused.Kind.OFF_SCREEN, "Gemini Nano only writes while the game is on screen, so the game wrote this one")
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) OnDeviceAi.refresh()
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) throw Exception("Gemini Nano: ${OnDeviceAi.stateLabel()}. ${OnDeviceAi.last.detail}".trim())
         // Gemini Nano writes at most 256 tokens; a longer job is asked to fit, so it ends on a full sentence.
@@ -1767,7 +1783,12 @@ object Ollama {
         desk: OnDeviceAi.Desk? = null,
     ): Result<AiText> {
         val dialogue = desk != null
-        val wantsArticle = articleCopy.isNotBlank() || prompt.contains("BODY:") || prompt.contains("STORY:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")
+        // Gemini Nano answers this one (it's the provider, or it takes the dialogue): about 180 words, so short formats.
+        val nano = route(config, dialogue) == "nano"
+        // Several stories in one reply: three scoops, rumors or preview storylines.
+        val items = if (prompt.contains("Format each storyline as:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")) 3 else 1
+        // An article has a BODY: or STORY: field of its own; a package's TITLE_BODY: beats are short and aren't one.
+        val wantsArticle = articleCopy.isNotBlank() || Regex("(?m)^(BODY|STORY):").containsMatchIn(prompt) || items > 1
         val subject = LeagueLists.teams(lg).filter { prompt.contains(it.name) || prompt.contains(it.school) }.minByOrNull { listOf(prompt.indexOf(it.name), prompt.indexOf(it.school)).filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE } ?: lg.user
         val fallbackCopy = articleCopy.ifBlank { if (wantsArticle) ArticleWriting.news(lg, News(lg.season, lg.day, "${subject.name}: the latest outlook", teamId = subject.id)) else "" }
         // Game/series reports already carry RESULT/BOX/SERIES in the sheet; skip duplicating the
@@ -1777,14 +1798,15 @@ object Ollama {
             eventGame != null -> ""
             else -> "\nARTICLE CONTEXT:\n$fallbackCopy"
         }
-        val facts = AiFacts.build(lg, prompt, extraFacts + articleExtra, extraPlayers, preview, upcoming, eventGame)
+        val facts = AiFacts.build(lg, prompt, extraFacts + articleExtra, extraPlayers, preview, upcoming, eventGame, lean = nano)
         val requestId = AiDiagnostics.begin(config, if (prompt.contains("KEY 1:")) "Scouting report" else if (prompt.contains("KICKER:")) "Preview stories" else "Game report")
         var providerError: Throwable? = null
         var gotResponse = false
         val longForm = wantsArticle
-        val writingPrompt = prompt + if (longForm) "\n${ArticleWriting.instruction(config)}" else ""
-        val result = AiGrounding.generate(facts, writingPrompt, { raw -> validateDraft(raw) + if (longForm) ArticleWriting.errors(raw, config) else emptyList() }) { grounded ->
-            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config) * (if (prompt.contains("Format each storyline as:") || prompt.contains("SCOOP 1:") || prompt.contains("RUMOR 1:")) 3 else 1) else numPredict, onToken = onToken, desk = desk).also {
+        val writingPrompt = prompt + (if (longForm) "\n${ArticleWriting.instruction(config, nano, items)}" else "") +
+            (if (nano && !longForm && numPredict > OnDeviceAi.MAX_OUTPUT) "\n${ArticleWriting.SHORT_ROOM}" else "")
+        val result = AiGrounding.generate(facts, writingPrompt, { raw -> validateDraft(raw) + if (longForm) ArticleWriting.errors(raw, config, nano, items) else emptyList() }, withInstructions = false) { grounded ->
+            generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config, nano) * items else numPredict, onToken = onToken, desk = desk).also {
                 gotResponse = it.isSuccess
                 if (it.isFailure) providerError = it.exceptionOrNull()
             }
@@ -1884,7 +1906,7 @@ object Ollama {
             append("\nFormat your response EXACTLY as:\n")
             append("HEADLINE: <Epic championship headline>\n")
             append("OUTLET: <Publication, e.g. Championship Chronicle or The Daily Dribble>\n")
-            append("BODY:\n<3 paragraphs about the recorded championship outcome, supplied MVP production and team history. No invented celebrations, quotes or parade plans.>")
+            append("BODY:\n<The article about the recorded championship outcome, supplied MVP production and team history. No invented celebrations, quotes or parade plans.>")
         }
 
         return groundedGenerate(config, lg, prompt, numPredict = 360, extraFacts = "Champion ${champion.name}; runner-up ${runnerUp.name}; finals outcome $seriesOrScore${finalsMvp?.let { "; Finals MVP ${it.name}" }.orEmpty()}", extraPlayers = listOfNotNull(finalsMvp)).map { draft ->
@@ -1968,7 +1990,7 @@ object Ollama {
             append("\nFormat your response EXACTLY as:\n")
             append("HEADLINE: <Fiery pregame headline>\n")
             append("OUTLET: <Publication, e.g. Courtside Dispatch or The Rivalry Beat>\n")
-            append("BODY:\n<3 paragraphs about the actual records, available players and scheduled rivalry. No invented historical incidents, quotes, injuries or result.>")
+            append("BODY:\n<The article about the actual records, available players and scheduled rivalry. No invented historical incidents, quotes, injuries or result.>")
         }
 
         return groundedGenerate(config, lg, prompt, numPredict = 320, upcoming = true, extraFacts = "Upcoming day ${g.day}: ${lg.team(g.away).name} at ${lg.team(g.home).name}; rivalry ${rivalry?.name ?: "none recorded"}").map { draft ->
@@ -2056,7 +2078,7 @@ object Ollama {
             append("Format your response EXACTLY as:\n")
             append("HEADLINE: <Catchy newspaper headline>\n")
             append("OUTLET: <Publication name, e.g. Hoops Wire or The Daily Dribble>\n")
-            append("BODY:\n<2-3 paragraphs of article text>")
+            append("BODY:\n<The article>")
         }
 
         return groundedGenerate(config, lg, prompt).map { draft ->
@@ -2112,16 +2134,16 @@ object Ollama {
             append("Format each storyline as:\n")
             append("KICKER: <Short 1-3 word tag like 'The Favorite' or 'Hot Seat'>\n")
             append("HEADLINE: <Punchy storyline headline>\n")
-            append("BODY: <4-7 paragraphs of evidence-backed preview reporting>\n---\n")
+            append("BODY: <Evidence-backed preview reporting>\n---\n")
         }
 
         return groundedGenerate(config, lg, prompt, numPredict = 300, preview = true, extraFacts = topics.joinToString("\n") { "${it.subject}: ${it.facts}" }, validateDraft = { raw ->
-            val subjects = raw.split(Regex("(?im)(?=^KICKER:)")).filter { it.contains("HEADLINE:", true) }.map { PreviewTopics.match(lg, topics, it)?.subject }
+            val subjects = PreviewTopics.assign(lg, topics, raw.split(Regex("(?im)(?=^KICKER:)")).filter { it.contains("HEADLINE:", true) }).map { it?.subject }
             if (subjects.size != 3 || subjects.any { it == null } || subjects.distinct().size != 3) listOf("three distinct verified preview subjects required") else emptyList()
         }).mapCatching { draft ->
             if (!draft.isAi) return@mapCatching PreviewTopics.stories(lg, topics).take(3).onEach { it.fallbackReason = draft.fallbackReason }
             val raw = draft.text
-            val stories = mutableListOf<Story>()
+            val drafts = mutableListOf<Triple<String, String, String>>()
             var kicker = ""
             var head = ""
             val body = mutableListOf<String>()
@@ -2129,8 +2151,7 @@ object Ollama {
             fun flush() {
                 if (kicker.isNotEmpty() && head.isNotEmpty()) {
                     val text = if (body.isNotEmpty()) body.joinToString("\n").trim() else "Key storyline to watch for the upcoming season."
-                    val subject = PreviewTopics.match(lg, topics, "$head $text")
-                    if (subject != null) stories += Story(kicker, head, text, subject.teamId, subject.pid, draft.provider)
+                    drafts += Triple(kicker, head, text)
                 }
                 kicker = ""
                 head = ""
@@ -2161,6 +2182,9 @@ object Ollama {
                 }
             }
             flush()
+            val stories = PreviewTopics.assign(lg, topics, drafts.map { "${it.second} ${it.third}" }).zip(drafts).mapNotNull { (subject, d) ->
+                subject?.let { Story(d.first, d.second, d.third, it.teamId, it.pid, draft.provider) }
+            }
 
             if (stories.isEmpty()) {
                 throw IllegalStateException("No verified subject in the draft; the existing game-written stories were kept.")
@@ -2169,8 +2193,10 @@ object Ollama {
     }
 
     /**
-     * Batch mode: one AI call a week (the Hoops Dispatch) instead of the nightly story desks and a rewrite of every
-     * article. Always on for Gemini Nano, whose daily allowance is small; dialogue still gets written as it happens.
+     * Batch mode: one AI call a week (the Hoops Dispatch) instead of the nightly story desks (articles, the media,
+     * campus, rivalry, draft, storyline, coaching, moments and journalism packages). Always on for Gemini Nano,
+     * whose allowance is small and whose replies are short; dialogue still gets written as it happens, and every
+     * desk still writes when the player asks for it.
      */
     fun batchOnly(config: OllamaConfig) = config.weeklyBatch || config.provider.equals("nano", true)
 
@@ -2198,7 +2224,7 @@ object Ollama {
 
     /** Fire-and-forget living media ecosystem package (breaking + debates + social + polls). */
     fun maybeAutoGenerateMediaEcosystem(config: OllamaConfig, lg: League, force: Boolean = false) {
-        if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate) return
+        if (!config.enabled || !config.mediaEcosystem || !config.autoGenerate || batchOnly(config)) return
         if (!force && (lg.day < 4 || lg.day % 4 != 0)) return
         aiScope.launch {
             try {
@@ -2252,7 +2278,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Hoops Wire Network. Titles and league situation first. Facts only from the brief. Speculation must be labeled as rumor.",
-            numPredict = 560,
+            numPredict = 800,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2298,7 +2324,7 @@ object Ollama {
 
     /** Fire-and-forget campus / franchise development package. */
     fun maybeAutoGenerateUniversityDevelopment(config: OllamaConfig, lg: League, force: Boolean = false) {
-        if (!config.enabled || !config.universityDevelopment || !config.autoGenerate) return
+        if (!config.enabled || !config.universityDevelopment || !config.autoGenerate || batchOnly(config)) return
         if (!force && (lg.day < 9 || lg.day % 9 != 0)) return
         aiScope.launch {
             try {
@@ -2344,7 +2370,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "University development desk. Facts only from the brief.",
-            numPredict = 420,
+            numPredict = 600,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2386,7 +2412,7 @@ object Ollama {
 
     /** Fire-and-forget historical rivalries package (programs, coaches, fans, players). */
     fun maybeAutoGenerateHistoricalRivalries(config: OllamaConfig, lg: League, force: Boolean = false) {
-        if (!config.enabled || !config.historicalRivalries || !config.autoGenerate) return
+        if (!config.enabled || !config.historicalRivalries || !config.autoGenerate || batchOnly(config)) return
         if (!force && (lg.day < 6 || lg.day % 6 != 0)) return
         if (lg.rivals.isEmpty() && CoachRivals.rivals(lg).isEmpty()) return
         aiScope.launch {
@@ -2429,7 +2455,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Historical rivalries desk. Facts only from the brief.",
-            numPredict = 420,
+            numPredict = 600,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2471,7 +2497,7 @@ object Ollama {
 
     /** Fire-and-forget draft universe package (stock, combine profiles, surprises, alumni). */
     fun maybeAutoGenerateDraftUniverse(config: OllamaConfig, lg: League) {
-        if (!config.enabled || !config.draftUniverse || !config.autoGenerate) return
+        if (!config.enabled || !config.draftUniverse || !config.autoGenerate || batchOnly(config)) return
         val dn = lg.proState?.draftNight
         val draftNightPulse = dn != null && (dn.log.isNotEmpty() || !dn.done)
         if (!draftNightPulse && (lg.day < 12 || lg.day % 8 != 0)) return
@@ -2515,7 +2541,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "NBA draft universe desk. Facts only from the brief.",
-            numPredict = 420,
+            numPredict = 600,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2557,7 +2583,7 @@ object Ollama {
 
     /** Fire-and-forget player storyline features from detected arcs. */
     fun maybeAutoGeneratePlayerStorylines(config: OllamaConfig, lg: League) {
-        if (!config.enabled || !config.playerStorylines || !config.autoGenerate) return
+        if (!config.enabled || !config.playerStorylines || !config.autoGenerate || batchOnly(config)) return
         if (lg.day < 8 || lg.day % 7 != 0) return
         val arcs = try {
             PlayerStorylines.detectArcs(lg)
@@ -2609,7 +2635,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Player storylines desk. Facts only from the brief.",
-            numPredict = 420,
+            numPredict = 600,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2657,7 +2683,7 @@ object Ollama {
 
     /** Fire-and-forget living coaching careers package (hot seats, rivals, legacy). */
     fun maybeAutoGenerateCoachingCareers(config: OllamaConfig, lg: League) {
-        if (!config.enabled || !config.livingCoachingCareers || !config.autoGenerate) return
+        if (!config.enabled || !config.livingCoachingCareers || !config.autoGenerate || batchOnly(config)) return
         aiScope.launch {
             generateLivingCoachingCareers(config, lg).onSuccess { pack ->
                 if (pack.stories.isNotEmpty()) LeagueLists.appendNews(lg, pack.stories)
@@ -2701,7 +2727,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Coaching careers desk. Facts only from the brief. Label speculation clearly.",
-            numPredict = 420,
+            numPredict = 600,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2743,7 +2769,7 @@ object Ollama {
 
     /** Fire-and-forget historic moment feature for a recorded highlight. */
     fun maybeAutoGenerateHistoricMoment(config: OllamaConfig, lg: League, m: Moment) {
-        if (!config.enabled || !config.historicMoments || !config.autoGenerate) return
+        if (!config.enabled || !config.historicMoments || !config.autoGenerate || batchOnly(config)) return
         aiScope.launch {
             generateHistoricMoment(config, lg, m).onSuccess { pack ->
                 // Prefer fleshing the matching news row; otherwise append.
@@ -2787,12 +2813,12 @@ object Ollama {
             appendLine(brief)
             appendLine("Format EXACTLY:")
             appendLine("HEADLINE: <punchy feature headline matching the kind>")
-            appendLine("BODY: <2-3 short paragraphs; court storms / buzzers / heartbreaks stay inside the brief>")
+            appendLine("BODY: <The feature; court storms / buzzers / heartbreaks stay inside the brief>")
         }
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Historic moments desk. Facts only from the brief.",
-            numPredict = 360,
+            numPredict = 500,
             eventGame = LeagueLists.games(lg).firstOrNull { it.id == m.gameId },
         )
         result.map { draft ->
@@ -2832,7 +2858,7 @@ object Ollama {
 
     /** Fire-and-forget national sports desk package after a day of games. */
     fun maybeAutoGenerateJournalism(config: OllamaConfig, lg: League) {
-        if (!config.enabled || !config.sportsJournalism || !config.autoGenerate) return
+        if (!config.enabled || !config.sportsJournalism || !config.autoGenerate || batchOnly(config)) return
         if (lg.day < 3 || lg.day % 3 != 0) return
         aiScope.launch {
             generateSportsJournalism(config, lg).onSuccess { pack ->
@@ -2882,7 +2908,7 @@ object Ollama {
         val result = groundedGenerate(
             config, lg, prompt,
             system = "Hoops Wire national desk. Titles and league situation first. Facts only from the brief. Speculation must be labeled as such.",
-            numPredict = 560,
+            numPredict = 800,
         )
         result.map { draft ->
             fun field(key: String): String {
@@ -2928,7 +2954,7 @@ object Ollama {
         if (!config.enabled || !config.playerInterviews || !config.autoGenerate) return
         if (!g.involves(lg.userTeamId) || g.box == null) return
         val settleDay = lg.day
-        aiScope.launch {
+        aiScope.launch(AiTraffic.Lane(AiTraffic.Priority.LIVE)) {
             if (!settled(config, lg, settleDay)) return@launch
             generatePlayerInterviews(config, lg, g).onSuccess { list ->
                 if (list.isNotEmpty()) {
@@ -2952,7 +2978,7 @@ object Ollama {
     ) {
         if (!config.enabled || !config.pressConference || !config.autoGenerate) return
         val settleDay = lg.day
-        aiScope.launch {
+        aiScope.launch(AiTraffic.Lane(AiTraffic.Priority.LIVE)) {
             if (!settled(config, lg, settleDay)) return@launch
             generatePressConference(config, lg, g, player, line, won, rivalry, winner).onSuccess { aiQ ->
                 if (lg.road?.press?.gameId == g.id) {
@@ -2973,7 +2999,7 @@ object Ollama {
     ) {
         if (!config.enabled || !config.socialFeed || !config.autoGenerate) return
         val settleDay = lg.day
-        aiScope.launch {
+        aiScope.launch(AiTraffic.Lane(AiTraffic.Priority.LIVE)) {
             if (!settled(config, lg, settleDay)) return@launch
             generateSocialTakes(config, lg, g, player, line, won).onSuccess { posts ->
                 lg.road?.feed?.addAll(posts)
@@ -3193,6 +3219,7 @@ object Ollama {
             system = "You are a professional basketball beat writer conducting a post-game press conference. Strictly use the provided stats, scores, and names. Never alter the statistics.",
             numPredict = 260,
             desk = OnDeviceAi.Desk.COACH,
+            eventGame = g.takeIf { it.box != null },
         ).map { draft ->
             val raw = draft.text
             var topic = if (winner) "Game-Winner" else if (rivalry) "Rivalry" else if (won) "Postgame Win" else "Tough Loss"
@@ -3283,6 +3310,7 @@ object Ollama {
             system = "You write realistic, engaging basketball social media posts. Strictly reflect the exact provided game statistics without altering numbers.",
             numPredict = 260,
             desk = OnDeviceAi.Desk.REACTIONS,
+            eventGame = g.takeIf { it.box != null },
         ).map { draft ->
             val raw = draft.text
             val posts = mutableListOf<Post>()
@@ -3380,7 +3408,7 @@ object Ollama {
             append("Format your response EXACTLY as:\n")
             append("HEADLINE: <Catchy newspaper headline>\n")
             append("OUTLET: <Publication name e.g. Courtside Report or Daily Dribble>\n")
-            append("STORY:\n<4-7 paragraphs using supplied game facts>\n")
+            append("STORY:\n<The recap, using supplied game facts>\n")
             append("COACH_QUOTE: <Use —; no recorded quote supplied>\n")
             append("STAR_QUOTE: <Use —; no recorded quote supplied>\n")
         }

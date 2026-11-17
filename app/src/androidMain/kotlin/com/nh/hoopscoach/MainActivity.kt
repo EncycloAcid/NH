@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         PlatformContext.filesDir = filesDir
         PlatformContext.versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull() ?: "3.9-pro.262"
+        }.getOrNull() ?: "3.9-pro.263"
         AndroidAssets.appContext = applicationContext
         if (com.nh.hoopscoach.game.OnDeviceAi.engine == null) com.nh.hoopscoach.game.OnDeviceAi.engine = GeminiNanoEngine()
         lifecycleScope.launch { runCatching { com.nh.hoopscoach.game.OnDeviceAi.refresh() } }
@@ -57,8 +57,15 @@ class MainActivity : ComponentActivity() {
         setContent { App(vm) }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // AICore only answers apps on screen: Gemini Nano requests wait for this.
+        com.nh.hoopscoach.game.OnDeviceAi.onScreen = true
+    }
+
     override fun onStop() {
         super.onStop()
+        com.nh.hoopscoach.game.OnDeviceAi.onScreen = false
         if (gameStarted) vm.saveSoon()
     }
 }

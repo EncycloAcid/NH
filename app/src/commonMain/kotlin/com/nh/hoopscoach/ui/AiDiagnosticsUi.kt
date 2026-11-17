@@ -72,6 +72,8 @@ fun AiDiagnosticsPanel(
             color = P.sub,
         )
         Text(AiDiagnostics.setupHint(config), style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // A provider resting after a rate limit or a busy signal: the game's own writing fills in until it's back.
+        com.nh.hoopscoach.game.AiTraffic.status().forEach { Text(it, style = T.small, color = P.warn) }
         Spacer(Modifier.height(6.dp))
         Row(
             Modifier
@@ -189,6 +191,8 @@ fun AiDiagnosticsPanel(
             ) {
                 testing = true
                 scope.launch {
+                    // A test asks now, even if the provider was resting after a rate limit.
+                    com.nh.hoopscoach.game.AiTraffic.reset()
                     val id = AiDiagnostics.begin(config, "Test AI")
                     try {
                         val response = if (config.autoPickModel) {

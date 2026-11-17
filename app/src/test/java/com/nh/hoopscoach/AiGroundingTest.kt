@@ -110,7 +110,8 @@ class AiGroundingTest {
         for (response in listOf(Result.success(""), Result.failure<String>(IllegalStateException("offline")))) {
             var attempts = 0
             assertTrue(AiGrounding.generate(facts, "Report") { attempts++; response }.isFailure)
-            assertEquals(2, attempts)
+            // An empty draft is rewritten once; a provider that failed isn't asked again at once (it would only add to a rate limit).
+            assertEquals(if (response.isSuccess) 2 else 1, attempts)
         }
         try {
             AiGrounding.generate(facts, "Report") { throw CancellationException("cancel") }

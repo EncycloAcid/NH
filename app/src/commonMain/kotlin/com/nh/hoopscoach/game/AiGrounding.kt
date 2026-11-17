@@ -18,6 +18,8 @@ data class AiFactSheet(
     val acronyms: Set<String> = emptySet(),
     /** Real capitalized phrases that aren't people: mascots, conferences, honors (see [AiGrounding.validate]). */
     val phrases: Set<String> = emptySet(),
+    /** Every first name and surname the game knows (its name pools and this league's people). */
+    val nameWords: Set<String> = emptySet(),
 )
 
 object AiFacts {
@@ -26,7 +28,12 @@ object AiFacts {
         Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(text)
     private fun stats(s: StatLine) = String.format(Locale.US, "%d GP; %.1f PPG; %.1f RPG; %.1f APG; %.1f MPG; %.1f%% FG; %.1f%% 3PT; %.1f%% FT", s.gp, s.ppg, s.rpg, s.apg, s.mpg, s.fgPct * 100, s.tpPct * 100, s.ftPct * 100)
 
-    fun build(lg: League, request: String, extra: String = "", players: List<Player> = emptyList(), preview: Boolean = false, upcoming: Boolean = false, eventGame: Game? = null): AiFactSheet {
+    /**
+     * The fact sheet for one request. [lean]: for Gemini Nano's small window (about 4,000 tokens, and every token
+     * spends its on-device allowance): the request's own teams (up to three), its players and each team's best,
+     * recent results, no long editorials. Every team and player the request names stays allowed either way.
+     */
+    fun build(lg: League, request: String, extra: String = "", players: List<Player> = emptyList(), preview: Boolean = false, upcoming: Boolean = false, eventGame: Game? = null, lean: Boolean = false): AiFactSheet {
         // Snapshot before iterating — auto article desks run on IO while the sim mutates these lists.
         val allPlayers = LeagueLists.players(lg)
         val alumni = LeagueLists.alumni(lg)
@@ -41,11 +48,13 @@ object AiFacts {
         // Game/series sheets stay under the local 8192 context budget: only the two clubs,
         // box principals, and a micro title brief — no abbr/surname false-positives or desk fluff.
         val eventTeams = eventGame?.let { listOf(lg.team(it.home), lg.team(it.away)) }.orEmpty()
-        val situationTeams = if (gameReport) emptyList() else SituationAwareness.namedTeams(lg).take(3)
+        val situationTeams = if (gameReport || lean) emptyList() else SituationAwareness.namedTeams(lg).take(3)
+        // In the order the request names them, so the subject comes first.
         val mentionedTeams = if (gameReport) emptyList() else leagueTeams.filter { t -> aliases(t).any { mentioned(context, it) } }
+            .sortedBy { t -> aliases(t).map { context.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE }
         val teams = (eventTeams + mentionedTeams + (if (gameReport) emptyList() else namedPlayers.mapNotNull { p -> leagueTeams.firstOrNull { it.id == p.teamId } }) +
             (if (gameReport) emptyList() else listOf(lg.user)) + situationTeams)
-            .distinctBy { it.id }.take(if (gameReport) 2 else 8)
+            .distinctBy { it.id }.take(if (gameReport) 2 else if (lean) 3 else 8)
         val eventPlayerIds = eventGame?.box?.let { b -> (b.home + b.away).map { it.pid }.toSet() }.orEmpty()
         val featured = if (gameReport) {
             // Only box principals / named players who actually played this game — not same-name
@@ -53,13 +62,20 @@ object AiFacts {
             (players + namedPlayers.filter { it.id in eventPlayerIds || teams.any { t -> it.teamId == t.id } } +
                 teams.flatMap { t -> lg.rosterOf(t).filter { it.out } }).distinctBy { it.id }
         } else {
-            (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
+            if (lean) (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(1) } +
+                teams.flatMap { t -> lg.rosterOf(t).filter { it.out } }).distinctBy { it.id }.take(6)
+            else (namedPlayers + players + teams.flatMap { t -> lg.rosterOf(t).sortedByDescending { it.ovr }.take(2) } +
                 teams.flatMap { t -> lg.rosterOf(t).filter { it.out } } + teams.mapNotNull { AiTemplates.newcomer(lg, it) } +
                 teams.mapNotNull { AiTemplates.departure(lg, it, allPlayers, alumni) }).distinctBy { it.id }
         }
         val names = (teams.flatMap { aliases(it) } + featured.map { it.name } + teams.map { lg.coachOf(it).name } +
             teams.map { lg.conf(it.confId).name } + (if (gameReport) emptyList() else lg.rivals.map { it.name }) +
             featured.flatMap { listOf(it.hometown, it.highSchool, it.injury) }.filter { it.isNotBlank() }).toMutableSet()
+        // The request named them, so the writer may too, even when the sheet has no room for their details.
+        if (!gameReport) {
+            names += mentionedTeams.flatMap { aliases(it) }
+            names += namedPlayers.map { it.name }
+        }
         val allNames = (leagueTeams.flatMap { aliases(it) } + population.map { it.name } + coaches.map { it.name }).toSet()
         val records = mutableMapOf<String, Set<String>>()
         val preseason = lg.phase == Phase.REGULAR && leagueTeams.all { it.gp == 0 }
@@ -89,12 +105,13 @@ object AiFacts {
                         pv.proj[t.id]?.let { p -> appendLine("FORECAST ${t.name}: rank ${p.nat}; ${p.w}-${p.l}.") }
                         pv.odds[t.id]?.let { o -> appendLine("ODDS ${t.name}: NCAA ${PreviewWriting.percent(o.ncaa)}; conference ${PreviewWriting.percent(o.conf)}; Final Four ${PreviewWriting.percent(o.f4)}; title ${PreviewWriting.percent(o.title)}; win percentiles ${o.lo}/${o.median ?: "unknown"}/${o.hi}.") }
                     }
-                    appendLine("EDITORIAL ${if (lg.pro) t.name else t.school}: ${AiTemplates.previewCopy(lg, t)}")
+                    if (!lean || t == teams.first()) appendLine("EDITORIAL ${if (lg.pro) t.name else t.school}: ${AiTemplates.previewCopy(lg, t)}")
                 }
-                aliases(t).forEach { records[it] = setOf(t.record) }
+                // "Los Angeles" is two NBA teams: only a name that means one team ties a record to it.
+                aliases(t).filter { a -> teams.count { o -> aliases(o).any { it.equals(a, true) } } == 1 }.forEach { records[it] = setOf(t.record) }
             }
             val results = (eventGame?.let { listOf(it) } ?: games).filter { it.played && it.day <= lg.day && teams.any { t -> it.involves(t.id) } }
-                .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(if (gameReport) 1 else 6)
+                .sortedWith(compareByDescending<Game> { it.day }.thenByDescending { it.id }).take(if (gameReport) 1 else if (lean) 3 else 6)
             results.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
                 names += aliases(h); names += aliases(a)
@@ -126,7 +143,7 @@ object AiFacts {
                 } }
             }
             featured.forEach { p ->
-                if (!gameReport && p in namedPlayers) leagueTeams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
+                if (!gameReport && !lean && p in namedPlayers) leagueTeams.firstOrNull { it.id == p.teamId }?.let { t -> appendLine("PLAYER EDITORIAL ${p.name}: ${AiTemplates.previewCopy(lg, t, p)}") }
                 appendLine("PLAYER ${p.name}; ${p.posLabel}; class ${p.cls}; team ${leagueTeams.firstOrNull { it.id == p.teamId }?.name ?: "unattached"}; age ${p.age}; height ${p.height} in; weight ${p.weight} lb; recruit rank ${p.recruitRank}; rating ${p.ovr}; potential ${p.pot}.")
                 if (!gameReport) {
                     val best = Attr.entries.maxBy { p[it] }; val worst = Attr.entries.minBy { p[it] }
@@ -140,7 +157,8 @@ object AiFacts {
             val scheduleGames = if (gameReport) {
                 games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(2)
             } else {
-                (games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it, games) }).distinctBy { it.id }
+                if (lean) games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(2)
+                else (games.filter { !it.played && teams.any { t -> it.involves(t.id) } }.sortedBy { it.day }.take(3) + teams.mapNotNull { AiTemplates.notableGame(lg, it, games) }).distinctBy { it.id }
             }
             scheduleGames.forEach { g ->
                 val h = lg.team(g.home); val a = lg.team(g.away)
@@ -162,8 +180,11 @@ object AiFacts {
         val properNames = leagueTeams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + coaches.map { it.name }
         val acronyms = leagueTeams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
         // Mascots ("Tar Heels"), conferences ("Big Ten") and honors are real, capitalized and not people.
-        val phrases = (leagueTeams.map { it.mascot } + lg.confs.flatMap { listOf(it.name, it.abbr) }).filter { it.length > 2 }.toSet()
-        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms, phrases)
+        // ...and so are the capitalized phrases the game itself wrote into the request (a reporter's byline, an outlet).
+        val phrases = (leagueTeams.map { it.mascot } + lg.confs.flatMap { listOf(it.name, it.abbr) } +
+            Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b").findAll(request).map { it.value }).filter { it.length > 2 }.toSet()
+        val nameWords = (population.map { it.name } + coaches.map { it.name }).flatMap { it.split(' ') }.filter { it.length > 1 }.toSet() + Names.first + Names.last
+        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms, phrases, nameWords)
     }
 
     fun version(lg: League): String {
@@ -204,6 +225,26 @@ object AiGrounding {
         "Here", "Where", "When", "Why", "How", "Which", "Mine", "Ours", "Yours", "His", "Hers", "Theirs", "Ball", "Game", "Season",
         "Team", "Character", "Culture", "Discipline", "Attitude", "Preparation", "Hard", "Nobody's", "Consistency", "Patience",
     )
+
+    /**
+     * Ordinary words a writer capitalizes (positions, roles, days, game and media terms). A Title Case phrase made only
+     * of these ("Point Guard", "Saturday Night", "Athletic Director", "Second Half Adjustments") isn't a person.
+     */
+    private val COMMON = ("point guard guards shooting small power forward forwards center centers wing wings big bigs coach coaches head assistant " +
+        "associate athletic director staff trainer scout scouts captain captains rookie rookies freshman freshmen sophomore junior senior seniors " +
+        "veteran veterans star stars starter starters bench reserve reserves walk on transfer transfers recruit recruits prospect prospects " +
+        "monday tuesday wednesday thursday friday saturday sunday night nights day days morning afternoon evening weekend week month season seasons " +
+        "january february march april may june july august september october november december tonight today tomorrow " +
+        "game games first second third fourth half halves quarter quarters overtime tip off tipoff buzzer beater clutch time final finals four eight " +
+        "sixteen round rounds seed seeds bracket tournament tourney conference league division regular post postseason playoff playoffs play in " +
+        "series run runs lead comeback win wins loss losses streak record standings race title titles championship champion champions crown banner " +
+        "defense defensive offense offensive transition rebounding rebounds three pointers paint glass pace tempo spacing rotation rotations lineup " +
+        "lineups depth minutes adjustments adjustment keys key plan matchup matchups showdown rivalry rivals classic invitational showcase opener " +
+        "home road away court floor arena gym crowd fans fan student section network report news daily weekly wire sports basketball hoops insider " +
+        "desk beat column editor press media radio show notes rankings ranking poll polls top preseason preview outlook watch buzz rumor rumors scoop " +
+        "takeaways grades grade program programs culture identity system era dynasty legacy future state university national nation the of and a an " +
+        "to for at with way new next last best hot seat team teams squad unit group family big man men test statement fast break edge battle " +
+        "upset rally road trip senior night selection sunday madness dance most valuable improved player players year mid major").split(' ').toSet()
 
     /** A fact-check failure in plain words, for the "game-written" note on a story. */
     fun plain(reason: String): String = when {
@@ -254,7 +295,7 @@ object AiGrounding {
         if (text.isBlank()) return listOf("empty response")
         val errors = mutableListOf<String>()
         val content = numericWords(canonicalText(text, facts)).lines().filterNot { it.startsWith("OUTLET:", true) || it.startsWith("REPORTER:", true) }
-            .joinToString("\n") { it.replace(Regex("^(SCOOP|RUMOR) \\d+:"), "ITEM:") }
+            .joinToString("\n") { it.replace(Regex("^(?:SCOOP|RUMOR|KEY)\\s*\\d+:"), "ITEM:").replace(Regex("^\\s*\\d+\\s*\\|"), "PID|") }
         val numbers = number.findAll(facts.text).map { it.value }.toSet()
         if (number.findAll(content).any { m ->
                 val rate = m.value.endsWith('%') || Regex("^\\s*(PPG|RPG|APG|MPG|points per game|rebounds per game|assists per game)\\b", RegexOption.IGNORE_CASE).containsMatchIn(content.substring(m.range.last + 1))
@@ -301,7 +342,7 @@ object AiGrounding {
             val prefix = content.substring((m.range.first - 90).coerceAtLeast(0), m.range.first)
             if (Regex("(?:record|sits? at|stands? at|is|are|\\()\\s*$", RegexOption.IGNORE_CASE).containsMatchIn(prefix) &&
                 !Regex("last season|last year|previous|project|forecast|conference", RegexOption.IGNORE_CASE).containsMatchIn(prefix)) {
-                val named = facts.records.keys.mapNotNull { name -> Regex(Regex.escape(name), RegexOption.IGNORE_CASE).findAll(prefix).lastOrNull()?.let { name to it.range.first } }.maxByOrNull { it.second }?.first
+                val named = facts.records.keys.mapNotNull { name -> Regex(Regex.escape(name), RegexOption.IGNORE_CASE).findAll(prefix).lastOrNull()?.let { name to it.range.last } }.maxByOrNull { it.second }?.first
                 if (named != null && value !in facts.records.getValue(named)) errors += "record belongs to another team"
             }
         }
@@ -321,21 +362,30 @@ object AiGrounding {
             "First Round", "Conference Semifinals", "Conference Finals", "Finals", "Play-In", "NBA Cup",
         )
         (common + facts.phrases + HONORS).sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
-        // A heading line (HEADLINE:, and the short title before "|" on a KEY / SCOOP / RUMOR line) is in Title Case.
-        val heading = Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):")
-        val titled = Regex("(?i)^((?:KEY|SCOOP|RUMOR)\\s*\\d+:)([^|]*)\\|(.*)$")
+        // A heading is in Title Case: HEADLINE:, a package's TITLE_HEADLINE: / AWARD_TITLE:, and the part before "|" on a
+        // KEY / SCOOP / RUMOR line (a title) or a social post (the handle).
+        val heading = Regex("(?i)^[A-Z_]*(?:HEADLINE|KICKER|TITLE|HEAD):")
+        val titled = Regex("(?i)^((?:(?:KEY|SCOOP|RUMOR)\\s*\\d+|ITEM|ANALYST|FAN|HATER|TEAMMATE):)([^|]*)\\|(.*)$")
         val prose = residue.lines().filterNot { heading.containsMatchIn(it) }.joinToString("\n") { line -> titled.find(line.trim())?.let { "${it.groupValues[1]} ${it.groupValues[3]}" } ?: line }
         val headers = (residue.lines().filter { heading.containsMatchIn(it) } + residue.lines().mapNotNull { titled.find(it.trim())?.groupValues?.get(2) }).joinToString("\n")
         val firstNames = facts.allNames.map { it.substringBefore(' ') }.toSet()
-        val properName = Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b")
-        (properName.findAll(prose) + properName.findAll(headers).filter { it.value.substringBefore(' ') in firstNames }).take(3).forEach { errors += "unknown proper name: ${entityLabel(it.value)}" }
+        // Names with an inner capital count too (LeBron, DeAndre, McDonald).
+        val properName = Regex("\\b[A-Z][a-z]*[A-Z]?[a-z]+(?:[ '-][A-Z][a-z]*[A-Z]?[a-z]+)+\\b")
+        // A person's name is two or three words, not all of them ordinary; a longer Title Case run is a headline-style
+        // sentence, a name only if it holds one the game knows.
+        fun nameLike(phrase: String): Boolean {
+            val words = phrase.split(' ', '-', '\'').filter { it.isNotBlank() }
+            if (words.all { it.lowercase(Locale.US) in COMMON }) return false
+            return words.size <= 3 || words.any { it in facts.nameWords }
+        }
+        (properName.findAll(prose).filter { nameLike(it.value) } + properName.findAll(headers).filter { it.value.substringBefore(' ') in firstNames }).take(3).forEach { errors += "unknown proper name: ${entityLabel(it.value)}" }
         val subjects = setOf("He", "She", "It", "This", "That", "There", "They", "We", "What", "Who", "Basketball", "March", "April", "Defense", "Offense", "Depth", "Availability", "Continuity", "Nothing", "Everyone", "Nobody", "Something") + STARTERS
         // A capitalized word before "is/has/won" mid-sentence is a name. At the start of a sentence it's usually
         // just a word ("Tonight is...", "Effort has..."), so there it counts only when the clause states a fact
         // with a number ("Atlantis is 7-3").
         Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).filter { m ->
             val word = m.groupValues[1]
-            if (word in subjects) return@filter false
+            if (word in subjects || word.lowercase(Locale.US) in COMMON) return@filter false
             val before = prose.substring(0, m.range.first).trimEnd()
             val sentenceStart = before.isEmpty() || before.last() in ".!?:\"“”\n-—(" || before.endsWith("topic")
             if (!sentenceStart) return@filter true
@@ -351,12 +401,13 @@ object AiGrounding {
         return errors.distinct()
     }
 
-    suspend fun generate(facts: AiFactSheet, request: String, validateDraft: (String) -> List<String> = { emptyList() }, producer: suspend (String) -> Result<String>): Result<String> {
+    /** [withInstructions] false: the caller sends [instructions] as the system text already (once is enough). */
+    suspend fun generate(facts: AiFactSheet, request: String, validateDraft: (String) -> List<String> = { emptyList() }, withInstructions: Boolean = true, producer: suspend (String) -> Result<String>): Result<String> {
         var reasons = ""
         val format = request.substringAfter("Format your response EXACTLY as:", request.substringAfter("Format each storyline as:", ""))
         val labels = Regex("(?m)^([A-Z][A-Z_ ]*(?: \\d+)?):(?:\\s*<|\\s*$)").findAll(format).map { it.groupValues[1].trim() }.distinct().toList()
         repeat(2) { attempt ->
-            val prompt = "$instructions\n\nFACT SHEET\n${facts.text}\nEND FACT SHEET\n\nWRITING REQUEST\n$request" +
+            val prompt = (if (withInstructions) "$instructions\n\n" else "") + "FACT SHEET\n${facts.text}\nEND FACT SHEET\n\nWRITING REQUEST\n$request" +
                 if (attempt == 0) "" else "\nYour previous draft was rejected ($reasons). Rewrite conservatively from the fact sheet only."
             val result = try { producer(prompt) } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
             (result.exceptionOrNull() as? CancellationException)?.let { throw it }
@@ -377,7 +428,7 @@ object AiGrounding {
                     if (key in labels) "$key:${line.substringAfter(':')}" else line
                 })
                 reasons = errors.joinToString(", ")
-            } else reasons = "generation unavailable"
+            } else return Result.failure(result.exceptionOrNull() ?: IllegalStateException("generation unavailable"))
         }
         return Result.failure(IllegalStateException("Could not verify the draft after two attempts ($reasons). The existing game-written content was kept."))
     }

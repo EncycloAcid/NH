@@ -16,6 +16,14 @@ object OnDeviceAi {
 
     class Status(val state: State, val detail: String = "", val model: String = "")
 
+    /** AICore said no: busy, out of this app's allowance, or the game isn't on screen. [AiTraffic] rests on these. */
+    class Refused(val kind: Kind, message: String, cause: Throwable? = null) : Exception(message, cause) {
+        enum class Kind { BUSY, QUOTA, OFF_SCREEN, OTHER }
+    }
+
+    /** The game is on screen (AICore only answers then). The Android app keeps this up to date. */
+    @Volatile var onScreen: Boolean = true
+
     /** What the platform provides (the Android app's Gemini Nano engine). */
     interface Engine {
         /** Whether Gemini Nano is on the phone, needs a download, or isn't offered. */
@@ -64,6 +72,9 @@ object OnDeviceAi {
     /** Gemini Nano is downloaded and answering. */
     val ready: Boolean get() = engine != null && last.state == State.READY
 
+    /** Ready, on screen and not resting after a refusal: worth sending a request to right now. */
+    val usable: Boolean get() = ready && onScreen && !AiTraffic.resting("nano")
+
     suspend fun refresh(): Status {
         val e = engine ?: return Status(State.NOT_SUPPORTED, NOT_HERE).also { last = it }
         return runCatching { e.status() }.getOrElse { Status(State.UNAVAILABLE, it.message ?: "AICore didn't answer.") }.also { last = it }
@@ -79,6 +90,27 @@ object OnDeviceAi {
         State.UNAVAILABLE -> "Not available right now"
         State.NOT_SUPPORTED -> "Not on this device"
         State.UNKNOWN -> "Checking…"
+    }
+
+    /**
+     * A reply that ran into the 256-token cap stops mid-sentence: cut it back to its last finished sentence, or drop
+     * a cut-off last line in a one-item-a-line format. JSON is left to its own parser, which salvages what it can.
+     */
+    fun tidy(reply: String): String {
+        val text = reply.trimEnd()
+        val start = text.trimStart()
+        if (text.isEmpty() || start.startsWith("{") || start.startsWith("[") || start.startsWith("```")) return text
+        if (Regex("[.!?…][\"'’”)\\]]*$").containsMatchIn(text)) return text
+        val lines = text.lines()
+        val last = lines.last()
+        // Only a sentence inside the line's content counts (after a "LABEL:" or the last "|").
+        val contentStart = maxOf(last.lastIndexOf('|'), Regex("^[A-Z][A-Z_ ]*(?: \\d+)?:").find(last)?.range?.last ?: -1) + 1
+        val end = Regex("[.!?][\"'’”)]*(?=\\s)").findAll(last).lastOrNull { it.range.first >= contentStart }?.range?.last
+        return when {
+            end != null -> (lines.dropLast(1) + last.substring(0, end + 1)).joinToString("\n")
+            lines.size > 1 -> lines.dropLast(1).joinToString("\n").trimEnd()
+            else -> text
+        }
     }
 
     /**

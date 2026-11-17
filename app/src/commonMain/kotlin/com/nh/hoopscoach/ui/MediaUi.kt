@@ -399,7 +399,7 @@ fun ArticleScreen(vm: GameViewModel, lg: League, index: Int) {
                         modifier = Modifier.padding(top = 6.dp),
                     )
                     if (!verified && fallbackReason.isNotBlank()) {
-                        Text("Game-written: $fallbackReason", style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
+                        Text(gameWrittenNote(fallbackReason), style = T.small, color = P.faint, modifier = Modifier.padding(top = 4.dp))
                     }
                     val pic = lg.playerOrNull(n.pid)
                     val team = lg.teams.getOrNull(n.teamId)

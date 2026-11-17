@@ -264,7 +264,8 @@ fun RadioShowCard(vm: GameViewModel, lg: League) {
     val ai = lg.radioAi[key]
     if (ai == null && lg.ollama.enabled) androidx.compose.runtime.LaunchedEffect(key) {
         com.nh.hoopscoach.game.Ollama.generate(lg.ollama, R.aiPrompt(lg, call),
-            system = "You write short, natural lines for sports-radio callers. Plain text only.", temperature = 0.8, numPredict = 90)
+            system = "You write short, natural lines for sports-radio callers. Plain text only.", temperature = 0.8, numPredict = 90,
+            desk = com.nh.hoopscoach.game.OnDeviceAi.Desk.REACTIONS)
             .onSuccess { text ->
                 val clean = text.trim().trim('"').lines().firstOrNull { it.isNotBlank() }?.take(240)
                 if (!clean.isNullOrBlank()) vm.act { it.radioAi[key] = clean; while (it.radioAi.size > 24) it.radioAi.remove(it.radioAi.keys.first()) }

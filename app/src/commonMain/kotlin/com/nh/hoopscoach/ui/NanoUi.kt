@@ -92,6 +92,9 @@ fun NanoProviderPanel(
             Text(OnDeviceAi.NOT_HERE + " On the PC, pick Local (Ollama) or a cloud provider.", style = T.small, color = P.warn)
         } else {
             NanoStatus(scope) { ready = OnDeviceAi.ready; vm.redraw() }
+            com.nh.hoopscoach.game.AiTraffic.status().filter { it.startsWith("Gemini Nano") }.forEach {
+                Text("$it. The game writes its own lines until then; Test Gemini Nano tries now.", style = T.small, color = P.warn, modifier = Modifier.padding(top = 6.dp))
+            }
             Spacer(Modifier.height(14.dp))
             NanoModelTable(vm, lg, everythingElse = true)
             if (ready) {
@@ -100,6 +103,7 @@ fun NanoProviderPanel(
                     onTesting(true)
                     onTestStatus("Asking Gemini Nano on this phone…")
                     scope.launch {
+                        com.nh.hoopscoach.game.AiTraffic.reset()
                         val res = com.nh.hoopscoach.game.Ollama.testNano(lg.ollama)
                         onTesting(false)
                         res.onSuccess { line ->

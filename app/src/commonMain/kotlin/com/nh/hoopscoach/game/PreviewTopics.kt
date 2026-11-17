@@ -55,6 +55,23 @@ object PreviewTopics {
     /** The issue's storylines, written for their kind of story (see [StoryDesk]). */
     fun stories(lg: League, topics: List<PreviewTopic>) = StoryDesk.write(lg, topics)
 
+    /**
+     * Gives each story its own topic: the one whose subject it names (the longest name first, so "North Carolina and
+     * NC State" beats "North Carolina Tar Heels"), else its player, else its team; never a topic already taken. A school
+     * with two topics (its title odds and a rivalry date) no longer has both stories credited to the first.
+     */
+    fun assign(lg: League, topics: List<PreviewTopic>, texts: List<String>): List<PreviewTopic?> {
+        val used = mutableSetOf<PreviewTopic>()
+        fun name(t: PreviewTopic) = t.subject.substringBefore(':').trim()
+        return texts.map { text ->
+            fun free(c: List<PreviewTopic>) = c.firstOrNull { it !in used }
+            val bySubject = topics.filter { name(it).isNotEmpty() && text.contains(name(it), true) }.sortedByDescending { name(it).length }
+            val byPlayer = topics.filter { t -> t.pid >= 0 && lg.playerOrNull(t.pid)?.let { text.contains(it.name, true) } == true }
+            val byTeam = topics.filter { t -> lg.teams.firstOrNull { it.id == t.teamId }?.let { text.contains(it.school, true) } == true }
+            (free(byPlayer.filter { it in bySubject }) ?: free(bySubject) ?: free(byPlayer) ?: free(byTeam))?.also { used += it }
+        }
+    }
+
     fun match(lg: League, topics: List<PreviewTopic>, text: String): PreviewTopic? =
         topics.firstOrNull { t -> t.pid >= 0 && lg.playerOrNull(t.pid)?.let { text.contains(it.name, true) } == true } ?:
             topics.firstOrNull { t -> t.pid < 0 && lg.teams.firstOrNull { it.id == t.teamId }?.let { text.contains(it.school, true) } == true }

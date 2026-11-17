@@ -62,7 +62,8 @@ fun InterviewDialog(vm: GameViewModel, lg: League, o: JobOffer, onClose: () -> U
                     // With AI on, the athletic director's own last word, about his record.
                     if (lg.ollama.enabled && o.score >= 0) androidx.compose.runtime.LaunchedEffect(o.teamId, o.score) {
                         if (adSays == null) com.nh.hoopscoach.game.Ollama.generate(lg.ollama, Interviews.aiPrompt(lg, t, o),
-                            system = "You speak as a college athletic director. Short, direct, plain text.", temperature = 0.7, numPredict = 90)
+                            system = "You speak as a college athletic director. Short, direct, plain text.", temperature = 0.7, numPredict = 90,
+                            desk = com.nh.hoopscoach.game.OnDeviceAi.Desk.COACH)
                             .onSuccess { adSays = it.trim().trim('"').lines().firstOrNull { l -> l.isNotBlank() }?.take(260) }
                     }
                     adSays?.let { Text("The AD: \"$it\"", style = T.small.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = P.sub, modifier = Modifier.padding(top = 6.dp)) }

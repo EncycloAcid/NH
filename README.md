@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.262**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.263**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.262.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.263.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.262)
+## What's new (3.9-pro.243 to 3.9-pro.263)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **AI that keeps working**: every AI request now goes through one line, in order of what you're waiting on (what you tapped first, then the dialogue for the game you just played, then background stories), paced per provider. A rate limit, a busy Gemini Nano or a used-up allowance gives that provider a rest instead of a burst of retries; background stories skip it, and the game's own writing fills in with a note saying when the AI is back. Every writer was run against Gemini Nano's limits: prompts are trimmed to fit its window, multi-story replies fit its 256-token answers, and the fact check no longer rejects good drafts over interview IDs, Title Case headlines and positions ("Point Guard"), shared city names ("Los Angeles") or names the request itself gave.
 - **Polish**: one family of icons in place of emoji, filled tab icons, the original logo refined, every screen checked at small phone widths and large font sizes (long names shrink to fit, nothing is cut off, scrolling strips fade at the edge), and fixed-size cards keep their layout at any font size.
 
 ## AI writing (optional)
@@ -69,7 +70,7 @@ Turn it on in **Career → Settings → AI Dynasty Intelligence**. The game alwa
 - **Gemini Nano** (Android with AICore: Pixel 9 and newer, up-to-date AICore and Google Play services, a locked bootloader) runs on the phone's own chip through Google's ML Kit GenAI Prompt API (`com.google.mlkit:genai-prompt`). Settings show whether it's ready or needs its one-time download (with a Download button), and a Test button.
   - **Use it as the provider**, or keep another provider for articles and turn on **Dialogue on Gemini Nano** for press conferences, postgame player quotes, social posts, speeches, recruiting letters and player personalities.
   - **Model by feature**: the phone's fast model (E2B) for quick player reactions and short notifications; the full model (E4B) for player personalities, coach interviews and recruiting conversations. Each row can be switched.
-  - Built for its limits: AICore answers only while the game is on screen and keeps a daily allowance per app, so the week's news goes out in one batched request (the Dispatch), a fast sim only writes for the game it stops on, prompts are fitted to its roughly 4,000-token window, the fixed instructions use AICore's prefix cache, and if it can't answer the other provider (or the game) writes it.
+  - Built for its limits: AICore answers only while the game is on screen and keeps a daily allowance per app, so the week's news goes out in one batched request (the Dispatch) and the nightly story desks wait for it, a fast sim only writes for the game it stops on, each request gets a lean fact sheet sized to its roughly 4,000-token window, replies are sized to its 256-token answers (one cut short ends on its last full sentence), the fixed instructions use AICore's prefix cache, nothing is sent while the game is off screen, a busy or out-of-allowance Nano rests instead of being retried, and if it can't answer the other provider (or the game) writes it. Settings show when it's resting; Test tries again at once.
 - **Weekly batch**: one request a week instead of nightly story desks (always on for Gemini Nano).
 
 ## Road to the League: one player's career
