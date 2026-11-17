@@ -115,7 +115,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     FitText(p.last.uppercase(), T.title, P.ink, minScale = 0.55f)
                     Text("${p.posLabel} · age ${p.age} · " + (if (lg.pro) (if (p.proYears == 0) "rookie" else "${ordinal(p.proYears + 1)} year") else p.cls) +
                         " · ${Ratings.heightLabel(p.height)} · ${p.weight} lbs", style = T.small, color = P.sub)
-                    if (team != null) Text("${team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
+                    if (team != null) Text("${if (lg.pro) team.name else team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
                     SmallButton("Card", Modifier.padding(top = 4.dp)) { showCard = true }
                     if (p.out || p.limited > 0 || p.hurtPlaying) Text(com.nh.hoopscoach.game.Injuries.tag(p), style = T.small, color = injuryColor(p))

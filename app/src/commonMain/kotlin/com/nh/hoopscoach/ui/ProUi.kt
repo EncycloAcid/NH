@@ -468,6 +468,7 @@ fun ProTeamScreen(vm: GameViewModel, lg: League) {
                             Text("${g.site(u.id)} ${opp.name}", style = T.body, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (g.label.isNotEmpty()) Text(g.label, style = T.small, color = P.accent)
                         }
+                        Spacer(Modifier.width(10.dp))
                         if (g.played) Text("${g.scoreFor(u.id)}-${g.scoreAgainst(u.id)}", style = T.numSm, color = P.ink)
                         else Text("${opp.w}-${opp.l}", style = T.small, color = P.sub)
                     }

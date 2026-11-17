@@ -931,12 +931,12 @@ private fun MediaEcosystemCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Network desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} network",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} network" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing breaking news, debates, recruiting, and poll coverage…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "breaking news, debates, recruiting, and poll coverage…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Title desk first, then breaking news, analyst debates, fan arguments, recruiting rumors, and poll reactions — all from real league titles and game events.",
@@ -976,12 +976,12 @@ private fun UniversityDevelopmentCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Campus desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} campus",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} campus" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing arena, facility, and brand coverage…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "arena, facility, and brand coverage…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Renovations, training centers, recruiting hubs, and national brand campaigns — grounded in your upgrade budget and Program Pull.",
@@ -1021,12 +1021,12 @@ private fun HistoricalRivalriesCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Rivalries desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} history",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} history" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing accumulated rivalry history…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "accumulated rivalry history…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Series ledgers, coaching heat, fan mood, and rivalries that grow from repeated close games — grounded in recorded history.",
@@ -1066,12 +1066,12 @@ private fun DraftUniverseCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Draft desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} draft",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} draft" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing draft stock, workout notes, and alumni careers…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "draft stock, workout notes, and alumni careers…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Prospect boards, size/tools workout profiles, draft-night slides and reaches, and where former players landed — from recorded facts only.",
@@ -1112,12 +1112,12 @@ private fun PlayerStorylinesCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Features desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} arcs",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} arcs" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing player arcs from real production…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "player arcs from real production…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Bench-to-star leaps, five-star heat checks, and walk-on heroes — $arcs qualifying arcs on the board today.",
@@ -1157,12 +1157,12 @@ private fun CoachingCareersCard(vm: GameViewModel, lg: League) {
     Spacer(Modifier.height(10.dp))
     Section(
         "Sideline desk",
-        action = if (writing) "Filing…" else "${lg.ollama.shortActionName} careers",
+        action = if (writing) "Filing…" else if (lg.ollama.enabled) "${lg.ollama.shortActionName} careers" else "File",
         onAction = { if (!writing) runDesk() },
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing coaching reputation, carousel, and rivalry coverage…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "coaching reputation, carousel, and rivalry coverage…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Hot seats, job-offer chatter, coaching rivalries, and multi-school legacies — grounded in security scores and recorded moves.",
@@ -1210,7 +1210,7 @@ private fun WireDeskCard(vm: GameViewModel, lg: League) {
     )
     Panel {
         if (writing) {
-            Text("${lg.ollama.providerDisplayName} is filing title watch and league pulse coverage…", style = T.small, color = P.accent)
+            Text((if (lg.ollama.enabled) "${lg.ollama.providerDisplayName} is filing " else "Filing ") + "title watch and league pulse coverage…", style = T.small, color = P.accent)
         } else {
             Text(
                 "Title watch, league pulse (polls, races, hot seats), and ${if (lg.pro) "trade" else "recruiting"} notes — grounded in banners, Elo, and real results.",

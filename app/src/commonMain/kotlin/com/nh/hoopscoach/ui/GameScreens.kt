@@ -510,7 +510,7 @@ private fun ScoreHalf(t: Team, score: Int, ahead: Boolean, final: Boolean, modif
 @Composable
 fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
     val cols = listOf("MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3PT", "FT", "PF")
-    val widths = listOf(38, 40, 40, 40, 38, 38, 34, 52, 48, 48, 32)
+    val widths = listOf(34, 36, 36, 36, 34, 34, 32, 52, 48, 48, 32)
     fun values(s: StatLine) = listOf(
         "${kotlin.math.round(s.sec / 60.0).toInt()}", "${s.pts}", "${s.reb}", "${s.ast}", "${s.stl}", "${s.blk}", "${s.tov}",
         "${s.fgm}-${s.fga}", "${s.tpm}-${s.tpa}", "${s.ftm}-${s.fta}", "${s.pf}",
@@ -519,7 +519,7 @@ fun BoxTable(vm: GameViewModel, lg: League, t: Team, lines: List<PlayerLine>) {
     lines.forEach { total.add(it.s) }
     Panel(padding = PaddingValues(vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            Column(Modifier.width(144.dp).padding(start = 14.dp)) {
+            Column(Modifier.width(132.dp).padding(start = 14.dp)) {
                 Text("PLAYER", style = T.label, color = P.sub, modifier = Modifier.height(28.dp).padding(top = 8.dp))
                 lines.forEach { l ->
                     Row(Modifier.height(38.dp).clickable { vm.openPlayer(l.pid) }, verticalAlignment = Alignment.CenterVertically) {

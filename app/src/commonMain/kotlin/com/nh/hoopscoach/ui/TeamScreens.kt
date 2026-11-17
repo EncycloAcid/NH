@@ -630,7 +630,10 @@ fun GameRow(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game.Game, me: I
             Text(teamLabel(opp), style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(gameKind(lg, g), style = T.small.copy(fontSize = 12.sp), color = if (lg.rivalry(g) != null) P.bad else P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (g.played) Text("${g.scoreFor(me)}-${g.scoreAgainst(me)}${if (g.ot > 0) " OT" else ""}", style = T.numSm, color = if (won) P.good else P.bad)
+        if (g.played) {
+            Spacer(Modifier.width(10.dp))
+            Text("${g.scoreFor(me)}-${g.scoreAgainst(me)}${if (g.ot > 0) " OT" else ""}", style = T.numSm, color = if (won) P.good else P.bad)
+        }
     }
 }
 

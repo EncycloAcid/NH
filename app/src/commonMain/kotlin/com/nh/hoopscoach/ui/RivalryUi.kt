@@ -225,7 +225,7 @@ fun RivalsList(vm: GameViewModel, lg: League, t: Team) {
             Column(Modifier.weight(1f)) {
                 Text(o.school, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val when_ = next?.let { if (it.day <= Schedule.REG_DAYS) "Next: game ${it.day}" else "Next: ${it.label.substringAfter("· ")}" } ?: "No meeting left this season"
-                Text("${r.title} · $when_", style = T.small, color = P.sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${r.title} · $when_", style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("$w-$l", style = T.numSm, color = when { w > l -> P.good; w < l -> P.bad; else -> P.ink })

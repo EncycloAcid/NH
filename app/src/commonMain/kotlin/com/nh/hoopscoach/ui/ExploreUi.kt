@@ -76,7 +76,7 @@ fun ExploreScreen(vm: GameViewModel, lg: League) {
             BackBar("Explore", "${lg.confs.size} conferences · ${lg.teams.size} ${if (lg.pro) "teams" else "programs"} · ${lg.coaches.count { it.teamId >= 0 }} coaches", onBack = { vm.back() })
             OutlinedTextField(
                 value = query, onValueChange = { query = it.take(40) }, singleLine = true,
-                label = { Text("Find a school or coach") }, colors = fieldColors(),
+                label = { Text(if (lg.pro) "Find a team or coach" else "Find a school or coach") }, colors = fieldColors(),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 6.dp),
             )
         }

@@ -110,7 +110,9 @@ object NewsDesk {
             s.reb >= 20 -> "grabs ${s.reb} rebounds"
             s.blk >= 7 -> "blocks ${s.blk} shots"
             s.ast >= 15 -> "hands out ${s.ast} assists"
-            else -> "goes for ${s.pts} and ${s.reb}"
+            s.reb >= 10 -> "goes for ${s.pts} and ${s.reb}"
+            s.ast >= 10 -> "scores ${s.pts} with ${s.ast} assists"
+            else -> "scores ${s.pts}"
         }
         val headline = "${p.last} $what as ${nick(lg, t)} ${if (n.won) "beat" else "fall to"} ${nick(lg, opp)} ${max(n.us, n.them)}-${minOf(n.us, n.them)}"
         val place = dateline(if (home) t else opp)

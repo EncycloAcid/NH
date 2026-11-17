@@ -1,5 +1,7 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.ui.layout.onSizeChanged
+
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -260,7 +262,9 @@ fun Stat(label: String, value: String, modifier: Modifier = Modifier, color: Col
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // A long number shrinks to fit its cell; a long label takes a second line instead of running into its neighbor.
         FitText(value, style, color, minScale = 0.65f, textAlign = TextAlign.Center)
-        Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), color = labelColor, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        // One word never breaks in the middle ("EXPOSUR-E"): it shrinks a little to fit instead.
+        if (' ' !in label.trim()) FitText(label.uppercase(), T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), labelColor, minScale = 0.7f, textAlign = TextAlign.Center)
+        else Text(label.uppercase(), style = T.label.copy(fontSize = 10.sp, lineHeight = 12.sp), color = labelColor, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 
@@ -340,13 +344,21 @@ fun Segmented(
     }
     fun Modifier.track(i: Int) = onGloballyPositioned { starts[i] = it.positionInParent().x.toInt(); widths[i] = it.size.width; rowH.intValue = it.size.height }
     if (scroll) {
-        // The strip scrolls to keep the selected tab in view.
+        // The track stays put and the tabs slide inside it, fading out at an edge with more that way;
+        // the selected tab scrolls to the middle, so it (and its neighbours) are never cut in half.
         val state = rememberScrollState()
-        LaunchedEffect(selected, starts[selected]) { starts[selected]?.let { state.animateScrollTo((it - 120).coerceAtLeast(0)) } }
-        Box(modifier.padding(horizontal = edge).fadeEdges(state, 22.dp).horizontalScroll(state).then(track)) {
-            pill()
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
+        val viewport = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        LaunchedEffect(selected, starts[selected], widths[selected], viewport.intValue) {
+            val s = starts[selected] ?: return@LaunchedEffect
+            val w = widths[selected] ?: 0
+            if (viewport.intValue > 0) state.animateScrollTo((s + w / 2 - viewport.intValue / 2).coerceIn(0, state.maxValue.coerceAtLeast(0)))
+        }
+        Box(modifier.padding(horizontal = edge).fillMaxWidth().then(track).onSizeChanged { viewport.intValue = it.width }) {
+            Box(Modifier.fadeEdges(state, 40.dp).horizontalScroll(state)) {
+                pill()
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
+                }
             }
         }
     } else {

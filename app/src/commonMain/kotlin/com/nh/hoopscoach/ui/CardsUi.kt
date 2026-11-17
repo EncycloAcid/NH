@@ -69,12 +69,35 @@ fun MiniCard(c: Card, width: Dp = 96.dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** A slot in a set you don't have yet. */
+/** A slot in a set you don't have yet: a silhouette where the card goes, and whose card it is. */
 @Composable
 private fun EmptySlot(name: String, width: Dp) {
     val shape = RoundedCornerShape(width * 0.08f)
-    Box(Modifier.width(width).aspectRatio(0.71f).clip(shape).background(P.surface2.copy(alpha = 0.6f)).border(1.dp, P.line, shape).padding(6.dp), contentAlignment = Alignment.Center) {
-        Text(name, style = T.small.copy(fontSize = (width.value * 0.1f).sp), color = P.faint, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    val ink = P.line
+    Column(Modifier.width(width).aspectRatio(0.71f).clip(shape).background(P.surface).border(1.dp, P.line, shape)) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().weight(1f).padding(top = width * 0.14f, start = width * 0.2f, end = width * 0.2f)) {
+            val r = size.width * 0.22f
+            drawCircle(ink, r, androidx.compose.ui.geometry.Offset(size.width / 2, r + 1f))
+            drawRoundRect(ink, androidx.compose.ui.geometry.Offset(0f, r * 2.35f), androidx.compose.ui.geometry.Size(size.width, size.height - r * 2.35f),
+                androidx.compose.ui.geometry.CornerRadius(size.width * 0.45f, size.width * 0.45f))
+        }
+        Box(Modifier.fillMaxWidth().background(P.surface2).padding(horizontal = 4.dp, vertical = 4.dp), contentAlignment = Alignment.Center) {
+            Text(name, style = T.label.copy(fontSize = (width.value * 0.105f).sp, letterSpacing = 0.sp), color = P.sub, textAlign = TextAlign.Center,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = (width.value * 0.125f).sp)
+        }
+    }
+}
+
+/** Cards in a grid that fills the width: as many columns of at least [minWidth] as fit (three at the least). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> CardGrid(items: List<T>, minWidth: Dp = 78.dp, gap: Dp = 8.dp, card: @Composable (T, Dp) -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Gutter)) {
+        val cols = ((maxWidth + gap) / (minWidth + gap)).toInt().coerceAtLeast(3)
+        val w = (maxWidth - gap * (cols - 1)) / cols
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
+            items.forEach { card(it, w) }
+        }
     }
 }
 
@@ -126,9 +149,7 @@ fun BinderScreen(vm: GameViewModel, lg: League) {
         }
         if (b.lastPack.isNotEmpty()) item {
             Section("Your last pack")
-            FlowRow(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                b.lastPack.forEach { c -> MiniCard(c, 104.dp, Modifier.popIn(c.pid * 31 + b.opened)) }
-            }
+            CardGrid(b.lastPack, minWidth = 100.dp) { c, w -> MiniCard(c, w, Modifier.popIn(c.pid * 31 + b.opened)) }
         }
         val sets = b.sets.sortedWith(compareBy({ it.done }, { -it.season }))
         sets.forEach { s ->
@@ -138,11 +159,9 @@ fun BinderScreen(vm: GameViewModel, lg: League) {
                 Text(s.blurb + if (s.done) "." else ". Finish it for two packs and ${if (lg.playerMode) "a bigger following" else "more fan interest"}.",
                     style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 2.dp))
                 Spacer(Modifier.height(6.dp))
-                FlowRow(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    s.pids.forEach { pid ->
-                        val c = b.cards.lastOrNull { it.pid == pid }
-                        if (c != null) MiniCard(c, 74.dp) else EmptySlot(lg.anyPlayer(pid)?.name ?: "?", 74.dp)
-                    }
+                CardGrid(s.pids) { pid, w ->
+                    val c = b.cards.lastOrNull { it.pid == pid }
+                    if (c != null) MiniCard(c, w) else EmptySlot(lg.anyPlayer(pid)?.name ?: "?", w)
                 }
             }
         }
@@ -153,9 +172,7 @@ fun BinderScreen(vm: GameViewModel, lg: League) {
             }
             Spacer(Modifier.height(8.dp))
             val shown = b.cards.filter { filter == 0 || it.rarity == 4 - filter }.sortedWith(compareByDescending<Card> { it.rarity }.thenByDescending { it.rating })
-            FlowRow(Modifier.fillMaxWidth().padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                shown.take(120).forEach { MiniCard(it, 74.dp) }
-            }
+            CardGrid(shown.take(120)) { c, w -> MiniCard(c, w) }
             if (shown.size > 120) Text("And ${shown.size - 120} more.", style = T.small, color = P.faint, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 6.dp))
             Spacer(Modifier.height(24.dp))
         }
