@@ -55,7 +55,7 @@ private fun DeskPrompt(vm: GameViewModel, lg: League, pr: CoachDesk.Prompt) {
         Text((if (pr.kind == "mail") "FROM: " else "ASKED BY ") + pr.who.uppercase(), style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 2.dp))
         Text(pr.question, style = T.bodyB, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
         pr.choices.forEachIndexed { i, ch ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = CoachDesk.answer(it, pr, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)
@@ -91,7 +91,7 @@ private fun PredictionCard(vm: GameViewModel, lg: League) {
         Text("The reporters want a prediction on the record. Make one, and it's graded at season's end: hit it and the bosses love you; miss and they remember.",
             style = T.small, color = P.sub)
         Spacer(Modifier.height(6.dp))
-        for (b in CoachDesk.bets(lg)) ListRow(onClick = { vm.act { CoachDesk.predict(it, b.id) }; vm.toast("On the record: \"${b.label}.\"") }) {
+        for (b in CoachDesk.bets(lg)) ChoiceRow(onClick = { vm.act { CoachDesk.predict(it, b.id) }; vm.toast("On the record: \"${b.label}.\"") }) {
             Column(Modifier.weight(1f)) {
                 Text("\"${b.label}.\"", style = T.bodyB, color = P.ink)
                 Text(b.detail, style = T.small, color = P.sub)
@@ -120,7 +120,7 @@ private fun IncidentCard(vm: GameViewModel, lg: League, inc: com.nh.hoopscoach.g
         }
         Text(inc.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         inc.options.forEachIndexed { i, op ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = C.resolve(it, inc, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)
@@ -148,7 +148,7 @@ private fun PregameCard(vm: GameViewModel, lg: League, g: com.nh.hoopscoach.game
     Panel {
         Text(C.why(lg, g).uppercase(), style = T.label, color = P.accent)
         Text("The locker room is quiet. Everybody's looking at you.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp))
-        for (s in C.speeches(lg, g)) ListRow(onClick = {
+        for (s in C.speeches(lg, g)) ChoiceRow(onClick = {
             var reaction = ""
             vm.act { reaction = C.speak(it, g, s) }
             if (reaction.isNotEmpty()) vm.toast(reaction)
@@ -170,7 +170,7 @@ private fun BracketCard(vm: GameViewModel, lg: League) {
     Panel {
         Text("It's Selection Sunday. Everybody in the country is filling out a bracket, the coaches too. Who wins it all?", style = T.small, color = P.sub)
         Text("Get it right and the fans love it (and the bosses smile).", style = T.small, color = P.faint, modifier = Modifier.padding(bottom = 6.dp))
-        for (t in C.bracketChoices(lg)) ListRow(onClick = { vm.act { C.pickChampion(it, t.id) }; vm.toast("Locked in: ${t.school}.") }) {
+        for (t in C.bracketChoices(lg)) ChoiceRow(onClick = { vm.act { C.pickChampion(it, t.id) }; vm.toast("Locked in: ${t.school}.") }) {
             Text("${b.seeds[t.id] ?: ""}", style = T.numSm, color = if (t.id == lg.userTeamId) P.accent else P.sub, modifier = Modifier.width(28.dp))
             TeamBadge(t, 28.dp)
             androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
@@ -191,7 +191,7 @@ private fun BoosterCard(vm: GameViewModel, lg: League, rq: com.nh.hoopscoach.gam
         Text("FROM: ${rq.who.uppercase()}", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 2.dp))
         Text("\"${rq.text}\"", style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
         rq.asks.forEachIndexed { i, a ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = O.answerBooster(it, rq, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)
@@ -223,7 +223,7 @@ fun LifeCard(vm: GameViewModel, lg: League) {
         Text(l.title.uppercase(), style = T.label, color = P.accent)
         Text(l.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
         l.moves.forEachIndexed { i, mv ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = O.live(it, l, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)

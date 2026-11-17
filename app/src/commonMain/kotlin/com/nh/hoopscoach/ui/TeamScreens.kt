@@ -127,22 +127,23 @@ fun RosterBalance(vm: GameViewModel, lg: League, t: Team) {
 @Composable
 fun TeamRings(lg: League, t: Team) {
     Panel(padding = PaddingValues(vertical = 14.dp, horizontal = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            RingStat("Overall", Tactics.teamRating(lg, t))
-            RingStat("Offense", Tactics.teamRating(lg, t) { Ratings.offense(it) })
-            RingStat("Defense", Tactics.teamRating(lg, t) { Ratings.defense(it) })
-            RingStat("Power", Rankings.power(lg, t))
-            RingStat("Prestige", t.prestige)
+        Row(Modifier.fillMaxWidth()) {
+            RingStat("Overall", Tactics.teamRating(lg, t), Modifier.weight(1f))
+            RingStat("Offense", Tactics.teamRating(lg, t) { Ratings.offense(it) }, Modifier.weight(1f))
+            RingStat("Defense", Tactics.teamRating(lg, t) { Ratings.defense(it) }, Modifier.weight(1f))
+            RingStat("Power", Rankings.power(lg, t), Modifier.weight(1f))
+            RingStat("Prestige", t.prestige, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun RingStat(label: String, v: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun RingStat(label: String, v: Int, modifier: Modifier = Modifier) {
+    // Each ring gets an equal share of the row; a long label shrinks to fit its share instead of touching the next one.
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Ring(v, 50.dp, textSize = 19.sp)
         Spacer(Modifier.height(4.dp))
-        Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), color = P.sub)
+        FitText(label.uppercase(), T.label.copy(fontSize = 9.sp, letterSpacing = 0.6.sp), P.sub, Modifier.padding(horizontal = 2.dp), minScale = 0.7f, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
@@ -314,7 +315,10 @@ private fun SlotPick(label: String, p: Player?, modifier: Modifier, onClick: () 
             Text(label.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.sub)
             Text(p?.short ?: "Choose", style = T.bodyB.copy(fontSize = 14.sp), color = if (p == null) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (p != null) Text("${shown(p.ovr)}", style = T.numSm.copy(fontSize = 17.sp), color = tier(shown(p.ovr)))
+        if (p != null) {
+            Spacer(Modifier.width(6.dp))
+            Text("${shown(p.ovr)}", style = T.numSm.copy(fontSize = 17.sp), color = tier(shown(p.ovr)))
+        }
     }
 }
 

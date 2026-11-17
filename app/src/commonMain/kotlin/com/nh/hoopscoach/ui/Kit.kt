@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -249,6 +250,17 @@ fun ListRow(onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, paddin
 }
 
 /**
+ * One answer in a card of choices (a press question, a call, a storyline beat): a full-width rounded box lined up
+ * with the text above it, the same everywhere, instead of a plain row indented past it.
+ */
+@Composable
+fun ChoiceRow(onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    val m = modifier.fillMaxWidth().padding(vertical = 4.dp).clip(shape).background(P.surface2)
+    Row((if (onClick != null) m.hoverClick(onClick) else m).padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+/**
  * Clickable with a mouse in mind: a hand cursor and a faint wash while the pointer is over it (on a PC;
  * a phone has no pointer, so it's just a click there).
  */
@@ -331,7 +343,8 @@ fun Segmented(
         )
         Box(
             // Until the pill has measured itself, the selected tab draws its own background.
-            m.clip(RoundedCornerShape(11.dp)).background(if (sel && pillW == 0) pillColor else Color.Transparent)
+            // Every tab fills the row's height, so a label that shrank to fit stays centered with the others.
+            m.then(androidx.compose.ui.Modifier.fillMaxHeight()).clip(RoundedCornerShape(11.dp)).background(if (sel && pillW == 0) pillColor else Color.Transparent)
                 .clickable { onSelect(i) }.padding(horizontal = if (scroll) 14.dp else 4.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -361,7 +374,7 @@ fun Segmented(
         Box(modifier.padding(horizontal = edge).fillMaxWidth().then(track).onSizeChanged { viewport.intValue = it.width }) {
             Box(Modifier.fadeEdges(state, 40.dp).horizontalScroll(state)) {
                 pill()
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     options.forEachIndexed { i, l -> chip(i, l, Modifier.track(i)) }
                 }
             }
@@ -369,7 +382,7 @@ fun Segmented(
     } else {
         Box(modifier.padding(horizontal = edge).fillMaxWidth().then(track)) {
             pill()
-            Row(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                 // Five or more tabs share the width by label length so none gets cut off.
                 options.forEachIndexed { i, l -> chip(i, l, Modifier.weight(if (options.size >= 5) l.length + 4f else 1f).track(i)) }
             }

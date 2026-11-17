@@ -57,7 +57,7 @@ fun StoryBeatCard(vm: GameViewModel, lg: League, s: Storyline) {
         if (s.log.isNotEmpty()) Text("So far: " + s.log.joinToString(" · ") { it.substringAfter(": ") }, style = T.small, color = P.sub,
             maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 4.dp))
         b.choices.forEachIndexed { i, ch ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = Storylines.choose(it, s, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)

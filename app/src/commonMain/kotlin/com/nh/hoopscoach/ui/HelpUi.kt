@@ -238,9 +238,10 @@ fun GettingStartedCard(vm: GameViewModel, lg: League) {
         Bar(done.toFloat() / list.size, Modifier.fillMaxWidth(), height = 5.dp)
         list.forEachIndexed { i, s ->
             Spacer(Modifier.height(if (i == 0) 12.dp else 10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // The step's number lines up with its title; the button sits in the middle of the step.
+            Row(verticalAlignment = Alignment.Top) {
                 Box(
-                    Modifier.size(24.dp).clip(CircleShape).background(if (s.done) P.good else androidx.compose.ui.graphics.Color.Transparent)
+                    Modifier.padding(top = 1.dp).size(24.dp).clip(CircleShape).background(if (s.done) P.good else androidx.compose.ui.graphics.Color.Transparent)
                         .border(1.5.dp, if (s.done) P.good else P.line, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -256,7 +257,7 @@ fun GettingStartedCard(vm: GameViewModel, lg: League) {
                 val go = s.go
                 if (!s.done && s.button != null && go != null) {
                     Spacer(Modifier.width(8.dp))
-                    SmallButton(s.button, primary = i == list.indexOfFirst { !it.done }) {
+                    SmallButton(s.button, Modifier.align(Alignment.CenterVertically), primary = i == list.indexOfFirst { !it.done }) {
                         vm.act { if (s.id !in it.tipsDone) it.tipsDone += s.id }
                         go()
                     }

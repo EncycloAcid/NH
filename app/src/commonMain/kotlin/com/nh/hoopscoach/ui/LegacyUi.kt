@@ -370,7 +370,7 @@ fun DadCallCard(vm: GameViewModel, lg: League) {
         }
         Text(c.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         c.answers.forEachIndexed { i, a ->
-            ListRow(onClick = {
+            ChoiceRow(onClick = {
                 var reaction = ""
                 vm.act { reaction = F.answer(it, c, i) }
                 if (reaction.isNotEmpty()) vm.toast(reaction)
