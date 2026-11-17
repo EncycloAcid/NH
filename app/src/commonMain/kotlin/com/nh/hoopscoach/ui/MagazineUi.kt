@@ -174,7 +174,7 @@ private fun OutlookCard(t: Team, rank: String, record: String, range: String, ba
         Spacer(Modifier.height(14.dp))
         bars.forEach { (label, v) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = T.small, color = fg.copy(alpha = 0.9f), modifier = Modifier.width(96.dp))
+                FitText(label, T.small, fg.copy(alpha = 0.9f), Modifier.width(104.dp).padding(end = 6.dp), minScale = 0.75f)
                 Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(fg.copy(alpha = 0.18f))) {
                     Box(Modifier.fillMaxWidth(v.toFloat().coerceIn(0.02f, 1f)).height(8.dp).clip(RoundedCornerShape(4.dp)).background(fg))
                 }

@@ -1,57 +1,117 @@
 # Hoops Dynasty Pro
 
-A college basketball coaching game for **Android and PC** (version **3.4-pro.182**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both targets — update the game once and Android and PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.260**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
-Pick a school, set your rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, develop players, and chase national titles season after season.
+Three ways to play, all in one app:
 
-You can coach any of the 364 Division I schools, in their real 2026-27 conferences (32 of them, to the best of our knowledge), with real names, nicknames and colors. Every player and coach is fictional. Every school shows its own logo (the logo files you supplied, in `app/src/main/assets/logos`, one per team named by its abbreviation). A school without a logo file falls back to a drawn monogram in its colors. The logos are the schools' trademarks, so keep this build for personal use and don't publish it to an app store. To fix any school's name, nickname or colors, use **Career → Settings → Schools**.
+- **Coach a college program**: any of the 364 Division I schools, in their real 2026-27 conferences, with real names, nicknames and colors. Set the rotation and tactics, play or sim games, recruit high schoolers and transfers, manage NIL money, build the program's facilities, and chase national titles season after season.
+- **Play one player's career** (Road to the League): create a player, play his senior year of high school, pick a school, play college, go through Draft Night and keep going in the NBA. When he retires, coach, or start over as his son.
+- **Coach an NBA team**: today's league (2026-27) or any season back to 1986-87, with that season's real rosters.
 
+Every college player and coach is fictional. Each school shows its own logo from the files you supplied (`app/src/main/assets/logos`); a school without one gets a drawn monogram in its colors. The logos and NBA photos are trademarks and the user's own files, so keep this build for personal use and don't publish it to an app store. To fix a school's name, nickname or colors, use **Career → Settings → Schools**.
 
-The design is clean and neutral, with light and dark modes, and takes its accent color from the school you coach. The PC window uses the same phone-sized layout as Android.
+The design is clean and neutral, with light and dark modes, and takes its accent color from your team. On a phone it's a phone layout; on a PC window it grows a sidebar and a league panel.
 
 ## Install
 
-Every push builds Android and PC packages and publishes them on the **Releases** page:
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.260.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
-| Android | `HoopsDynasty.apk` | Android device (sideload) |
-| Windows | `HoopsDynasty-windows.exe` | Windows 10+ (installer; Java is bundled) |
-| PC (jar) | `HoopsDynasty-pc.jar` | [Java 17+](https://adoptium.net/) |
+| Android | `HoopsDynasty-<version>.apk` | Android 8.0+ (sideload) |
+| Windows | `HoopsDynasty-windows-<version>.exe` | Windows 10+ (installer; Java is bundled) |
+| PC (jar) | `HoopsDynasty-pc-<version>.jar` | [Java 17+](https://adoptium.net/) |
 | Linux (optional) | `.deb` | when packaging succeeds on CI |
 
 ### Android
 
-1. Download `HoopsDynasty.apk` from the newest release on your phone.
+1. On your phone, download the `.apk` from the newest release.
 2. Open the file. If Android asks, allow your browser or file manager to install unknown apps.
 3. Your dynasty saves automatically on the device.
 
-**Keep your save safe:** In **Career → Settings**, use **Export** / **Import Save**. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), the builds were signed with different keys. Back up first, uninstall, install the new build, then restore.
+**Keep your save safe:** In **Career → Settings**, use **Export** / **Import Save** (and **Snapshot** for a checkpoint slot). If Android ever refuses to install a new build over the old one ("app not installed"), the builds were signed with different keys: back up first, uninstall, install the new build, then restore.
 
 ### Windows
 
-1. Download `HoopsDynasty-windows.exe` from the newest release.
-2. Run the installer and open **Hoops Dynasty** from the Start menu / desktop shortcut.
-3. No separate Java install is required — the EXE bundles a runtime.
+1. Download the `HoopsDynasty-windows-<version>.exe` from the newest release.
+2. Run the installer and open **Hoops Dynasty** from the Start menu or the desktop shortcut.
+3. No separate Java install is needed: the installer bundles a runtime.
 
 ### Other PC (macOS / Linux / jar)
 
-1. Install [Java 17+](https://adoptium.net/) if you don't already have it.
-2. Download `HoopsDynasty-pc.jar` from the newest release.
-3. Run: `java -jar HoopsDynasty-pc.jar`
-4. Linux releases may also include a `.deb` when packaging succeeds.
+1. Install [Java 17+](https://adoptium.net/) if you don't have it.
+2. Download `HoopsDynasty-pc-<version>.jar` from the newest release.
+3. Run `java -jar HoopsDynasty-pc-<version>.jar`.
 
 **PC notes**
 
-- The window is phone-sized on purpose (same layout and UI as Android).
-- **Escape** goes back (same as the on-screen back control).
-- Saves live under `~/.hoopsdynasty/` (on Windows: `%USERPROFILE%\.hoopsdynasty\`), with slots in the `saves/` subfolder.
-- Phone and PC use the same save format. In **Career → Settings**, use **Export** / **Import Save** to move a dynasty between them.
-- Profile photo picking from the gallery is Android-only; other avatar styles work on PC.
+- Keys: **Space**/**Enter** continue, **S** sims the day, **W** sims a week, **1-5** switch tabs, **Esc** goes back, **Ctrl+S** saves, **F1** lists them.
+- Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
+- Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## This branch: Pro career (experiment)
+## What's new (3.9-pro.243 to 3.9-pro.260)
 
-The `pro-career` branch grows out of Road to the League: when your player is drafted, his career keeps going in a pro league. It builds as its own app, **Hoops Dynasty Pro** (`com.nh.hoopscoach.pro`), so it installs next to the main game and the Road app without touching their saves. Everything below about Road to the League still applies up to Draft Night.
+- **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
+- **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
+- **High school senior year**: before picking a school, play the summer travel-team circuit (three stops), a senior season around three big moments (the national TV showcase, the rivalry game's last shot, the state playoffs), up to five official visits, and a commitment ceremony with three hats on the table. Your ranking, stars and offers move with how you play. Or skip straight to the offers.
+- **Season-long storylines**: three-part stories through each season, each part a choice. As a player: the rival who trash-talks you, a teammate feud, your coach on the hot seat. As a coach: a rival coach taking shots, two of your players feuding, your own hot seat. Choices move followers, leadership, moods, fans, boosters and job security, and each ends in the news.
+- **Rivalry psychology**: before a rivalry game each side has a mindset, from Flat to Out for blood, built from the series (the last meeting, streaks, who leads it) and from what you've said. Pick your stance (downplay it, embrace it, call them out); each point of mindset is a little sharper shooting and fewer turnovers in that game.
+- **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
+- **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
+- **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **Polish**: one family of icons in place of emoji, filled tab icons, the original logo refined, every screen checked at small phone widths and large font sizes (long names shrink to fit, nothing is cut off, scrolling strips fade at the edge), and fixed-size cards keep their layout at any font size.
+
+## AI writing (optional)
+
+Turn it on in **Career → Settings → AI Dynasty Intelligence**. The game always writes its own coverage first, so nothing waits on a model; the AI rewrites or adds to it, and every AI draft is fact-checked against the game (names, scores, records, statistics, the season's phase). A draft that fails keeps the game's version, with a note saying why in plain words.
+
+- **Providers**: Gemini Nano on the phone, Ollama on a computer you run it on, or a cloud key for Gemini, ChatGPT, Claude, Groq, DeepSeek, OpenRouter, Cerebras or Mistral.
+- **Gemini Nano** (Android with AICore: Pixel 9 and newer, up-to-date AICore and Google Play services, a locked bootloader) runs on the phone's own chip through Google's ML Kit GenAI Prompt API (`com.google.mlkit:genai-prompt`). Settings show whether it's ready or needs its one-time download (with a Download button), and a Test button.
+  - **Use it as the provider**, or keep another provider for articles and turn on **Dialogue on Gemini Nano** for press conferences, postgame player quotes, social posts, speeches, recruiting letters and player personalities.
+  - **Model by feature**: the phone's fast model (E2B) for quick player reactions and short notifications; the full model (E4B) for player personalities, coach interviews and recruiting conversations. Each row can be switched.
+  - Built for its limits: AICore answers only while the game is on screen and keeps a daily allowance per app, so the week's news goes out in one batched request (the Dispatch), a fast sim only writes for the game it stops on, prompts are fitted to its roughly 4,000-token window, the fixed instructions use AICore's prefix cache, and if it can't answer the other provider (or the game) writes it.
+- **Weekly batch**: one request a week instead of nightly story desks (always on for Gemini Nano).
+
+## Road to the League: one player's career
+
+Instead of coaching a program, you play one player's career: New career → Play. (It started as a separate experimental app and is now part of this one.)
+
+- **Create your player**: name, position, height and weight, play style, hometown and state, jersey number, and prospect level (3-star sleeper, 4-star prospect or 5-star blue-chipper). Every level has a real ceiling: 96 to 99 potential.
+- **Senior year first** (optional): the summer circuit, the senior season, official visits and the commitment ceremony (see What's new).
+- **Scholarship offers**: schools offer, matched to your level, with a lean toward home. Each offer shows your projected role, how many players at your position are already as good as you, distance from home and the NIL money the school pays.
+- **Your team is coached by the AI**: the coach sets the rotation and tactics, recruits and pays the roster. You see the roster and the program; your row is marked YOU. Minutes come from being the best at your position.
+- **The Me tab**: draft stock and big-board rank, your role and planned minutes, the depth chart at your position, training focus and XP, your NIL deal and career earnings, and your story season by season. Today shows a "Your player" card with your last game.
+- **NIL deals**: each season pick one. A hometown dealership pays full value. A performance deal pays 60% plus 4% per point you average and a bonus for All-America honors. A national brand pays 150% but costs 15% of your development that season. Richer programs pay more.
+- **The offseason** in four steps:
+  1. **Decision**: return to school, declare for the draft (undrafted underclassmen go back to school), or enter the transfer portal.
+  2. **Draft Night**. If you're in the draft (you declared, or you're a senior), you wait in the green room while the picks come in one at a time: slow through the lottery, quicker through the first round, fast in the second. The room talks about each pick (a teammate going, another player at your position off the board), and your phone rings right before your name is called. Skip ahead any time. Then you see your pick against your mock-draft spot (your big-board rank among the players actually in the draft), or that the night ended without your name. The other tabs stay spoiler-free until the night is over.
+  3. **Summer**: workouts, and transfer offers if you entered the portal.
+  4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
+- **Media and followers**: you start with a following that matches your ranking (about 150K for a top five-star, 50K to 70K for a four-star, 10K for a three-star). Big games grow it, more on big stages (NCAA Tournament x3, conference tournaments and rivalries x1.5, ranked opponents x1.3) and at big-brand schools. Thirty-point nights and game-winners go viral. Every follower adds $1 a year to your NIL value, and sponsors pay one-time bonuses at 100K, 250K, 500K, 1M, 2.5M and 5M followers.
+- **Postgame press**: after notable games (a big night, a game-winner, a rivalry win, a tournament win, a tough loss, draft buzz) you get a question on Today and the Me tab with three answers. Humble answers please fans and teammates. Brash ones grow your following faster but cost locker-room goodwill. Your answers shape a persona: Fan favorite (wins lift the fan base more), Quiet pro, or Lightning rod (big games grow your following 20% faster).
+- **Big moments**: in live games, when your team has the ball in the last two minutes and it's within five, the game pauses (up to three times a game). Pick the play: a pull-up jumper or three, a drive to the rim, or a kick-out to your best shooter. Each shows its chance to score from your ratings against that defense. Then the engine plays it out, with fouls, turnovers and rebounds. Simmed games play on their own. The Me tab counts how often you came through.
+- **Weekly practice**: choose a plan, applied after every game.
+  - Team practice: works your training focus.
+  - Shooting reps: Inside, Mid-Range and 3-Point.
+  - Film study: Handling, Passing and Perimeter D. Easy on the legs.
+  - Weight room: Inside, Rebound and Interior D. The most tiring.
+  - Rest: recovers fatigue.
+  Practice work banks toward each rating (+1 per 300). Fatigue comes from practice and minutes. Past 40 it costs you up to 9% shooting in games, and past 70 practice gains are halved.
+- **Spend your NIL**: the guaranteed part of your NIL deal lands in your bank when you sign. Performance bonuses arrive at season end, and sponsor payouts as you hit milestones. Spend the bank on your own team for the season (contracts end with it):
+  - Personal trainer ($150K): develop 25% faster from games and practice.
+  - Nutritionist ($90K): fatigue builds a quarter slower, and you recover faster.
+  - Shooting coach ($120K): +3% on jump shots, +5% when you take the big shot late.
+  - Agent ($80K): 15% more on NIL deals, bonuses and sponsor payouts.
+  The Me tab shows your bank and staff; the career summary shows what you invested.
+- **Spotlight**: live games jump from one of your plays to the next (your shots, assists, steals, fouls and turnovers, highlighted in the feed), so a game takes about a minute at 2x. Big moments still stop the game. Switch to "Every play" any time; the choice is saved.
+- **Your class rival**: when your career starts (or, for a career saved before this update, when your next season starts), a five-star at your position (a top-five recruit in your class) signs with one of the best programs in your conference, so you meet at least twice a season. The Me tab puts him side by side with you: overall, scoring, the Player of the Year race and the big board, plus your head-to-head record and the next meeting. Today flags rival games, live games show both of your point totals, winning the duel grows your following faster, and the press asks about him. On Draft Night the room calls out his pick, and your ending says how you came out against him.
+- **Summer events**: each summer after the draft, pick one invitation. Elite camps (a guard, wing or bigs camp for your position, a shooting camp and a lockdown defense camp) add +2 to three ratings and some followers, with a chance at camp MVP. After your first two seasons, a top-40 big-board rank or an 84 overall gets you a U19 National Team invite: every rating +1, a medal and a big jump in followers. Your summers show up in your story.
+- **Award races**: a Player of the Year ladder on the Me tab, scored the same way as the end-of-season awards. It shows your rank, your All-America pace, a weekly up or down arrow, your conference race and the freshman race.
+- **The ending**: the draft leads to the pros (above); undrafted after four seasons, he goes overseas. Either way you get a career summary with totals, your story, NIL earned and every school you played for, and then legacy mode.
+
+## Player career: the pros
+
+When your player is drafted, his career keeps going in the NBA. (The app is **Hoops Dynasty Pro**, `com.nh.hoopscoach.pro`.) Everything above about Road to the League applies up to Draft Night.
 
 - **Draft Night to the pros**: the board shows which pro team took each player (by roster strength, with a lottery among the four worst). After your name is called, "Start your pro career" builds the league. An undrafted senior rated 86 or better gets a two-way deal instead of going overseas.
 - **The league**: the 30 real teams in the East and West, with their logos, and their current players with headshots (522 players; the logos and photos are the user's own files, for personal use, in `assets/nba`). Overalls and ages are estimates on the game's pro scale (`game/NbaData.kt`, generated from the roster file). Each team keeps its best 14; your draft class (your college classmates, and your rival if he's been drafted) joins as rookies, weakest rosters picking first. **The pros are a step up: a college player arrives at least 5 lower and no higher than 87** (80 on the 2K scale the screens show; a 92 starts at 87), and **no rookie goes above 87 during his first season**: summer camp and practice still sharpen the skills he works on, but his overall holds at 87 until his first summer. His ceiling stays, so rookies earn their minutes and grow into stars. Pro coaches give young, high-ceiling players development minutes (up to 4 points of credit in the rotation). Future drafts bring rookies by pick: about 85 for No. 1 (77 on screen, up to 80), 80 for No. 30 (72), 76 for No. 60, with real upside. Over the years real players age and retire, and generated rookies take their places. Coaches are generated.
@@ -335,50 +395,6 @@ The `pro-career` branch grows out of Road to the League: when your player is dra
   - *Straight to an NBA bench*: retire from the NBA and teams call about their head-coaching job the same day, listed on the ending screen above the college jobs. Losing teams looking for a new voice: one offer for a role player, two for a solid pro (an All-Star, a ring or eight seasons), three for a legend (who can land a good team too). The team you finished with often wants you (25%, 50% or 80% by your name). Take one and the league you played in becomes your coaching career, picking up the offseason where you retired: same players, rivals and history, then the draft, free agency and your first season. Your ratings come from your playing career (offense and defense from your peak, player relations from your legacy), and your playing career goes on your Career tab.
 - **The end**: retire when you choose from 30 on, or when nobody offers a contract (at 43 at the latest). The ending shows your pro and college totals, rings, MVPs, All-Star selections, earnings, a Hall of Fame verdict and how your rival's career went.
 
-## Road to the League (experiment)
-
-The `road-to-the-league` branch adds a second way to play: instead of coaching a program, you play one player's college career. It builds as a separate app, **Hoops Dynasty Road** (`com.nh.hoopscoach.road`), so it installs next to the main game and never touches its save. The main game keeps going on its own branch.
-
-- **Create your player**: name, position, height and weight, play style, hometown and state, jersey number, and prospect level (3-star sleeper, 4-star prospect or 5-star blue-chipper). Every level has a real ceiling: 96 to 99 potential.
-- **Scholarship offers**: eight schools offer, matched to your level, with a lean toward home. Each offer shows your projected role, how many players at your position are already as good as you, distance from home and the NIL money the school pays.
-- **Your team is coached by the AI**: the coach sets the rotation and tactics, recruits and pays the roster. You see the roster and the program; your row is marked YOU. Minutes come from being the best at your position.
-- **The Me tab**: draft stock and big-board rank, your role and planned minutes, the depth chart at your position, training focus and XP, your NIL deal and career earnings, and your story season by season. Today shows a "Your player" card with your last game.
-- **NIL deals**: each season pick one. A hometown dealership pays full value. A performance deal pays 60% plus 4% per point you average and a bonus for All-America honors. A national brand pays 150% but costs 15% of your development that season. Richer programs pay more.
-- **The offseason** in four steps:
-  1. **Decision**: return to school, declare for the draft (undrafted underclassmen go back to school), or enter the transfer portal.
-  2. **Draft Night**. If you're in the draft (you declared, or you're a senior), you wait in the green room while the picks come in one at a time: slow through the lottery, quicker through the first round, fast in the second. The room talks about each pick (a teammate going, another player at your position off the board), and your phone rings right before your name is called. Skip ahead any time. Then you see your pick against your mock-draft spot (your big-board rank among the players actually in the draft), or that the night ended without your name. The other tabs stay spoiler-free until the night is over.
-  3. **Summer**: workouts, and transfer offers if you entered the portal.
-  4. **Next season**: everything else (coaching changes, recruiting, tryouts) runs on its own.
-- **Media and followers**: you start with a following that matches your ranking (about 150K for a top five-star, 50K to 70K for a four-star, 10K for a three-star). Big games grow it, more on big stages (NCAA Tournament x3, conference tournaments and rivalries x1.5, ranked opponents x1.3) and at big-brand schools. Thirty-point nights and game-winners go viral. Every follower adds $1 a year to your NIL value, and sponsors pay one-time bonuses at 100K, 250K, 500K, 1M, 2.5M and 5M followers.
-- **Postgame press**: after notable games (a big night, a game-winner, a rivalry win, a tournament win, a tough loss, draft buzz) you get a question on Today and the Me tab with three answers. Humble answers please fans and teammates. Brash ones grow your following faster but cost locker-room goodwill. Your answers shape a persona: Fan favorite (wins lift the fan base more), Quiet pro, or Lightning rod (big games grow your following 20% faster).
-- **Big moments**: in live games, when your team has the ball in the last two minutes and it's within five, the game pauses (up to three times a game). Pick the play: a pull-up jumper or three, a drive to the rim, or a kick-out to your best shooter. Each shows its chance to score from your ratings against that defense. Then the engine plays it out, with fouls, turnovers and rebounds. Simmed games play on their own. The Me tab counts how often you came through.
-- **Weekly practice**: choose a plan, applied after every game.
-  - Team practice: works your training focus.
-  - Shooting reps: Inside, Mid-Range and 3-Point.
-  - Film study: Handling, Passing and Perimeter D. Easy on the legs.
-  - Weight room: Inside, Rebound and Interior D. The most tiring.
-  - Rest: recovers fatigue.
-  Practice work banks toward each rating (+1 per 300). Fatigue comes from practice and minutes. Past 40 it costs you up to 9% shooting in games, and past 70 practice gains are halved.
-- **Spend your NIL**: the guaranteed part of your NIL deal lands in your bank when you sign. Performance bonuses arrive at season end, and sponsor payouts as you hit milestones. Spend the bank on your own team for the season (contracts end with it):
-  - Personal trainer ($150K): develop 25% faster from games and practice.
-  - Nutritionist ($90K): fatigue builds a quarter slower, and you recover faster.
-  - Shooting coach ($120K): +3% on jump shots, +5% when you take the big shot late.
-  - Agent ($80K): 15% more on NIL deals, bonuses and sponsor payouts.
-  The Me tab shows your bank and staff; the career summary shows what you invested.
-- **Spotlight**: live games jump from one of your plays to the next (your shots, assists, steals, fouls and turnovers, highlighted in the feed), so a game takes about a minute at 2x. Big moments still stop the game. Switch to "Every play" any time; the choice is saved.
-- **Your class rival**: when your career starts (or, for a career saved before this update, when your next season starts), a five-star at your position (a top-five recruit in your class) signs with one of the best programs in your conference, so you meet at least twice a season. The Me tab puts him side by side with you: overall, scoring, the Player of the Year race and the big board, plus your head-to-head record and the next meeting. Today flags rival games, live games show both of your point totals, winning the duel grows your following faster, and the press asks about him. On Draft Night the room calls out his pick, and your ending says how you came out against him.
-- **Summer events**: each summer after the draft, pick one invitation. Elite camps (a guard, wing or bigs camp for your position, a shooting camp and a lockdown defense camp) add +2 to three ratings and some followers, with a chance at camp MVP. After your first two seasons, a top-40 big-board rank or an 84 overall gets you a U19 National Team invite: every rating +1, a medal and a big jump in followers. Your summers show up in your story.
-- **Award races**: a Player of the Year ladder on the Me tab, scored the same way as the end-of-season awards. It shows your rank, your All-America pace, a weekly up or down arrow, your conference race and the freshman race.
-- **The ending** (on the Road branch): drafted (with your pick) or, after four seasons, undrafted and overseas. On this branch the draft leads to the pros instead. You get a career summary with totals, your story, NIL earned and every school you played for.
-
-## Install on your phone
-
-1. Open the repository's **Releases** page on your Android phone and download `HoopsDynasty.apk` from the newest build. Every push builds a fresh one.
-2. Open the file. If Android asks, allow your browser or file manager to install unknown apps.
-3. Your dynasty saves automatically on the device.
-
-**Keep your save safe:** In **Settings → Back Up Save**, write your dynasty to a file. If Android ever refuses to install a new build over the old one ("app not installed" or a package conflict), it means the builds were signed with different keys. Back up first, uninstall, install the new build, then use **Restore Save**.
-
 ## What's in the game
 
 - **Continue bar**: one bar above the tabs always shows what's next. Play the game live, sim it, or use the ⋮ menu to jump a week, to the conference tournament, to Selection Sunday, or to the end of the season.
@@ -543,19 +559,29 @@ The `road-to-the-league` branch adds a second way to play: instead of coaching a
 Requirements: JDK 17+ and the Android SDK (Android Studio works out of the box).
 
 ```sh
-./gradlew :app:assembleRelease          # APK at app/build/outputs/apk/release/app-release.apk
+./gradlew :app:assembleRelease                 # Android APK: app/build/outputs/apk/release/app-release.apk
+./gradlew :app:run                             # the PC version, in a window
+./gradlew :app:packageUberJarForCurrentOS      # the PC jar
+./gradlew :app:packageExe                      # the Windows installer (on Windows)
 ./gradlew :app:testDebugUnitTest --tests com.nh.hoopscoach.SimTest   # simulates 3 full seasons
 ```
 
-`ScreenshotTest` renders every main screen on the JVM with Robolectric and writes PNGs to `build/screenshots/`.
+The tests run on the JVM. Gemini Nano needs a real phone, so tests never touch it: the weekly Dispatch and the crystal ball go through a `NewsGenerator` interface, and `SimTest` plugs in the game's own template writer (`WeeklyDispatchTest` covers the fact sheet and the JSON checks). `ScreenshotTest` renders the main screens with Robolectric and writes PNGs to `build/screenshots/`.
 
 ## Project layout
 
 ```
-app/src/main/java/com/nh/hoopscoach/
-  game/   pure Kotlin game logic: league generation, possession-by-possession game engine,
-          schedule, rankings (Elo-based NET + AP poll), awards, recruiting, finance, offseason
-  ui/     Jetpack Compose screens, theme, drawn team logos and player portraits
+app/src/commonMain/kotlin/com/nh/hoopscoach/
+  game/   the game, in plain Kotlin: league generation, the possession-by-possession engine, schedules,
+          rankings, recruiting, NIL and finance, the offseason, the pros, careers, storylines, rivalries,
+          facilities, skill trees, the AI writers and their fact-checking (Ollama.kt, AiGrounding.kt,
+          WeeklyDispatch.kt, OnDeviceAi.kt)
+  ui/     the Compose screens, theme, icons (GameIcons.kt), team logos, portraits and cards
+app/src/androidMain/   the Android app: MainActivity, the Gemini Nano engine (GeminiNanoEngine.kt)
+app/src/desktopMain/   the PC app: the window, keys, the phone-to-PC transfer
+app/src/test/          JVM tests (game simulation, AI grounding, screenshots)
+app/src/main/          Android manifest, resources, launcher icon, assets (logos, NBA data, eras)
+tools/                 scripts that build the data files (eras, rosters, history, avatars)
 ```
 
 ## Signing key

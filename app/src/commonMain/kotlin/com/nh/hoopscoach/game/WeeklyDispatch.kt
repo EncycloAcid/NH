@@ -72,7 +72,7 @@ object AiNewsGenerator : NewsGenerator {
         val prompt = "WEEK ${brief.index} FACTS (JSON):\n${brief.json}\n\n" +
             "Write exactly 5 headlines and 3 ${if (brief.pro) "trade rumors" else "rumors (transfer portal, coaching seats, recruiting)"}.\n" +
             "Reply with JSON only: {\"headlines\": [5 strings], \"rumors\": [3 strings]}"
-        val raw = Ollama.generate(config, prompt, system, temperature = 0.8, numPredict = 420, dialogue = true).getOrNull() ?: return null
+        val raw = Ollama.generate(config, prompt, system, temperature = 0.8, numPredict = 420, desk = OnDeviceAi.Desk.NOTIFICATIONS).getOrNull() ?: return null
         val (h, r) = WeeklyDispatch.parse(raw, "headlines", "rumors", brief) ?: return null
         if (h.size < 3) return null
         return DispatchEdition(brief.season, brief.index, h.take(5), r.take(3), ai = true, writer = Ollama.writerName(config, true))
@@ -82,7 +82,7 @@ object AiNewsGenerator : NewsGenerator {
         val prompt = "RECRUITING ROUND ${brief.index} FACTS (JSON):\n${brief.json}\n\n" +
             "Write 5 crystal-ball predictions (each names one recruit and the school he's leaning to, from the facts) and 3 transfer portal or recruiting rumors.\n" +
             "Reply with JSON only: {\"predictions\": [5 strings], \"rumors\": [3 strings]}"
-        val raw = Ollama.generate(config, prompt, WeeklyDispatch.SYSTEM_CRYSTAL, temperature = 0.8, numPredict = 420, dialogue = true).getOrNull() ?: return null
+        val raw = Ollama.generate(config, prompt, WeeklyDispatch.SYSTEM_CRYSTAL, temperature = 0.8, numPredict = 420, desk = OnDeviceAi.Desk.NOTIFICATIONS).getOrNull() ?: return null
         val (p, r) = WeeklyDispatch.parse(raw, "predictions", "rumors", brief) ?: return null
         if (p.size < 3) return null
         return CrystalBall(brief.season, brief.index, p.take(5), r.take(3), ai = true, writer = Ollama.writerName(config, true))

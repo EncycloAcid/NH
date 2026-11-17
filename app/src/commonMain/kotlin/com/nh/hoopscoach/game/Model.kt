@@ -872,8 +872,10 @@ class OllamaConfig(
     var mistralAccountEmail: String = "",
     /** Dialogue (press conferences, interviews, speeches, posts, letters) on Gemini Nano when it's ready, whatever the provider. */
     var nanoForDialogue: Boolean = false,
-    /** Gemini Nano: the faster, smaller model where the phone has both. */
+    /** Gemini Nano: the faster, smaller model for anything not in [nanoSizes]' table (articles and the rest). */
     var nanoFast: Boolean = false,
+    /** Gemini Nano's model for each desk ([OnDeviceAi.Desk] name to "fast" or "full"); missing ones use the desk's default. */
+    var nanoSizes: MutableMap<String, String> = mutableMapOf(),
     /**
      * One AI call a week (the Hoops Dispatch) instead of a story desk every night. Always on for Gemini Nano,
      * whose daily allowance is small.

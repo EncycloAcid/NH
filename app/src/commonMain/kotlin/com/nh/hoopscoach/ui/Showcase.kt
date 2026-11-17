@@ -245,7 +245,9 @@ private fun CardFront(lg: League, p: Player, width: Dp, tilt: Float) {
     val shine by rememberInfiniteTransition(label = "foil").animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Restart), label = "f")
     // Everything is sized off the card's width, so a small card is the big one shrunk, not a cramped copy.
     val k = width.value / 240f
-    fun sz(x: Float) = (x * k).sp
+    // In card units, whatever the phone's font size: the card's a fixed-size picture, like a printed one.
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    fun sz(x: Float) = (x * k / fontScale).sp
     val plateH = width * 0.3f
     val ink = onColor(primary)
     // The nameplate's spot color: the school's second color if it reads on the first, else the rarity's.
@@ -358,7 +360,9 @@ private fun CardBack(lg: League, p: Player, width: Dp) {
     val rar = rarityOf(shown(p.ovr))
     val primary = t?.let { Color(it.primary) } ?: Color(0xFF3A3F47)
     val k = width.value / 240f
-    fun sz(x: Float) = (x * k).sp
+    // In card units, whatever the phone's font size: the card's a fixed-size picture, like a printed one.
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    fun sz(x: Float) = (x * k / fontScale).sp
     val ink = Color.White
     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp * k)).rarityEdge(rar).padding(5.dp * k)) {
         Column(
@@ -380,9 +384,9 @@ private fun CardBack(lg: League, p: Player, width: Dp) {
             Row(Modifier.fillMaxWidth()) {
                 listOf("HT" to Ratings.heightLabel(p.height), "WT" to "${p.weight}", (if (lg.pro) "AGE" else "CLASS") to (if (lg.pro) "${p.age}" else p.cls),
                     "FROM" to p.hometown.substringBefore(",").ifEmpty { "—" }).forEach { (l, v) ->
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(if (l == "FROM") 1.5f else 1f)) {
                         Text(l, style = T.label.copy(fontSize = sz(7f)), color = ink.copy(alpha = 0.55f))
-                        Text(v, style = T.bodyB.copy(fontSize = sz(10.5f), lineHeight = sz(11f)), color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        FitText(v, T.bodyB.copy(fontSize = sz(10.5f), lineHeight = sz(11f)), ink, minScale = 0.7f)
                     }
                 }
             }

@@ -16,6 +16,8 @@ data class AiFactSheet(
     val upcoming: Boolean = false,
     val entityAliases: Map<String, String> = emptyMap(),
     val acronyms: Set<String> = emptySet(),
+    /** Real capitalized phrases that aren't people: mascots, conferences, honors (see [AiGrounding.validate]). */
+    val phrases: Set<String> = emptySet(),
 )
 
 object AiFacts {
@@ -159,7 +161,9 @@ object AiFacts {
         }
         val properNames = leagueTeams.flatMap { listOf(it.name, it.school) } + population.map { it.name } + coaches.map { it.name }
         val acronyms = leagueTeams.map { it.abbr }.filter { abbreviation -> properNames.none { it.equals(abbreviation, true) } }.toSet()
-        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms)
+        // Mascots ("Tar Heels"), conferences ("Big Ten") and honors are real, capitalized and not people.
+        val phrases = (leagueTeams.map { it.mascot } + lg.confs.flatMap { listOf(it.name, it.abbr) }).filter { it.length > 2 }.toSet()
+        return AiFactSheet(text, names, allNames, records, lg.phase, preseason, preview, upcoming, shortNames, acronyms, phrases)
     }
 
     fun version(lg: League): String {
@@ -183,6 +187,38 @@ object AiFacts {
 }
 
 object AiGrounding {
+    /** Honors and basketball phrases a writer capitalizes that aren't names. */
+    private val HONORS = setOf(
+        "All-American", "All-America", "All-Conference", "All-Defensive", "All-Rookie", "All-Star", "All-Tournament", "All-Freshman",
+        "Player of the Year", "Coach of the Year", "Rookie of the Year", "Freshman of the Year", "Sixth Man", "Defensive Player",
+        "Selection Sunday", "Senior Night", "Senior Day", "Midnight Madness", "Big Dance", "Draft Night", "Media Day", "Game Day",
+        "Hall of Fame", "Mr. Basketball", "Tobacco Road", "Big Man", "Point God",
+    )
+
+    /** Ordinary words that start a sentence of dialogue ("Tonight is...", "Everybody has..."). */
+    private val STARTERS = setOf(
+        "Everybody", "Everything", "Everyone", "Somebody", "Someone", "Anybody", "Anyone", "Nothing", "Today", "Tonight", "Tomorrow", "Yesterday",
+        "Winning", "Losing", "Effort", "Energy", "Confidence", "Toughness", "Execution", "Rebounding", "Shooting", "Passing", "Practice",
+        "Chemistry", "Teamwork", "Leadership", "Pressure", "Momentum", "Experience", "Focus", "Respect", "Family", "Life", "Credit",
+        "Trust", "Belief", "Talent", "Health", "Recruiting", "Coaching", "Defending", "Scoring", "Each", "Every", "One",
+        "Here", "Where", "When", "Why", "How", "Which", "Mine", "Ours", "Yours", "His", "Hers", "Theirs", "Ball", "Game", "Season",
+        "Team", "Character", "Culture", "Discipline", "Attitude", "Preparation", "Hard", "Nobody's", "Consistency", "Patience",
+    )
+
+    /** A fact-check failure in plain words, for the "game-written" note on a story. */
+    fun plain(reason: String): String = when {
+        reason.contains("unknown proper name") || reason.contains("unknown named subject") ->
+            "the AI's draft named someone who isn't in this league" + (Regex(": ([^,)]+)").find(reason)?.groupValues?.get(1)?.let { " ($it)" } ?: "")
+        reason.contains("entity outside fact sheet") -> "the AI's draft brought in a team or player who isn't part of this story"
+        reason.contains("unsupported number") || reason.contains("statistic belongs") -> "the AI's draft got a number wrong"
+        reason.contains("record or score") || reason.contains("record belongs") -> "the AI's draft got a score or record wrong"
+        reason.contains("wrong season phase") || reason.contains("result claimed") -> "the AI's draft got the timing wrong (a result that hasn't happened)"
+        reason.contains("unsupported event detail") -> "the AI's draft made up a play or detail"
+        reason.contains("missing") || reason.contains("malformed") -> "the AI's draft didn't follow the format"
+        reason.contains("empty response") -> "the AI sent back nothing"
+        else -> reason
+    }
+
     private fun entityLabel(name: String) = com.nh.hoopscoach.CrashReporter.redact(name)
         .replace(Regex("[\\p{Cntrl}\\p{Cf}]"), " ").replace(Regex("\\s+"), " ").trim().take(80)
     val instructions = """Use ONLY the fact sheet for names, statistics, records, scores, injuries, history and events. Do not invent play sequences, quotes, reactions, medical advice, contract demands or transactions. Missing information is unknown: omit it. Distinguish previous-season statistics, current records and simulated forecasts. Never present forecasts as results or certainties. Use the stated phase, not a real-world calendar assumption. Use sentence case, full supplied player/team names, digits for numbers and exact supplied numeric formatting. Do not introduce other named people or teams (including player comparisons). Use Staff for a reporter and Courtside Report for an outlet. Keep the requested output fields. Fictional player/coach dialogue may express opinions or intentions, but must not invent factual events. Never mention simulations, assumptions or rosters in the copy; describe players, projections and games directly."""
@@ -272,6 +308,8 @@ object AiGrounding {
         val known = facts.names.sortedByDescending { it.length }
         var residue = content
         known.forEach { name -> residue = residue.replace(Regex("(?i)(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])"), "entity") }
+        // Honors first: "All-American" isn't American University.
+        HONORS.sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
         facts.allNames.filter { it !in facts.names && it.length > 3 && residue.contains(it, ignoreCase = it !in facts.acronyms) }.forEach { name ->
             val caseFlag = if (name in facts.acronyms) "" else "(?i)"
             if (Regex("$caseFlag(?<![\\p{L}\\d])${Regex.escape(name)}(?![\\p{L}\\d])").containsMatchIn(residue)) errors += "entity outside fact sheet: ${entityLabel(name)}"
@@ -282,14 +320,25 @@ object AiGrounding {
             "First Team", "Second Team", "Third Team", "Staff", "Hot Seat", "Baseline Sports", "Hoops Wire",
             "First Round", "Conference Semifinals", "Conference Finals", "Finals", "Play-In", "NBA Cup",
         )
-        common.sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
+        (common + facts.phrases + HONORS).sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
         val prose = residue.lines().filterNot { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
         val headers = residue.lines().filter { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
         val firstNames = facts.allNames.map { it.substringBefore(' ') }.toSet()
         val properName = Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b")
         (properName.findAll(prose) + properName.findAll(headers).filter { it.value.substringBefore(' ') in firstNames }).take(3).forEach { errors += "unknown proper name: ${entityLabel(it.value)}" }
-        val subjects = setOf("He", "She", "It", "This", "That", "There", "They", "We", "What", "Who", "Basketball", "March", "April", "Defense", "Offense", "Depth", "Availability", "Continuity", "Nothing", "Everyone", "Nobody", "Something")
-        Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).filter { it.groupValues[1] !in subjects }.take(3).forEach { errors += "unknown named subject: ${entityLabel(it.groupValues[1])}" }
+        val subjects = setOf("He", "She", "It", "This", "That", "There", "They", "We", "What", "Who", "Basketball", "March", "April", "Defense", "Offense", "Depth", "Availability", "Continuity", "Nothing", "Everyone", "Nobody", "Something") + STARTERS
+        // A capitalized word before "is/has/won" mid-sentence is a name. At the start of a sentence it's usually
+        // just a word ("Tonight is...", "Effort has..."), so there it counts only when the clause states a fact
+        // with a number ("Atlantis is 7-3").
+        Regex("\\b([A-Z][a-z]+)\\s+(?:is|are|has|went|won|lost)\\b").findAll(prose).filter { m ->
+            val word = m.groupValues[1]
+            if (word in subjects) return@filter false
+            val before = prose.substring(0, m.range.first).trimEnd()
+            val sentenceStart = before.isEmpty() || before.last() in ".!?:\"“”\n-—(" || before.endsWith("topic")
+            if (!sentenceStart) return@filter true
+            val clause = prose.substring(m.range.first).split(Regex("[.!?\\n]")).first()
+            clause.any { it.isDigit() }
+        }.take(3).forEach { errors += "unknown named subject: ${entityLabel(it.groupValues[1])}" }
         val lower = content.lowercase(Locale.US)
         if ((facts.preseason || facts.preview || facts.upcoming) && Regex("\\b(tonight's win|tonight's loss|won tonight|lost tonight|just defeated|clinched|eliminated|advanced to|celebrated the win)\\b").containsMatchIn(lower)) errors += "result claimed before event"
         if (facts.phase == Phase.OFFSEASON && Regex("\\b(tonight's game|tonight's win|tonight's loss|tomorrow's game)\\b").containsMatchIn(lower)) errors += "wrong season phase"

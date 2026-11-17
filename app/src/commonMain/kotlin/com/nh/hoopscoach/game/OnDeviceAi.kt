@@ -31,6 +31,22 @@ object OnDeviceAi {
         suspend fun generate(prompt: String, system: String, temperature: Double, maxTokens: Int, fast: Boolean, onToken: ((String) -> Unit)?): String
     }
 
+    /**
+     * What Gemini Nano writes, and which of the phone's two models suits it: the fast one (E2B) for short,
+     * quick lines, the full one (E4B) where the writing needs more.
+     */
+    enum class Desk(val label: String, val blurb: String, val fullByDefault: Boolean) {
+        REACTIONS("Quick player reactions", "Postgame player quotes and social posts", false),
+        NOTIFICATIONS("Short notifications", "The weekly Dispatch and recruiting crystal ball", false),
+        PERSONALITIES("Player personalities", "On-court personalities and scout notes", true),
+        COACH("Coach interviews", "Press conferences, halftime and award speeches", true),
+        RECRUITING("Recruiting conversations", "Recruiting pitch letters", true),
+    }
+
+    /** Whether [desk] uses the fast model (anything else: the "everything else" setting). */
+    fun fast(config: OllamaConfig, desk: Desk?): Boolean =
+        if (desk == null) config.nanoFast else config.nanoSizes[desk.name]?.let { it == "fast" } ?: !desk.fullByDefault
+
     const val NAME = "Gemini Nano"
     const val NOT_HERE = "Gemini Nano runs on Android phones with AICore (Pixel 9 and newer), not on this device."
 

@@ -226,6 +226,10 @@ jobs:
           name: Hoops Dynasty ${{ steps.ver.outputs.name }} (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           body: |
+            ### What's in this build
+            ${{ github.event.head_commit.message }}
+
+            ### Install
             **Android:** download `HoopsDynasty-${{ steps.ver.outputs.name }}.apk` on your phone, open it, and allow installs from your browser if asked.
             **Windows:** download `HoopsDynasty-windows-${{ steps.ver.outputs.name }}.exe` and run the installer (Java is bundled).
             **Linux / other PC:** download `HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` and run with Java 17+: `java -jar HoopsDynasty-pc-${{ steps.ver.outputs.name }}.jar` (a `.deb` may also be attached).

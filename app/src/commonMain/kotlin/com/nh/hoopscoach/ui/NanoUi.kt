@@ -92,15 +92,8 @@ fun NanoProviderPanel(
             Text(OnDeviceAi.NOT_HERE + " On the PC, pick Local (Ollama) or a cloud provider.", style = T.small, color = P.warn)
         } else {
             NanoStatus(scope) { ready = OnDeviceAi.ready; vm.redraw() }
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Faster replies", style = T.bodyB, color = P.ink)
-                    Text("Use the smaller, quicker model where the phone has one. Off: the full model, better writing.", style = T.small, color = P.sub)
-                }
-                Spacer(Modifier.width(8.dp))
-                AppSwitch(lg.ollama.nanoFast, { on -> vm.act { it.ollama.nanoFast = on } })
-            }
+            Spacer(Modifier.height(14.dp))
+            NanoModelTable(vm, lg, everythingElse = true)
             if (ready) {
                 Spacer(Modifier.height(12.dp))
                 SecondaryButton(if (testing) "Writing…" else "Test Gemini Nano", Modifier.fillMaxWidth(), enabled = !testing) {
@@ -149,6 +142,37 @@ fun NanoDialogueRow(vm: GameViewModel, lg: League, scope: CoroutineScope) {
             Spacer(Modifier.height(10.dp))
             NanoStatus(scope) { vm.redraw() }
             if (!OnDeviceAi.ready) Text("Until it's ready, dialogue stays with ${lg.ollama.providerDisplayName}.", style = T.small, color = P.faint, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(12.dp))
+            NanoModelTable(vm, lg, everythingElse = false)
         }
     }
+}
+
+/**
+ * Which of the phone's two Gemini Nano models writes each kind of copy: the fast one (E2B) for quick, short
+ * lines, the full one (E4B) for the writing that needs more. Tap to switch a row.
+ */
+@Composable
+fun NanoModelTable(vm: GameViewModel, lg: League, everythingElse: Boolean) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    Text("MODEL BY FEATURE", style = T.label.copy(fontSize = 10.sp), color = P.sub)
+    Text("Fast (E2B) answers quickest; Full (E4B) writes better. AICore runs whichever of the two this phone has.",
+        style = T.small, color = P.faint, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp))
+    @Composable
+    fun row(label: String, blurb: String, fast: Boolean, set: (Boolean) -> Unit) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(label, style = T.bodyB.copy(fontSize = 14.sp), color = P.ink)
+                Text(blurb, style = T.small, color = P.sub)
+            }
+            Spacer(Modifier.width(8.dp))
+            SmallButton("Fast · E2B", primary = fast) { if (!fast) set(true) }
+            Spacer(Modifier.width(6.dp))
+            SmallButton("Full · E4B", primary = !fast) { if (fast) set(false) }
+        }
+    }
+    OnDeviceAi.Desk.entries.forEach { d ->
+        row(d.label, d.blurb, OnDeviceAi.fast(lg.ollama, d)) { f -> vm.act { it.ollama.nanoSizes[d.name] = if (f) "fast" else "full" } }
+    }
+    if (everythingElse) row("Everything else", "Articles, recaps and the rest", lg.ollama.nanoFast) { f -> vm.act { it.ollama.nanoFast = f } }
 }
