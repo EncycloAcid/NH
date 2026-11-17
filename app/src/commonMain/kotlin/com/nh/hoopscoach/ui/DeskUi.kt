@@ -259,6 +259,11 @@ fun PlayerInbox(vm: GameViewModel, lg: League, press: Boolean = true) {
     if (PC.goalDue(lg)) entries += "Your goal this season" to { GoalCard(vm, lg) }
     if (com.nh.hoopscoach.game.Shoes.designPending(lg) != null) entries += "Design your shoe" to { ShoeDesignCard(vm, lg) }
     com.nh.hoopscoach.game.OffCourt.life(lg)?.let { l -> entries += "Off the court: ${l.title.lowercase()}" to { LifeCard(vm, lg) } }
+    // Legacy: his father on the phone (a scouting report before a big game goes first).
+    com.nh.hoopscoach.game.Family.call(lg)?.let { c ->
+        val e: Pair<String, @Composable () -> Unit> = c.title to { DadCallCard(vm, lg) }
+        if (c.kind == "prep") entries.add(0, e) else entries += e
+    }
     for (s in com.nh.hoopscoach.game.Storylines.pending(lg)) entries += com.nh.hoopscoach.game.Storylines.title(s) to { StoryBeatCard(vm, lg, s) }
     if (!PC.goalDue(lg)) GoalCard(vm, lg)
     InboxStack(entries)

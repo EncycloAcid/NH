@@ -34,6 +34,8 @@ class Ancestor(
     val era: String = "TODAY",
     /** His badges when he retired ([Badge] name to tier): his son starts with a head start on them. */
     val badges: Map<String, Int> = emptyMap(),
+    /** His rival's name: the feud passes down to the sons. */
+    val rival: String = "",
 ) {
     val name get() = "$first $last"
 }
@@ -74,6 +76,7 @@ object LegacyMode {
             seasons = seasons, school = school, age = h.age,
             era = lg.proState?.era ?: lg.era,
             badges = runCatching { Badges.of(lg, h).associate { it.first.name to it.second } }.getOrDefault(emptyMap()),
+            rival = Rival.player(lg)?.name ?: lg.road?.rivalName.orEmpty(),
         )
     }
 
@@ -399,7 +402,7 @@ object LegacyMode {
     }
 
     /** His college (or pro) points a game so far, with this season. */
-    private fun careerPpg(lg: League, h: Player, pro: Boolean): Pair<Double, Int> {
+    fun careerPpg(lg: League, h: Player, pro: Boolean): Pair<Double, Int> {
         val lines = h.career.filter { (it.cls == PRO_YEAR) == pro && it.s.gp > 0 }.map { it.s }.toMutableList()
         if (lg.pro == pro && h.stats.gp > 0 && h.career.none { it.season == lg.season && (it.cls == PRO_YEAR) == pro }) lines += h.stats
         val gp = lines.sumOf { it.gp }
@@ -483,8 +486,11 @@ object LegacyMode {
         val a = father(lg) ?: return false
         val h = lg.hero ?: return false
         if (!g.involves(h.teamId)) return false
+        // When they're barely speaking, he skips the regular-season trips.
+        if (Family.skipsTrip(lg, g)) return false
         if (lg.rivalry(g) != null || g.type == GameType.NCAA || g.type == GameType.PLAYOFF || g.type == GameType.CONF_TOURNEY) return true
-        if (!lg.pro && (lg.teams.getOrNull(g.home)?.school == a.school || lg.teams.getOrNull(g.away)?.school == a.school)) return true
+        // Against his old school (when his son went somewhere else).
+        if (!lg.pro && Family.againstDadsSchool(lg, g, a)) return true
         return h.stats.gp == 0 && (if (lg.pro) h.career.none { it.cls == PRO_YEAR } else h.career.isEmpty())
     }
 
@@ -492,8 +498,11 @@ object LegacyMode {
     fun heroEdge(lg: League, g: Game): Double {
         val a = father(lg) ?: return 0.0
         val h = lg.hero ?: return 0.0
-        var e = if (dadInStands(lg, g)) 0.012 + 0.003 * tier(lg) else 0.0
+        // Seeing him there lifts the son more when they're close, less when they're not.
+        var e = if (dadInStands(lg, g)) (0.012 + 0.003 * tier(lg)) * Family.bondFactor(lg) else 0.0
         if (!lg.pro && !g.neutral && h.teamId == g.home && lg.teams.getOrNull(g.home)?.school == a.school) e += 0.008
+        // The film session they did together for this one.
+        e += Family.prepEdge(lg, g)
         return e
     }
 
@@ -503,6 +512,7 @@ object LegacyMode {
     fun afterGame(lg: League, g: Game, line: GameLogEntry) {
         val a = father(lg) ?: return
         val h = lg.hero ?: return
+        Family.afterGame(lg, g)
         if (line.pts < 25 || !dadInStands(lg, g)) return
         lg.news += News(lg.season, lg.day, "With ${a.name} watching, ${h.name} scores ${line.pts}", true, kind = "legacy", gameId = g.id, pid = h.id, teamId = h.teamId, source = "Hoops Wire")
     }

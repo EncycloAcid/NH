@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -230,7 +231,9 @@ fun LegacyCard(vm: GameViewModel, lg: League) {
     val tier = LegacyMode.tier(lg)
     val marks = LegacyMode.marks(lg)
     val family = dad.last.substringBefore(" Jr.").substringBefore(" II").substringBefore(" IV").trim()
-    Section("The $family legacy")
+    val r = lg.road
+    val F = com.nh.hoopscoach.game.Family
+    Section("The $family legacy", action = "You vs Dad", onAction = { vm.push(Route.FamilyCompare) })
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AncestorPortrait(lg, dad, 52.dp)
@@ -239,6 +242,44 @@ fun LegacyCard(vm: GameViewModel, lg: League) {
                 Text("GENERATION ${lg.lineage.size + 1} · ${LegacyMode.TIER_NAMES[tier].uppercase()}", style = T.label.copy(fontSize = 10.sp), color = P.gold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(dad.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(LegacyMode.resume(dad).replaceFirstChar { it.uppercase() } + ".", style = T.small, color = P.sub, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        // The two of them: how close they are, and what that does.
+        if (r != null) {
+            Spacer(Modifier.height(10.dp))
+            Hairline()
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("YOU AND YOUR FATHER", style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.weight(1f))
+                Text(F.bondLabel(r.dadBond).uppercase(), style = T.label.copy(fontSize = 10.sp), color = bondColor(r.dadBond))
+            }
+            Bar(r.dadBond / 100f, Modifier.fillMaxWidth().padding(top = 5.dp), color = bondColor(r.dadBond), height = 5.dp)
+            Text(when {
+                r.dadBond >= 80 -> "Close. Seeing him in the stands lifts you more than anyone."
+                r.dadBond >= 55 -> "Good. He's at the big games, and it helps."
+                r.dadBond >= 25 -> "Distant. He still comes to the big ones, but it doesn't lift you like it used to."
+                else -> "Strained. He's skipping the regular-season trips. Pick up when he calls."
+            }, style = T.small, color = P.sub, modifier = Modifier.padding(top = 4.dp))
+            val next = F.nextGame(lg)
+            if (next != null && r.dadPrep == next.id) Text("Film session with your father done: a lift on your shots next game.", style = T.small, color = P.good, modifier = Modifier.padding(top = 4.dp))
+            if (r.feudWith.isNotEmpty()) com.nh.hoopscoach.game.Rival.player(lg)?.let { rv ->
+                Text("The feud: ${rv.name}, son of your father's rival ${r.feudWith}" + (lg.teams.getOrNull(rv.teamId)?.let { ", plays for ${if (lg.pro) it.name else it.school}." } ?: "."),
+                    style = T.small, color = P.bad, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        // Once a season, before the first games: a workout on one of his best skills.
+        if (F.workoutOpen(lg)) {
+            Spacer(Modifier.height(10.dp))
+            Hairline()
+            Text("PRESEASON WORKOUT WITH DAD", style = T.label.copy(fontSize = 10.sp), color = P.accent, modifier = Modifier.padding(top = 8.dp))
+            Text("He'll work with you on one of the things he did best. Pick one: +${F.workoutGain(lg)}, more the closer you are.", style = T.small, color = P.sub)
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                dad.strengths.mapNotNull { Attr.entries.getOrNull(it) }.forEach { a ->
+                    SmallButton("${a.label} +${F.workoutGain(lg)}", Modifier.weight(1f)) {
+                        var msg = ""
+                        vm.act { msg = F.workout(it, a.ordinal) }
+                        if (msg.isNotEmpty()) vm.toast(msg)
+                    }
+                }
             }
         }
         // This season against his father's at the same point.
@@ -303,5 +344,171 @@ fun LegacyCard(vm: GameViewModel, lg: League) {
         }
         val log = lg.road?.legacyLog.orEmpty()
         if (log.isNotEmpty()) Text(log.takeLast(2).joinToString("\n"), style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+
+@Composable
+private fun bondColor(b: Int): Color = when { b >= 80 -> P.good; b >= 55 -> P.accent; b >= 35 -> P.warn; else -> P.bad }
+
+/** His father calls: what he says, and how you answer (the bond, and maybe a film session for the next game). */
+@Composable
+fun DadCallCard(vm: GameViewModel, lg: League) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val F = com.nh.hoopscoach.game.Family
+    val c = F.call(lg) ?: return
+    val dad = F.father(lg) ?: return
+    Section("Family", action = "Let it ring", onAction = { vm.act { F.skip(it, c) } })
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AncestorPortrait(lg, dad, 40.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(c.title.uppercase(), style = T.label, color = P.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(dad.name + " · " + F.bondLabel(lg.road?.dadBond ?: 60).lowercase(), style = T.small, color = P.sub)
+            }
+        }
+        Text(c.text, style = T.body, color = P.ink, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        c.answers.forEachIndexed { i, a ->
+            ListRow(onClick = {
+                var reaction = ""
+                vm.act { reaction = F.answer(it, c, i) }
+                if (reaction.isNotEmpty()) vm.toast(reaction)
+            }) {
+                Column(Modifier.weight(1f)) {
+                    Text(a.text, style = T.body, color = P.ink)
+                    val hints = listOfNotNull(
+                        if (a.bond >= 3) "closer" else if (a.bond < 0) "he notices" else null,
+                        if (a.prep) "film session: a lift next game" else null,
+                        if (a.mood >= 2) "feels good" else if (a.mood < 0) "mood ↓" else null,
+                        if (a.fatigue >= 2) "a late night" else null,
+                    )
+                    if (hints.isNotEmpty()) Text(hints.joinToString(" · "), style = T.small.copy(fontSize = 11.sp), color = P.faint)
+                }
+            }
+        }
+    }
+}
+
+/** You against your father: college year by year, the pros, the honors, his marks, and the two of you. */
+@Composable
+fun FamilyCompareScreen(vm: GameViewModel, lg: League) {
+    val dad = LegacyMode.father(lg) ?: run { vm.back(); return }
+    val h = lg.hero ?: run { vm.back(); return }
+    val r = lg.road
+    val p = dad.played
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            BackBar("You vs Dad", "${h.name} · ${dad.name}", onBack = { vm.back() })
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        PlayerJersey(h, lg.teams.getOrNull(h.teamId), 64.dp)
+                        Text(h.name, style = T.bodyB, color = P.ink, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                        Text("YOU", style = T.label.copy(fontSize = 10.sp), color = P.accent)
+                    }
+                    Text("VS", style = T.head, color = P.faint)
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AncestorPortrait(lg, dad, 64.dp)
+                        Text(dad.name, style = T.bodyB, color = P.ink, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                        Text("DAD", style = T.label.copy(fontSize = 10.sp), color = P.faint)
+                    }
+                }
+            }
+        }
+        // College, class by class: points, rebounds, assists.
+        item {
+            Section("College, year by year")
+            Panel {
+                CompareHead("Pts · reb · ast")
+                val classes = (dad.seasons.map { it.cls } + h.career.filter { it.cls != PRO_YEAR && it.s.gp > 0 }.map { it.cls } + (if (!lg.pro && h.stats.gp > 0) listOf(h.year) else emptyList()))
+                    .filter { it in 1..5 }.distinct().sorted()
+                if (classes.isEmpty()) Text("No college seasons yet.", style = T.small, color = P.sub)
+                classes.forEach { c ->
+                    val d = dad.seasons.lastOrNull { it.cls == c }
+                    val mine = h.career.lastOrNull { it.cls == c && it.cls != PRO_YEAR && it.s.gp > 0 }?.s
+                        ?: h.stats.takeIf { !lg.pro && h.year == c && it.gp > 0 }
+                    CompareRow(clsName(c),
+                        mine?.let { "%.1f · %.1f · %.1f".format(it.ppg, it.rpg, it.apg) } ?: "—",
+                        d?.let { "%.1f · %.1f · %.1f".format(it.ppg, it.rpg, it.apg) } ?: "—",
+                        (mine?.ppg ?: -1.0) - (d?.ppg ?: 99.0))
+                }
+            }
+        }
+        // The pros.
+        item {
+            Section("The pros")
+            Panel {
+                CompareHead("")
+                val myPro = h.career.count { it.cls == PRO_YEAR && it.s.gp > 0 } + if (lg.pro && h.stats.gp > 0 && h.career.none { it.season == lg.season && it.cls == PRO_YEAR }) 1 else 0
+                val (myPpg, myGp) = LegacyMode.careerPpg(lg, h, pro = true)
+                val dadPick = LegacyMode.pick(dad)
+                val pickMine = r?.draftPick?.takeIf { it > 0 }
+                CompareRow("Draft", pickMine?.let { "No. $it" } ?: if (r?.undrafted == true) "Undrafted" else "—", dadPick?.let { "No. $it" } ?: "Undrafted",
+                    if (pickMine != null) ((dadPick ?: 99) - pickMine).toDouble() else -1.0)
+                CompareRow("NBA seasons", "$myPro", "${p.proSeasons}", (myPro - p.proSeasons).toDouble())
+                CompareRow("Points a game", if (myGp > 0) "%.1f".format(myPpg) else "—", LegacyMode.proPpg(dad).takeIf { it > 0 }?.let { "%.1f".format(it) } ?: "—",
+                    if (myGp > 0) myPpg - LegacyMode.proPpg(dad) else -1.0)
+                CompareRow("All-Star", "${r?.allStars ?: 0}", "${p.allStars}", ((r?.allStars ?: 0) - p.allStars).toDouble())
+                CompareRow("Rings", "${r?.rings ?: 0}", "${p.rings}", ((r?.rings ?: 0) - p.rings).toDouble())
+                CompareRow("MVP", "${r?.mvps ?: 0}", "${p.mvps}", ((r?.mvps ?: 0) - p.mvps).toDouble())
+            }
+        }
+        if (p.collegeHonors.isNotEmpty()) item {
+            Section("His college honors")
+            Panel { p.collegeHonors.forEach { Text("• $it", style = T.small, color = P.sub) } }
+        }
+        val marks = LegacyMode.marks(lg)
+        if (marks.isNotEmpty()) item {
+            Section("Chasing Dad · ${marks.count { it.done }} of ${marks.size}")
+            Panel {
+                marks.forEach { m ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(18.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (m.done) P.good else P.surface2), contentAlignment = Alignment.Center) {
+                            if (m.done) androidx.compose.material3.Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(m.goal, style = T.small, color = if (m.done) P.ink else P.sub, modifier = Modifier.weight(1f))
+                        Text(m.dad, style = T.small.copy(fontSize = 11.sp), color = P.faint, maxLines = 1)
+                    }
+                }
+            }
+        }
+        if (r != null) item {
+            Section("The two of you")
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(com.nh.hoopscoach.game.Family.bondLabel(r.dadBond), style = T.head, color = bondColor(r.dadBond), modifier = Modifier.weight(1f))
+                    Text("${r.dadBond}/100", style = T.numSm, color = P.sub)
+                }
+                Bar(r.dadBond / 100f, Modifier.fillMaxWidth().padding(top = 6.dp), color = bondColor(r.dadBond), height = 5.dp)
+                Text("Answer when he calls, take his film sessions and work out with him in the preseason, and you get closer. The closer you are, the more it lifts you to see him in the stands.",
+                    style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
+                if (r.legacyLog.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    r.legacyLog.asReversed().take(12).forEach { Text(it, style = T.small.copy(fontSize = 12.sp), color = P.faint) }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun CompareHead(what: String) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Text(what.uppercase(), style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.weight(1f))
+        Text("YOU", style = T.label.copy(fontSize = 9.sp), color = P.accent, modifier = Modifier.width(110.dp), textAlign = TextAlign.End)
+        Text("DAD", style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.width(110.dp), textAlign = TextAlign.End)
+    }
+}
+
+/** A line of the comparison; [lead] above zero means you're ahead of him there. */
+@Composable
+private fun CompareRow(label: String, mine: String, dad: String, lead: Double) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = T.body, color = P.ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(mine, style = T.bodyB.copy(fontSize = 14.sp), color = if (lead > 0 && mine != "—") P.good else P.ink, modifier = Modifier.width(110.dp), textAlign = TextAlign.End, maxLines = 1)
+        Text(dad, style = T.body.copy(fontSize = 14.sp), color = P.sub, modifier = Modifier.width(110.dp), textAlign = TextAlign.End, maxLines = 1)
     }
 }

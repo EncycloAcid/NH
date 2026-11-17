@@ -1237,6 +1237,13 @@ class RoadState(
     /** Legacy mode: the father's marks he's passed ([LegacyMode.marks]) and each season against his father. */
     val legacyMarks: MutableList<String> = mutableListOf(),
     val legacyLog: MutableList<String> = mutableListOf(),
+    /** Legacy mode, the father as a person ([Family]): their bond, the last call answered, a film session for a game, the season's workout. */
+    var dadBond: Int = 60,
+    var dadCall: Int = Int.MIN_VALUE,
+    var dadPrep: Int = -1,
+    var dadSummer: Int = 0,
+    /** The family feud: his rival is the son of his father's rival (that father's name). */
+    var feudWith: String = "",
     /** The long way, undrafted ([LongWay]): the offers, the season away, the NBA's calls, and the team he signs with. */
     var longWay: Boolean = false,
     val wayOffers: MutableList<AbroadOffer> = mutableListOf(),

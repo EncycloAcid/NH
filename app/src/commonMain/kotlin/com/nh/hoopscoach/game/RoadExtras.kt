@@ -20,6 +20,10 @@ object Rival {
         val p = LeagueGen.makePlayer(lg, h.pos, h.year.coerceIn(1, 4), target, t.id)
         if (p.country != null) { p.country = null; p.first = Rng.pick(Names.first); p.last = Rng.pick(Names.last); p.hometown = Rng.pick(Names.towns) }
         if (p.last == h.last) p.last = Rng.pick(Names.last.filter { it != h.last })
+        // Legacy: the son of his father's rival. The feud goes on.
+        val dadRival = LegacyMode.father(lg)?.rival.orEmpty()
+        val feudLast = dadRival.substringAfter(' ', "").trim()
+        if (feudLast.isNotEmpty() && feudLast != h.last) { p.last = feudLast; r.feudWith = dadRival }
         p.pot = Rng.range(94, 97).coerceAtLeast(p.ovr + 8).coerceAtMost(99)
         p.stars = 5
         p.recruitRank = if (h.stars == 5) Rng.range(1, (h.recruitRank - 1).coerceIn(1, 3)) else Rng.range(1, 5)
@@ -36,6 +40,11 @@ object Rival {
         Tactics.autoAllocate(lg, t)
         r.rivalId = p.id
         r.rivalName = p.name
+        if (r.feudWith.isNotEmpty()) LegacyMode.father(lg)?.let { dad ->
+            lg.news += News(lg.season, 0, "The feud goes on: ${p.name}, son of ${r.feudWith}, signs with ${t.school}", true, kind = "legacy", pid = p.id, teamId = t.id,
+                source = "Hoops Wire", body = "${dad.name} and ${r.feudWith} spent a whole career measured against each other. Now their sons are in the same class, " +
+                    "${h.name} at ${lg.team(h.teamId).school} and ${p.name} at ${t.school}. Nobody has to tell either of them who to beat.")
+        }
         lg.news += News(
             lg.season, 0,
             if (h.year <= 1) "${p.name}, the No. ${p.recruitRank} recruit in the class, signs with ${t.school}"

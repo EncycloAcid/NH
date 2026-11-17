@@ -85,6 +85,8 @@ sealed interface Route {
     data object PlayerCombine : Route
     /** Help: how to play and the glossary, opened searching [term] (blank for all). */
     data class Help(val term: String = "") : Route
+    /** Legacy: you against your father, side by side. */
+    data object FamilyCompare : Route
 }
 
 /** A game being watched possession by possession. */

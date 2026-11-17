@@ -125,6 +125,8 @@ object Help {
         HelpTerm("Pick'em", PLAYER, "Pick the winners of the week's three biggest games. Get them right for card packs.", listOf("pickem")),
         HelpTerm("Cards and the binder", PLAYER, "Win games to earn card packs, open them to collect players, and finish sets for more packs.", listOf("cards", "packs", "binder")),
         HelpTerm("Legacy", PLAYER, "Your career score from awards, titles and points. When you retire, your son can carry the name into his own career.", listOf("son", "family")),
+        HelpTerm("You and your father", PLAYER, "Playing as a son: your father calls after big nights, bad nights and before big games. Answer, take his film sessions and work out with him in the preseason and you get closer; the closer you are, the more it lifts you to see him in the stands. Strained, he skips the regular-season trips.", listOf("dad", "father", "bond", "film", "workout")),
+        HelpTerm("The family feud", PLAYER, "If your father had a rival, your rival is that rival's son.", listOf("feud", "rival")),
         HelpTerm("The long way", PLAYER, "Not drafted? Play in the G League or overseas and play your way into an NBA call-up.", listOf("g league", "overseas", "undrafted")),
     )
 
