@@ -233,7 +233,9 @@ object AllStarWeekend {
         val shooters = pool.map { it.first }.filter { it.stats.tpa >= it.stats.gp * 3 }
             .sortedByDescending { it[Attr.OUT] * 2.0 + it.stats.per(it.stats.tpm) * 4 }.take(8)
         if (shooters.size >= 3) {
-            val first = shooters.associateWith { threes(it) }
+            // His own round, if he shot it (All-Star Saturday, played).
+            val mine3 = AllStarSaturday.threeScore(lg)
+            val first = shooters.associateWith { if (it.id == hid && mine3 >= 0) mine3 else threes(it) }
             val finalists = first.entries.map { it.key to it.value + Rng.d() }.sortedByDescending { it.second }.take(3).map { it.first }
             val last = finalists.associateWith { threes(it) }
             val (champ, score) = last.entries.maxBy { it.value + Rng.d() }.let { it.key to it.value }
@@ -250,10 +252,14 @@ object AllStarWeekend {
         }
 
         // Slam Dunk Contest: four young finishers, two dunks each, then a final two.
-        val dunkers = pool.map { it.first }.filter { it.age <= 26 && it.pos != Pos.C }
+        var dunkers = pool.map { it.first }.filter { it.age <= 26 && it.pos != Pos.C }
             .map { it to it[Attr.INS] + Rng.gauss() * 4 }.sortedByDescending { it.second }.take(4).map { it.first }
+        // He was invited and took his dunks: he's in it, with the judges' scores he earned.
+        val mineDunk = AllStarSaturday.dunkScore(lg)
+        val heroP = pool.firstOrNull { it.first.id == hid }?.first
+        if (mineDunk >= 0 && heroP != null && dunkers.none { it.id == hid } && dunkers.size >= 4) dunkers = dunkers.dropLast(1) + heroP
         if (dunkers.size >= 2) {
-            val first = dunkers.associateWith { dunk(it) + dunk(it) }
+            val first = dunkers.associateWith { if (it.id == hid && mineDunk >= 0) mineDunk else dunk(it) + dunk(it) }
             val finalists = first.entries.map { it.key to it.value + Rng.d() }.sortedByDescending { it.second }.take(2).map { it.first }
             val last = finalists.associateWith { dunk(it) to dunk(it) }
             val champ = last.entries.maxBy { it.value.first + it.value.second + Rng.d() }

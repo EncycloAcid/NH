@@ -1244,6 +1244,18 @@ class RoadState(
     var dadSummer: Int = 0,
     /** The family feud: his rival is the son of his father's rival (that father's name). */
     var feudWith: String = "",
+    /** A pro and his coach ([CoachTrust]): trust (with the team it's for), the last talk, a role promised for a season, and the coach's ask. */
+    var coachTrust: Int = 50,
+    var trustTeam: Int = -1,
+    var coachTalk: Int = -99_999,
+    var rolePromise: Int = 0,
+    var coachAsk: String = "",
+    var coachAskLeft: Int = 0,
+    var coachAskHits: Int = 0,
+    /** All-Star Saturday, played ([AllStarSaturday]): the season, and his 3-Point Contest round (of 34) and two dunks (of 100). */
+    var contestSeason: Int = 0,
+    var threeScore: Int = -1,
+    var dunkScore: Int = -1,
     /** The long way, undrafted ([LongWay]): the offers, the season away, the NBA's calls, and the team he signs with. */
     var longWay: Boolean = false,
     val wayOffers: MutableList<AbroadOffer> = mutableListOf(),

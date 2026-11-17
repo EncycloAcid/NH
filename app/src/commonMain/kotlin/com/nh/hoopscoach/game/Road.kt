@@ -442,6 +442,7 @@ object Road {
         if (!g.involves(h.teamId)) return
         val line = h.log.lastOrNull()?.takeIf { it.gameId == g.id } ?: return
         practiceDay(lg, h, line.min)
+        runCatching { CoachTrust.afterGame(lg, g, line) }
         updateRace(lg)
         val t = lg.team(h.teamId)
         val opp = lg.team(g.opp(t.id))

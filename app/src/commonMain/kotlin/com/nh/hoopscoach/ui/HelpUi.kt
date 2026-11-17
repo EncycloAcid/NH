@@ -107,6 +107,8 @@ object Help {
         HelpTerm("NBA Cup", NBA, "The in-season tournament: group games in November, then knockout rounds and the final in Las Vegas.", listOf("cup")),
         HelpTerm("Draft lottery", NBA, "The teams that miss the playoffs; the worst records have the best odds at the top picks.", listOf("lottery")),
         HelpTerm("Trade deadline", NBA, "The last day of the regular season you can make trades.", listOf("deadline")),
+        HelpTerm("Coach's trust", PLAYER, "As a pro, how much your coach trusts you: it grows with good games and doing what he asks, and it's minutes. Talk to him every ten days on Me, Team: ask for a bigger role, ask what he needs (one thing over five games), or tell him you'll do whatever the team needs.", listOf("coach", "trust", "minutes", "role")),
+        HelpTerm("All-Star Saturday", PLAYER, "Invited to the 3-Point Contest or the Dunk Contest? Play your round from Today in the days before the break: it's your score when the weekend comes.", listOf("dunk contest", "3-point contest", "three-point contest", "all-star")),
         HelpTerm("Owner and job security", NBA, "The owner's verdict on you, out of 100. Beat the projected wins and win playoff series to raise it; fall too low and you're fired.", listOf("owner", "fired")),
 
         // Your player

@@ -159,6 +159,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
             }
         }
         item { HeroTodayCard(vm, lg) }
+        item { CoachTodayCard(vm, lg) }
+        item { AllStarInviteCard(vm, lg) }
         item { PlayerInbox(vm, lg, press = false) }
         item { HeroMedicalCard(vm, lg) }
         item { ShootaroundCard(vm, lg) }
@@ -1012,7 +1014,7 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
             Panel {
                 Text(Road.role(lg).uppercase(), style = T.label, color = P.accent)
                 Text(if (mins > 0) "${planMin(lg, t, h.id)} minutes a game in the plan" else "Out of the rotation", style = T.head, color = P.ink)
-                Text("Coach ${lg.coachOf(t).last} plays his best. Outplay the man ahead of you to start.", style = T.small, color = P.sub)
+                Text("Coach ${lg.coachOf(t).last} plays the players he trusts. Outplay the man ahead of you, and give him what he asks for.", style = T.small, color = P.sub)
                 if (h.stats.gp > 0) {
                     Spacer(Modifier.height(10.dp))
                     StatRow(listOf(
@@ -1021,6 +1023,8 @@ fun ProHeroScreen(vm: GameViewModel, lg: League) {
                     ), style = T.numSm)
                 }
             }
+            // Where he stands with the coach (and a talk with him), right under the role it decides.
+            CoachPanel(vm, lg)
             Section("Depth chart · ${h.posLabel}")
             GroupList(Road.depth(lg), inset = 64.dp) { p ->
                 ListRow(onClick = { vm.openPlayer(p.id) }, modifier = if (p.id == h.id) Modifier.background(P.accentSoft) else Modifier) {

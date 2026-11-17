@@ -24,7 +24,9 @@ object Tactics {
         // High-ceiling rookies get a bit more, as lottery picks do.
         fun rate(p: Player): Double = p.ovr + (if (lg.pro && p.age <= 23) ((p.pot - p.ovr) / 3.0).coerceIn(0.0, 4.0) else 0.0) +
             (if (lg.pro && p.id == lg.heroId && p.age <= 23) 2.0 else 0.0) +
-            (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0)
+            (if (lg.pro && p.proYears == 0 && p.year == PRO_YEAR && p.pot >= 88) 2.5 else 0.0) +
+            // A pro player's standing with his coach ([CoachTrust]): trust, and a role he was promised.
+            CoachTrust.credit(lg, p)
         // Academic redshirts stay off the depth chart; injured don't get minutes unless the team is too thin.
         val active = Redshirts.available(lg, t)
         val pool = active.filter { !it.out }.takeIf { it.size >= 8 }.let { it ?: active }.sortedByDescending { rate(it) }.toMutableList()

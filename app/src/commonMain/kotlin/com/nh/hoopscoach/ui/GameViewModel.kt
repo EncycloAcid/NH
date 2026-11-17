@@ -87,6 +87,9 @@ sealed interface Route {
     data class Help(val term: String = "") : Route
     /** Legacy: you against your father, side by side. */
     data object FamilyCompare : Route
+    /** All-Star Saturday, played: the 3-Point Contest and the Dunk Contest. */
+    data object ThreeContest : Route
+    data object DunkContest : Route
 }
 
 /** A game being watched possession by possession. */
