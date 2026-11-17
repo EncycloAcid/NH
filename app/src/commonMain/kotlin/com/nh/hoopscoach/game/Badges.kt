@@ -56,8 +56,8 @@ enum class Badge(
 object Badges {
     val TIERS = listOf("", "Bronze", "Silver", "Gold", "Legend")
 
-    /** Rating percentiles for each tier among the league's rotation players. */
-    private val CUTS = doubleArrayOf(0.75, 0.88, 0.96, 0.99)
+    /** Rating percentiles for each tier among the league's rotation players (the first: where the user's player can start earning one). */
+    private val CUTS = doubleArrayOf(0.55, 0.75, 0.88, 0.96, 0.99)
 
     private class Cuts(val key: Int, val by: Array<IntArray>)
     private val cache = WeakHashMap<League, Cuts>()
@@ -71,7 +71,7 @@ object Badges {
         val pool = LeagueLists.teams(lg).flatMap { t -> t.roster.mapNotNull { lg.playerOrNull(it) }.sortedByDescending { it.ovr }.take(9) }
         val by = Badge.entries.map { b ->
             val v = pool.map { rating(it, b) }.sorted()
-            if (v.isEmpty()) intArrayOf(99, 99, 99, 99) else IntArray(4) { i -> v[((v.size - 1) * CUTS[i]).roundToInt()] }
+            if (v.isEmpty()) intArrayOf(99, 99, 99, 99, 99) else IntArray(CUTS.size) { i -> v[((v.size - 1) * CUTS[i]).roundToInt()] }
         }.toTypedArray()
         synchronized(cache) { cache[lg] = Cuts(key, by) }
         return by
@@ -81,11 +81,14 @@ object Badges {
     fun ratingTier(lg: League, p: Player, b: Badge): Int {
         val c = cuts(lg)[b.ordinal]
         val r = rating(p, b)
-        return c.count { r >= it }
+        return (1..4).count { r >= c[it] }
     }
 
-    /** The rating [p] needs for [tier] of [b]. */
-    fun ratingFor(lg: League, b: Badge, tier: Int): Int = cuts(lg)[b.ordinal][(tier - 1).coerceIn(0, 3)]
+    /** The highest tier the user's player can earn: one above his rating's, if that skill is at least league-average. */
+    fun cap(lg: League, p: Player, b: Badge): Int = if (rating(p, b) < cuts(lg)[b.ordinal][0]) 0 else ratingTier(lg, p, b) + 1
+
+    /** The rating [p] needs for [tier] of [b] (to earn it: the tier below's cutoff; Bronze: league average). */
+    fun ratingFor(lg: League, b: Badge, tier: Int): Int = cuts(lg)[b.ordinal][(tier - 1).coerceIn(0, 4)]
 
     fun xpTier(p: Player, b: Badge): Int { val x = p.badgeXp[b.name] ?: 0; return b.xp.count { x >= it } }
 
@@ -96,7 +99,7 @@ object Badges {
     @Volatile var off = false
 
     fun tier(lg: League, p: Player, b: Badge): Int = if (off) 0 else
-        if (earns(lg, p)) minOf(xpTier(p, b), ratingTier(lg, p, b) + 1) else ratingTier(lg, p, b)
+        if (earns(lg, p)) minOf(xpTier(p, b), cap(lg, p, b)) else ratingTier(lg, p, b)
 
     /** Every badge's tier for [p], by [Badge] ordinal. */
     fun tiers(lg: League, p: Player): IntArray = IntArray(Badge.entries.size) { tier(lg, p, Badge.entries[it]) }
@@ -110,8 +113,8 @@ object Badges {
         if (t >= 4) return "Maxed out"
         val x = p.badgeXp[b.name] ?: 0
         val needXp = b.xp[t]
-        val needRating = if (t >= 1) ratingFor(lg, b, t) else 0
-        val ratingShort = t >= 1 && rating(p, b) < needRating
+        val needRating = ratingFor(lg, b, t + 1)
+        val ratingShort = cap(lg, p, b) <= t
         return when {
             x < needXp && ratingShort -> "$x/$needXp ${b.unit}, and ${b.attr.label} $needRating, for ${TIERS[t + 1]}"
             x < needXp -> "$x/$needXp ${b.unit} for ${TIERS[t + 1]}"

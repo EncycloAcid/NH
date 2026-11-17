@@ -146,7 +146,7 @@ fun HeroBadgesCard(vm: GameViewModel, lg: League) {
     // The closest next tier by badge points (among those his ratings allow).
     val next = Badge.entries.mapNotNull { b ->
         val t = Badges.tier(lg, h, b)
-        if (t >= 4 || Badges.ratingTier(lg, h, b) + 1 <= t) return@mapNotNull null
+        if (t >= 4 || Badges.cap(lg, h, b) <= t) return@mapNotNull null
         val x = h.badgeXp[b.name] ?: 0
         Triple(b, t, x.toFloat() / b.xp[t])
     }.maxByOrNull { it.third }

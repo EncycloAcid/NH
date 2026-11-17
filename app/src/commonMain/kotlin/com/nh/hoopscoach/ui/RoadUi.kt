@@ -1084,6 +1084,7 @@ fun RoadOffseasonFlow(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     if (Road.inGreenRoom(lg)) { GreenRoom(vm, lg); return }
     if (r.goingPro) { GoProScreen(vm, lg); return }
+    if (r.longWay) { LongWayScreen(vm, lg); return }
     if (r.ended) { RoadEnding(vm, lg); return }
     val h = lg.playerOrNull(lg.heroId) ?: return
     val t = lg.team(h.teamId)
@@ -1262,7 +1263,7 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                             Text("THE DRAFT IS OVER", style = T.label, color = onHero.copy(alpha = 0.8f))
                             Text("UNDRAFTED", style = T.hero, color = onHero)
                             val next = if (r.goingPro) "Your agent gets you a two-way deal. Make a roster and prove them wrong."
-                                else if (r.ended) "Your agent already has calls in from overseas."
+                                else if (r.longWay || r.ended) "Your agent already has calls: the G League, and clubs overseas."
                                 else "You head back to ${lg.team(school).school} for your ${classLong(h.year + 1).lowercase()} season."
                             Text("${picks.size} names called, none of them yours. $next", style = T.small, color = onHero.copy(alpha = 0.9f))
                         }
@@ -1297,6 +1298,7 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
             !done -> FlowFooter(null, "Skip ahead") { vm.revealSeason = lg.season; vm.reveal = stop }
             // On to the going-pro screen, where you pick the league (today's or a past era).
             r.goingPro -> FlowFooter(null, "Next: choose your league") { vm.act { Road.watchedDraft(it) } }
+            r.longWay -> FlowFooter(null, "Next: your options") { vm.act { Road.watchedDraft(it) } }
             r.ended -> FlowFooter(null, "Continue") { vm.act { Road.watchedDraft(it) } }
             else -> FlowFooter(null, "Next: the summer") { vm.roadNext() }
         }

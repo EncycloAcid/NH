@@ -100,6 +100,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
         item { DispatchCard(vm, lg) }
+        item { BinderTodayCard(vm, lg) }
         item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }

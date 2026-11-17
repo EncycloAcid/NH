@@ -336,13 +336,15 @@ object Road {
             // Drafted, or undrafted but good enough for a two-way deal: the career goes on in the pros.
             r.goingPro = pick != null || (me0 != null && me0.ovr >= 86)
             r.undrafted = pick == null
-            r.ended = !r.goingPro
+            r.ended = false
+            // Undrafted isn't the end: the G League and clubs overseas call ([LongWay]).
+            if (!r.goingPro) LongWay.begin(lg)
             r.portal = false
             r.draftPick = pick?.pick ?: 0
             val me = lg.hero
             r.ending = when {
                 pick == null && r.goingPro -> "${me?.name ?: "He"} goes undrafted, then signs a two-way deal to chase a pro roster spot."
-                pick == null -> "${me?.name ?: "He"} went undrafted after four seasons and signs to play overseas."
+                pick == null -> "${me?.name ?: "He"} goes undrafted. His agent has calls from the G League and from clubs overseas."
                 pick.pick <= 14 -> "Lottery pick! ${me?.name} goes No. ${pick.pick} overall in the ${lg.season} draft."
                 pick.pick <= 30 -> "${me?.name} goes No. ${pick.pick} overall, a first-round pick in the ${lg.season} draft."
                 else -> "${me?.name} goes No. ${pick.pick} overall in the second round of the ${lg.season} draft."
@@ -389,7 +391,7 @@ object Road {
     fun next(lg: League) {
         val os = lg.offseason ?: return
         val r = lg.road ?: return
-        if (r.ended || r.goingPro || lg.pro) return
+        if (r.ended || r.goingPro || r.longWay || lg.pro) return
         when (os.step) {
             OffStep.ROSTER -> Offseason.advance(lg)
             OffStep.DRAFT -> { watchedDraft(lg); Offseason.advance(lg); if (os.step == OffStep.CAREER) Offseason.advance(lg) }

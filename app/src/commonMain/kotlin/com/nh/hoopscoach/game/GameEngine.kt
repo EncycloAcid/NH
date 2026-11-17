@@ -1470,6 +1470,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (lg.pro) RecordBook.afterGame(lg, lines)
         if (heroSide >= 0) runCatching { lg.playerOrNull(heroId)?.let { h -> lines[heroSide][heroId]?.let { Badges.afterGame(lg, h, it, heroMakes) } } }
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
+        runCatching { Cards.afterGame(lg, game) }
         if (userInvolved) Ollama.maybeAutoGenerateInterviews(lg.ollama, lg, game)
     }
 

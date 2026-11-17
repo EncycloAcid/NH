@@ -342,8 +342,9 @@ object ProLeague {
             joinPro(lg, p, teamFor(d.pick), d.cls)
         }
         if (lg.playerOrNull(hero.id) == null) {
-            // Undrafted: a two-way deal with one of the weaker teams.
-            val t = teamFor(Rng.int(1, 10))
+            // Undrafted: the team that called him (the long way), or a two-way deal with one of the weaker teams.
+            val t = r.signSlot.takeIf { it.isNotEmpty() }?.let { s -> lg.teams.firstOrNull { it.slot == s } } ?: teamFor(Rng.int(1, 10))
+            r.signSlot = ""
             joinPro(lg, hero, t, hero.year)
         }
         importRival(college, lg, order)
@@ -1187,6 +1188,7 @@ object ProSeason {
             t.homeGames = 0; t.homeAtt = 0; t.sellouts = 0
             Tactics.autoAllocate(lg, t)
         }
+        runCatching { Cards.seasonEnd(lg) }
         runCatching { SkillTree.seasonEnd(lg) }
         for (p in lg.players) {
             p.stats = StatLine(); p.tourney = StatLine(); p.log = mutableListOf()

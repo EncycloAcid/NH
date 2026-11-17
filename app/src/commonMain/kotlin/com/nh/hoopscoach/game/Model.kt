@@ -1220,6 +1220,14 @@ class RoadState(
     /** Legacy mode: the father's marks he's passed ([LegacyMode.marks]) and each season against his father. */
     val legacyMarks: MutableList<String> = mutableListOf(),
     val legacyLog: MutableList<String> = mutableListOf(),
+    /** The long way, undrafted ([LongWay]): the offers, the season away, the NBA's calls, and the team he signs with. */
+    var longWay: Boolean = false,
+    val wayOffers: MutableList<AbroadOffer> = mutableListOf(),
+    var abroad: Abroad? = null,
+    val calls: MutableList<NbaCall> = mutableListOf(),
+    val abroadPast: MutableList<String> = mutableListOf(),
+    var signSlot: String = "",
+    var signTeam: String = "",
     var startSeason: Int = 0,
     var dealSeason: Int = 0,
     var deal: NilDeal = NilDeal.NONE,
@@ -1830,6 +1838,8 @@ class League(
     var newsSeen: Int = 0,
     /** A coach who played first (Road to the League): his playing career, carried from save to save. */
     var playedAs: PlayedAs? = null,
+    /** The card collection ([Cards]). */
+    val binder: Binder = Binder(),
     /** Legacy mode: the generations this career descends from, oldest first (the last is his father). */
     var lineage: MutableList<Ancestor> = mutableListOf(),
     /** Legacy mode, coaching: the user's son (a recruit, then a player), or -1. */

@@ -80,6 +80,7 @@ sealed interface Route {
     data object Explore : Route
     data class ConfPage(val confId: Int) : Route
     data object Facilities : Route
+    data object Binder : Route
 }
 
 /** A game being watched possession by possession. */

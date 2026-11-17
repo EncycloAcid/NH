@@ -166,6 +166,7 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
         item { DispatchCard(vm, lg) }
+        item { BinderTodayCard(vm, lg) }
         item { TopTenCard(vm, lg) }
         item { MarqueeCard(vm, lg) }
         item { InjuryReport(vm, lg, u) }
@@ -1874,7 +1875,8 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
     val h = lg.hero ?: return
     // A career that started in an era goes pro into it, and a son (legacy mode) into his father's, years on;
     // otherwise pick one here.
-    val legacy = lg.lineage.isNotEmpty()
+    // A son, or a player a team called the long way: his league is the one he's in, nothing to pick.
+    val legacy = lg.lineage.isNotEmpty() || r.signSlot.isNotEmpty()
     val careerEra = com.nh.hoopscoach.game.Era.entries.firstOrNull { it.name == lg.era && (legacy || it != com.nh.hoopscoach.game.Era.TODAY) }
         ?: if (legacy) com.nh.hoopscoach.game.Era.TODAY else null
     var era by remember { mutableStateOf(careerEra ?: com.nh.hoopscoach.game.Era.TODAY) }
@@ -1885,8 +1887,8 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 ScreenHeader("Road to the League", "Going pro", null)
                 Panel(color = P.hero) {
                     Text(if (pick != null) "NO. ${pick.pick} OVERALL" else "UNDRAFTED FREE AGENT", style = T.label, color = P.onHero.copy(alpha = 0.8f))
-                    Text((pick?.proTeam ?: "Two-way deal").uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
-                    Text("${h.name} · ${h.ovr} overall in college. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.Ratings.shownPro(com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr))} on the pro scale and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
+                    Text((pick?.proTeam ?: r.signTeam.ifEmpty { "Two-way deal" }).uppercase(), style = T.hero.copy(fontSize = 30.sp, lineHeight = 30.sp), color = P.onHero)
+                    Text("${h.name} · ${h.ovr} overall${if (r.signTeam.isEmpty()) " in college" else ""}. The pros are a step up: you'll start at ${com.nh.hoopscoach.game.Ratings.shownPro(com.nh.hoopscoach.game.ProLeague.rookieOverall(h.ovr))} on the pro scale and grow from there.", style = T.small, color = P.onHero.copy(alpha = 0.9f))
                 }
             }
             if (careerEra != null) item {
@@ -1901,9 +1903,11 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                 Panel {
                     Text("THE ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} NBA", style = T.label, color = P.accent)
                     Text(if (stars.isNotEmpty()) stars.joinToString(", ") else if (dad != null) "Your father's league, ${(lg.season + 1 - (dad.played.lastSeason.takeIf { it > 0 } ?: lg.season)).coerceAtLeast(1)} years on" else careerEra.title, style = T.head, color = P.ink)
-                    Text(if (stars.isNotEmpty()) "${teams?.size ?: 30} teams, each with the real roster it opened that season: real ratings, real photos, the real draft classes every summer after."
-                        else "The league he played in, years later: the players he knew have moved on, and a new generation runs it." +
-                            (if (dad != null) " You go in as ${dad.name}'s son." else ""), style = T.small, color = P.sub)
+                    Text(when {
+                        stars.isNotEmpty() -> "${teams?.size ?: 30} teams, each with the real roster it opened that season: real ratings, real photos, the real draft classes every summer after."
+                        dad != null -> "The league he played in, years later: the players he knew have moved on, and a new generation runs it. You go in as ${dad.name}'s son."
+                        else -> "Today's league, ${lg.season + 1 - 2026} years on: today's players older, some retired, and new draft classes every summer."
+                    }, style = T.small, color = P.sub)
                     Text(eraRules(careerEra), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 4.dp))
                 }
             } else item { EraPicker(era) { era = it } }
