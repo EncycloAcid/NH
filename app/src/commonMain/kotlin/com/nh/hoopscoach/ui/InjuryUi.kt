@@ -1,5 +1,8 @@
 package com.nh.hoopscoach.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -30,21 +33,29 @@ import com.nh.hoopscoach.game.Ollama
 import com.nh.hoopscoach.game.Player
 import com.nh.hoopscoach.game.Team
 
-/** [t]'s injury report: who's out, with what, and for how long. Nothing when everyone is healthy. */
+/** [t]'s injury report: who's out, who's questionable, who's back but not 100%, and (for your team) your calls. */
 @Composable
 fun InjuryReport(vm: GameViewModel, lg: League, t: Team) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     val hurt = Injuries.report(lg, t)
     if (hurt.isEmpty()) return
     Section("Injury report · ${hurt.size}")
     GroupList(hurt, inset = 70.dp) { p ->
-        ListRow(onClick = { vm.openPlayer(p.id) }) {
-            PlayerJersey(p, t, 40.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(Injuries.tag(p), style = T.small, color = injuryColor(p), maxLines = 2)
+        Column {
+            ListRow(onClick = { vm.openPlayer(p.id) }) {
+                PlayerJersey(p, t, 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(p.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(Injuries.tag(p), style = T.small, color = injuryColor(p), maxLines = 2)
+                    if (p.out && p.injGrade >= 2 && p.injGames < Injuries.SEASON_OUT)
+                        Bar(Injuries.progress(p), Modifier.fillMaxWidth().padding(top = 5.dp, end = 8.dp), color = injuryColor(p), height = 4.dp)
+                }
+                Tag(statusShort(p), statusColor(p))
             }
-            Tag("INJ", P.bad)
+            // The player-mode hero makes his own calls on his Medical card.
+            if (!lg.playerMode && (Injuries.canPlan(lg, p) || Injuries.canPlayThrough(lg, p)))
+                Column(Modifier.padding(start = 70.dp, end = 16.dp, bottom = 12.dp)) { MedicalCall(vm, lg, p) }
         }
     }
     if (lg.ollama.enabled && lg.ollama.injuryReports) {
@@ -121,9 +132,120 @@ fun LeagueInjuries(vm: GameViewModel, lg: League) {
     }
 }
 
-/** How bad it is, at a glance: amber for day-to-day, red for anything longer. */
+/** How bad it is, at a glance: amber for day-to-day (or back but not 100%), red for anything longer. */
 @Composable
-fun injuryColor(p: com.nh.hoopscoach.game.Player): androidx.compose.ui.graphics.Color = if (p.injGames <= 3 && p.injTotal <= 3) P.warn else P.bad
+fun injuryColor(p: com.nh.hoopscoach.game.Player): androidx.compose.ui.graphics.Color = if (!p.out || (p.injGames <= 3 && p.injTotal <= 3) || (p.injGrade in 1..2 && p.injGames <= 2)) P.warn else P.bad
+
+/** The report's status tag: OUT, QUESTIONABLE, DOUBTFUL, PLAYING HURT or LIMITED. */
+fun statusShort(p: Player): String = when (Injuries.status(p)) {
+    "Out for the season" -> "SEASON"
+    "Playing through it" -> "PLAYING HURT"
+    "" -> "OK"
+    else -> Injuries.status(p).uppercase()
+}
+
+@Composable
+fun statusColor(p: Player): androidx.compose.ui.graphics.Color = when {
+    p.out && (p.injGames > 2 || p.injGrade >= 3 || p.injGrade == 0) -> P.bad
+    else -> P.warn
+}
+
+/** Your call on a hurt player (or yourself): the recovery plan, or playing through a questionable tag. */
+@Composable
+fun MedicalCall(vm: GameViewModel, lg: League, p: Player) {
+    val you = lg.playerMode && p.id == lg.heroId
+    if (Injuries.canPlan(lg, p)) {
+        val plan = Injuries.planOf(p)
+        Text("RECOVERY PLAN", style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Injuries.PLANS.forEach { (key, label) ->
+                val sel = key == plan
+                val shape = RoundedCornerShape(12.dp)
+                val g = Injuries.gamesOn(p, key)
+                val l = Injuries.limitedOn(p, key)
+                Column(
+                    Modifier.weight(1f).clip(shape).background(if (sel) P.accentSoft else P.surface2.copy(alpha = 0.5f))
+                        .border(1.dp, if (sel) P.accent else P.line, shape)
+                        .clickable { vm.act { Injuries.setPlan(it, p, key) } }
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                ) {
+                    Text(label, style = T.bodyB.copy(fontSize = 13.sp), color = if (sel) P.accent else P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Out $g", style = T.small.copy(fontSize = 11.sp), color = P.sub, maxLines = 1)
+                    Text(if (l == 0) "Back at 100%" else "$l limited", style = T.small.copy(fontSize = 11.sp),
+                        color = when { l == 0 -> P.good; key == "rush" -> P.warn; else -> P.sub }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Text(Injuries.planNote(plan, you), style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
+    }
+    if (Injuries.canPlayThrough(lg, p)) {
+        val tagWord = if (p.injGames == 1) "questionable" else "doubtful"
+        Text(
+            if (you) "You're $tagWord for the next game. Play through it and you're available, but below 100% until it heals, and likelier to make it worse."
+            else "${p.last} is $tagWord. He can play through it: available now, below 100% until it heals, and likelier to make it worse.",
+            style = T.small, color = P.sub, modifier = Modifier.padding(top = 8.dp),
+        )
+        SmallButton("Play through it", Modifier.padding(top = 8.dp), primary = true) { vm.act { Injuries.playThrough(it, p) } }
+    }
+}
+
+/** Player career, Today: how your body is, and your calls when you're hurt. Nothing when you're 100%. */
+@Composable
+fun HeroMedicalCard(vm: GameViewModel, lg: League) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val h = lg.hero ?: return
+    if (!h.out && h.limited <= 0 && !h.hurtPlaying) return
+    Section("Medical")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(Injuries.status(h).uppercase(), style = T.label.copy(fontSize = 10.sp), color = statusColor(h))
+                Text(when {
+                    h.out && h.injury.isNotEmpty() -> h.injury.replaceFirstChar { it.uppercase() }
+                    h.hurtPlaying -> "Playing on " + h.injury.ifEmpty { "it" }
+                    else -> "Not 100% yet"
+                }, style = T.head, color = P.ink)
+                Text(when {
+                    h.injGames >= Injuries.SEASON_OUT -> "Out for the season. Rehab, and come back next year."
+                    h.out -> "Out ${Injuries.howLong(lg, h.injGames)}" + if (h.injGrade > 0) " · ${Injuries.GRADES[h.injGrade].lowercase()}" else ""
+                    h.hurtPlaying -> "You're playing hurt: your shot's a little off, and it heals at half speed."
+                    else -> "${h.limited} more game${if (h.limited == 1) "" else "s"} below 100%: your shot's a little off and you're likelier to get hurt again."
+                }, style = T.small, color = P.sub)
+            }
+            if (h.out && h.injGrade > 0 && h.injGames < Injuries.SEASON_OUT) Ring((Injuries.progress(h) * 100).toInt(), 60.dp, label = "HEALED")
+        }
+        MedicalCall(vm, lg, h)
+        if (Injuries.prone(h)) Text("Injury-prone: ${h.injCount} recent injuries make the next one likelier. Rest when you can.",
+            style = T.small, color = P.warn, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+/** The player sheet's medical file: status, the plan, injury-proneness, lasting costs and history. */
+@Composable
+fun MedicalPanel(vm: GameViewModel, lg: League, p: Player) {
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    if (!p.out && p.limited <= 0 && !p.hurtPlaying && p.injHistory.isEmpty() && p.lostBurst <= 0) return
+    Section("Medical")
+    Panel {
+        val st = Injuries.status(p)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (st.isEmpty()) "Healthy" else st, style = T.head, color = if (st.isEmpty()) P.good else statusColor(p), modifier = Modifier.weight(1f))
+            if (Injuries.prone(p)) Tag("INJURY-PRONE", P.warn)
+        }
+        if (st.isNotEmpty()) Text(Injuries.tag(p), style = T.small, color = P.sub)
+        if (p.out && p.injGrade >= 2 && p.injGames < Injuries.SEASON_OUT) {
+            Bar(Injuries.progress(p), Modifier.fillMaxWidth().padding(top = 8.dp), color = injuryColor(p), height = 5.dp)
+            Text("${Injuries.GRADES[p.injGrade]} ${p.injPart} injury · plan: ${Injuries.PLANS.first { it.first == Injuries.planOf(p) }.second.lowercase()}",
+                style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 4.dp))
+        }
+        if (Injuries.canPlan(lg, p) || Injuries.canPlayThrough(lg, p)) MedicalCall(vm, lg, p)
+        if (p.lostBurst > 0) Text("Lasting cost: −${p.lostBurst} to quickness and defense from serious injuries.", style = T.small, color = P.bad, modifier = Modifier.padding(top = 8.dp))
+        if (p.injHistory.isNotEmpty()) {
+            Text("HISTORY", style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 10.dp))
+            p.injHistory.asReversed().take(8).forEach { Text(it, style = T.small, color = P.sub, modifier = Modifier.padding(top = 2.dp)) }
+        }
+    }
+}
 
 /** The user's team is defending a title: what it's chasing and how it's going. */
 @Composable

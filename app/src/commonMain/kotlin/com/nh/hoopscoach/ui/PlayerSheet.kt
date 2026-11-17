@@ -118,7 +118,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     if (team != null) Text("${team.school} · ${Tactics.role(lg, team, p.id)}", style = T.small, color = P.accent)
                     if (p.nickname.isNotBlank()) Text("\"${p.nickname}\"", style = T.bodyB, color = P.accent)
                     SmallButton("Card", Modifier.padding(top = 4.dp)) { showCard = true }
-                    if (p.out) Text("Injured: ${com.nh.hoopscoach.game.Injuries.tag(p)}", style = T.small, color = injuryColor(p))
+                    if (p.out || p.limited > 0 || p.hurtPlaying) Text(com.nh.hoopscoach.game.Injuries.tag(p), style = T.small, color = injuryColor(p))
                     // A pro's contract.
                     if (lg.pro && team != null) {
                         val sal = com.nh.hoopscoach.game.Payroll.salaryOf(lg, p)
@@ -155,6 +155,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                     }
                 }
             }
+            MedicalPanel(vm, lg, p)
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag(p.style.label.uppercase() + if (p.style.group != com.nh.hoopscoach.game.ArchGroup.MANUAL) " · " + p.style.group.label.uppercase() else "", P.accent)

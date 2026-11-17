@@ -105,7 +105,7 @@ fun PickemCard(vm: GameViewModel, lg: League) {
 fun ShootaroundCard(vm: GameViewModel, lg: League) {
     @Suppress("UNUSED_VARIABLE") val rev = vm.rev
     val r = lg.road ?: return
-    if (!lg.playerMode || Shootaround.todaysGame(lg) == null) return
+    if (!lg.playerMode || Shootaround.todaysGame(lg) == null || lg.hero?.out == true) return
     val done = r.shootSeason == lg.season && r.shootDay == lg.day
     val hot = Shootaround.edge(lg) > 0
     Panel(onClick = if (done) null else ({ vm.push(Route.Shootaround) })) {

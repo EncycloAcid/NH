@@ -362,6 +362,22 @@ class Player(
     var injury: String = "",
     var injGames: Int = 0,
     var injTotal: Int = 0,
+    /**
+     * Medical ([Injuries]): the body part and grade (1 minor to 4 season-ending), the recovery plan ("rest",
+     * "standard", "rush"), the standard games of recovery left (a plan speeds it or slows it), games he'll play
+     * below 100% after coming back, playing through a questionable tag, his recent injuries, the last part he hurt,
+     * the explosiveness a major injury cost him for good, and his history.
+     */
+    var injPart: String = "",
+    var injGrade: Int = 0,
+    var injPlan: String = "",
+    var injLeft: Double = 0.0,
+    var limited: Int = 0,
+    var hurtPlaying: Boolean = false,
+    var injCount: Int = 0,
+    var lastPart: String = "",
+    var lostBurst: Int = 0,
+    var injHistory: MutableList<String> = mutableListOf(),
     /** His summer development plan, set by the user's coach: "shooting", "playmaking", "inside", "defense", "conditioning" or "". */
     var devPlan: String = "",
     /** His custom portrait (see Face), or "" to draw one from [look]. */

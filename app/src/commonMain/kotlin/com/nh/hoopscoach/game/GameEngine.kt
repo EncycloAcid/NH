@@ -212,6 +212,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (shooter.id in homecoming) p += 0.025
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
         p += bt(shooter, shotBadge(type)) * shotBadge(type).step + (if (abs(trail) <= 5) bt(shooter, Badge.ICE_WATER) * Badge.ICE_WATER.step else 0.0)
+        if (shooter.limited > 0 || shooter.hurtPlaying) p -= Injuries.LIMITED_PENALTY
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) + heroHome + family - heroTired
@@ -1082,6 +1083,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake += bt(shooter, shotBadge(type)) * shotBadge(type).step + best(offense, Badge.FLOOR_GENERAL, shooter.id) * Badge.FLOOR_GENERAL.step
             if (finalPeriod && clock < 120 && abs(trail) <= 5) pMake += bt(shooter, Badge.ICE_WATER) * Badge.ICE_WATER.step
             pMake -= if (type == 0) best(defense, Badge.RIM_PROTECTOR) * Badge.RIM_PROTECTOR.step else (guard?.let { bt(it, Badge.LOCKDOWN) } ?: 0) * Badge.LOCKDOWN.step
+            // Back from an injury (or playing through one) and not 100% yet.
+            if (shooter.limited > 0 || shooter.hurtPlaying) pMake -= Injuries.LIMITED_PENALTY
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
                 Defense.PRESS -> if (type == 0) pMake += 0.03

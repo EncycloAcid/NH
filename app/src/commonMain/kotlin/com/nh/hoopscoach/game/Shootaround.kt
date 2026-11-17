@@ -27,7 +27,7 @@ object Shootaround {
 
     fun available(lg: League): Boolean {
         val r = lg.road ?: return false
-        if (!lg.playerMode || r.ended || r.longWay || todaysGame(lg) == null) return false
+        if (!lg.playerMode || r.ended || r.longWay || todaysGame(lg) == null || lg.hero?.out == true) return false
         return !(r.shootSeason == lg.season && r.shootDay == lg.day)
     }
 

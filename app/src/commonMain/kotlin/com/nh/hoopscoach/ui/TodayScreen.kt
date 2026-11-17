@@ -86,6 +86,7 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
             }
         }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
+        if (lg.playerMode) item { HeroMedicalCard(vm, lg) }
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
         if (lg.playerMode) item { HeroBadgesCard(vm, lg) }
         if (lg.playerMode && lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
@@ -495,6 +496,7 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
             ScreenHeader(eyebrow, roundName, sub) { TeamBadge(u, 46.dp) }
         }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
+        if (lg.playerMode) item { HeroMedicalCard(vm, lg) }
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
         if (lg.playerMode) item { HeroBadgesCard(vm, lg) }
         if (lg.playerMode && lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
