@@ -3,8 +3,10 @@ package com.nh.hoopscoach.game
 object ArticleWriting {
     fun checked(news: News) = news.isAiGenerated && errors(news.body, OllamaConfig()).isEmpty()
     fun small(config: OllamaConfig) = config.provider.lowercase() == "ollama" && (config.speedMode == "turbo" || Regex("(?i)(1b|3b|small)").containsMatchIn(config.model))
-    fun budget(config: OllamaConfig) = if (small(config)) 850 else 1800
-    fun instruction(config: OllamaConfig) = "Write 4-7 substantial paragraphs, ${if (small(config)) "160-240" else "250-450"} words. Separate paragraphs with blank lines. Finish every sentence. Cover the lede, exact game lines for both teams, recorded period scoring or a recorded decisive event, records and standings context, and the next scheduled game when supplied. For other article types develop the relevant event, evidence, implications and what comes next. Omit unavailable details. Never invent a run or a quote; no quotations unless explicitly supplied as recorded dialogue."
+    /** Gemini Nano on the phone: 256 tokens a reply, so a short article. */
+    fun tiny(config: OllamaConfig) = config.provider.equals("nano", true)
+    fun budget(config: OllamaConfig) = if (tiny(config)) OnDeviceAi.MAX_OUTPUT else if (small(config)) 850 else 1800
+    fun instruction(config: OllamaConfig) = "Write ${if (tiny(config)) "3-5 short paragraphs, 100-160" else "4-7 substantial paragraphs, " + (if (small(config)) "160-240" else "250-450")} words. Separate paragraphs with blank lines. Finish every sentence. Cover the lede, exact game lines for both teams, recorded period scoring or a recorded decisive event, records and standings context, and the next scheduled game when supplied. For other article types develop the relevant event, evidence, implications and what comes next. Omit unavailable details. Never invent a run or a quote; no quotations unless explicitly supplied as recorded dialogue."
 
     fun bodies(raw: String): List<String> {
         if (Regex("(?m)^SCOOP \\d+:").containsMatchIn(raw)) return briefs(raw, "SCOOP").map { it.second }
@@ -27,8 +29,8 @@ object ArticleWriting {
     fun errors(raw: String, config: OllamaConfig): List<String> = bodies(raw).flatMap { body ->
         val paragraphs = body.split(Regex("\\n\\s*\\n")).filter { it.isNotBlank() }
         buildList {
-            if (paragraphs.size !in 4..7) add("article requires 4-7 paragraphs")
-            if (Regex("\\S+").findAll(body).count() < if (small(config)) 140 else 220) add("article is too short")
+            if (paragraphs.size !in (if (tiny(config)) 3..7 else 4..7)) add("article requires ${if (tiny(config)) "3-7" else "4-7"} paragraphs")
+            if (Regex("\\S+").findAll(body).count() < if (tiny(config)) 90 else if (small(config)) 140 else 220) add("article is too short")
             if (paragraphs.any { !Regex("[.!?][\\\"'’”)]*$").containsMatchIn(it.trim()) }) add("unfinished article sentence")
             if (Regex("(?i)\\b(to|with|and|the|a|an|of|for|in|at|by|from|or|but|because)[.!?][\\\"'’”)]*$").containsMatchIn(body.trim())) add("unfinished article sentence")
         }

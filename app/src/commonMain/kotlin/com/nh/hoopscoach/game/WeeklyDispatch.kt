@@ -70,7 +70,7 @@ object AiNewsGenerator : NewsGenerator {
     override suspend fun weekly(brief: WeeklyDispatch.Brief, config: OllamaConfig): DispatchEdition? {
         val system = if (brief.pro) WeeklyDispatch.SYSTEM_NBA else WeeklyDispatch.SYSTEM_COLLEGE
         val prompt = "WEEK ${brief.index} FACTS (JSON):\n${brief.json}\n\n" +
-            "Write exactly 5 headlines and 3 ${if (brief.pro) "trade rumors" else "rumors (transfer portal, coaching seats, recruiting)"}.\n" +
+            "Write exactly 5 headlines and 3 ${if (brief.pro) "trade rumors" else "rumors (transfer portal, coaching seats, recruiting)"}, each under 14 words.\n" +
             "Reply with JSON only: {\"headlines\": [5 strings], \"rumors\": [3 strings]}"
         val raw = Ollama.generate(config, prompt, system, temperature = 0.8, numPredict = 420, desk = OnDeviceAi.Desk.NOTIFICATIONS).getOrNull() ?: return null
         val (h, r) = WeeklyDispatch.parse(raw, "headlines", "rumors", brief) ?: return null
@@ -80,7 +80,7 @@ object AiNewsGenerator : NewsGenerator {
 
     override suspend fun crystalBall(brief: WeeklyDispatch.Brief, config: OllamaConfig): CrystalBall? {
         val prompt = "RECRUITING ROUND ${brief.index} FACTS (JSON):\n${brief.json}\n\n" +
-            "Write 5 crystal-ball predictions (each names one recruit and the school he's leaning to, from the facts) and 3 transfer portal or recruiting rumors.\n" +
+            "Write 5 crystal-ball predictions (each names one recruit and the school he's leaning to, from the facts) and 3 transfer portal or recruiting rumors, each under 14 words.\n" +
             "Reply with JSON only: {\"predictions\": [5 strings], \"rumors\": [3 strings]}"
         val raw = Ollama.generate(config, prompt, WeeklyDispatch.SYSTEM_CRYSTAL, temperature = 0.8, numPredict = 420, desk = OnDeviceAi.Desk.NOTIFICATIONS).getOrNull() ?: return null
         val (p, r) = WeeklyDispatch.parse(raw, "predictions", "rumors", brief) ?: return null
@@ -302,14 +302,27 @@ object WeeklyDispatch {
      */
     fun parse(raw: String, a: String, b: String, brief: Brief): Pair<List<String>, List<String>>? {
         val start = raw.indexOf('{')
+        if (start < 0) return null
         val end = raw.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        val obj = runCatching { json.parseToJsonElement(raw.substring(start, end + 1)).jsonObject }.getOrNull() ?: return null
+        val obj = (if (end > start) runCatching { json.parseToJsonElement(raw.substring(start, end + 1)).jsonObject }.getOrNull() else null)
+            ?: return salvage(raw.substring(start), a, b, brief)
         fun list(key: String): List<String> {
             val arr = (obj[key] ?: obj.entries.firstOrNull { it.key.contains(key.take(5), true) }?.value) as? JsonArray ?: return emptyList()
             return arr.mapNotNull { e -> runCatching { e.jsonPrimitive.content }.getOrNull() }.map { clean(it) }.filter { ok(it, brief) }.distinct()
         }
         return list(a) to list(b)
+    }
+
+    /** A reply cut off partway (a model's output limit): keeps every string that was finished, in each list. */
+    private fun salvage(raw: String, a: String, b: String, brief: Brief): Pair<List<String>, List<String>>? {
+        fun strings(from: String) = Regex("\"((?:[^\"\\\\]|\\\\.)*)\"").findAll(from).map { it.groupValues[1].replace("\\\"", "\"") }
+            .filter { !it.equals(a, true) && !it.equals(b, true) }.map { clean(it) }.filter { ok(it, brief) }.distinct().toList()
+        val ia = raw.indexOf("\"$a\"", ignoreCase = true)
+        if (ia < 0) return null
+        val ib = raw.indexOf("\"$b\"", ignoreCase = true)
+        val first = if (ib > ia) raw.substring(ia + a.length + 2, ib) else raw.substring(ia + a.length + 2)
+        val second = if (ib > ia) raw.substring(ib + b.length + 2) else ""
+        return strings(first) to strings(second)
     }
 
     private fun clean(s: String) = s.trim().removePrefix("-").removePrefix("•").trim().replace(Regex("^\\d+[.)]\\s*"), "").trim('"', '“', '”', ' ')

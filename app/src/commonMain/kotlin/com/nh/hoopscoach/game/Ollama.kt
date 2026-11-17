@@ -1620,7 +1620,9 @@ object Ollama {
         val engine = OnDeviceAi.engine ?: throw Exception(OnDeviceAi.NOT_HERE)
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) OnDeviceAi.refresh()
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) throw Exception("Gemini Nano: ${OnDeviceAi.stateLabel()}. ${OnDeviceAi.last.detail}".trim())
-        engine.generate(prompt, system, temperature, numPredict, OnDeviceAi.fast(config, desk), onToken).trim()
+        // Gemini Nano writes at most 256 tokens; a longer job is asked to fit, so it ends on a full sentence.
+        val sys = if (numPredict > OnDeviceAi.MAX_OUTPUT) "$system Keep the whole reply under 160 words and finish every sentence." else system
+        engine.generate(prompt, sys, temperature, numPredict.coerceAtMost(OnDeviceAi.MAX_OUTPUT), OnDeviceAi.fast(config, desk), onToken).trim()
             .also { check(it.isNotEmpty()) { "Empty response from Gemini Nano" } }
     }
 
@@ -3788,7 +3790,8 @@ object Ollama {
             Personality.seedRoster(players)
             return@withContext Result.success(PersonalityPass(players.count { it.has(Trait.GUNNER) || it.has(Trait.PASS_FIRST) }, false, "Rule-based seeding (AI personalities off)."))
         }
-        val targets = players.filter { it.teamId >= 0 }.sortedByDescending { it.ovr }.take(12)
+        val onPhone = route(config, dialogue = true) == "nano"
+        val targets = players.filter { it.teamId >= 0 }.sortedByDescending { it.ovr }.take(if (onPhone) 8 else 12)
         if (targets.isEmpty()) return@withContext Result.success(PersonalityPass(0, false, "No roster players."))
 
         val rosterLines = targets.joinToString("\n") { p ->
@@ -3798,7 +3801,7 @@ object Ollama {
             appendLine("You are a basketball scout. Assign ONE on-court personality to each player.")
             appendLine("Roles: GUNNER (confident scorer who takes tough shots), PASS_FIRST (unselfish, looks for teammates), or BALANCED.")
             appendLine("Format EXACTLY one line per player:")
-            appendLine("ID|ROLE|Short scout note (max 18 words)")
+            appendLine("ID|ROLE|Short scout note (max ${if (onPhone) 10 else 18} words)")
             appendLine("Roster:")
             appendLine(rosterLines)
         }

@@ -97,7 +97,8 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
     override suspend fun generate(prompt: String, system: String, temperature: Double, maxTokens: Int, fast: Boolean, onToken: ((String) -> Unit)?): String = lock.withLock {
         val m = client(fast)
         if (tokenLimit <= 0) tokenLimit = runCatching { m.getTokenLimit() }.getOrDefault(4000).takeIf { it > 0 } ?: 4000
-        val out = maxTokens.coerceIn(32, 1024)
+        // AICore takes 1 to 256 output tokens a reply (about 180 words).
+        val out = maxTokens.coerceIn(16, OnDeviceAi.MAX_OUTPUT)
         // About 3 characters a token, leaving room for the instructions and the reply.
         val budget = ((tokenLimit - out - 96).coerceAtLeast(500) * 3.0).toInt() - system.length
         var input = OnDeviceAi.fit(prompt, budget.coerceAtLeast(1200))
