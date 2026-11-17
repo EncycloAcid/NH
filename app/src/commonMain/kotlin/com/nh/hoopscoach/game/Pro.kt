@@ -250,9 +250,12 @@ object ProLeague {
         )
         // An era career in college joins the league the year he's drafted, after the years he spent in school.
         val inEra = era != Era.TODAY && college.era == era.name && college.season >= era.year
+        val arrive = firstSeason(college, era, inEra)
+        // A son arriving after the last real season: the last real league, aged forward to the year he arrives.
+        val base = if (inEra && !RealSeasons.has(arrive) && college.lineage.isNotEmpty()) (arrive - 1 downTo era.year).firstOrNull { RealSeasons.has(it) } else null
         // A past era has only the teams that existed in the season he arrives (23 in 1985-86, 25 in 1988-89),
         // under their names then (the Bobcats in 2006-07, the Hornets and Pelicans by 2016-17).
-        val startList = if (era != Era.TODAY) EraData.teams(firstSeason(college, era, inEra)) ?: EraData.teams(era.year) else null
+        val startList = if (era != Era.TODAY) EraData.teams(arrive) ?: base?.let { EraData.teams(it) } ?: EraData.teams(era.year) else null
         val teams = mutableListOf<Team>()
         for (f in TEAMS) {
             val fr = startList?.firstOrNull { it.slot == f.abbr }
@@ -280,6 +283,8 @@ object ProLeague {
         lg.heroId = college.heroId
         lg.road = r
         lg.proState = ProState(era = era.name, realTeams = startList != null)
+        // Legacy mode: the family goes with him.
+        lg.lineage += college.lineage
         for (t in teams) {
             val c = Coach(lg.nextCoachId++, Rng.pick(Names.first), Rng.pick(Names.last), Rng.range(38, 66), t.id,
                 Rng.range(55, 92), Rng.range(55, 92), Rng.range(40, 80), Rng.range(50, 90), Rng.int(0, 1_000_000))
@@ -291,12 +296,12 @@ object ProLeague {
             for (t in teams) {
                 for (np in NbaData.PLAYERS.filter { it.team == t.id }.sortedByDescending { it.ovr }.take(REAL_ROSTER)) makeReal(lg, np, t)
             }
-        } else if (RealSeasons.has(firstSeason(college, era, inEra))) {
+        } else if (RealSeasons.has(base ?: arrive)) {
             // The real rosters of the season he arrives (an era career), or of the era's first season: every
             // player on the team he really opened that season with. His college classmates come in below.
             val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
             val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
-            fillReal(lg, firstSeason(college, era, inEra), heroClass + stillInSchool + hero.name)
+            fillReal(lg, base ?: arrive, heroClass + stillInSchool + hero.name)
         } else {
             // The era's stars on their real teams, and generated players around them. Clubs that didn't exist yet are all generated.
             val stars = Eras.stars(era)
@@ -315,12 +320,13 @@ object ProLeague {
         lg.reindex()
         // The real rosters are the 2025-26 league. The years the user spent in college pass for them too:
         // everyone ages, develops or declines, the oldest retire, and young draftees take the open spots.
-        if (era == Era.TODAY) repeat((college.season + 1 - DATA_SEASON).coerceIn(0, 8)) { pastYear(lg) }
+        // A son's league (legacy mode) is his father's, however many years on: everyone he played with has moved on.
+        if (era == Era.TODAY) repeat((college.season + 1 - DATA_SEASON).coerceIn(0, if (college.lineage.isNotEmpty()) 40 else 8)) { pastYear(lg) }
         // An era career: the years he spent in college pass for the pros too, with that year's teams and real draft class
         // (the players still in college, or drafted with him, come in below as his classmates instead).
         val heroClass = college.draftHistory.filter { it.season == college.season }.mapNotNull { college.anyPlayer(it.pid)?.name }.toSet()
         val stillInSchool = college.players.filter { it.teamId >= 0 }.map { it.name }.toSet()
-        if (inEra && !RealSeasons.has(firstSeason(college, era, inEra))) for (y in era.year..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
+        if (inEra && !RealSeasons.has(arrive)) for (y in (base ?: era.year)..college.season) pastYear(lg, y, heroClass + stillInSchool, draft = y < college.season)
         // Picks go by the order planned on Draft Night, to the team in that franchise's place.
         val eraList = if (inEra) EraData.teams(college.season + 1) else null
         fun teamFor(pick: Int): Team {
@@ -377,6 +383,7 @@ object ProLeague {
         Payroll.sign(lg, fresh = true)
         Picks.ensure(lg)
         Longevity.assignReal(lg)
+        runCatching { LegacyMode.checkMarks(lg) }
         return lg
     }
 
@@ -1314,6 +1321,7 @@ object ProCareer {
         val h = lg.playerOrNull(lg.heroId) ?: return
         val t = lg.team(h.teamId)
         Leadership.seasonEnd(lg)
+        runCatching { LegacyMode.seasonEnd(lg) }
         val endorse = endorsements(lg)
         r.earned += endorse
         // His signature shoe: this year's sales, next year's model, or offers once he's a star.

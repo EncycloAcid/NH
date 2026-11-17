@@ -158,6 +158,16 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private val heroClutch = if (heroId >= 0) Road.clutchBonus(lg) else 0.0
     /** His hometown crowd: a lift on every shot at home when he plays for his city's team. */
     private val heroHome = if (heroId >= 0) Hometown.shotBonus(lg, game) else 0.0
+    /** His father in the stands for a big game, and the gym his father made famous ([LegacyMode]). */
+    private val family = if (heroSide >= 0) runCatching { LegacyMode.heroEdge(lg, game) }.getOrDefault(0.0) else 0.0
+
+    /** Everyone's badge tiers tonight, by player id ([Badges]). */
+    private val badgeTiers: Map<Int, IntArray> = runCatching { (rosters[0] + rosters[1]).associate { it.id to Badges.tiers(lg, it) } }.getOrDefault(emptyMap())
+    private fun bt(p: Player, b: Badge) = badgeTiers[p.id]?.getOrNull(b.ordinal) ?: 0
+    private fun best(side: List<Player>, b: Badge, except: Int = -1) = side.maxOfOrNull { if (it.id == except) 0 else bt(it, b) } ?: 0
+    private fun shotBadge(type: Int) = when (type) { 0 -> Badge.RIM_WRECKER; 1 -> Badge.PULL_UP; else -> Badge.SNIPER }
+    /** The user's player's baskets tonight: inside, mid-range, threes (his badge points). */
+    private val heroMakes = IntArray(3)
     /** A Game 7, an elimination game or a close-out: more big moments, and they start earlier. */
     val bigNight: String = if (heroSide >= 0) BigNights.stakes(lg, game) else ""
 
@@ -201,9 +211,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         p += chem[o].first + psyche[o] * RivalryPsyche.MAKE
         if (shooter.id in homecoming) p += 0.025
         if (shooter.has(Trait.CLUTCH) && abs(trail) <= 5) p += 0.03
+        p += bt(shooter, shotBadge(type)) * shotBadge(type).step + (if (abs(trail) <= 5) bt(shooter, Badge.ICE_WATER) * Badge.ICE_WATER.step else 0.0)
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
-        if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) + heroHome - heroTired
+        if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) + heroHome + family - heroTired
         return p.coerceIn(0.12, 0.82)
     }
 
@@ -256,7 +267,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         road?.let { it.moments++ }
         fun stolen(loser: Player, how: String) {
             line(o, loser).tov++
-            val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+            val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) * (1 + bt(it, Badge.BALL_HAWK) * 0.4) }
             line(d, stealer).stl++
             log(d, "${stealer.short} $how ${loser.short}!", 0)
             lastMoment = "Turned over. ${stealer.short} $how ${loser.short}."
@@ -424,6 +435,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         if (pbp) {
             val a = teams[1]; val h = teams[0]
             log(-1, "Tip-off: ${a.school} at ${h.school}${if (game.neutral) " (neutral site)" else ""}", 0)
+            if (family > 0) runCatching { LegacyMode.standsLine(lg, game) }.getOrNull()?.let { log(-1, it, 0) }
             if (!lg.pro && era != CollegeEra.MODERN) log(-1, "Era rules: ${era.rulesSummary()}", 0)
         }
     }
@@ -607,6 +619,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val (x, y) = ShotChart.spot(type, what)
         lastSx = x.toFloat(); lastSy = y.toFloat()
         ShotChart.tally(lg, p, ShotChart.zone(type, x, y), made)
+        if (made && p.id == heroId) heroMakes[type.coerceIn(0, 2)]++
         shotLog += ShotChart.pack(p.id, side, x, y, made, type)
     }
 
@@ -993,6 +1006,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         when (off(o)) { Offense.UPTEMPO -> pTo += 0.01; Offense.GRIND -> pTo -= 0.012; else -> {} }
         if (o == 1) pTo += HomeCourt.visitorTurnovers(court)
         pTo -= chem[o].second + psyche[o] * RivalryPsyche.TOV
+        // A ball hawk on the floor forces more; a ball handler with a handle gives fewer away.
+        pTo += best(defense, Badge.BALL_HAWK) * Badge.BALL_HAWK.step - bt(handler, Badge.TIGHT_HANDLES) * Badge.TIGHT_HANDLES.step
         pTo -= (coaches[o].off - 70) * 0.0004 * coaching
         if (lg.pro) pTo *= 0.9
         pTo = pTo.coerceIn(0.07, 0.3)
@@ -1002,7 +1017,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val kind = Rng.d()
             when {
                 kind < 0.55 -> {
-                    val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) }
+                    val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) * (1 + bt(it, Badge.BALL_HAWK) * 0.4) }
                     line(d, stealer).stl++
                     log(d, "${stealer.short} steals it from ${loser.short}", 0, "steal", stealer.id, loser.id, o)
                 }
@@ -1062,6 +1077,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             pMake += chem[o].first + psyche[o] * RivalryPsyche.MAKE
             if (shooter.id in homecoming) pMake += 0.025
             if (lift[o] > 0 && shooter.id != heroId && offense.any { it.id == heroId }) pMake += lift[o]
+            // Badges: the shooter's, the best passer's on the floor, and the defense's ([Badges]).
+            pMake += bt(shooter, shotBadge(type)) * shotBadge(type).step + best(offense, Badge.FLOOR_GENERAL, shooter.id) * Badge.FLOOR_GENERAL.step
+            if (finalPeriod && clock < 120 && abs(trail) <= 5) pMake += bt(shooter, Badge.ICE_WATER) * Badge.ICE_WATER.step
+            pMake -= if (type == 0) best(defense, Badge.RIM_PROTECTOR) * Badge.RIM_PROTECTOR.step else (guard?.let { bt(it, Badge.LOCKDOWN) } ?: 0) * Badge.LOCKDOWN.step
             when (def(d)) {
                 Defense.ZONE -> if (type == 0) pMake -= 0.03 else if (type == 2) pMake += 0.012
                 Defense.PRESS -> if (type == 0) pMake += 0.03
@@ -1073,7 +1092,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.GRIND) pMake += 0.015
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && finalPeriod && clock < 120 && abs(trail) <= 5) pMake += 0.03
-            if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) + heroHome - heroTired
+            if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) + heroHome + family - heroTired
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
@@ -1091,7 +1110,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
             val foulP = when (type) { 0 -> 0.2; 1 -> 0.06; else -> 0.022 } * (if (lg.pro) SHOOTING_FOUL_PRO * proEra.fouls else SHOOTING_FOUL_COLLEGE * era.fouls)
             val fouled = Rng.chance(foulP)
-            val made = Rng.chance(if (fouled) pMake * 0.62 else pMake)
+            val made = Rng.chance(if (fouled) pMake * (0.62 + bt(shooter, Badge.AND_ONE) * Badge.AND_ONE.step) else pMake)
             // Before the three-point line, a long jumper is still just a two.
             val countsThree = type == 2 && (lg.pro || era.hasThrees)
             val pts = if (countsThree) 3 else 2
@@ -1122,7 +1141,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
                     val mates = offense.filter { it.id != shooter.id }
                     if (mates.isNotEmpty()) {
                         // The best passers, point guards above all, get most of the assists.
-                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) * Tendency.pass(it) * spec(it) }
+                        val passer = Rng.weighted(mates) { exp((it[Attr.PAS] - 70) / 20.0) * posAst(it.pos) * Tendency.pass(it) * spec(it) * (1 + bt(it, Badge.FLOOR_GENERAL) * 0.3) }
                         line(o, passer).ast++
                         astText = " (${passer.short} assists)"
                     }
@@ -1182,7 +1201,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (Rng.chance(pBlk)) {
                 // Rim protectors, big men above all, get most of the blocks.
                 // Rim protectors get most blocks at the rim; on jump shots anyone closing out can get a hand on it.
-                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) * spec(it) }
+                val b = Rng.weighted(defense) { (it[Attr.BLK] / 70.0).pow(3) * (if (type == 0) posBlk(it.pos) else 1.0) * Tendency.blk(it) * spec(it) * (1 + bt(it, Badge.RIM_PROTECTOR) * 0.35) }
                 line(d, b).blk++
                 blocked = true
                 if (type == 0) highlight(d, b, "block", Rng.flavorPick(listOf("${b.name} swats ${shooter.name} at the rim", "${b.name} pins ${shooter.name}'s layup off the glass", "${b.name} sends ${shooter.name}'s shot into the stands", "${b.name} meets ${shooter.name} at the rim and rejects it")) +
@@ -1216,7 +1235,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     /** Who grabs a rebound: good rebounders, big men and tall wings most, but guards chase long ones too. */
     private fun rebounder(side: List<Player>) = Rng.weighted(side) {
-        (it[Attr.REB] / 70.0).pow(if (lg.pro) 1.6 else 2.0) * posReb(it.pos) * heightReb(it) * Tendency.reb(it) * spec(it)
+        (it[Attr.REB] / 70.0).pow(if (lg.pro) 1.6 else 2.0) * posReb(it.pos) * heightReb(it) * Tendency.reb(it) * spec(it) * (1 + bt(it, Badge.GLASS_CLEANER) * Badge.GLASS_CLEANER.step)
     }
 
     /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
@@ -1449,6 +1468,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Moments.afterGame(lg, game, buzzerBeater, forcedOt)
         }
         if (lg.pro) RecordBook.afterGame(lg, lines)
+        if (heroSide >= 0) runCatching { lg.playerOrNull(heroId)?.let { h -> lines[heroSide][heroId]?.let { Badges.afterGame(lg, h, it, heroMakes) } } }
         if (lg.playerMode) Road.afterGame(lg, game, buzzerBeater)
         if (userInvolved) Ollama.maybeAutoGenerateInterviews(lg.ollama, lg, game)
     }

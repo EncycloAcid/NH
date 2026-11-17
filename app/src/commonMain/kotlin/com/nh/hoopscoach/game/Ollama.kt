@@ -1636,9 +1636,10 @@ object Ollama {
         if (!OnDeviceAi.onScreen) throw OnDeviceAi.Refused(OnDeviceAi.Refused.Kind.OFF_SCREEN, "Gemini Nano only writes while the game is on screen, so the game wrote this one")
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) OnDeviceAi.refresh()
         if (OnDeviceAi.last.state != OnDeviceAi.State.READY) throw Exception("Gemini Nano: ${OnDeviceAi.stateLabel()}. ${OnDeviceAi.last.detail}".trim())
-        // Gemini Nano writes at most 256 tokens; a longer job is asked to fit, so it ends on a full sentence.
-        val sys = if (numPredict > OnDeviceAi.MAX_OUTPUT) "$system Keep the whole reply under 160 words and finish every sentence." else system
-        engine.generate(prompt, sys, temperature, numPredict.coerceAtMost(OnDeviceAi.MAX_OUTPUT), OnDeviceAi.fast(config, desk), onToken).trim()
+        // Gemini Nano writes 256 tokens a request, chained up to the reply-length setting; a longer job is asked to fit.
+        val cap = OnDeviceAi.replyTokens(config)
+        val sys = if (numPredict > cap) "$system Keep the whole reply under ${OnDeviceAi.words(cap)} words and finish every sentence." else system
+        engine.generate(prompt, sys, temperature, numPredict.coerceAtMost(cap), OnDeviceAi.fast(config, desk), onToken).trim()
             .also { check(it.isNotEmpty()) { "Empty response from Gemini Nano" } }
     }
 
@@ -1804,7 +1805,7 @@ object Ollama {
         var gotResponse = false
         val longForm = wantsArticle
         val writingPrompt = prompt + (if (longForm) "\n${ArticleWriting.instruction(config, nano, items)}" else "") +
-            (if (nano && !longForm && numPredict > OnDeviceAi.MAX_OUTPUT) "\n${ArticleWriting.SHORT_ROOM}" else "")
+            (if (nano && !longForm && numPredict > OnDeviceAi.replyTokens(config)) "\n${ArticleWriting.shortRoom(config)}" else "")
         val result = AiGrounding.generate(facts, writingPrompt, { raw -> validateDraft(raw) + if (longForm) ArticleWriting.errors(raw, config, nano, items) else emptyList() }, withInstructions = false) { grounded ->
             generate(config, grounded, system = "$system ${AiGrounding.instructions}", numPredict = if (longForm) ArticleWriting.budget(config, nano) * items else numPredict, onToken = onToken, desk = desk).also {
                 gotResponse = it.isSuccess

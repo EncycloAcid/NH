@@ -55,8 +55,14 @@ object OnDeviceAi {
     fun fast(config: OllamaConfig, desk: Desk?): Boolean =
         if (desk == null) config.nanoFast else config.nanoSizes[desk.name]?.let { it == "fast" } ?: !desk.fullByDefault
 
-    /** The most a Gemini Nano reply can be, in tokens (AICore's limit; about 180 words). */
+    /** The most one Gemini Nano request writes, in tokens (AICore's limit; about 160 words). */
     const val MAX_OUTPUT = 256
+
+    /** How long a reply can be: [MAX_OUTPUT] a request, chained up to the setting (256, 512 or 768). */
+    fun replyTokens(config: OllamaConfig): Int = config.nanoReplyTokens.coerceIn(MAX_OUTPUT, MAX_OUTPUT * 3)
+
+    /** About how many words fit in [tokens]. */
+    fun words(tokens: Int): Int = (tokens * 0.62).toInt() / 10 * 10
 
     const val NAME = "Gemini Nano"
     const val NOT_HERE = "Gemini Nano runs on Android phones with AICore (Pixel 9 and newer), not on this device."

@@ -571,7 +571,7 @@ class GameViewModel : ViewModel() {
                         val dad = L.ancestorOf(old) ?: error("No career to hand down")
                         val world = L.newWorld(old, dad)
                         val spec = L.sonSpec(dad, first, pos)
-                        val son = com.nh.hoopscoach.game.Road.createHero(world, spec).also { L.inherit(it, dad) }
+                        val son = com.nh.hoopscoach.game.Road.createHero(world, spec).also { L.inherit(it, dad, world.lineage) }
                         Triple(world, spec, son to L.withFatherOffer(world, son, dad, com.nh.hoopscoach.game.Road.offers(world, son)))
                     }
                 }

@@ -97,11 +97,35 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
     override suspend fun generate(prompt: String, system: String, temperature: Double, maxTokens: Int, fast: Boolean, onToken: ((String) -> Unit)?): String = lock.withLock {
         val m = client(fast)
         if (tokenLimit <= 0) tokenLimit = runCatching { m.getTokenLimit() }.getOrDefault(4000).takeIf { it > 0 } ?: 4000
-        // AICore takes 1 to 256 output tokens a reply (about 180 words).
-        val out = maxTokens.coerceIn(16, OnDeviceAi.MAX_OUTPUT)
+        // AICore writes 1 to 256 output tokens a request; a longer reply (the reply-length setting) is chained.
+        val want = maxTokens.coerceIn(16, OnDeviceAi.MAX_OUTPUT * 3)
+        val out = want.coerceAtMost(OnDeviceAi.MAX_OUTPUT)
         // About 3 characters a token, leaving room for the instructions and the reply.
-        val budget = ((tokenLimit - out - 96).coerceAtLeast(500) * 3.0).toInt() - system.length
-        var input = OnDeviceAi.fit(prompt, budget.coerceAtLeast(1200))
+        val budget = (((tokenLimit - out - 96).coerceAtLeast(500) * 3.0).toInt() - system.length).coerceAtLeast(1200)
+        val input = OnDeviceAi.fit(prompt, budget)
+        var (text, capped) = ask(m, input, system, temperature, out, onToken)
+        var written = out
+        // Stopped at the cap with room left in the reply: ask it to go on from exactly where it stopped. The
+        // instructions are the same cached prefix; the new part is the reply so far.
+        while (capped && written + 32 < want) {
+            val more = (want - written).coerceAtMost(OnDeviceAi.MAX_OUTPUT)
+            val sofar = "\n\nYOUR REPLY SO FAR (continue it from exactly where it stops: don't repeat any of it, don't start over, keep the same format):\n$text"
+            val next = runCatching {
+                delay(300)
+                ask(m, OnDeviceAi.fit(input, (budget - sofar.length).coerceAtLeast(1200)) + sofar, system, temperature, more, onToken)
+            }.getOrNull() ?: break
+            if (next.first.isBlank()) break
+            text = join(text, next.first)
+            capped = next.second
+            written += more
+        }
+        // Still stopped at the cap: don't end on half a sentence.
+        if (capped) OnDeviceAi.tidy(text) else text
+    }
+
+    /** One request: the reply, and whether it stopped at the token cap (FinishReason.MAX_TOKENS). */
+    private suspend fun ask(m: GenerativeModel, prompt: String, system: String, temperature: Double, out: Int, onToken: ((String) -> Unit)?): Pair<String, Boolean> {
+        var input = prompt
         var attempt = 0
         while (true) {
             try {
@@ -122,9 +146,7 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
                     }
                 })
                 val candidate = response.candidates.firstOrNull()
-                val text = candidate?.text.orEmpty().ifBlank { streamed.toString() }
-                // Stopped at the token cap (FinishReason.MAX_TOKENS): don't end on half a sentence.
-                return@withLock if (candidate?.finishReason == 1) OnDeviceAi.tidy(text) else text
+                return candidate?.text.orEmpty().ifBlank { streamed.toString() } to (candidate?.finishReason == 1)
             } catch (e: GenAiException) {
                 attempt++
                 // A phone that won't take a cached prefix: send the instructions in the prompt from now on.
@@ -141,7 +163,12 @@ class GeminiNanoEngine : OnDeviceAi.Engine {
                 throw refusal(e)
             }
         }
-        @Suppress("UNREACHABLE_CODE") ""
+    }
+
+    /** The reply so far and its continuation, joined at the seam. */
+    private fun join(a: String, b: String): String {
+        val seamless = a.isEmpty() || a.last().isWhitespace() || b.first().isWhitespace() || b.first() in ".,;:!?)'’\"-"
+        return if (seamless) a + b else "$a $b"
     }
 
     /** AICore's error as a refusal the game's traffic control understands (rest a moment, rest for the day...). */

@@ -160,6 +160,8 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         }
         item { HeroTodayCard(vm, lg) }
         item { PlayerInbox(vm, lg, press = false) }
+        item { HeroBadgesCard(vm, lg) }
+        if (lg.lineage.isNotEmpty()) item { LegacyCard(vm, lg) }
         item { StorylinesPanel(vm, lg) }
         item { TitleDefenseCard(lg) }
         item { TvCard(vm, lg) }
@@ -1870,8 +1872,11 @@ fun ProEnding(vm: GameViewModel, lg: League) {
 fun GoProScreen(vm: GameViewModel, lg: League) {
     val r = lg.road ?: return
     val h = lg.hero ?: return
-    // A career that started in an era goes pro into it; otherwise pick one here.
-    val careerEra = com.nh.hoopscoach.game.Era.entries.firstOrNull { it.name == lg.era && it != com.nh.hoopscoach.game.Era.TODAY }
+    // A career that started in an era goes pro into it, and a son (legacy mode) into his father's, years on;
+    // otherwise pick one here.
+    val legacy = lg.lineage.isNotEmpty()
+    val careerEra = com.nh.hoopscoach.game.Era.entries.firstOrNull { it.name == lg.era && (legacy || it != com.nh.hoopscoach.game.Era.TODAY) }
+        ?: if (legacy) com.nh.hoopscoach.game.Era.TODAY else null
     var era by remember { mutableStateOf(careerEra ?: com.nh.hoopscoach.game.Era.TODAY) }
     val pick = lg.draftHistory.lastOrNull { it.pid == h.id }
     Column(Modifier.fillMaxSize()) {
@@ -1892,10 +1897,13 @@ fun GoProScreen(vm: GameViewModel, lg: League) {
                     com.nh.hoopscoach.game.RealSeasons.season(lg.season + 1).filter { it.g >= 20 }
                         .sortedByDescending { com.nh.hoopscoach.game.RealSeasons.rating2k(it) * 100 + it.ppg }.map { it.name }.distinct().take(4)
                 }
+                val dad = com.nh.hoopscoach.game.LegacyMode.father(lg)
                 Panel {
                     Text("THE ${lg.season}-${((lg.season + 1) % 100).toString().padStart(2, '0')} NBA", style = T.label, color = P.accent)
-                    Text(if (stars.isNotEmpty()) stars.joinToString(", ") else careerEra.title, style = T.head, color = P.ink)
-                    Text("${teams?.size ?: 30} teams, each with the real roster it opened that season: real ratings, real photos, the real draft classes every summer after.", style = T.small, color = P.sub)
+                    Text(if (stars.isNotEmpty()) stars.joinToString(", ") else if (dad != null) "Your father's league, ${(lg.season + 1 - (dad.played.lastSeason.takeIf { it > 0 } ?: lg.season)).coerceAtLeast(1)} years on" else careerEra.title, style = T.head, color = P.ink)
+                    Text(if (stars.isNotEmpty()) "${teams?.size ?: 30} teams, each with the real roster it opened that season: real ratings, real photos, the real draft classes every summer after."
+                        else "The league he played in, years later: the players he knew have moved on, and a new generation runs it." +
+                            (if (dad != null) " You go in as ${dad.name}'s son." else ""), style = T.small, color = P.sub)
                     Text(eraRules(careerEra), style = T.label.copy(fontSize = 10.sp), color = P.faint, modifier = Modifier.padding(top = 4.dp))
                 }
             } else item { EraPicker(era) { era = it } }

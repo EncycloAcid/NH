@@ -1,6 +1,8 @@
 package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,5 +214,94 @@ fun YourSonPanel(vm: GameViewModel, lg: League) {
             }
             Chevron()
         }
+    }
+}
+
+/**
+ * Today, for a son (legacy mode): how big the name is, this season against his father's at the same point,
+ * the father's marks he's chasing, whether his father will be in the stands next game, and the badges he
+ * was born with a head start on.
+ */
+@Composable
+fun LegacyCard(vm: GameViewModel, lg: League) {
+    val dad = LegacyMode.father(lg) ?: return
+    val h = lg.hero ?: return
+    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
+    val tier = LegacyMode.tier(lg)
+    val marks = LegacyMode.marks(lg)
+    val family = dad.last.substringBefore(" Jr.").substringBefore(" II").substringBefore(" IV").trim()
+    Section("The $family legacy")
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AncestorPortrait(lg, dad, 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("GENERATION ${lg.lineage.size + 1} · ${LegacyMode.TIER_NAMES[tier].uppercase()}", style = T.label.copy(fontSize = 10.sp), color = P.gold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(dad.name, style = T.bodyB, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(LegacyMode.resume(dad).replaceFirstChar { it.uppercase() } + ".", style = T.small, color = P.sub, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        // This season against his father's at the same point.
+        val dadPpg = if (!lg.pro) dad.seasons.firstOrNull { it.cls == h.year }?.ppg else LegacyMode.proPpg(dad).takeIf { it > 0 }
+        if (dadPpg != null) {
+            Spacer(Modifier.height(10.dp))
+            Hairline()
+            val mine = h.stats.ppg
+            val ahead = h.stats.gp > 0 && mine >= dadPpg
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (!lg.pro) "THIS SEASON VS DAD AS A ${clsName(h.year).uppercase()}" else "THIS SEASON VS DAD'S NBA AVERAGE", style = T.label.copy(fontSize = 9.sp), color = P.faint)
+                    Text(when {
+                        h.stats.gp == 0 -> "The season hasn't started."
+                        ahead -> "Out of his shadow so far."
+                        mine >= dadPpg - 2 -> "Right on his heels."
+                        else -> "Still chasing him."
+                    }, style = T.small, color = if (ahead) P.good else P.sub)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(if (h.stats.gp > 0) "%.1f".format(mine) else "—", style = T.numSm, color = if (ahead) P.good else P.ink)
+                    Text("YOU", style = T.label.copy(fontSize = 8.sp), color = P.accent)
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("%.1f".format(dadPpg), style = T.numSm, color = P.sub)
+                    Text("DAD", style = T.label.copy(fontSize = 8.sp), color = P.faint)
+                }
+            }
+        }
+        // He'll be there for the next big one.
+        lg.games.filter { !it.played && it.involves(h.teamId) }.minByOrNull { it.day }?.takeIf { LegacyMode.dadInStands(lg, it) }?.let { g ->
+            val opp = lg.team(g.opp(h.teamId))
+            Text("Your father will be in the stands for ${if (lg.pro) opp.name else opp.school}: a lift on your shots.", style = T.small, color = P.accent, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (marks.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Hairline()
+            Text("CHASING DAD · ${marks.count { it.done }} OF ${marks.size}", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+            marks.forEach { m ->
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(18.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (m.done) P.good else P.surface2), contentAlignment = Alignment.Center) {
+                        if (m.done) androidx.compose.material3.Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(m.goal, style = T.small, color = if (m.done) P.ink else P.sub, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(6.dp))
+                    Text(m.dad, style = T.small.copy(fontSize = 11.sp), color = P.faint, maxLines = 1)
+                }
+            }
+            Text("Each one you pass: a skill point and a bigger following.", style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (dad.badges.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Hairline()
+            Text("HIS BADGES · YOU STARTED WITH A HEAD START", style = T.label.copy(fontSize = 9.sp), color = P.faint, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                dad.badges.entries.sortedByDescending { it.value }.take(7).forEach { (name, t) ->
+                    com.nh.hoopscoach.game.Badge.entries.firstOrNull { it.name == name }?.let { BadgeMedal(it, t, 26.dp) }
+                }
+            }
+        }
+        val log = lg.road?.legacyLog.orEmpty()
+        if (log.isNotEmpty()) Text(log.takeLast(2).joinToString("\n"), style = T.small.copy(fontSize = 11.sp), color = P.faint, modifier = Modifier.padding(top = 8.dp))
     }
 }

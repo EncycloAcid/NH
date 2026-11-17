@@ -280,6 +280,7 @@ object Road {
         val t = lg.team(h.teamId)
         Leadership.seasonEnd(lg)
         runCatching { PlayerCareer.seasonEnd(lg) }
+        runCatching { LegacyMode.seasonEnd(lg) }
         val signed = r.dealSeason == lg.season
         val upfront = if (signed && r.paidSeason == lg.season) guaranteed(r.deal, r.dealBase) else 0
         val paid = if (signed) guaranteed(r.deal, r.dealBase) + bonus(lg, h) else 0
@@ -462,6 +463,7 @@ object Road {
         if (winner) lg.news += News(lg.season, lg.day, "${h.name}'s game-winner goes viral: ${count(r.followers)} followers and counting", true)
         if (won && r.persona <= -4) t.fans = (t.fans + 0.6).coerceAtMost(100.0)
         payMilestones(lg)
+        runCatching { LegacyMode.afterGame(lg, g, line) }
         r.press = pressFor(lg, g, h, line, t, opp, won, rivalry, score, winner, duel)
         Ollama.maybeAutoGeneratePress(lg.ollama, lg, g, h, line, won, rivalry, winner)
         if (lg.pro) BigNights.afterGame(lg, g, line, won, winner, stakes)

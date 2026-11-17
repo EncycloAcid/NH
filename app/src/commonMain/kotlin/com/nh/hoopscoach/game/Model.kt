@@ -340,6 +340,8 @@ class Player(
     var skillPts: Int = 0,
     var skills: MutableList<String> = mutableListOf(),
     var skillInit: Boolean = false,
+    /** Badge points the user's player has earned in games, by [Badge] name ([Badges]). */
+    var badgeXp: MutableMap<String, Int> = mutableMapOf(),
     var careerLevels: Int = 0,
     var seasonGains: IntArray = IntArray(10),
     var ovrHistory: MutableList<Int> = mutableListOf(),
@@ -877,6 +879,11 @@ class OllamaConfig(
     /** Gemini Nano's model for each desk ([OnDeviceAi.Desk] name to "fast" or "full"); missing ones use the desk's default. */
     var nanoSizes: MutableMap<String, String> = mutableMapOf(),
     /**
+     * How long a Gemini Nano reply can be, in tokens: AICore writes 256 a request, so 512 and 768 chain a second
+     * and third request that continues where it stopped (more of the on-device allowance per reply).
+     */
+    var nanoReplyTokens: Int = 512,
+    /**
      * One AI call a week (the Hoops Dispatch) instead of a story desk every night. Always on for Gemini Nano,
      * whose daily allowance is small.
      */
@@ -1210,6 +1217,9 @@ class SchoolOffer(val teamId: Int, val nil: Int, val role: String, val ahead: In
 class RoadState(
     /** His senior year of high school, if he played it ([SeniorYear]). */
     var hs: HighSchool? = null,
+    /** Legacy mode: the father's marks he's passed ([LegacyMode.marks]) and each season against his father. */
+    val legacyMarks: MutableList<String> = mutableListOf(),
+    val legacyLog: MutableList<String> = mutableListOf(),
     var startSeason: Int = 0,
     var dealSeason: Int = 0,
     var deal: NilDeal = NilDeal.NONE,

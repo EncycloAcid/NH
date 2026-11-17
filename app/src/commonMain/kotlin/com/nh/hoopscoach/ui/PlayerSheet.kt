@@ -283,7 +283,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
         }
         item {
             when (tab) {
-                0 -> RatingsTab(p)
+                0 -> { RatingsTab(p); BadgesPanel(vm, lg, p) }
                 1 -> CareerTab(vm, lg, p)
                 2 -> {
                     val canSpend = (!lg.playerMode && p.teamId == lg.userTeamId) || p.id == lg.heroId

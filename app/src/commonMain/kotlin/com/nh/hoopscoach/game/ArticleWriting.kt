@@ -5,19 +5,24 @@ object ArticleWriting {
     fun small(config: OllamaConfig) = config.provider.lowercase() == "ollama" && (config.speedMode == "turbo" || Regex("(?i)(1b|3b|small)").containsMatchIn(config.model))
     /** Gemini Nano on the phone: 256 tokens a reply, so a short article. */
     fun tiny(config: OllamaConfig) = config.provider.equals("nano", true)
-    fun budget(config: OllamaConfig, tiny: Boolean = tiny(config)) = if (tiny) OnDeviceAi.MAX_OUTPUT else if (small(config)) 850 else 1800
+    fun budget(config: OllamaConfig, tiny: Boolean = tiny(config)) = if (tiny) OnDeviceAi.replyTokens(config) else if (small(config)) 850 else 1800
 
-    /** For Gemini Nano on a format of short blocks (a package of beats): what fits in one short reply. */
-    const val SHORT_ROOM = "Room is short (about 170 words in all): keep every body to two or three sentences, write at most three blocks where the format lets you leave some out, and finish every sentence."
+    /** For Gemini Nano on a format of short blocks (a package of beats): what fits in its reply. */
+    fun shortRoom(config: OllamaConfig): String {
+        val cap = OnDeviceAi.replyTokens(config)
+        return "Room is short (about ${OnDeviceAi.words(cap)} words in all): keep every body to ${if (cap >= 512) "three or four" else "two or three"} sentences, " +
+            "write at most ${if (cap >= 768) "five" else if (cap >= 512) "four" else "three"} blocks where the format lets you leave some out, and finish every sentence."
+    }
 
     /**
      * How long to write. [tiny]: Gemini Nano answers (about 180 words a reply). [items]: several stories in one reply
      * (three scoops, rumors or preview storylines), each sized so all of them fit.
      */
     fun instruction(config: OllamaConfig, tiny: Boolean = tiny(config), items: Int = 1): String {
+        val cap = OnDeviceAi.replyTokens(config)
         val size = when {
-            tiny && items > 1 -> "one short paragraph of 20-30 words"
-            tiny -> "3-5 short paragraphs, 100-160 words"
+            tiny && items > 1 -> if (cap >= 768) "one or two short paragraphs, 60-90 words" else if (cap >= 512) "one short paragraph of 35-55 words" else "one short paragraph of 20-30 words"
+            tiny -> if (cap >= 768) "4-7 paragraphs, 250-400 words" else if (cap >= 512) "3-6 short paragraphs, 180-280 words" else "3-5 short paragraphs, 100-160 words"
             small(config) -> "4-7 substantial paragraphs, 160-240 words"
             else -> "4-7 substantial paragraphs, 250-450 words"
         }
@@ -49,7 +54,8 @@ object ArticleWriting {
         val range = if (brief) 1..3 else if (tiny) 3..7 else 4..7
         buildList {
             if (paragraphs.size !in range) add("article requires ${range.first}-${range.last} paragraphs")
-            if (Regex("\\S+").findAll(body).count() < if (brief) 15 else if (tiny) 90 else if (small(config)) 140 else 220) add("article is too short")
+            val cap = OnDeviceAi.replyTokens(config)
+            if (Regex("\\S+").findAll(body).count() < if (brief) (if (cap >= 768) 40 else if (cap >= 512) 25 else 15) else if (tiny) (if (cap >= 768) 200 else if (cap >= 512) 140 else 90) else if (small(config)) 140 else 220) add("article is too short")
             if (paragraphs.any { !Regex("[.!?][\\\"'’”)]*$").containsMatchIn(it.trim()) }) add("unfinished article sentence")
             if (Regex("(?i)\\b(to|with|and|the|a|an|of|for|in|at|by|from|or|but|because)[.!?][\\\"'’”)]*$").containsMatchIn(body.trim())) add("unfinished article sentence")
         }

@@ -179,4 +179,20 @@ fun NanoModelTable(vm: GameViewModel, lg: League, everythingElse: Boolean) {
         row(d.label, d.blurb, OnDeviceAi.fast(lg.ollama, d)) { f -> vm.act { it.ollama.nanoSizes[d.name] = if (f) "fast" else "full" } }
     }
     if (everythingElse) row("Everything else", "Articles, recaps and the rest", lg.ollama.nanoFast) { f -> vm.act { it.ollama.nanoFast = f } }
+    NanoReplyLength(vm, lg)
+}
+
+/**
+ * How long Gemini Nano's replies can be. AICore writes 256 tokens a request (Google's limit for the on-device
+ * model); Medium and Long ask it to continue where it stopped, for longer articles, speeches and packages.
+ */
+@Composable
+fun NanoReplyLength(vm: GameViewModel, lg: League) {
+    val opts = listOf(256, 512, 768)
+    val now = OnDeviceAi.replyTokens(lg.ollama)
+    Text("REPLY LENGTH", style = T.label.copy(fontSize = 10.sp), color = P.sub, modifier = Modifier.padding(top = 14.dp))
+    Text("AICore writes 256 tokens (about 160 words) a request. Medium and Long continue where it stops, in a second and third request: longer articles and speeches, more of the on-device allowance.",
+        style = T.small, color = P.faint, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+    Segmented(listOf("Short · 256", "Medium · 512", "Long · 768"), opts.indexOf(now).coerceAtLeast(0), { i -> vm.act { it.ollama.nanoReplyTokens = opts[i] } })
+    Text("Up to about ${OnDeviceAi.words(now)} words a reply.", style = T.small, color = P.sub, modifier = Modifier.padding(top = 6.dp))
 }
