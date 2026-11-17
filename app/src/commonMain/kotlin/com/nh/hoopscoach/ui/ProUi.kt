@@ -148,7 +148,6 @@ fun ProTodayScreen(vm: GameViewModel, lg: League) {
         item {
             ScreenHeader("${lg.season} · ${proPhase(lg)}", u.name, teamLine(lg, u)) { HelpButton(vm); TeamBadge(u, 50.dp) }
         }
-        item { GettingStartedCard(vm, lg) }
         // In the playoffs, where your series stands comes first.
         if (lg.phase == Phase.PLAYOFFS) item { PlayoffCard(vm, lg) }
         if (r.tradedSeason == lg.season && r.tradeNote.isNotEmpty() && lg.phase == Phase.REGULAR && lg.day - r.tradedDay in 0..7) item {

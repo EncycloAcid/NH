@@ -1,21 +1,17 @@
 package com.nh.hoopscoach.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -29,12 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.League
-import com.nh.hoopscoach.game.Road
-import com.nh.hoopscoach.game.Shootaround
 
 /** One term in the glossary: what it's called, the section it sits in, and what it means, in a line or two. */
 class HelpTerm(val term: String, val group: String, val text: String, val also: List<String> = emptyList())
@@ -171,100 +164,6 @@ object Help {
         return TERMS.filter { t -> t.term.lowercase().contains(s) || t.also.any { it.contains(s) } || t.text.lowercase().contains(s) }
             .sortedBy { t -> if (t.term.lowercase().contains(s) || t.also.any { it.contains(s) }) 0 else 1 }
     }
-
-    // ---------- getting started ----------
-
-    /** The first season of this career, when the getting-started list shows. */
-    fun firstSeason(lg: League): Boolean = when {
-        lg.playerMode -> {
-            val h = lg.hero
-            h != null && lg.road?.ended != true && (if (lg.pro) h.proYears == 0 else h.career.isEmpty())
-        }
-        else -> runCatching { lg.userCoach.history.none { !lg.pro || it.teamId >= 0 } }.getOrDefault(false)
-    }
-}
-
-/** One getting-started step: done by doing it (or by tapping its button, which takes you there). */
-private class Step(val id: String, val title: String, val detail: String, val done: Boolean, val button: String? = null, val go: (() -> Unit)? = null)
-
-private fun steps(vm: GameViewModel, lg: League): List<Step> {
-    fun tapped(id: String) = id in lg.tipsDone
-    val u = lg.user
-    val played = u.w + u.l > 0
-    val help = Step("help", "Look up any term", "NET, Prestige, Pull, the salary cap... every term the game uses, in a line. The ? on Today opens it any time.",
-        tapped("help"), "Help") { vm.push(Route.Help("")) }
-    return when {
-        lg.playerMode -> {
-            val h = lg.hero
-            val r = lg.road
-            val myGames = (h?.stats?.gp ?: 0) > 0
-            buildList {
-                if (!lg.pro) add(Step("nil", "Sign your NIL deal", "Three offers are waiting on Me. The guaranteed money lands right away.", !Road.needsDeal(lg), "Me") { vm.select(Tab.RECRUIT) })
-                else add(Step("me", "Check your role", "Me shows your minutes, contract, growth and the media around you.", tapped("me"), "Me") { vm.select(Tab.RECRUIT) })
-                if (h != null) add(Step("train", "Pick what you work on", "Your training focus decides which ratings grow fastest. Pick the holes in your game.", tapped("train"), "Focus") { vm.push(Route.Focus(h.id)) })
-                add(Step("game", "Play your first game", "Play takes the court yourself; Sim skips to the box score. Both are on the bar at the bottom.", myGames))
-                add(Step("shoot", "Try the shootaround", "On game days: ten shots before tip-off. Eight or better and you're feeling it that night.",
-                    (r?.shootSeason ?: 0) > 0, if (Shootaround.available(lg)) "Shoot" else null, if (Shootaround.available(lg)) ({ vm.push(Route.Shootaround) }) else null))
-                add(help)
-            }
-        }
-        lg.pro -> listOf(
-            Step("lineup", "Set your rotation", "Starters, minutes and the game plan are on Team, Lineup. Auto lets your staff choose.", tapped("lineup"), "Lineup") { vm.select(Tab.TEAM); vm.teamTab = 1 },
-            Step("payroll", "Know your money", "Payroll has the cap, the tax line and who's expiring. Extend the players you want to keep.", tapped("payroll"), "Payroll") { vm.select(Tab.TEAM); vm.teamTab = 2 },
-            Step("trades", "Visit the trade center", "Trades shows the teams that fit what you need, and the offers that come in.", tapped("trades"), "Trades") { vm.select(Tab.RECRUIT) },
-            Step("game", "Play your first game", "Play coaches it live; Sim day and Next game skip ahead. Both are on the bar at the bottom.", played),
-            help,
-        )
-        else -> listOf(
-            Step("lineup", "Set your lineup", "Pick your starters, split the minutes and choose a game plan on Team, Lineup. Auto lets your staff choose.", tapped("lineup"), "Lineup") { vm.select(Tab.TEAM); vm.teamTab = 1 },
-            Step("recruit", "Start recruiting", "Next year's class comes from Recruit: scout prospects and add the ones you like to your targets.", tapped("recruit"), "Recruit") { vm.select(Tab.RECRUIT) },
-            Step("game", "Play your first game", "Play coaches it live; Sim skips to the result. Both are on the bar at the bottom.", played),
-            Step("league", "See where you stand", "Polls, standings, stat leaders and Bubble Watch are on League.", tapped("league"), "League") { vm.select(Tab.LEAGUE) },
-            help,
-        )
-    }
-}
-
-/** Today, the first season of a career: a short list of what to do first, each a tap away. Hides once done (or when hidden). */
-@Composable
-fun GettingStartedCard(vm: GameViewModel, lg: League) {
-    @Suppress("UNUSED_VARIABLE") val rev = vm.rev
-    if (lg.tipsHidden || !Help.firstSeason(lg)) return
-    val list = steps(vm, lg)
-    val done = list.count { it.done }
-    if (done == list.size) return
-    Section("Getting started · $done of ${list.size}", action = "Hide", onAction = { vm.act { it.tipsHidden = true } })
-    Panel {
-        Bar(done.toFloat() / list.size, Modifier.fillMaxWidth(), height = 5.dp)
-        list.forEachIndexed { i, s ->
-            Spacer(Modifier.height(if (i == 0) 12.dp else 10.dp))
-            // The step's number lines up with its title; the button sits in the middle of the step.
-            Row(verticalAlignment = Alignment.Top) {
-                Box(
-                    Modifier.padding(top = 1.dp).size(24.dp).clip(CircleShape).background(if (s.done) P.good else androidx.compose.ui.graphics.Color.Transparent)
-                        .border(1.5.dp, if (s.done) P.good else P.line, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (s.done) Icon(androidx.compose.material.icons.Icons.Filled.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(16.dp))
-                    else Text("${i + 1}", style = T.label.copy(fontSize = 11.sp), color = P.sub)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(s.title, style = T.bodyB, color = if (s.done) P.faint else P.ink,
-                        textDecoration = if (s.done) TextDecoration.LineThrough else null)
-                    if (!s.done) Text(s.detail, style = T.small, color = P.sub)
-                }
-                val go = s.go
-                if (!s.done && s.button != null && go != null) {
-                    Spacer(Modifier.width(8.dp))
-                    SmallButton(s.button, Modifier.align(Alignment.CenterVertically), primary = i == list.indexOfFirst { !it.done }) {
-                        vm.act { if (s.id !in it.tipsDone) it.tipsDone += s.id }
-                        go()
-                    }
-                }
-            }
-        }
-    }
 }
 
 /** A round icon button for a screen header (the calendar, help). */
@@ -302,12 +201,6 @@ fun HelpScreen(vm: GameViewModel, lg: League, focus: String) {
                     if (i > 0) Spacer(Modifier.height(10.dp))
                     Text(k, style = T.bodyB, color = P.accent)
                     Text(v, style = T.small, color = P.sub)
-                }
-            }
-            if (lg.tipsHidden && Help.firstSeason(lg)) {
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.padding(horizontal = Gutter)) {
-                    SmallButton("Show the getting-started list on Today again") { vm.act { it.tipsHidden = false } }
                 }
             }
         }

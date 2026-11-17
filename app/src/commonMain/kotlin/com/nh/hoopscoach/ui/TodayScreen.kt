@@ -86,7 +86,6 @@ private fun SeasonToday(vm: GameViewModel, lg: League) {
                 TeamBadge(u, 46.dp)
             }
         }
-        item { GettingStartedCard(vm, lg) }
         if (lg.playerMode) item { HeroTodayCard(vm, lg); PlayerInbox(vm, lg) }
         if (lg.playerMode) item { HeroMedicalCard(vm, lg) }
         if (lg.playerMode) item { ShootaroundCard(vm, lg) }
