@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.261**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.262**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.261.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.262.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.261)
+## What's new (3.9-pro.243 to 3.9-pro.262)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.

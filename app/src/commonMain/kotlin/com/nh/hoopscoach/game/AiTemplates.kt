@@ -70,6 +70,27 @@ object AiTemplates {
         }
     }.trim()
 
+    /** One of three different scouting keys, from the matchup request: their best scorer, yours, and the matchup itself. */
+    private fun scoutingKey(request: String, n: Int, copy: String): String {
+        fun field(key: String) = request.lineSequence().firstOrNull { it.startsWith("$key:", true) }?.substringAfter(':')?.trim().orEmpty()
+        val them = field("Opponent").substringBefore(" (")
+        val us = field("User Team").substringBefore(" (")
+        val themRec = field("Opponent").substringAfter(" (", "").substringBefore(")")
+        val usRec = field("User Team").substringAfter(" (", "").substringBefore(")")
+        val watch = field("Opponent Player to Watch")
+        val ours = field("User Team Top Scorer")
+        fun who(s: String) = s.substringBefore(" (")
+        fun ppg(s: String) = Regex("averaging ([\\d.]+) ppg").find(s)?.groupValues?.get(1)
+        return when (n) {
+            1 -> if (watch.isNotBlank()) "Slow down ${who(watch).substringAfterLast(' ')} | ${who(watch)} ${ppg(watch)?.let { "averages $it points a game" } ?: "leads the way"} for $them. Make him work for every shot and keep a body on him off the ball."
+                else "Set the tone early | Win the first five minutes against $them and make them play from behind."
+            2 -> if (ours.isNotBlank()) "Get ${who(ours).substringAfterLast(' ')} going | ${who(ours)} ${ppg(ours)?.let { "averages $it points a game" } ?: "is the first option"} for $us. Get him early touches in his spots."
+                else "Share the ball | Move it side to side and make the extra pass; $us is at its best when everyone touches it."
+            else -> "The matchup | " + (if (us.isNotBlank() && them.isNotBlank() && usRec.isNotBlank() && themRec.isNotBlank()) "$us ($usRec) against $them ($themRec). " else "") +
+                copy.replace("\n", " ").split(Regex("(?<=[.!?])\\s+")).take(2).joinToString(" ")
+        }
+    }
+
     fun create(facts: AiFactSheet, request: String, articleCopy: String = ""): AiText {
         val lines = facts.text.lines()
         require(lines.any { it.startsWith("TEAM ") }) { "No factual team context is available." }
@@ -152,7 +173,7 @@ object AiTemplates {
                         val contract = contracts.getOrNull(index)?.removePrefix("CONTRACT ")
                         "Contract watch | ${contract?.let { "${it.trimEnd('.')}.\n\n" }.orEmpty()}$copy"
                     }
-                    label.startsWith("KEY") -> "The matchup ahead | ${copy.replace("\n", " ")}"
+                    label.startsWith("KEY") -> scoutingKey(request, label.substringAfterLast(' ').toIntOrNull() ?: 1, copy)
                     else -> copy.replace("\n", " ")
                 }
             }

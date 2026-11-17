@@ -1789,7 +1789,7 @@ object Ollama {
                 if (it.isFailure) providerError = it.exceptionOrNull()
             }
         }
-        val reason = if (gotResponse) "Fact check: " + AiGrounding.plain(result.exceptionOrNull()?.message.orEmpty().substringAfter('(').substringBefore(").")) + ", so the game wrote it" else AiDiagnostics.networkReason(providerError, config)
+        val reason = if (gotResponse) "Fact check: " + AiGrounding.plain(result.exceptionOrNull()?.message.orEmpty().substringAfter('(').substringBefore(").")) else AiDiagnostics.networkReason(providerError, config)
         AiDiagnostics.finish(requestId, if (result.isSuccess) "success" else if (gotResponse) "validation failure" else "network error", if (result.isFailure) reason else "Verified against game facts")
         val draft = result.fold({ AiText(it, true, writerName(config, dialogue)) }, { return runCatching { AiTemplates.create(facts, prompt, fallbackCopy).copy(fallbackReason = reason) }.onSuccess { onToken?.invoke(it.text) } })
         return Result.success(draft)

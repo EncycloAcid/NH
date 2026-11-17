@@ -94,13 +94,19 @@ fun AiBadge(isAi: Boolean, provider: String = "", modifier: Modifier = Modifier,
     if (!isAi && fallbackReason.isBlank()) return
     var details by remember { mutableStateOf(false) }
     Box(modifier) {
-        if (!isAi) Text("Game-written: $fallbackReason", style = T.small, color = P.sub, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 160.dp).clickable { details = true })
+        // A short mark; the reason (why the AI's version wasn't used) opens on tap.
+        if (!isAi) Row(Modifier.clip(RoundedCornerShape(8.dp)).background(P.surface2).clickable { details = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("Game-written", style = T.small.copy(fontSize = 11.sp), color = P.sub, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            Text("ⓘ", style = T.small.copy(fontSize = 11.sp), color = P.faint)
+        }
         else Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF228B50)).clickable { details = true }, contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.Check, contentDescription = "AI-generated", tint = Color.White, modifier = Modifier.size(16.dp))
         }
         DropdownMenu(expanded = details, onDismissRequest = { details = false }) {
-            Text(if (!isAi) fallbackReason else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider", style = T.small, color = P.ink, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+            Text(if (!isAi) "Written by the game. $fallbackReason." else if (provider.isBlank()) "AI-assisted content" else "Generated with $provider",
+                style = T.small, color = P.ink, modifier = Modifier.widthIn(max = 280.dp).padding(horizontal = 14.dp, vertical = 10.dp))
         }
     }
 }

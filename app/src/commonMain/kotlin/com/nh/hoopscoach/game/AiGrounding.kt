@@ -321,8 +321,11 @@ object AiGrounding {
             "First Round", "Conference Semifinals", "Conference Finals", "Finals", "Play-In", "NBA Cup",
         )
         (common + facts.phrases + HONORS).sortedByDescending { it.length }.forEach { residue = residue.replace(it, "topic", ignoreCase = true) }
-        val prose = residue.lines().filterNot { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
-        val headers = residue.lines().filter { Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):").containsMatchIn(it) }.joinToString("\n")
+        // A heading line (HEADLINE:, and the short title before "|" on a KEY / SCOOP / RUMOR line) is in Title Case.
+        val heading = Regex("(?i)^(HEADLINE|KICKER|TITLE|HEAD):")
+        val titled = Regex("(?i)^((?:KEY|SCOOP|RUMOR)\\s*\\d+:)([^|]*)\\|(.*)$")
+        val prose = residue.lines().filterNot { heading.containsMatchIn(it) }.joinToString("\n") { line -> titled.find(line.trim())?.let { "${it.groupValues[1]} ${it.groupValues[3]}" } ?: line }
+        val headers = (residue.lines().filter { heading.containsMatchIn(it) } + residue.lines().mapNotNull { titled.find(it.trim())?.groupValues?.get(2) }).joinToString("\n")
         val firstNames = facts.allNames.map { it.substringBefore(' ') }.toSet()
         val properName = Regex("\\b[A-Z][a-z]+(?:[ '-][A-Z][a-z]+)+\\b")
         (properName.findAll(prose) + properName.findAll(headers).filter { it.value.substringBefore(' ') in firstNames }).take(3).forEach { errors += "unknown proper name: ${entityLabel(it.value)}" }
