@@ -145,6 +145,11 @@ private const val SH = 830f
 private fun truss(x: Float): Float { val t = (x - SW / 2) / (SW / 2); return 34f + 14f * (1 - t * t) }
 private fun hang(x: Float): Float { val t = (x - SW / 2) / (SW / 2); return 38f + 26f * (1 - t * t) }
 
+/** The lectern: [LECTERN_W] wide, from [LECTERN_Y] down [LECTERN_H] to the dais (the broadcast's proportions). */
+private const val LECTERN_W = 226f
+private const val LECTERN_Y = 408f
+private const val LECTERN_H = 189f
+
 /** Rows of stripes added to every pennant so they hang long (its rows 48 on are plain stripes across). */
 private const val PENNANT_EXTRA = 24
 /** Where the six pennants hang (their centers), three to a side; how wide; how long. */
@@ -322,17 +327,29 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
         }
         // 5. The commissioner, the envelope up; his microphone; the stage; the lectern in front of him.
         val bob = if (sin(clock * 2.1f) > 0.6f) -1f else 0f
-        put(art.man, 175.6f, 247f + bob, 227f)
+        put(art.man, 175.3f, 247.5f + bob, 218f)
         Canvas(Modifier.fillMaxSize()) {
             val k = size.width / SW
-            drawLine(Color(0xFF1C1C22), Offset(268 * k, 404 * k), Offset(266 * k, 372 * k), 2.2f * k)
-            drawRoundRect(Color(0xFF2B2B33), Offset(262.5f * k, 361 * k), Size(7 * k, 12 * k), CornerRadius(3 * k))
-            drawRect(Color(0xFF55555F), Offset(263.5f * k, 362.5f * k), Size(1.5f * k, 8 * k))
+            drawLine(Color(0xFF1C1C22), Offset(271 * k, 410 * k), Offset(270 * k, 372 * k), 2.2f * k)
+            drawRoundRect(Color(0xFF2B2B33), Offset(266.5f * k, 361 * k), Size(7 * k, 12 * k), CornerRadius(3 * k))
+            drawRect(Color(0xFF55555F), Offset(267.5f * k, 362.5f * k), Size(1.5f * k, 8 * k))
             art.stage?.let { blit(it, 0, 0, it.width, it.height, -40f, 556f, 620f, 620f * it.height / it.width, k) }
+            // The lectern, tall and slim like the broadcast's: its top and plate as drawn, the plain wood panel under the
+            // plate (vertical grain, rows 150 to 212) drawn long, then its foot, standing on the dais.
+            art.lectern?.let { l ->
+                val s = LECTERN_W / l.width
+                val x = 270f - LECTERN_W / 2
+                val top = 150 * s; val foot = (l.height - 212) * s
+                blit(l, 0, 0, l.width, 150, x, LECTERN_Y, LECTERN_W, top, k)
+                blit(l, 0, 150, l.width, 62, x, LECTERN_Y + top, LECTERN_W, LECTERN_H - top - foot, k)
+                blit(l, 0, 212, l.width, l.height - 212, x, LECTERN_Y + LECTERN_H - foot, LECTERN_W, foot, k)
+            }
         }
-        put(art.lectern, 152f, 404f, 236f)
-        Column(Modifier.offset(x = u * 247.7f, y = u * 421f).size(u * 68.3f, u * 51.2f), horizontalAlignment = Alignment.CenterHorizontally) {
-            val plate = T.title.copy(fontSize = (u.value * 22.5f).sp, lineHeight = (u.value * 24f).sp)
+        // The year on the lectern's plate (where the sprite's plate has it painted out: its pixels 129 to 221 across, 23 to 92 down).
+        val ls = LECTERN_W / 318f
+        Column(Modifier.offset(x = u * (270f - LECTERN_W / 2 + 129 * ls), y = u * (LECTERN_Y + 23 * ls)).size(u * (92 * ls), u * (69 * ls)),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            val plate = T.title.copy(fontSize = (u.value * 21.6f).sp, lineHeight = (u.value * 23f).sp)
             Text("DRAFT", style = plate, color = Color(0xFFEDEDED))
             Text("$year", style = plate, color = Color(0xFFEDEDED))
         }
