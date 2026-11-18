@@ -62,6 +62,8 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.sin
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.Constraints
@@ -88,7 +90,12 @@ object DraftArt {
     private fun a(name: String) = Logos.asset("draft/$name.png")
     val banner get() = a("center_banner_blank")
     val lectern get() = a("podium_lectern")
-    val commissioner get() = a("commissioner_full_body")
+    /** The commissioner, in two layers: him, and his forearm with the envelope (same 250 x 225 frame), which turns at the elbow. */
+    val commissioner get() = a("commissioner_body")
+    val commissionerHand get() = a("commissioner_hand")
+    /** His elbow, in the frame's pixels: where the forearm turns. */
+    const val ELBOW_X = 204f
+    const val ELBOW_Y = 156f
     val crowd get() = a("crowd_table")
     val reps get() = a("team_reps")
     val stage get() = a("stage_platform")
@@ -224,6 +231,7 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
         object {
             val banner = DraftArt.banner; val league = DraftArt.league
             val lectern = DraftArt.sharp(DraftArt.lectern, 2); val man = DraftArt.sharp(DraftArt.commissioner, 3)
+            val hand = DraftArt.sharp(DraftArt.commissionerHand, 3)
             val crowdLeft = DraftArt.crowd?.let { DraftArt.sharp(it, 3, 0, 0, 122, it.height) }
             val crowdRight = DraftArt.crowd?.let { DraftArt.sharp(it, 3, 150, 0, 122, it.height) }
             val reps = DraftArt.sharp(DraftArt.reps, 2); val stage = DraftArt.sharp(DraftArt.stage, 3)
@@ -361,6 +369,15 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
         // 5. The commissioner, the envelope up; his microphone; the stage; the lectern in front of him.
         val bob = if (sin(clock * 2.1f) > 0.6f) -1f else 0f
         put(art.man, 175.3f, 247.5f + bob, 218f)
+        // His hand: the envelope waved gently from the elbow, now and then a little higher.
+        art.hand?.let { hand ->
+            val wave = 4.5f * sin(clock * 2.4f) - 1.5f + (if (sin(clock * 0.9f) > 0.85f) -2.5f * sin(clock * 9f) else 0f)
+            val w = 218f; val h = w * hand.height / hand.width
+            Image(hand, null, Modifier.offset(x = u * 175.3f, y = u * (247.5f + bob)).size(u * w, u * h).graphicsLayer {
+                rotationZ = wave
+                transformOrigin = TransformOrigin(DraftArt.ELBOW_X / 250f, DraftArt.ELBOW_Y / 225f)
+            }, contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.High)
+        }
         Canvas(Modifier.fillMaxSize()) {
             val k = size.width / SW
             drawLine(Color(0xFF1C1C22), Offset(271 * k, 410 * k), Offset(270 * k, 372 * k), 2.2f * k)
