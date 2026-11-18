@@ -1247,6 +1247,22 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
     Column(Modifier.fillMaxSize()) {
         StepHeader("Offseason · ${lg.season}", ROAD_STEPS, 1)
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            // The stage, and the commissioner reading every pick.
+            item {
+                val last = picks.getOrNull(shown - 1)
+                fun teamOf(d: DraftPick) = d.proTeam.ifEmpty { "next team" }
+                val line = when {
+                    done && myPick == null -> "That concludes the ${lg.season} NBA Draft. Thank you, and good night."
+                    ringing -> picks.getOrNull(mine)?.let { announce(lg.season, it.pick, teamOf(it), null) } ?: "..."
+                    last == null -> "Welcome to the ${lg.season} NBA Draft." + (picks.firstOrNull()?.takeIf { it.proTeam.isNotEmpty() }?.let { " The ${it.proTeam} are on the clock." } ?: "")
+                    last.pid == lg.heroId -> announce(lg.season, last.pick, teamOf(last), "${last.playerName}, from ${last.school}!")
+                    else -> announce(lg.season, last.pick, teamOf(last), "${last.playerName}, ${last.pos}, ${last.school}.")
+                }
+                DraftStage(lg.season) {
+                    DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1))
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             item {
                 Panel(color = P.hero) {
                     when {

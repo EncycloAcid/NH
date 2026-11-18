@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.276**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.277**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.276.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.277.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.276)
+## What's new (3.9-pro.243 to 3.9-pro.277)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **Draft Night on stage**: the draft is staged like a 90s TV broadcast, built from your retro draft art pack: the hall under its lights, the pennants and the league's banners, the "NBA Draft" banner (with the right year on its shield), the curtain, the crowd at its rails, the commissioner behind the wood podium raising the envelope (the plate shows that year's draft), and a retro dialogue box that types out every pick ("COMMISSIONER: With the first pick in the 1998 NBA Draft..."). In a player career it's the green room; coaching in the NBA, it heads Draft Night. (The pack's team and league marks are for this personal build only.)
 - **Playing in the NBA, deeper**: your coach's **trust** is now something you earn and spend. Good games raise it, bad ones and turnovers cost it, and it moves your minutes. Every ten days you can talk to him on Me, Team: ask for a bigger role (the odds are shown; a yes is more minutes all season, a no costs trust), ask what he needs (one thing to show him over five games: defend, rebound, take care of the ball, move it, or be aggressive), or tell him you'll do whatever the team needs. Today shows his ask while it's on. And **All-Star Saturday is playable**: invited to the 3-Point Contest, shoot five racks on the shot meter (money balls worth two, out of 34); invited to the Dunk Contest, pick your dunks (harder ones score higher, with a smaller window) and time the takeoff in front of five judges. Your round is your score when the weekend comes.
 - **Spacing inside cards**: every card of choices (press questions, the mailbag, predictions, locker-room calls, pregame speeches, bracket picks, booster asks, life off the court, storyline beats, your father's calls) shows its answers as the same rounded boxes, lined up with the question instead of indented past it; lineup slots keep a gap between the name and the rating; the team header's rating labels each get an equal share of the row; tab labels that shrink to fit stay centered with the rest.
 - **Spacing**: cards without a section title (the shootaround, your badges, the card binder, the rivalry clipping, "also waiting", the social feed's league story) keep an even 12dp gap instead of sitting flush against the card above; header record lines use single dots and never start a wrapped line with a space; Today's header has matching round calendar and help buttons, so the team name keeps its full size; the badges card's "All" link sits on its label line.

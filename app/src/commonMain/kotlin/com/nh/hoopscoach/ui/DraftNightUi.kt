@@ -74,6 +74,19 @@ private fun heightText(h: Int) = "${h / 12}'${h % 12}\""
 
 /** Draft night while it's on: the clock, the actions, then the tab the user picked. */
 internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: DraftState, ui: DraftUi) {
+    // The stage, and the commissioner with the last pick (or who's on the clock).
+    item {
+        val last = dn.log.lastOrNull()
+        val clock = lg.teams.getOrNull(dn.order.getOrNull(dn.at) ?: -1)
+        val line = when {
+            last == null -> "Welcome to the ${dn.season} NBA Draft." + (clock?.let { " The ${it.name} are on the clock." } ?: "")
+            else -> announce(dn.season, last.pick, lg.team(last.teamId).name, "${last.name}, ${last.pos}.")
+        }
+        DraftStage(dn.season) {
+            DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+    }
     item { DraftHero(vm, lg, dn) }
     item {
         val offers = DraftNight.offers(lg)
