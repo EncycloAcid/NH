@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.283**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.284**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.283.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.284.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.283)
+## What's new (3.9-pro.243 to 3.9-pro.284)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **The draft stage fits the screen**: the stage now fits between the step header and the footer, so the commissioner's dialogue box is always in full view. When the screen is shorter than the stage, the dark above the lights and the floor under the dialogue box are trimmed; on a short window or a wide PC window, the stage is drawn narrower and centered instead.
 - **Pennants like the draft sheet**: the six pennants over the stage are now long fabric pennants in the style of your draft sheet, made for every club from the sheet's own fabric: recolored to the club's color (the Lakers in gold, as on the sheet) with the club's logo from the game's logo files on it. The old clubs of an era career hang their own: the New Jersey Nets, the Seattle SuperSonics, the Vancouver Grizzlies, the Washington Bullets and the New Orleans Hornets, in their colors with their names.
 - **Polished stage art and logos**: each pennant and the commissioner's badge now carry the club's logo (from the game's own logo files) on a cream disc, ringed in team colors (an era club with another name keeps the plain ball). The lectern's plate is laid out cleanly from the stage atlas's league and sponsor logos, with "DRAFT", the year and "Presented by" written crisply. The pixel art (the commissioner, the lectern, the crowd, the reps, the stage, the curtains) is enlarged pixel for pixel and drawn smoothed, so its pixels come out crisp and even, and the banners and pennants are smoothed instead of jagged.
 - **Draft Night, like the broadcast**: the stage is rebuilt to match your reference shot: the dark dome with its arc of lights, the six pennants hanging long from the truss (the middle ones lower), the draft banner, the NBA banners in front of red curtains, the lattice walls and the lit stage house behind the commissioner, team reps standing at the back, the crowd at its blue-draped tables on both sides, his microphone, the big octagonal wood stage with its red carpet, and the lectern with "DRAFT", the year and "Presented by Sprite" on its plate. The commissioner and the lectern are sized and placed to match the reference: the lectern stands tall and slim (its plain wood panel drawn long), its top at his waist. The dialogue box sits over the front of the stage at the reference's size. Pieces cut from your stage atlas: the stage, the crowd at its tables, the team reps.

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -61,6 +62,11 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.sin
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
 import com.nh.hoopscoach.game.ProLeague
 import androidx.compose.ui.graphics.Paint
 import kotlin.math.roundToInt
@@ -161,6 +167,8 @@ object DraftArt {
 /** The stage art is laid out on its own canvas: [SW] wide, [SH] tall (the dialogue box covers the stage's front edge, as on TV). */
 private const val SW = 540f
 private const val SH = 830f
+/** How much of the stage's height can be trimmed to fit a short screen: the dark above the lights, the floor below. */
+private const val MAX_TRIM = 96f
 
 /** The truss of lights arcs a little lower in the middle; the pennants hang from it, the middle ones lower still. */
 private fun truss(x: Float): Float { val t = (x - SW / 2) / (SW / 2); return 34f + 14f * (1 - t * t) }
@@ -203,10 +211,14 @@ private fun DrawScope.logoDisc(logo: ImageBitmap, cx: Float, cy: Float, r: Float
  * [year], the league's banners, the lattice and the curtains, the stage house behind the commissioner, the team reps
  * standing at the back and the crowd at its draped tables, the commissioner with the envelope up, his microphone, the
  * wood stage with its red carpet, and the lectern with [year] on its plate. [overlay] goes on top (his dialogue box,
- * over the front of the stage).
+ * over the front of the stage), at the foot of what shows.
+ *
+ * It fits in [maxHeight] (the screen's room for it): where the whole stage is taller, the empty dark above the lights
+ * and the floor under the dialogue box are trimmed (up to [MAX_TRIM] of its height); past that, it's drawn narrower.
  */
 @Composable
-fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Modifier = Modifier, overlay: @Composable BoxScope.() -> Unit = {}) {
+fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Modifier = Modifier, maxHeight: Dp = Dp.Unspecified,
+    overlay: @Composable BoxScope.() -> Unit = {}) {
     // The pixel art enlarged once (two or three times, enough for a phone's pixels), then drawn smoothed.
     val art = remember {
         object {
@@ -222,8 +234,23 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
     val pennants = remember(clubs.map { it.slot + it.abbr }) { clubs.map { DraftArt.pennant(it) ?: DraftArt.league } }
     val anim = rememberInfiniteTransition(label = "stage")
     val clock by anim.animateFloat(0f, 3600f, infiniteRepeatable(tween(3_600_000, easing = LinearEasing)), label = "clock")
-    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(SW / SH).clip(RectangleShape)) {
-        val u: Dp = maxWidth / SW
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val limit = if (maxHeight.isSpecified) minOf(maxHeight, this.maxHeight) else this.maxHeight
+        val fits = limit.value.isFinite()
+        // Narrower only when trimming can't make it fit.
+        val w = if (fits && maxWidth * ((SH - MAX_TRIM) / SW) > limit) limit * (SW / (SH - MAX_TRIM)) else maxWidth
+        val u: Dp = w / SW
+        val h = if (fits) minOf(u * SH, limit) else u * SH
+        val trim = SH - h / u
+        val trimTop = (trim * 0.3f).coerceAtMost(26f)
+        Box(Modifier.fillMaxWidth().height(h).background(Color(0xFF030408)), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.width(w).height(h).clipToBounds()) {
+        // The whole stage, shifted up by what's trimmed from the top; what's trimmed from the bottom is clipped.
+        Box(Modifier.layout { m, _ ->
+            val pw = w.roundToPx(); val ph = (u * SH).roundToPx()
+            val p = m.measure(Constraints.fixed(pw, ph))
+            layout(pw, h.roundToPx()) { p.place(0, -(u * trimTop).roundToPx()) }
+        }) {
         /** [img] at ([x], [y]) on the stage's canvas, [w] wide, its own shape kept; crisp pixels. */
         @Composable
         fun put(img: ImageBitmap?, x: Float, y: Float, w: Float) {
@@ -370,11 +397,15 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
             Text("Presented by", style = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = (u.value * 8f).sp, lineHeight = (u.value * 9f).sp),
                 color = Color(0xFFD9D9D9), maxLines = 1, softWrap = false)
         }
-        // 6. The broadcast's dark edges, then on top: the dialogue box.
+        // 6. The broadcast's dark edges.
         Canvas(Modifier.fillMaxSize()) {
             drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Transparent, Color(0x73000000)), center = Offset(size.width / 2, size.height * 0.45f), radius = size.height * 0.62f))
         }
+        }
+        // 7. On top, at the foot of what shows: the dialogue box.
         overlay()
+        }
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
@@ -1389,7 +1390,9 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
     val step = ps.step
     val draftOn = step == ProStep.DRAFT && ps.draftNight?.done == false
     Column(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val room = maxHeight
+        LazyColumn(Modifier.fillMaxSize()) {
             item {
                 ScreenHeader(
                     "${lg.season} · Offseason",
@@ -1433,7 +1436,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                     Text("Next: the draft lottery, rookie selections, team options, qualifying offers, and contract extensions.", style = T.small, color = P.sub, modifier = Modifier.padding(horizontal = Gutter + 4.dp, vertical = 10.dp))
                 }
 
-                ProStep.DRAFT -> if (draftOn) draftNightItems(vm, lg, ps.draftNight!!, draftUi) else {
+                ProStep.DRAFT -> if (draftOn) draftNightItems(vm, lg, ps.draftNight!!, draftUi, room) else {
                     ps.draftNight?.let { dn -> item { DraftRecap(vm, lg, dn) } }
                     item {
                         val rookies = lg.rosterOf(u).filter { it.proYears == 0 }
@@ -1583,6 +1586,7 @@ fun NbaCoachOffseason(vm: GameViewModel, lg: League) {
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
+        }
         }
         Box(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 8.dp)) {
             val faActive = step == ProStep.FREE_AGENCY && ps.faRound in 1..Market.ROUNDS

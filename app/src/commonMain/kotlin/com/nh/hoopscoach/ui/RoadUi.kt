@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -1246,7 +1247,9 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
     val onHero = P.onHero
     Column(Modifier.fillMaxSize()) {
         StepHeader("Offseason · ${lg.season}", ROAD_STEPS, 1)
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val room = maxHeight
+        LazyColumn(Modifier.fillMaxSize()) {
             // The stage, and the commissioner reading every pick.
             item {
                 val last = picks.getOrNull(shown - 1)
@@ -1268,7 +1271,7 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                     else -> last ?: picks.firstOrNull()
                 }
                 val named = naming?.let { DraftArt.club(it.proTeam, lg.season) }
-                DraftStage(lg.season, row, lit) {
+                DraftStage(lg.season, row, lit, maxHeight = room) {
                     DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1),
                         portrait = named?.takeIf { DraftArt.badge(it.slot) != null }?.let { c -> { ClubBadge(c) } })
                 }
@@ -1322,6 +1325,7 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                 GroupList(picks.take(shown).asReversed()) { d -> DraftRow(vm, lg, d, me = d.pid == lg.heroId, fresh = !done && d.pick == shown, rival = d.pid == r.rivalId) }
             }
             item { Spacer(Modifier.height(20.dp)) }
+        }
         }
         when {
             !done -> FlowFooter(null, "Skip ahead") { vm.revealSeason = lg.season; vm.reveal = stop }

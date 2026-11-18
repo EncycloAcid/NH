@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.hoopscoach.game.Combine
@@ -73,7 +74,7 @@ private fun gradeColor(g: String): Color = when (g.firstOrNull()) {
 private fun heightText(h: Int) = "${h / 12}'${h % 12}\""
 
 /** Draft night while it's on: the clock, the actions, then the tab the user picked. */
-internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: DraftState, ui: DraftUi) {
+internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: DraftState, ui: DraftUi, stageRoom: Dp = Dp.Unspecified) {
     // The stage, and the commissioner with the last pick (or who's on the clock).
     item {
         val last = dn.log.lastOrNull()
@@ -86,7 +87,7 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
         val (row, lit) = DraftArt.window(dn.order, dn.at)
         val clubs = row.map { DraftArt.club(lg.team(it)) }
         val named = (last?.let { lg.team(it.teamId) } ?: clock)?.let { DraftArt.club(it) }
-        DraftStage(dn.season, clubs, lit) {
+        DraftStage(dn.season, clubs, lit, maxHeight = stageRoom) {
             DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 10.dp),
                 portrait = named?.takeIf { DraftArt.badge(it.slot) != null }?.let { c -> { ClubBadge(c) } })
         }
