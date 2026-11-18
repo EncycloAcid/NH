@@ -1267,9 +1267,10 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                     ringing -> picks.getOrNull(mine)
                     else -> last ?: picks.firstOrNull()
                 }
-                val badge = naming?.let { DraftArt.club(it.proTeam, lg.season) }?.let { DraftArt.badge(it.slot) }
+                val named = naming?.let { DraftArt.club(it.proTeam, lg.season) }
                 DraftStage(lg.season, row, lit) {
-                    DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1), badge = badge)
+                    DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1),
+                        portrait = named?.takeIf { DraftArt.badge(it.slot) != null }?.let { c -> { ClubBadge(c) } })
                 }
                 Spacer(Modifier.height(12.dp))
             }
