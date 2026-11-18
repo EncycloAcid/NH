@@ -61,6 +61,8 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.sin
+import com.nh.hoopscoach.game.ProLeague
+import androidx.compose.ui.graphics.Paint
 import kotlin.math.roundToInt
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
@@ -86,6 +88,24 @@ object DraftArt {
     val stage get() = a("stage_platform")
     val curtain get() = a("blue_curtain_tall")
     val league get() = a("league_vertical_banner")
+    /** The plate's logos, from the stage atlas. */
+    val nbaLogo get() = a("nba_logo")
+    val sponsor get() = a("sprite_logo")
+
+    /** The club's own logo (assets/nba/logos) for its pennant and badge; none for a club with another name that year. */
+    fun teamLogo(c: Club): ImageBitmap? = if (c.renamed) null else ProLeague.logoKey(c.slot)?.let { Logos.asset("nba/logos/$it.webp") }
+
+    /**
+     * Pixel art made [n] times bigger pixel for pixel ([sw] x [sh] of it from ([sx], [sy])): drawn back down with smoothing,
+     * its pixels stay crisp and come out even, where stretching it a little straight would double some pixels and not others.
+     */
+    fun sharp(img: ImageBitmap?, n: Int, sx: Int = 0, sy: Int = 0, sw: Int = img?.width ?: 0, sh: Int = img?.height ?: 0): ImageBitmap? {
+        if (img == null || sw <= 0 || sh <= 0) return img
+        val out = ImageBitmap(sw * n, sh * n)
+        androidx.compose.ui.graphics.Canvas(out).drawImageRect(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(sw * n, sh * n),
+            Paint().apply { filterQuality = FilterQuality.None })
+        return out
+    }
 
     /** One club in the team pack's teams.json (assets/teams, from the user's Kotlin draft pack): its pennant and badge. */
     @Serializable
@@ -157,20 +177,38 @@ private val SPOTS = listOf(30f, 90f, 150f, 390f, 450f, 510f)
 private const val PENNANT_W = 68f
 private val PENNANT_H = PENNANT_W / DraftArt.PW * (160 + PENNANT_EXTRA)
 
-/** Part of [img] ([sx], [sy], [sw], [sh] in its pixels) into ([x], [y], [w], [h]) on the stage, [k] pixels to a stage unit; crisp. */
+/** Part of [img] ([sx], [sy], [sw], [sh] in its pixels) into ([x], [y], [w], [h]) on the stage, [k] pixels to a stage unit, smoothed. */
 private fun DrawScope.blit(img: ImageBitmap, sx: Int, sy: Int, sw: Int, sh: Int, x: Float, y: Float, w: Float, h: Float, k: Float, filter: ColorFilter? = null) {
     val x0 = (x * k).roundToInt(); val y0 = (y * k).roundToInt()
     drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset(x0, y0), IntSize(((x + w) * k).roundToInt() - x0, ((y + h) * k).roundToInt() - y0),
-        colorFilter = filter, filterQuality = FilterQuality.None)
+        colorFilter = filter, filterQuality = FilterQuality.High)
 }
 
-/** A team pennant, long: its top (rod and name plate), a stripe row stretched [PENNANT_EXTRA] rows, then the rest. */
-private fun DrawScope.pennant(img: ImageBitmap, x: Float, y: Float, k: Float, filter: ColorFilter?) {
+/** All of [img] into ([x], [y], [w], [h]). */
+private fun DrawScope.blit(img: ImageBitmap, x: Float, y: Float, w: Float, h: Float, k: Float, filter: ColorFilter? = null) =
+    blit(img, 0, 0, img.width, img.height, x, y, w, h, k, filter)
+
+/** The cream disc for a club's logo: [r] across the middle of its medallion, the team color still ringing it. */
+private val LOGO_DISC = Color(0xFFF4F1EA)
+
+/** [logo] on a cream disc of radius [r] around ([cx], [cy]). */
+private fun DrawScope.logoDisc(logo: ImageBitmap, cx: Float, cy: Float, r: Float, k: Float, filter: ColorFilter?) {
+    drawCircle(LOGO_DISC, r * k, Offset(cx * k, cy * k), colorFilter = filter)
+    val side = r * 1.62f
+    blit(logo, cx - side / 2, cy - side / 2, side, side, k, filter)
+}
+
+/**
+ * A team pennant, long: its top (rod and name plate), a stripe row stretched [PENNANT_EXTRA] rows, then the rest; the
+ * club's [logo], when there is one, on the medallion (its ball at 48, 78 of the pennant's 96 x 160 pixels).
+ */
+private fun DrawScope.pennant(img: ImageBitmap, logo: ImageBitmap?, x: Float, y: Float, k: Float, filter: ColorFilter?) {
     val n = img.width / DraftArt.PW.toInt()
     val s = PENNANT_W / DraftArt.PW
     blit(img, 0, 0, img.width, 48 * n, x, y, PENNANT_W, 48 * s, k, filter)
     blit(img, 0, 48 * n, img.width, n, x, y + 48 * s, PENNANT_W, PENNANT_EXTRA * s, k, filter)
     blit(img, 0, 48 * n, img.width, img.height - 48 * n, x, y + (48 + PENNANT_EXTRA) * s, PENNANT_W, (img.height / n - 48) * s, k, filter)
+    if (logo != null) logoDisc(logo, x + 48 * s, y + (78 + PENNANT_EXTRA) * s, 19 * s, k, filter)
 }
 
 /**
@@ -183,14 +221,20 @@ private fun DrawScope.pennant(img: ImageBitmap, x: Float, y: Float, k: Float, fi
  */
 @Composable
 fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Modifier = Modifier, overlay: @Composable BoxScope.() -> Unit = {}) {
+    // The pixel art enlarged once (two or three times, enough for a phone's pixels), then drawn smoothed.
     val art = remember {
         object {
-            val banner = DraftArt.banner; val lectern = DraftArt.lectern; val man = DraftArt.commissioner
-            val crowd = DraftArt.crowd; val reps = DraftArt.reps; val stage = DraftArt.stage
-            val curtain = DraftArt.curtain; val league = DraftArt.league
+            val banner = DraftArt.banner; val league = DraftArt.league
+            val lectern = DraftArt.sharp(DraftArt.lectern, 2); val man = DraftArt.sharp(DraftArt.commissioner, 3)
+            val crowdLeft = DraftArt.crowd?.let { DraftArt.sharp(it, 3, 0, 0, 122, it.height) }
+            val crowdRight = DraftArt.crowd?.let { DraftArt.sharp(it, 3, 150, 0, 122, it.height) }
+            val reps = DraftArt.sharp(DraftArt.reps, 2); val stage = DraftArt.sharp(DraftArt.stage, 3)
+            val curtain = DraftArt.sharp(DraftArt.curtain, 3)
+            val nbaLogo = DraftArt.nbaLogo; val sponsor = DraftArt.sponsor
         }
     }
     val pennants = remember(clubs.map { it.slot }) { clubs.map { DraftArt.pennant(it.slot) ?: DraftArt.league } }
+    val logos = remember(clubs.map { it.slot + it.abbr }) { clubs.map { DraftArt.teamLogo(it) } }
     val anim = rememberInfiniteTransition(label = "stage")
     val clock by anim.animateFloat(0f, 3600f, infiniteRepeatable(tween(3_600_000, easing = LinearEasing)), label = "clock")
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(SW / SH).clip(RectangleShape)) {
@@ -200,7 +244,7 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
         fun put(img: ImageBitmap?, x: Float, y: Float, w: Float) {
             if (img == null) return
             val h = w * img.height / img.width
-            Image(img, null, Modifier.offset(x = u * x, y = u * y).size(u * w, u * h), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None)
+            Image(img, null, Modifier.offset(x = u * x, y = u * y).size(u * w, u * h), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.High)
         }
         val lights = listOf(Color.White, Color(0xFF6FA8FF), Color(0xFFFFE08A), Color(0xFFFF5A5A))
         // 1. The hall: the dark dome and its ribs, the back wall with its lattice, the red curtains at the sides,
@@ -268,7 +312,7 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
                 val filter = if (i == lit || lit < 0) null else dim
                 val y = hang(SPOTS[i]) + sways[i]
                 if (img === art.league) blit(img, 0, 0, img.width, img.height, SPOTS[i] - 25, y, 50f, 50f * img.height / img.width, k, filter)
-                else pennant(img, SPOTS[i] - PENNANT_W / 2, y, k, filter)
+                else pennant(img, logos.getOrNull(i), SPOTS[i] - PENNANT_W / 2, y, k, filter)
             }
         }
         // A club with another name that year: its name and abbreviation painted on the plates.
@@ -310,16 +354,18 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
         Canvas(Modifier.fillMaxSize()) {
             val k = size.width / SW
             art.reps?.let { r ->
-                val w = r.width * 0.75f; val h = r.height * 0.75f
-                blit(r, 0, 0, r.width, r.height, 84f, 312f, w, h, k)
+                // Three-quarter size (it's enlarged two times).
+                val w = r.width / 2 * 0.75f; val h = r.height / 2 * 0.75f
+                blit(r, 84f, 312f, w, h, k)
                 val x = SW - 84f - w
-                withTransform({ scale(-1f, 1f, Offset((x + w / 2) * k, 0f)) }) { blit(r, 0, 0, r.width, r.height, x, 312f, w, h, k) }
+                withTransform({ scale(-1f, 1f, Offset((x + w / 2) * k, 0f)) }) { blit(r, x, 312f, w, h, k) }
             }
-            art.crowd?.let { c ->
-                blit(c, 0, 0, 122, c.height, 0f, 556f - c.height, 122f, c.height.toFloat(), k)
-                blit(c, 150, 0, 122, c.height, SW - 122f, 556f - c.height, 122f, c.height.toFloat(), k)
+            val ch = (art.crowdLeft?.height ?: 0) / 3f
+            art.crowdLeft?.let { blit(it, 0f, 556f - ch, 122f, ch, k) }
+            art.crowdRight?.let { blit(it, SW - 122f, 556f - ch, 122f, ch, k) }
+            if (ch > 0) {
                 // Each section fades into the dark toward the aisle, where the stage lights don't reach.
-                val top = (556f - c.height) * k; val h = c.height * k
+                val top = (556f - ch) * k; val h = ch * k
                 val dark = Color(0xFF080C20)
                 drawRect(Brush.horizontalGradient(listOf(Color.Transparent, dark), startX = 100 * k, endX = 123 * k), Offset(100 * k, top), Size(23 * k, h))
                 drawRect(Brush.horizontalGradient(listOf(dark, Color.Transparent), startX = (SW - 123) * k, endX = (SW - 100) * k), Offset((SW - 123) * k, top), Size(23 * k, h))
@@ -333,25 +379,36 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
             drawLine(Color(0xFF1C1C22), Offset(271 * k, 410 * k), Offset(270 * k, 372 * k), 2.2f * k)
             drawRoundRect(Color(0xFF2B2B33), Offset(266.5f * k, 361 * k), Size(7 * k, 12 * k), CornerRadius(3 * k))
             drawRect(Color(0xFF55555F), Offset(267.5f * k, 362.5f * k), Size(1.5f * k, 8 * k))
-            art.stage?.let { blit(it, 0, 0, it.width, it.height, -40f, 556f, 620f, 620f * it.height / it.width, k) }
+            art.stage?.let { blit(it, -40f, 556f, 620f, 620f * it.height / it.width, k) }
             // The lectern, tall and slim like the broadcast's: its top and plate as drawn, the plain wood panel under the
-            // plate (vertical grain, rows 150 to 212) drawn long, then its foot, standing on the dais.
+            // plate (vertical grain, its rows 150 to 212) drawn long, then its foot, standing on the dais.
             art.lectern?.let { l ->
-                val s = LECTERN_W / l.width
+                val n = l.width / 318
+                val s = LECTERN_W / 318f
                 val x = 270f - LECTERN_W / 2
-                val top = 150 * s; val foot = (l.height - 212) * s
-                blit(l, 0, 0, l.width, 150, x, LECTERN_Y, LECTERN_W, top, k)
-                blit(l, 0, 150, l.width, 62, x, LECTERN_Y + top, LECTERN_W, LECTERN_H - top - foot, k)
-                blit(l, 0, 212, l.width, l.height - 212, x, LECTERN_Y + LECTERN_H - foot, LECTERN_W, foot, k)
+                val top = 150 * s; val foot = (223 - 212) * s
+                blit(l, 0, 0, l.width, 150 * n, x, LECTERN_Y, LECTERN_W, top, k)
+                blit(l, 0, 150 * n, l.width, 62 * n, x, LECTERN_Y + top, LECTERN_W, LECTERN_H - top - foot, k)
+                blit(l, 0, 212 * n, l.width, l.height - 212 * n, x, LECTERN_Y + LECTERN_H - foot, LECTERN_W, foot, k)
+                // The plate, laid out like the broadcast's (in the lectern's pixels): the league's logo, then the sponsor's.
+                fun lx(v: Float) = x + v * s
+                fun ly(v: Float) = LECTERN_Y + v * s
+                art.nbaLogo?.let { logo -> val h = 64f; val w = h * logo.width / logo.height; blit(logo, lx(86f), ly(25f), w * s, h * s, k) }
+                art.sponsor?.let { logo -> val h = 45f; val w = h * logo.width / logo.height; blit(logo, lx(229f) - w * s, ly(97f), w * s, h * s, k) }
             }
         }
-        // The year on the lectern's plate (where the sprite's plate has it painted out: its pixels 129 to 221 across, 23 to 92 down).
+        // The plate's words: "DRAFT" and the year beside the league's logo, "Presented by" beside the sponsor's.
         val ls = LECTERN_W / 318f
-        Column(Modifier.offset(x = u * (270f - LECTERN_W / 2 + 129 * ls), y = u * (LECTERN_Y + 23 * ls)).size(u * (92 * ls), u * (69 * ls)),
+        val px = 270f - LECTERN_W / 2
+        Column(Modifier.offset(x = u * (px + 126 * ls), y = u * (LECTERN_Y + 22 * ls)).size(u * (106 * ls), u * (72 * ls)),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            val plate = T.title.copy(fontSize = (u.value * 21.6f).sp, lineHeight = (u.value * 23f).sp)
-            Text("DRAFT", style = plate, color = Color(0xFFEDEDED))
-            Text("$year", style = plate, color = Color(0xFFEDEDED))
+            val plate = T.title.copy(fontSize = (u.value * 21.6f).sp, lineHeight = (u.value * 23f).sp, shadow = Shadow(Color.Black, Offset(0f, u.value * 0.8f), 0f))
+            Text("DRAFT", style = plate, color = Color(0xFFF2F2F2))
+            Text("$year", style = plate, color = Color(0xFFF2F2F2))
+        }
+        Box(Modifier.offset(x = u * (px + 82 * ls), y = u * (LECTERN_Y + 104 * ls)).size(u * (92 * ls), u * (30 * ls)), contentAlignment = Alignment.CenterEnd) {
+            Text("Presented by", style = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = (u.value * 8f).sp, lineHeight = (u.value * 9f).sp),
+                color = Color(0xFFD9D9D9), maxLines = 1, softWrap = false)
         }
         // 6. The broadcast's dark edges, then on top: the dialogue box.
         Canvas(Modifier.fillMaxSize()) {
@@ -406,12 +463,15 @@ fun DialogueBox(speaker: String, text: String, modifier: Modifier = Modifier, pa
     }
 }
 
-/** [club]'s badge from the team pack, [size] square; a club with another name that year gets its abbreviation plate painted. */
+/** [club]'s badge from the team pack, [size] square, with the club's logo; a club with another name that year gets its abbreviation plate painted instead. */
 @Composable
 fun ClubBadge(club: DraftArt.Club, size: Dp = 44.dp) {
     val img = DraftArt.badge(club.slot) ?: return
+    val logo = remember(club.slot, club.abbr) { DraftArt.teamLogo(club) }
     Box(Modifier.size(size)) {
-        Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None)
+        Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.High)
+        // The club's logo over the badge's ball (its center at 31.5, 26.5 of the badge's 64 x 64 pixels).
+        if (logo != null) Canvas(Modifier.fillMaxSize()) { val k = this.size.width / 64f; logoDisc(logo, 31.5f, 26.5f, 16.5f, k, null) }
         if (club.renamed) {
             val k = size / 64f
             val r = DraftArt.BADGE_PLATE
