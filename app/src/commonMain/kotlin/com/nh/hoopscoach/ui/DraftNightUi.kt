@@ -87,7 +87,7 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
         val clubs = row.map { DraftArt.club(lg.team(it)) }
         val named = (last?.let { lg.team(it.teamId) } ?: clock)?.let { DraftArt.club(it) }
         DraftStage(dn.season, clubs, lit) {
-            DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp),
+            DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 10.dp),
                 portrait = named?.takeIf { DraftArt.badge(it.slot) != null }?.let { c -> { ClubBadge(c) } })
         }
         Spacer(Modifier.height(12.dp))

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,17 +61,29 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.sin
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.geometry.CornerRadius
 
 /**
- * The Draft Night art (assets/draft, from the user's retro draft pack): the hall's pieces, drawn back to front.
- * The center banner and the podium come with their year painted out; the year is written on them here.
+ * The Draft Night art (assets/draft, from the user's retro draft packs): the hall's pieces, drawn back to front.
+ * The center banner and the lectern's plate come with their year painted out; the year is written on them here.
+ * The stage, the crowd at its tables and the team reps standing behind it are cut from the stage atlas.
  */
 object DraftArt {
     private fun a(name: String) = Logos.asset("draft/$name.png")
     val banner get() = a("center_banner_blank")
-    val podium get() = a("podium_blank")
+    val lectern get() = a("podium_lectern")
     val commissioner get() = a("commissioner_full_body")
-    val crowd get() = a("arena_crowd_and_railings")
+    val crowd get() = a("crowd_table")
+    val reps get() = a("team_reps")
+    val stage get() = a("stage_platform")
     val curtain get() = a("blue_curtain_tall")
     val league get() = a("league_vertical_banner")
 
@@ -128,124 +141,205 @@ object DraftArt {
 private const val SW = 540f
 private const val SH = 830f
 
+/** The truss of lights arcs a little lower in the middle; the pennants hang from it, the middle ones lower still. */
+private fun truss(x: Float): Float { val t = (x - SW / 2) / (SW / 2); return 34f + 14f * (1 - t * t) }
+private fun hang(x: Float): Float { val t = (x - SW / 2) / (SW / 2); return 38f + 26f * (1 - t * t) }
+
+/** Rows of stripes added to every pennant so they hang long (its rows 48 on are plain stripes across). */
+private const val PENNANT_EXTRA = 24
+/** Where the six pennants hang (their centers), three to a side; how wide; how long. */
+private val SPOTS = listOf(30f, 90f, 150f, 390f, 450f, 510f)
+private const val PENNANT_W = 68f
+private val PENNANT_H = PENNANT_W / DraftArt.PW * (160 + PENNANT_EXTRA)
+
+/** Part of [img] ([sx], [sy], [sw], [sh] in its pixels) into ([x], [y], [w], [h]) on the stage, [k] pixels to a stage unit; crisp. */
+private fun DrawScope.blit(img: ImageBitmap, sx: Int, sy: Int, sw: Int, sh: Int, x: Float, y: Float, w: Float, h: Float, k: Float, filter: ColorFilter? = null) {
+    val x0 = (x * k).roundToInt(); val y0 = (y * k).roundToInt()
+    drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset(x0, y0), IntSize(((x + w) * k).roundToInt() - x0, ((y + h) * k).roundToInt() - y0),
+        colorFilter = filter, filterQuality = FilterQuality.None)
+}
+
+/** A team pennant, long: its top (rod and name plate), a stripe row stretched [PENNANT_EXTRA] rows, then the rest. */
+private fun DrawScope.pennant(img: ImageBitmap, x: Float, y: Float, k: Float, filter: ColorFilter?) {
+    val n = img.width / DraftArt.PW.toInt()
+    val s = PENNANT_W / DraftArt.PW
+    blit(img, 0, 0, img.width, 48 * n, x, y, PENNANT_W, 48 * s, k, filter)
+    blit(img, 0, 48 * n, img.width, n, x, y + 48 * s, PENNANT_W, PENNANT_EXTRA * s, k, filter)
+    blit(img, 0, 48 * n, img.width, img.height - 48 * n, x, y + (48 + PENNANT_EXTRA) * s, PENNANT_W, (img.height / n - 48) * s, k, filter)
+}
+
 /**
- * Draft Night on stage: the dark hall and its lights, the curtain, the draft banner with [year], the pennants of
- * [clubs] (the six picking now and next, in order; [onClock] is lit up, under a spotlight) and the league's banners,
- * the crowd at its rails, the commissioner behind the podium (the envelope up), and the podium's plate with [year].
- * [overlay] goes on top (the commissioner's dialogue box, over the floor).
+ * Draft Night on stage, like a 90s broadcast: the dark hall under its arc of lights, the pennants of [clubs] (the six
+ * picking now and next, in order; [onClock] lit up under a spotlight) hung long from the truss, the draft banner with
+ * [year], the league's banners, the lattice and the curtains, the stage house behind the commissioner, the team reps
+ * standing at the back and the crowd at its draped tables, the commissioner with the envelope up, his microphone, the
+ * wood stage with its red carpet, and the lectern with [year] on its plate. [overlay] goes on top (his dialogue box,
+ * over the front of the stage).
  */
 @Composable
 fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Modifier = Modifier, overlay: @Composable BoxScope.() -> Unit = {}) {
     val art = remember {
         object {
-            val banner = DraftArt.banner; val podium = DraftArt.podium; val man = DraftArt.commissioner
-            val crowd = DraftArt.crowd; val curtain = DraftArt.curtain; val league = DraftArt.league
+            val banner = DraftArt.banner; val lectern = DraftArt.lectern; val man = DraftArt.commissioner
+            val crowd = DraftArt.crowd; val reps = DraftArt.reps; val stage = DraftArt.stage
+            val curtain = DraftArt.curtain; val league = DraftArt.league
         }
     }
     val pennants = remember(clubs.map { it.slot }) { clubs.map { DraftArt.pennant(it.slot) ?: DraftArt.league } }
     val anim = rememberInfiniteTransition(label = "stage")
     val clock by anim.animateFloat(0f, 3600f, infiniteRepeatable(tween(3_600_000, easing = LinearEasing)), label = "clock")
-    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(SW / SH)) {
+    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(SW / SH).clip(RectangleShape)) {
         val u: Dp = maxWidth / SW
         /** [img] at ([x], [y]) on the stage's canvas, [w] wide, its own shape kept; crisp pixels. */
         @Composable
-        fun put(img: ImageBitmap?, x: Float, y: Float, w: Float, m: Modifier = Modifier, filter: ColorFilter? = null) {
+        fun put(img: ImageBitmap?, x: Float, y: Float, w: Float) {
             if (img == null) return
             val h = w * img.height / img.width
-            Image(img, null, m.offset(x = u * x, y = u * y).size(u * w, u * h), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None, colorFilter = filter)
+            Image(img, null, Modifier.offset(x = u * x, y = u * y).size(u * w, u * h), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None)
         }
-        // 1. The hall: dark, a truss of lights overhead (twinkling), the floor in front.
+        val lights = listOf(Color.White, Color(0xFF6FA8FF), Color(0xFFFFE08A), Color(0xFFFF5A5A))
+        // 1. The hall: the dark dome and its ribs, the back wall with its lattice, the red curtains at the sides,
+        // the stage house (a beam of little lights over the curtain behind him), and the blue floor.
         Canvas(Modifier.fillMaxSize()) {
             val k = size.width / SW
-            drawRect(Brush.verticalGradient(listOf(Color(0xFF05070D), Color(0xFF0C1430), Color(0xFF13245C)), endY = 700 * k))
-            drawRect(Color(0xFF13286B), Offset(0f, 700 * k), Size(size.width, size.height - 700 * k))
-            drawRect(Color(0xFF2A2F3B), Offset(0f, 30 * k), Size(size.width, 9 * k))
-            var x = 0f
-            while (x < SW) { drawRect(Color(0xFF454C5E), Offset(x * k, 31 * k), Size(2 * k, 7 * k)); x += 10f }
-            val lights = listOf(Color.White, Color(0xFF6FA8FF), Color(0xFFFFE08A), Color(0xFFFF5A5A))
-            for ((i, lx) in (24 until 540 step 62).withIndex()) {
+            drawRect(Brush.verticalGradient(listOf(Color(0xFF030408), Color(0xFF0A1234)), endY = 560 * k))
+            for (i in 0 until 3) {
+                val r = 520f + 100 * i
+                drawArc(Color(0xFF141A2C), 190f, 160f, false, Offset((270 - r) * k, (60 - r * 0.42f + 40 * i) * k), Size(2 * r * k, 2 * r * 0.42f * k), style = Stroke(2 * k))
+            }
+            drawRect(Color(0xFF080C20), Offset(0f, 150 * k), Size(size.width, 410 * k))
+            for ((x0, x1) in listOf(96f to 186f, 354f to 444f)) {
+                drawRect(Color(0xFF0B112C), Offset(x0 * k, 170 * k), Size((x1 - x0) * k, 250 * k))
+                var gx = x0; while (gx <= x1) { drawRect(Color(0xFF161E40), Offset(gx * k, 170 * k), Size(k, 250 * k)); gx += 15f }
+                var gy = 170f; while (gy <= 420f) { drawRect(Color(0xFF161E40), Offset(x0 * k, gy * k), Size((x1 - x0) * k, k)); gy += 17f }
+            }
+            art.curtain?.let { c ->
+                // Red curtains: the blue one, dyed.
+                val red = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(0f, 0f, 0.62f, 0f, 0f, 0.25f, 0f, 0f, 0f, 0f, 0f, 0.25f, 0f, 0f, 0f, 0f, 0f, 0f, 1f, 0f)))
+                blit(c, 0, 0, c.width, c.height, 66f, 160f, 34f, 280f, k, red)
+                blit(c, 0, 0, c.width, c.height, 440f, 160f, 34f, 280f, k, red)
+                blit(c, 0, 0, c.width, c.height, 184f, 262f, 172f, 230f, k)
+            }
+            drawRect(Color(0xFF16192A), Offset(180 * k, 244 * k), Size(180 * k, 20 * k))
+            drawRect(Color(0xFF282E42), Offset(180 * k, 262 * k), Size(180 * k, 3 * k))
+            for ((i, lx) in (192..351 step 16).withIndex()) {
+                val c = listOf(Color(0xFFC8C8C8), Color(0xFF5A82D2), Color(0xFFD2B96E))[i % 3]
+                drawCircle(c.copy(alpha = 0.7f + 0.3f * sin(clock * 3.1f + i)), 2 * k, Offset(lx * k, 253 * k))
+            }
+            drawRect(Color(0xFF121E64), Offset(0f, 548 * k), Size(size.width, size.height - 548 * k))
+        }
+        // 2. The draft banner, with this year's draft on its shield.
+        put(art.banner, 188f, 84f, 164f)
+        Box(Modifier.offset(x = u * 239.7f, y = u * 198f).size(u * 62.4f, u * 37.4f), contentAlignment = Alignment.Center) {
+            Text("'${(year % 100).toString().padStart(2, '0')}", style = T.title.copy(fontSize = (u.value * 33.9f).sp, lineHeight = (u.value * 33.9f).sp,
+                shadow = Shadow(Color(0xFF14102A), Offset(0f, u.value * 2.2f), 0f)), color = Color(0xFFF4F1EA))
+        }
+        // 3. The truss and its lights (twinkling); the pennants, three to a side in pick order: the club on the clock
+        // under a spotlight, swaying, the ones up next a shade darker; the league's banners under them.
+        val dim = ColorFilter.tint(Color(0x66000000), BlendMode.SrcAtop)
+        val lit = onClock.takeIf { it in pennants.indices && it < SPOTS.size } ?: -1
+        val sways = pennants.indices.map { i -> if (sin(clock * (if (i == lit) 2.4f else 1.2f) + i * 1.7f) > (if (i == lit) 0.3f else 0.85f)) 1f else 0f }
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / SW
+            val arc = Path().apply { moveTo(0f, truss(0f) * k); var x = 4f; while (x <= SW) { lineTo(x * k, truss(x) * k); x += 4f } }
+            drawPath(arc, Color(0xFF2A2F3B), style = Stroke(8 * k))
+            drawPath(arc, Color(0xFF454C5E), style = Stroke(1.2f * k))
+            for ((i, lx) in (22..539 step 62).withIndex()) {
                 val c = lights[i % lights.size]
                 val on = 0.75f + 0.25f * sin(clock * 2.6f + i * 1.3f)
-                drawCircle(c.copy(alpha = 0.18f * on), 11 * k, Offset(lx * k, 44 * k))
-                drawCircle(c.copy(alpha = on), 4 * k, Offset(lx * k, 44 * k))
+                val ly = truss(lx.toFloat()) + 9
+                drawCircle(c.copy(alpha = 0.16f * on), 12 * k, Offset(lx * k, ly * k))
+                drawCircle(c.copy(alpha = on), 4 * k, Offset(lx * k, ly * k))
+            }
+            if (lit >= 0) {
+                val cx = SPOTS[lit]; val top = truss(cx) + 9; val bottom = hang(cx) + PENNANT_H
+                val glow = 0.16f + 0.05f * sin(clock * 3f)
+                drawPath(Path().apply {
+                    moveTo((cx - 5) * k, top * k); lineTo((cx + 5) * k, top * k); lineTo((cx + 44) * k, bottom * k); lineTo((cx - 44) * k, bottom * k); close()
+                }, Brush.verticalGradient(listOf(Color(0xFFFFF3C4).copy(alpha = glow * 1.6f), Color(0xFFFFF3C4).copy(alpha = 0f)), startY = top * k, endY = bottom * k))
+            }
+            pennants.forEachIndexed { i, img ->
+                if (i >= SPOTS.size || img == null) return@forEachIndexed
+                val filter = if (i == lit || lit < 0) null else dim
+                val y = hang(SPOTS[i]) + sways[i]
+                if (img === art.league) blit(img, 0, 0, img.width, img.height, SPOTS[i] - 25, y, 50f, 50f * img.height / img.width, k, filter)
+                else pennant(img, SPOTS[i] - PENNANT_W / 2, y, k, filter)
             }
         }
-        // 2. The tall curtain behind the commissioner.
-        put(art.curtain, 150f, 214f, 240f)
-        // 3. The draft banner, with this year's draft on its shield.
-        put(art.banner, 178f, 58f, 184f)
-        Box(Modifier.offset(x = u * 236f, y = u * 186f).size(u * 70f, u * 42f), contentAlignment = Alignment.Center) {
-            Text("'${(year % 100).toString().padStart(2, '0')}", style = T.title.copy(fontSize = (u.value * 38).sp, lineHeight = (u.value * 38).sp,
-                shadow = Shadow(Color(0xFF14102A), Offset(0f, u.value * 2.5f), 0f)), color = Color(0xFFF4F1EA))
-        }
-        // The pennants, three to a side in pick order, all at one pixel scale, each centered on its spot: the club
-        // on the clock under a spotlight from the truss, swaying, the ones up next a shade darker. A club with
-        // another name that year gets its name plate painted.
-        val spots = listOf(30f, 88f, 146f, 394f, 452f, 510f)
-        val pw = 58f
-        val dim = ColorFilter.tint(Color(0x66000000), BlendMode.SrcAtop)
-        if (onClock in pennants.indices && onClock < spots.size) Canvas(Modifier.fillMaxSize()) {
-            val k = size.width / SW
-            val cx = spots[onClock] * k
-            val glow = 0.16f + 0.05f * sin(clock * 3f)
-            drawPath(Path().apply {
-                moveTo(cx - 5 * k, 44 * k); lineTo(cx + 5 * k, 44 * k); lineTo(cx + 40 * k, 172 * k); lineTo(cx - 40 * k, 172 * k); close()
-            }, Brush.verticalGradient(listOf(Color(0xFFFFF3C4).copy(alpha = glow * 1.6f), Color(0xFFFFF3C4).copy(alpha = 0f)), startY = 44 * k, endY = 172 * k))
-        }
+        // A club with another name that year: its name and abbreviation painted on the plates.
         pennants.forEachIndexed { i, img ->
-            if (i >= spots.size || img == null) return@forEachIndexed
-            val lit = i == onClock
-            val sway = if (sin(clock * (if (lit) 2.4f else 1.2f) + i * 1.7f) > (if (lit) 0.3f else 0.85f)) 1f else 0f
-            val league = img === art.league
-            val w = if (league) 50f else pw
-            val x = spots[i] - w / 2
-            val y = 52f + sway
-            put(img, x, y, w, filter = if (lit || onClock < 0) null else dim)
-            val c = clubs[i]
-            if (c.renamed && !league) {
-                // That year's name on the plates: the city and the nickname across the top, the abbreviation at the foot.
-                val k = pw / DraftArt.PW
-                @Composable
-                fun plate(r: FloatArray, content: @Composable () -> Unit) =
-                    Box(Modifier.offset(x = u * (x + r[0] * k), y = u * (y + r[1] * k)).size(u * (r[2] * k), u * (r[3] * k)).background(DraftArt.PLATE)
-                        .then(if (lit || onClock < 0) Modifier else Modifier.background(Color(0x66000000))), contentAlignment = Alignment.Center) { content() }
-                val lines = listOf(c.city.uppercase(), c.nick.uppercase()).filter { it.isNotEmpty() }
-                val f = minOf(6.6f, 58f / (lines.maxOf { it.length }.coerceAtLeast(1) * 0.66f)) * k
-                plate(DraftArt.NAME_PLATE) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        for (l in lines) Text(l, style = TextStyle(fontWeight = FontWeight.Bold, fontSize = (u.value * f).sp, lineHeight = (u.value * f * 1.15f).sp),
-                            color = DraftArt.PLATE_TEXT, maxLines = 1, softWrap = false)
-                    }
-                }
-                plate(DraftArt.ABBR_PLATE) {
-                    Text(c.abbr, style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = (u.value * 9.6f * k).sp, lineHeight = (u.value * 10f * k).sp),
+            val c = clubs.getOrNull(i) ?: return@forEachIndexed
+            if (i >= SPOTS.size || img == null || img === art.league || !c.renamed) return@forEachIndexed
+            val x = SPOTS[i] - PENNANT_W / 2
+            val y = hang(SPOTS[i]) + sways[i]
+            val k = PENNANT_W / DraftArt.PW
+            val shade = i != lit && lit >= 0
+            @Composable
+            fun plate(r: FloatArray, dy: Float, content: @Composable () -> Unit) =
+                Box(Modifier.offset(x = u * (x + r[0] * k), y = u * (y + (r[1] + dy) * k)).size(u * (r[2] * k), u * (r[3] * k)).background(DraftArt.PLATE)
+                    .then(if (shade) Modifier.background(Color(0x66000000)) else Modifier), contentAlignment = Alignment.Center) { content() }
+            val lines = listOf(c.city.uppercase(), c.nick.uppercase()).filter { it.isNotEmpty() }
+            val f = minOf(6.6f, 58f / (lines.maxOf { it.length }.coerceAtLeast(1) * 0.66f)) * k
+            plate(DraftArt.NAME_PLATE, 0f) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    for (l in lines) Text(l, style = TextStyle(fontWeight = FontWeight.Bold, fontSize = (u.value * f).sp, lineHeight = (u.value * f * 1.15f).sp),
                         color = DraftArt.PLATE_TEXT, maxLines = 1, softWrap = false)
                 }
             }
+            plate(DraftArt.ABBR_PLATE, PENNANT_EXTRA.toFloat()) {
+                Text(c.abbr, style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = (u.value * 9.6f * k).sp, lineHeight = (u.value * 10f * k).sp),
+                    color = DraftArt.PLATE_TEXT, maxLines = 1, softWrap = false)
+            }
         }
-        if (onClock in pennants.indices && onClock < spots.size) {
-            val tx = (spots[onClock] - 34f).coerceIn(2f, SW - 70f)
-            Box(Modifier.offset(x = u * tx, y = u * 158f).size(u * 68f, u * 13f).background(Color(0xE60A0A10)).border(u * 1f, Color(0xFFF5C518)),
+        if (lit >= 0) {
+            val tx = (SPOTS[lit] - 34f).coerceIn(2f, SW - 70f)
+            Box(Modifier.offset(x = u * tx, y = u * (hang(SPOTS[lit]) + PENNANT_H + 4)).size(u * 68f, u * 13f).background(Color(0xE60A0A10)).border(u * 1f, Color(0xFFF5C518)),
                 contentAlignment = Alignment.Center) {
                 Text("ON THE CLOCK", style = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = (u.value * 7.5f).sp, lineHeight = (u.value * 8f).sp),
                     color = Color(0xFFF5C518), maxLines = 1, softWrap = false)
             }
         }
-        put(art.league, 8f, 184f, 50f)
-        put(art.league, 482f, 184f, 50f)
-        // 4. The crowd and its rails, side to side (the podium hides the aisle).
-        put(art.crowd, 0f, 330f, 540f)
-        // 6 before 5: the commissioner stands behind the podium, so it's drawn over his feet.
+        put(art.league, 8f, 196f, 56f)
+        put(art.league, 476f, 196f, 56f)
+        // 4. The team reps standing at the back, then the crowd at its draped tables, one section to a side.
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / SW
+            art.reps?.let { r ->
+                val w = r.width * 0.75f; val h = r.height * 0.75f
+                blit(r, 0, 0, r.width, r.height, 84f, 312f, w, h, k)
+                val x = SW - 84f - w
+                withTransform({ scale(-1f, 1f, Offset((x + w / 2) * k, 0f)) }) { blit(r, 0, 0, r.width, r.height, x, 312f, w, h, k) }
+            }
+            art.crowd?.let { c ->
+                blit(c, 0, 0, 122, c.height, 0f, 556f - c.height, 122f, c.height.toFloat(), k)
+                blit(c, 150, 0, 122, c.height, SW - 122f, 556f - c.height, 122f, c.height.toFloat(), k)
+                // Each section fades into the dark toward the aisle, where the stage lights don't reach.
+                val top = (556f - c.height) * k; val h = c.height * k
+                val dark = Color(0xFF080C20)
+                drawRect(Brush.horizontalGradient(listOf(Color.Transparent, dark), startX = 100 * k, endX = 123 * k), Offset(100 * k, top), Size(23 * k, h))
+                drawRect(Brush.horizontalGradient(listOf(dark, Color.Transparent), startX = (SW - 123) * k, endX = (SW - 100) * k), Offset((SW - 123) * k, top), Size(23 * k, h))
+            }
+        }
+        // 5. The commissioner, the envelope up; his microphone; the stage; the lectern in front of him.
         val bob = if (sin(clock * 2.1f) > 0.6f) -1f else 0f
-        put(art.man, 159f, 242.5f + bob, 250f * 1.067f)
-        // 5. The podium, with this year's draft on its plate.
-        put(art.podium, 109.3f, 462.1f, 490f * 0.656f)
-        Column(Modifier.offset(x = u * 240f, y = u * 481f).size(u * 76f, u * 50f), horizontalAlignment = Alignment.CenterHorizontally) {
-            val plate = T.title.copy(fontSize = (u.value * 21).sp, lineHeight = (u.value * 22).sp)
+        put(art.man, 175.6f, 247f + bob, 227f)
+        Canvas(Modifier.fillMaxSize()) {
+            val k = size.width / SW
+            drawLine(Color(0xFF1C1C22), Offset(268 * k, 404 * k), Offset(266 * k, 372 * k), 2.2f * k)
+            drawRoundRect(Color(0xFF2B2B33), Offset(262.5f * k, 361 * k), Size(7 * k, 12 * k), CornerRadius(3 * k))
+            drawRect(Color(0xFF55555F), Offset(263.5f * k, 362.5f * k), Size(1.5f * k, 8 * k))
+            art.stage?.let { blit(it, 0, 0, it.width, it.height, -40f, 556f, 620f, 620f * it.height / it.width, k) }
+        }
+        put(art.lectern, 152f, 404f, 236f)
+        Column(Modifier.offset(x = u * 247.7f, y = u * 421f).size(u * 68.3f, u * 51.2f), horizontalAlignment = Alignment.CenterHorizontally) {
+            val plate = T.title.copy(fontSize = (u.value * 22.5f).sp, lineHeight = (u.value * 24f).sp)
             Text("DRAFT", style = plate, color = Color(0xFFEDEDED))
             Text("$year", style = plate, color = Color(0xFFEDEDED))
         }
-        // 7. On top: the dialogue box.
+        // 6. The broadcast's dark edges, then on top: the dialogue box.
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Transparent, Color(0x73000000)), center = Offset(size.width / 2, size.height * 0.45f), radius = size.height * 0.62f))
+        }
         overlay()
     }
 }
@@ -277,7 +371,7 @@ fun DialogueBox(speaker: String, text: String, modifier: Modifier = Modifier, pa
     val a by blink.animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
     val mono = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp)
     Box(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF0A0A10))
+        modifier.fillMaxWidth().heightIn(min = 100.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF0A0A10))
             .border(3.dp, Color(0xFFE8E8E8), RoundedCornerShape(8.dp)).padding(3.dp)
             .border(1.5.dp, Color(0xFF6C6C78), RoundedCornerShape(6.dp))
             .clickable { shown = text.length }
