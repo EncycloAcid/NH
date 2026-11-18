@@ -82,8 +82,12 @@ internal fun LazyListScope.draftNightItems(vm: GameViewModel, lg: League, dn: Dr
             last == null -> "Welcome to the ${dn.season} NBA Draft." + (clock?.let { " The ${it.name} are on the clock." } ?: "")
             else -> announce(dn.season, last.pick, lg.team(last.teamId).name, "${last.name}, ${last.pos}.")
         }
-        DraftStage(dn.season) {
-            DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp))
+        // The pennants: the clubs on the clock and up next; the badge of the club he's naming.
+        val (row, lit) = DraftArt.window(dn.order, dn.at)
+        val clubs = row.map { DraftArt.club(lg.team(it)) }
+        val badge = (last?.let { lg.team(it.teamId) } ?: clock)?.let { DraftArt.badge(DraftArt.club(it).slot) }
+        DraftStage(dn.season, clubs, lit) {
+            DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), badge = badge)
         }
         Spacer(Modifier.height(12.dp))
     }

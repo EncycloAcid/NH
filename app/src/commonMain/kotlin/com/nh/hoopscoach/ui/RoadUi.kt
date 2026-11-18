@@ -1258,8 +1258,18 @@ private fun GreenRoom(vm: GameViewModel, lg: League) {
                     last.pid == lg.heroId -> announce(lg.season, last.pick, teamOf(last), "${last.playerName}, from ${last.school}!")
                     else -> announce(lg.season, last.pick, teamOf(last), "${last.playerName}, ${last.pos}, ${last.school}.")
                 }
-                DraftStage(lg.season) {
-                    DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1))
+                // The pennants: the clubs on the clock and up next; the badge of the club he's naming.
+                val at = if (ringing) mine else shown
+                val clubs = remember(lg.season, picks.size) { picks.map { DraftArt.club(it.proTeam, lg.season) ?: DraftArt.Club("", "") } }
+                val (row, lit) = DraftArt.window(clubs, at)
+                val naming = when {
+                    done && myPick == null -> null
+                    ringing -> picks.getOrNull(mine)
+                    else -> last ?: picks.firstOrNull()
+                }
+                val badge = naming?.let { DraftArt.club(it.proTeam, lg.season) }?.let { DraftArt.badge(it.slot) }
+                DraftStage(lg.season, row, lit) {
+                    DialogueBox("COMMISSIONER", line, Modifier.align(Alignment.BottomCenter).padding(10.dp), paceMs = if (done || ringing) 0L else pickPace(shown + 1), badge = badge)
                 }
                 Spacer(Modifier.height(12.dp))
             }
