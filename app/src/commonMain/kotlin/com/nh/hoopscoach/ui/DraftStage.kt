@@ -92,7 +92,7 @@ object DraftArt {
     val nbaLogo get() = a("nba_logo")
     val sponsor get() = a("sprite_logo")
 
-    /** The club's own logo (assets/nba/logos) for its pennant and badge; none for a club with another name that year. */
+    /** The club's own logo (assets/nba/logos) for its badge; none for a club with another name that year. */
     fun teamLogo(c: Club): ImageBitmap? = if (c.renamed) null else ProLeague.logoKey(c.slot)?.let { Logos.asset("nba/logos/$it.webp") }
 
     /**
@@ -117,13 +117,18 @@ object DraftArt {
         runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<List<PackTeam>>(text) }.getOrDefault(emptyList()).associateBy { it.abbreviation }
     }
 
-    fun pennant(slot: String) = PACK[slot]?.banner?.let { Logos.asset(it) }
     fun badge(slot: String) = PACK[slot]?.badge?.let { Logos.asset(it) }
+
+    /**
+     * The club's pennant (assets/draft/pennants), in the style of the user's draft sheet: its fabric in the club's
+     * color with the club's logo on it, or, for a club that had another name that year, that name.
+     */
+    fun pennant(c: Club) = a("pennants/${(if (c.renamed) c.abbr else c.slot).lowercase()}")
 
     /**
      * A club on Draft Night: [slot] is its franchise (today's abbreviation, which picks its pennant and badge), [abbr],
      * [city] and [nick] what it was called that year. A club that went by another name then (the Vancouver Grizzlies
-     * in '98) gets its pennant's and badge's name plates painted over.
+     * in '98) hangs its own pennant, and its badge gets that abbreviation painted on.
      */
     class Club(val slot: String, val abbr: String, val city: String = "", val nick: String = "") {
         val renamed get() = abbr != slot && abbr in RENAMED && PACK.containsKey(slot)
@@ -140,10 +145,6 @@ object DraftArt {
         return NbaData.TEAMS.firstOrNull { it.csv == name || "${it.city} ${it.name}" == name }?.let { Club(it.abbr, it.abbr, it.city, it.name) }
     }
 
-    /** The pennant's plates (in its 96 x 160 pixels): the club's name across the top, its abbreviation at the foot. */
-    const val PW = 96f
-    val NAME_PLATE = floatArrayOf(17f, 19f, 62f, 21f)
-    val ABBR_PLATE = floatArrayOf(25f, 113f, 46f, 12f)
     /** The badge's abbreviation plate (in its 64 x 64 pixels). */
     val BADGE_PLATE = floatArrayOf(13f, 43f, 38f, 11f)
     val PLATE = Color(0xFF101522)
@@ -170,12 +171,10 @@ private const val LECTERN_W = 226f
 private const val LECTERN_Y = 408f
 private const val LECTERN_H = 189f
 
-/** Rows of stripes added to every pennant so they hang long (its rows 48 on are plain stripes across). */
-private const val PENNANT_EXTRA = 24
-/** Where the six pennants hang (their centers), three to a side; how wide; how long. */
+/** Where the six pennants hang (their centers), three to a side; how wide; how long (the pennants are 150 x 357). */
 private val SPOTS = listOf(30f, 90f, 150f, 390f, 450f, 510f)
-private const val PENNANT_W = 68f
-private val PENNANT_H = PENNANT_W / DraftArt.PW * (160 + PENNANT_EXTRA)
+private const val PENNANT_W = 58f
+private const val PENNANT_H = PENNANT_W * 357f / 150f
 
 /** Part of [img] ([sx], [sy], [sw], [sh] in its pixels) into ([x], [y], [w], [h]) on the stage, [k] pixels to a stage unit, smoothed. */
 private fun DrawScope.blit(img: ImageBitmap, sx: Int, sy: Int, sw: Int, sh: Int, x: Float, y: Float, w: Float, h: Float, k: Float, filter: ColorFilter? = null) {
@@ -196,19 +195,6 @@ private fun DrawScope.logoDisc(logo: ImageBitmap, cx: Float, cy: Float, r: Float
     drawCircle(LOGO_DISC, r * k, Offset(cx * k, cy * k), colorFilter = filter)
     val side = r * 1.62f
     blit(logo, cx - side / 2, cy - side / 2, side, side, k, filter)
-}
-
-/**
- * A team pennant, long: its top (rod and name plate), a stripe row stretched [PENNANT_EXTRA] rows, then the rest; the
- * club's [logo], when there is one, on the medallion (its ball at 48, 78 of the pennant's 96 x 160 pixels).
- */
-private fun DrawScope.pennant(img: ImageBitmap, logo: ImageBitmap?, x: Float, y: Float, k: Float, filter: ColorFilter?) {
-    val n = img.width / DraftArt.PW.toInt()
-    val s = PENNANT_W / DraftArt.PW
-    blit(img, 0, 0, img.width, 48 * n, x, y, PENNANT_W, 48 * s, k, filter)
-    blit(img, 0, 48 * n, img.width, n, x, y + 48 * s, PENNANT_W, PENNANT_EXTRA * s, k, filter)
-    blit(img, 0, 48 * n, img.width, img.height - 48 * n, x, y + (48 + PENNANT_EXTRA) * s, PENNANT_W, (img.height / n - 48) * s, k, filter)
-    if (logo != null) logoDisc(logo, x + 48 * s, y + (78 + PENNANT_EXTRA) * s, 19 * s, k, filter)
 }
 
 /**
@@ -233,8 +219,7 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
             val nbaLogo = DraftArt.nbaLogo; val sponsor = DraftArt.sponsor
         }
     }
-    val pennants = remember(clubs.map { it.slot }) { clubs.map { DraftArt.pennant(it.slot) ?: DraftArt.league } }
-    val logos = remember(clubs.map { it.slot + it.abbr }) { clubs.map { DraftArt.teamLogo(it) } }
+    val pennants = remember(clubs.map { it.slot + it.abbr }) { clubs.map { DraftArt.pennant(it) ?: DraftArt.league } }
     val anim = rememberInfiniteTransition(label = "stage")
     val clock by anim.animateFloat(0f, 3600f, infiniteRepeatable(tween(3_600_000, easing = LinearEasing)), label = "clock")
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(SW / SH).clip(RectangleShape)) {
@@ -311,33 +296,8 @@ fun DraftStage(year: Int, clubs: List<DraftArt.Club>, onClock: Int, modifier: Mo
                 if (i >= SPOTS.size || img == null) return@forEachIndexed
                 val filter = if (i == lit || lit < 0) null else dim
                 val y = hang(SPOTS[i]) + sways[i]
-                if (img === art.league) blit(img, 0, 0, img.width, img.height, SPOTS[i] - 25, y, 50f, 50f * img.height / img.width, k, filter)
-                else pennant(img, logos.getOrNull(i), SPOTS[i] - PENNANT_W / 2, y, k, filter)
-            }
-        }
-        // A club with another name that year: its name and abbreviation painted on the plates.
-        pennants.forEachIndexed { i, img ->
-            val c = clubs.getOrNull(i) ?: return@forEachIndexed
-            if (i >= SPOTS.size || img == null || img === art.league || !c.renamed) return@forEachIndexed
-            val x = SPOTS[i] - PENNANT_W / 2
-            val y = hang(SPOTS[i]) + sways[i]
-            val k = PENNANT_W / DraftArt.PW
-            val shade = i != lit && lit >= 0
-            @Composable
-            fun plate(r: FloatArray, dy: Float, content: @Composable () -> Unit) =
-                Box(Modifier.offset(x = u * (x + r[0] * k), y = u * (y + (r[1] + dy) * k)).size(u * (r[2] * k), u * (r[3] * k)).background(DraftArt.PLATE)
-                    .then(if (shade) Modifier.background(Color(0x66000000)) else Modifier), contentAlignment = Alignment.Center) { content() }
-            val lines = listOf(c.city.uppercase(), c.nick.uppercase()).filter { it.isNotEmpty() }
-            val f = minOf(6.6f, 58f / (lines.maxOf { it.length }.coerceAtLeast(1) * 0.66f)) * k
-            plate(DraftArt.NAME_PLATE, 0f) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    for (l in lines) Text(l, style = TextStyle(fontWeight = FontWeight.Bold, fontSize = (u.value * f).sp, lineHeight = (u.value * f * 1.15f).sp),
-                        color = DraftArt.PLATE_TEXT, maxLines = 1, softWrap = false)
-                }
-            }
-            plate(DraftArt.ABBR_PLATE, PENNANT_EXTRA.toFloat()) {
-                Text(c.abbr, style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = (u.value * 9.6f * k).sp, lineHeight = (u.value * 10f * k).sp),
-                    color = DraftArt.PLATE_TEXT, maxLines = 1, softWrap = false)
+                val w = if (img === art.league) 50f else PENNANT_W
+                blit(img, SPOTS[i] - w / 2, y, w, w * img.height / img.width, k, filter)
             }
         }
         if (lit >= 0) {
