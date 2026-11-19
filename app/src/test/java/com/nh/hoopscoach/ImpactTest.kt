@@ -45,7 +45,7 @@ class ImpactTest {
         var guard = 0
         while (h.ovr < 97 && guard++ < 600) { val i = Rng.int(0, 9); if (h.attrs[i] < 99) h.attrs[i]++ }
         lg.road!!.leadership = 60
-        Gameplan.autoAllocate(lg, t)
+        Tactics.autoAllocate(lg, t)
         val lift = Leadership.lift(lg, lg.rosterOf(t))
         println("lift at ${h.ovr} as a captain: $lift")
         assertTrue("a star lifts his teammates", lift > 0.006)

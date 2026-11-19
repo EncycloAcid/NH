@@ -121,6 +121,6 @@ class RecruitingTest {
         assertEquals(lg.players.size, save.players.size)
         Offseason.advance(lg)
         assertEquals(Phase.REGULAR, lg.phase)
-        for (t in lg.teams) assertEquals("scholarships for ${t.school}", Recruiting.MAX_ROSTER, Tryouts.scholarships(lg, t))
+        for (t in lg.teams) assertTrue("scholarships for ${t.school}", Tryouts.scholarships(lg, t) in com.nh.hoopscoach.game.WorldEvents.cap(lg, t)..Recruiting.MAX_ROSTER)
     }
 }

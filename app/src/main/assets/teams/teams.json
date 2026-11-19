@@ -1,0 +1,242 @@
+[
+  {
+    "name": "Atlanta Hawks",
+    "abbreviation": "ATL",
+    "primary": "#C8102E",
+    "secondary": "#FDB927",
+    "banner": "teams/banners/atl.png",
+    "badge": "teams/badges/atl.png"
+  },
+  {
+    "name": "Boston Celtics",
+    "abbreviation": "BOS",
+    "primary": "#007A33",
+    "secondary": "#BA9653",
+    "banner": "teams/banners/bos.png",
+    "badge": "teams/badges/bos.png"
+  },
+  {
+    "name": "Brooklyn Nets",
+    "abbreviation": "BKN",
+    "primary": "#111111",
+    "secondary": "#FFFFFF",
+    "banner": "teams/banners/bkn.png",
+    "badge": "teams/badges/bkn.png"
+  },
+  {
+    "name": "Charlotte Hornets",
+    "abbreviation": "CHA",
+    "primary": "#1D1160",
+    "secondary": "#00788C",
+    "banner": "teams/banners/cha.png",
+    "badge": "teams/badges/cha.png"
+  },
+  {
+    "name": "Chicago Bulls",
+    "abbreviation": "CHI",
+    "primary": "#CE1141",
+    "secondary": "#000000",
+    "banner": "teams/banners/chi.png",
+    "badge": "teams/badges/chi.png"
+  },
+  {
+    "name": "Cleveland Cavaliers",
+    "abbreviation": "CLE",
+    "primary": "#860038",
+    "secondary": "#FDBB30",
+    "banner": "teams/banners/cle.png",
+    "badge": "teams/badges/cle.png"
+  },
+  {
+    "name": "Dallas Mavericks",
+    "abbreviation": "DAL",
+    "primary": "#00538C",
+    "secondary": "#B8C4CA",
+    "banner": "teams/banners/dal.png",
+    "badge": "teams/badges/dal.png"
+  },
+  {
+    "name": "Denver Nuggets",
+    "abbreviation": "DEN",
+    "primary": "#0E2240",
+    "secondary": "#FEC524",
+    "banner": "teams/banners/den.png",
+    "badge": "teams/badges/den.png"
+  },
+  {
+    "name": "Detroit Pistons",
+    "abbreviation": "DET",
+    "primary": "#C8102E",
+    "secondary": "#1D42BA",
+    "banner": "teams/banners/det.png",
+    "badge": "teams/badges/det.png"
+  },
+  {
+    "name": "Golden State Warriors",
+    "abbreviation": "GSW",
+    "primary": "#1D428A",
+    "secondary": "#FFC72C",
+    "banner": "teams/banners/gsw.png",
+    "badge": "teams/badges/gsw.png"
+  },
+  {
+    "name": "Houston Rockets",
+    "abbreviation": "HOU",
+    "primary": "#CE1141",
+    "secondary": "#000000",
+    "banner": "teams/banners/hou.png",
+    "badge": "teams/badges/hou.png"
+  },
+  {
+    "name": "Indiana Pacers",
+    "abbreviation": "IND",
+    "primary": "#002D62",
+    "secondary": "#FDBB30",
+    "banner": "teams/banners/ind.png",
+    "badge": "teams/badges/ind.png"
+  },
+  {
+    "name": "LA Clippers",
+    "abbreviation": "LAC",
+    "primary": "#C8102E",
+    "secondary": "#1D428A",
+    "banner": "teams/banners/lac.png",
+    "badge": "teams/badges/lac.png"
+  },
+  {
+    "name": "Los Angeles Lakers",
+    "abbreviation": "LAL",
+    "primary": "#552583",
+    "secondary": "#FDB927",
+    "banner": "teams/banners/lal.png",
+    "badge": "teams/badges/lal.png"
+  },
+  {
+    "name": "Memphis Grizzlies",
+    "abbreviation": "MEM",
+    "primary": "#5D76A9",
+    "secondary": "#12173F",
+    "banner": "teams/banners/mem.png",
+    "badge": "teams/badges/mem.png"
+  },
+  {
+    "name": "Miami Heat",
+    "abbreviation": "MIA",
+    "primary": "#98002E",
+    "secondary": "#F9A01B",
+    "banner": "teams/banners/mia.png",
+    "badge": "teams/badges/mia.png"
+  },
+  {
+    "name": "Milwaukee Bucks",
+    "abbreviation": "MIL",
+    "primary": "#00471B",
+    "secondary": "#EEE1C6",
+    "banner": "teams/banners/mil.png",
+    "badge": "teams/badges/mil.png"
+  },
+  {
+    "name": "Minnesota Timberwolves",
+    "abbreviation": "MIN",
+    "primary": "#0C2340",
+    "secondary": "#236192",
+    "banner": "teams/banners/min.png",
+    "badge": "teams/badges/min.png"
+  },
+  {
+    "name": "New Orleans Pelicans",
+    "abbreviation": "NOP",
+    "primary": "#0C2340",
+    "secondary": "#C8102E",
+    "banner": "teams/banners/nop.png",
+    "badge": "teams/badges/nop.png"
+  },
+  {
+    "name": "New York Knicks",
+    "abbreviation": "NYK",
+    "primary": "#006BB6",
+    "secondary": "#F58426",
+    "banner": "teams/banners/nyk.png",
+    "badge": "teams/badges/nyk.png"
+  },
+  {
+    "name": "Oklahoma City Thunder",
+    "abbreviation": "OKC",
+    "primary": "#007AC1",
+    "secondary": "#EF3B24",
+    "banner": "teams/banners/okc.png",
+    "badge": "teams/badges/okc.png"
+  },
+  {
+    "name": "Orlando Magic",
+    "abbreviation": "ORL",
+    "primary": "#0077C0",
+    "secondary": "#C4CED4",
+    "banner": "teams/banners/orl.png",
+    "badge": "teams/badges/orl.png"
+  },
+  {
+    "name": "Philadelphia 76ers",
+    "abbreviation": "PHI",
+    "primary": "#006BB6",
+    "secondary": "#ED174C",
+    "banner": "teams/banners/phi.png",
+    "badge": "teams/badges/phi.png"
+  },
+  {
+    "name": "Phoenix Suns",
+    "abbreviation": "PHX",
+    "primary": "#1D1160",
+    "secondary": "#E56020",
+    "banner": "teams/banners/phx.png",
+    "badge": "teams/badges/phx.png"
+  },
+  {
+    "name": "Portland Trail Blazers",
+    "abbreviation": "POR",
+    "primary": "#E03A3E",
+    "secondary": "#000000",
+    "banner": "teams/banners/por.png",
+    "badge": "teams/badges/por.png"
+  },
+  {
+    "name": "Sacramento Kings",
+    "abbreviation": "SAC",
+    "primary": "#5A2D81",
+    "secondary": "#63727A",
+    "banner": "teams/banners/sac.png",
+    "badge": "teams/badges/sac.png"
+  },
+  {
+    "name": "San Antonio Spurs",
+    "abbreviation": "SAS",
+    "primary": "#C4CED4",
+    "secondary": "#000000",
+    "banner": "teams/banners/sas.png",
+    "badge": "teams/badges/sas.png"
+  },
+  {
+    "name": "Toronto Raptors",
+    "abbreviation": "TOR",
+    "primary": "#CE1141",
+    "secondary": "#000000",
+    "banner": "teams/banners/tor.png",
+    "badge": "teams/badges/tor.png"
+  },
+  {
+    "name": "Utah Jazz",
+    "abbreviation": "UTA",
+    "primary": "#002B5C",
+    "secondary": "#F9A01B",
+    "banner": "teams/banners/uta.png",
+    "badge": "teams/badges/uta.png"
+  },
+  {
+    "name": "Washington Wizards",
+    "abbreviation": "WAS",
+    "primary": "#002B5C",
+    "secondary": "#E31837",
+    "banner": "teams/banners/was.png",
+    "badge": "teams/badges/was.png"
+  }
+]

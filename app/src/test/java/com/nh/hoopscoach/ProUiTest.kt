@@ -75,7 +75,7 @@ class ProUiTest {
     fun proCareer() {
         GameViewModel.autoLoad = false
         val college = ProTest().toDraft(21)
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         rule.setContent { App(vm) }
         // Draft Night with pro teams on the board, then the hand-off.
         vm.install(college); vm.select(Tab.TODAY); idle()

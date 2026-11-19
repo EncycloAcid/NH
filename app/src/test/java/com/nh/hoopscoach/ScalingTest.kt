@@ -1,6 +1,6 @@
 package com.nh.hoopscoach
 
-import com.nh.hoopscoach.game.Gameplan
+import com.nh.hoopscoach.game.Tactics
 import com.nh.hoopscoach.game.LeagueGen
 import com.nh.hoopscoach.game.Offseason
 import com.nh.hoopscoach.game.Phase
@@ -48,7 +48,7 @@ class ScalingTest {
         assertTrue(elite.isNotEmpty())
         var starLed = 0
         for (t in elite) {
-            Gameplan.validate(lg, t)
+            Tactics.validate(lg, t)
             val roster = lg.rosterOf(t).sortedByDescending { it.ovr }
             val star = roster.first()
             val role = roster.drop(5).firstOrNull() ?: roster.last()

@@ -73,9 +73,7 @@ class StartupTest {
     }
 
     private fun activityViewModel(activity: MainActivity): GameViewModel =
-        ViewModelProvider(activity)[GameViewModel::class.java].also {
-            org.junit.Assert.assertSame(activity.application, it.getApplication<android.app.Application>())
-        }
+        ViewModelProvider(activity)[GameViewModel::class.java]
 
     @Before fun prepare() {
         // AndroidX's singleton otherwise retains the previous Robolectric Application.

@@ -125,7 +125,7 @@ class CrashHuntTest {
         Rng.r = Random(5)
         val base = LeagueGen.newLeague()
         val lg = Offseason.claimTeam(base, base.teams.first { it.school == "Georgia Tech" }.id, "Jordan", "Reed")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.setContent { App(vm) }
         playThrough(vm, lg, "fresh")
@@ -137,7 +137,7 @@ class CrashHuntTest {
         val dir = File(System.getProperty("user.dir"), "../build/oldsaves").canonicalFile
         val files = dir.listFiles { f -> f.name.endsWith(".sav") }?.sortedBy { it.name }.orEmpty()
         println("old saves in $dir: ${files.map { it.name }}")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         var current: League? = null
         rule.setContent { if (current != null || true) App(vm) }
         for (f in files) {

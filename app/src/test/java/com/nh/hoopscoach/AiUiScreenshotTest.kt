@@ -56,7 +56,7 @@ class AiUiScreenshotTest {
         news.aiLabeled = true
         news.source = "Baseline Sports · Google Gemini"
         lg.news += news
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, 0) } }
         rule.onAllNodesWithContentDescription("AI-generated").assertCountEquals(0)
@@ -90,7 +90,7 @@ class AiUiScreenshotTest {
         lg.news += News(lg.season, lg.day, article.text, gameId = article.gameId,
             source = if (isAi) "Baseline Sports · Google Gemini" else "Game-written · Baseline Sports", teamId = lg.userTeamId, pid = star.id, kind = "article", aiLabeled = isAi,
             body = fullStory, aiFallbackReason = if (isAi) "" else "Gemini requires an API key. Configure it in AI settings.")
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.activity.setContent { HoopsTheme { ArticleScreen(vm, lg, lg.news.lastIndex) } }
         rule.onNodeWithText(lg.news.last().text).assertIsDisplayed()

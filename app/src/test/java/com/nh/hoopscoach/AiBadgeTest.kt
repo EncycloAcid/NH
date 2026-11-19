@@ -66,7 +66,7 @@ class AiBadgeTest {
         GameViewModel.autoLoad = false
         val (lg, article) = ArticleFixture.league()
         lg.ollama.enabled = true
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         val story = Story("Game story", article.text, ArticleFixture.aiStory(), lg.userTeamId, aiProvider = "Google Gemini")
         rule.activity.setContent { HoopsTheme { StoryCard(vm, lg, story, 0, false) } }
@@ -79,7 +79,7 @@ class AiBadgeTest {
         val lg = Offseason.newGame(5, "Test", "Coach")
         lg.ollama.enabled = true
         lg.road = RoadState().also { it.press = PressQuestion(lg.season, 1, "Postgame", "How do you assess the game?", emptyList(), "Staff", false) }
-        val vm = GameViewModel(ApplicationProvider.getApplicationContext())
+        val vm = testViewModel()
         vm.install(lg)
         rule.activity.setContent { HoopsTheme { Column { PressCard(vm, lg) } } }
         rule.onNodeWithContentDescription("AI-generated").assertDoesNotExist()
