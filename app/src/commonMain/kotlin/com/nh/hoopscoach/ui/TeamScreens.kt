@@ -190,7 +190,7 @@ fun RosterRow(vm: GameViewModel, lg: League, t: Team, p: Player, mine: Boolean) 
                 "${p.posLabel} · ${if (p.year == com.nh.hoopscoach.game.PRO_YEAR) "age ${p.age}" else p.cls} · ${Ratings.heightLabel(p.height)}" +
                     when {
                         Redshirts.sitting(p) -> " · sitting out"
-                        mins > 0 -> " · $mins min"
+                        mins > 0 -> " · ${planMin(lg, t, p.id)} min"
                         else -> ""
                     },
                 style = T.small, color = P.sub, maxLines = 1,
@@ -230,7 +230,8 @@ internal fun LazyListScope.lineup(vm: GameViewModel, lg: League, t: Team) {
             Picker("Offense", t.plan.offense.label, Offense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> vm.act { it.user.plan.offense = Offense.entries[i] } }
             Picker("Defense", t.plan.defense.label, Defense.entries.map { it.label to it.blurb }, Modifier.weight(1f)) { i -> vm.act { it.user.plan.defense = Defense.entries[i] } }
         }
-        Section("Rotation · 200 minutes")
+        // The plan is written per 40 minutes a position; the pros play 48, so they see 240.
+        Section("Rotation · ${if (lg.pro) 240 else 200} minutes")
     }
     items(Pos.entries.size) { i -> SlotPanel(vm, lg, t, i) }
 }
@@ -253,10 +254,11 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
             SlotPick("Backup", rs, Modifier.weight(1f)) { choose = false }
         }
         Spacer(Modifier.height(10.dp))
-        // The split of the position's minutes: the starter's on the left, the backup's on the right.
+        // The split of the position's minutes: the starter's on the left, the backup's on the right (in a pro game's 48).
+        val scale = if (lg.pro) 1.2 else 1.0
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.width(44.dp)) {
-                Text("$minutes", style = T.numSm, color = P.ink)
+                Text("${kotlin.math.round(minutes * scale).toInt()}", style = T.numSm, color = P.ink)
                 Text("START", style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.sub)
             }
             HoopsSlider(
@@ -264,7 +266,7 @@ private fun SlotPanel(vm: GameViewModel, lg: League, t: Team, idx: Int) {
                 onFinished = { val m = minutes; vm.act { slot.starterMin = m; it.user.plan.auto = false } },
             )
             Column(Modifier.width(44.dp), horizontalAlignment = Alignment.End) {
-                Text("${40 - minutes}", style = T.numSm, color = P.sub)
+                Text("${kotlin.math.round((40 - minutes) * scale).toInt()}", style = T.numSm, color = P.sub)
                 Text("BENCH", style = T.label.copy(fontSize = 9.sp, letterSpacing = 0.5.sp), color = P.sub)
             }
         }

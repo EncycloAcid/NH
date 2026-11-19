@@ -312,8 +312,10 @@ fun SettingsScreen(vm: GameViewModel, lg: League) {
                 val seasonYear = active?.season ?: lg.season
                 val rec = active?.record ?: "${lg.user.w}-${lg.user.l}"
                 val title = active?.title ?: "$schoolName Dynasty"
-                val modeLabel = active?.mode ?: if (lg.pro) "NBA Coach" else "College Coach"
-                val person = active?.coachOrPlayer ?: lg.coaches.firstOrNull { it.id == lg.userCoachId }?.name ?: "Coach"
+                // Before the first save, the slot's summary comes from the career itself (a player career names the player).
+                val fallback = remember(lg) { com.nh.hoopscoach.game.SaveManager.metaFromLeague("current", "$schoolName Dynasty", lg) }
+                val modeLabel = active?.mode ?: fallback.mode
+                val person = active?.coachOrPlayer ?: fallback.coachOrPlayer
                 val timeStr = active?.let { SaveManager.formatSaveTime(it.lastSaved) } ?: "Just now"
                 val sizeStr = active?.let { SaveManager.formatFileSize(it.sizeBytes) } ?: ""
 

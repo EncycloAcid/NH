@@ -21,7 +21,7 @@ enum class Badge(
     LOCKDOWN("Lockdown", "Defense", "Smothers his man's jumper", Attr.PER, null, intArrayOf(30, 100, 230, 480), "stops", 0.008),
     RIM_PROTECTOR("Rim Protector", "Defense", "Owns the paint", Attr.IDF, Attr.BLK, intArrayOf(35, 120, 270, 550), "rim stops", 0.006),
     BALL_HAWK("Ball Hawk", "Defense", "Jumps passing lanes", Attr.STL, null, intArrayOf(25, 90, 200, 420), "steals", 0.003),
-    GLASS_CLEANER("Glass Cleaner", "Rebounding", "Wins the boards", Attr.REB, null, intArrayOf(70, 240, 520, 1000), "rebounds", 0.3);
+    GLASS_CLEANER("Glass Cleaner", "Rebounding", "Wins the boards", Attr.REB, null, intArrayOf(70, 240, 520, 1000), "rebounds", 0.12);
 
     /** "+1.4% on threes" at [tier]. */
     fun effectAt(tier: Int): String {

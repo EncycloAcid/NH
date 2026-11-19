@@ -485,7 +485,8 @@ private fun TourneyToday(vm: GameViewModel, lg: League) {
     val myPlayIn = if (isNcaa) b.playInOf(u.id) else null
     val inEvent = b.hasTeam(u.id)
     val today = Season.userGameToday(lg)
-    val roundName = when { b.done -> "Champions"; ffDay -> "First Four"; else -> roundTitle(b, b.current, isNcaa) }
+    // Once the bracket is over, "Champions" only for the champion; everyone else's season is over.
+    val roundName = when { b.done -> if (b.champion == u.id) "Champions" else "Season Over"; ffDay -> "First Four"; else -> roundTitle(b, b.current, isNcaa) }
     val alive = !b.done && ((b.current < b.rounds.size && u.id in b.rounds[b.current]) || (ffDay && myPlayIn != null))
     LazyColumn(Modifier.fillMaxWidth()) {
         item {

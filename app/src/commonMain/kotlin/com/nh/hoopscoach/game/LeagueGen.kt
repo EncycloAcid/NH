@@ -85,7 +85,10 @@ object LeagueGen {
         val years = mutableListOf(1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, Rng.range(1, 4)).shuffled(Rng.r)
         val numbers = (0..55).shuffled(Rng.r).toMutableList()
         order.forEachIndexed { i, pos ->
-            val target = (q + QUALITY[i] + Rng.gauss() * 3).roundToInt().coerceIn(35, 95)
+            // Upperclassmen have had their college years to grow: the world starts as it settles after a few seasons
+            // (seniors about seven points past freshmen), not flat and then climbing for the first few years.
+            val grown = when (years[i]) { 2 -> 3; 3 -> 5; 4 -> 7; else -> 0 }
+            val target = (q + QUALITY[i] + grown + Rng.gauss() * 3).roundToInt().coerceIn(35, 95)
             val p = makePlayer(lg, pos, years[i], target, t.id)
             p.number = numbers.removeAt(0)
             lg.addPlayer(p)

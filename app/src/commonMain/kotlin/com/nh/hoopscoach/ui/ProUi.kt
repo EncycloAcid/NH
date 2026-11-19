@@ -70,7 +70,7 @@ import com.nh.hoopscoach.game.Team
 /** Planned minutes: the plan is written per 40, and a pro game runs 48. */
 fun planMin(lg: League, t: Team, pid: Int): Int {
     val m = com.nh.hoopscoach.game.Tactics.plannedMinutes(t, pid)
-    return if (lg.pro) (m * 1.2).toInt() else m
+    return if (lg.pro) kotlin.math.round(m * 1.2).toInt() else m
 }
 
 /** Where an MVP-race rank puts him. */

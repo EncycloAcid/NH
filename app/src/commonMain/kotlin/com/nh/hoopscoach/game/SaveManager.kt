@@ -125,6 +125,7 @@ object SaveManager {
         val secondary = (u?.secondary ?: 0xFFF59E0BL).toInt()
         val rec = if (u != null) "${u.w}-${u.l}" else "0-0"
         val modeName = when {
+            lg.mode == GameMode.PLAYER && lg.pro -> "NBA Player"
             lg.mode == GameMode.PLAYER -> "Road to League"
             lg.pro -> "NBA Coach"
             else -> "College Coach"

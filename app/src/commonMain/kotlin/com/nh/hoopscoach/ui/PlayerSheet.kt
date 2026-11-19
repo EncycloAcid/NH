@@ -158,7 +158,9 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
             MedicalPanel(vm, lg, p)
             Spacer(Modifier.height(10.dp))
             FlowRow(Modifier.padding(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Tag(p.style.label.uppercase() + if (p.style.group != com.nh.hoopscoach.game.ArchGroup.MANUAL) " · " + p.style.group.label.uppercase() else "", P.accent)
+                // The style, and its family unless the name already says it ("Two-Way Guard", not "... · Two-Way & All-Around").
+                val family = p.style.group.label.takeIf { p.style.group != com.nh.hoopscoach.game.ArchGroup.MANUAL && !p.style.label.contains(it.substringBefore(' ').substringBefore('&').trim(), ignoreCase = true) }
+                Tag(p.style.label.uppercase() + (family?.let { " · " + it.uppercase() } ?: ""), P.accent)
                 // College players have a draft stock and a mood; pros have a trade value.
                 if (lg.pro && team != null) Tag("TRADE VALUE: ${com.nh.hoopscoach.game.Trades.tier(p).uppercase()}", P.sub)
                 else if (team != null) Tag("DRAFT: ${Offseason.projection(board[p.id], p.year).uppercase()}", P.sub) else Tag("FORMER PLAYER", P.sub)
@@ -170,7 +172,7 @@ fun PlayerCard(vm: GameViewModel, lg: League, p: Player, modifier: Modifier = Mo
                 if (p.redshirt == Redshirt.ACADEMIC) Tag("ACADEMIC RS", P.accent)
                 if (p.redshirt == Redshirt.MEDICAL) Tag("MEDICAL RS", P.good)
                 else if (p.rsClass && p.redshirt == Redshirt.NONE) Tag("RS", P.sub)
-                if (p.shoePay > 0) Tag(com.nh.hoopscoach.game.Shoes.ofPlayer(p)?.short?.uppercase() ?: "SHOE", P.gold)
+                if (p.shoePay > 0) Tag(com.nh.hoopscoach.game.Shoes.ofPlayer(p)?.label?.uppercase() ?: "SHOE DEAL", P.gold)
                 p.traits.forEach { Tag(it.label.uppercase(), traitColor(it)) }
                 if (p.favorite) Tag("★ FAVORITE", P.gold)
                 if (p.id == lg.legacySonId) Tag("YOUR SON", P.gold, filled = true)

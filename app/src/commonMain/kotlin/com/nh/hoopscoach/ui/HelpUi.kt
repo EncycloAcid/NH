@@ -59,7 +59,7 @@ object Help {
         HelpTerm("Questionable · Doubtful · Limited", RATINGS, "Questionable or doubtful: a minor injury, likely back in a game or two, and he can play through it. Limited: back, but not 100% yet, so he shoots a little worse and is likelier to get hurt again.", listOf("playing hurt", "play through")),
 
         // Running your team
-        HelpTerm("Rotation and minutes", TEAM, "Each game has 200 player-minutes to share, 40 at each position. The slider at each position splits them between the starter and his backup.", listOf("lineup", "minutes", "starters")),
+        HelpTerm("Rotation and minutes", TEAM, "Each game has 200 player-minutes to share, 40 at each position (240 and 48 in the NBA). The slider at each position splits them between the starter and his backup.", listOf("lineup", "minutes", "starters")),
         HelpTerm("Usage", TEAM, "How much of the offense runs through a player. Raise it for your best scorer, lower it for a shooter who should only take open shots."),
         HelpTerm("Game plan", TEAM, "Your offense and defense styles, like Run & Gun, Grind It Out, Pack Line or a full-court press. Auto lets your staff pick what fits the roster.", listOf("offense", "defense", "auto", "tactics")),
         HelpTerm("Power", TEAM, "Your team's strength from its results so far, like a power ranking."),

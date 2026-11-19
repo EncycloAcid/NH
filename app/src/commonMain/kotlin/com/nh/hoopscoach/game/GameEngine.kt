@@ -201,9 +201,10 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     /** Chance a shot of [type] goes in (0 inside, 1 mid-range, 2 three), as the regular possession figures it. */
     private fun makeChance(o: Int, d: Int, shooter: Player, type: Int, ds: DefStats, trail: Int): Double {
         var p = when (type) {
-            0 -> 0.522 + ((shooter[Attr.INS] - n[0]) * 0.0055 - (ds.intD - n[5]) * 0.0038) * talent
+            // College finishes a touch below the pros at the rim and from three; the pros shoot threes a little better.
+            0 -> 0.522 + (if (lg.pro) 0.0 else -0.022) + ((shooter[Attr.INS] - n[0]) * 0.0055 - (ds.intD - n[5]) * 0.0038) * talent
             1 -> 0.365 + ((shooter[Attr.MID] - n[1]) * 0.0047 - (ds.perD - n[6]) * 0.003) * talent
-            else -> 0.312 + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (ds.perD - n[6]) * 0.0026) * talent
+            else -> 0.312 + (if (lg.pro) 0.022 else -0.01) + ((shooter[Attr.OUT] - n[2]) * 0.0043 - (ds.perD - n[6]) * 0.0026) * talent
         }
         p += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
         p += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
@@ -216,7 +217,23 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         // A timeout settles his team for a few trips (and takes a little out of the other side's run).
         if (settle > 0 && coachSide >= 0) p += if (o == coachSide) 0.03 else -0.02
         if (shooter.id == heroId) p += (if (type > 0) heroJumper + heroClutch else 0.0) + heroHome + family - heroTired
+        p += scoreEffect(trail)
         return p.coerceIn(0.12, 0.82)
+    }
+
+    /**
+     * Score effects: a team up big plays looser (the starters coast, the shots get casual) and a team down big plays
+     * harder, most of all in the second half. Leads shrink the way they do in real games, so fewer end in blowouts
+     * and more come down to the last minute. [lead] is the offense's score minus the defense's.
+     */
+    private fun scoreEffect(lead: Int): Double {
+        val big = abs(lead)
+        if (big == 0) return 0.0
+        // Late and close: the team ahead tightens up, the team behind lets it fly.
+        if (finalPeriod && clock < 240 && big <= 6) return if (lead > 0) -0.034 else 0.024
+        if (big < 10) return 0.0
+        val x = ((big - 8) / 18.0).coerceAtMost(1.0) * (if (secondHalf) 1.0 else 0.45)
+        return if (lead > 0) -0.06 * x else 0.026 * x
     }
 
     private fun pullType(hero: Player, trail: Int) = if (trail == -3 || hero[Attr.OUT] >= hero[Attr.MID] + 3) 2 else 1
@@ -399,7 +416,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         var SHOT_CAP = 0.33
         const val NON_SHOOTING_PRO = 0.08
         const val NON_SHOOTING_COLLEGE = 0.13
-        const val SHOOTING_FOUL_PRO = 1.0
+        const val SHOOTING_FOUL_PRO = 1.1
         const val SHOOTING_FOUL_COLLEGE = 1.15
 
         fun computeNorms(lg: League): DoubleArray {
@@ -481,7 +498,8 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         val elapsed = halfElapsed()
         val late = finalPeriod && clock < 240
         val margin = score[side] - score[1 - side]
-        val garbage = period == regPeriods && clock < 270 && abs(margin) >= 18
+        // Garbage time: the benches empty with a big lead late (sooner when it's huge).
+        val garbage = period == regPeriods && ((clock < 270 && abs(margin) >= 16) || (clock < 480 && abs(margin) >= 22))
         val chosen = ArrayList<Player>(5)
         for ((i, s) in t.plan.slots.withIndex()) {
             if (i >= 5) break
@@ -532,7 +550,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             Offense.UPTEMPO -> 15.6; Offense.GRIND -> 20.0; Offense.PERIMETER -> 16.8; Offense.INSIDE -> 17.6; else -> 17.2
         }
         when (def(1 - o)) { Defense.PRESS -> base -= 1.0; Defense.ZONE -> base += 0.6; Defense.PACKLINE -> base += 0.8; else -> {} }
-        if (lg.pro) base *= 0.81 * proEra.pace
+        if (lg.pro) base *= 0.835 * proEra.pace
         else base *= era.pace
         // Nobody holds it past the shot clock (or past the soft max in the stall-ball era).
         return (base * (0.6 + Rng.d() * 0.8)).coerceAtMost(shotClock - 0.5)
@@ -602,7 +620,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     }
 
     /** Free-throw percentage: about 78% in the NBA and 71% in college for the average shooter. */
-    private fun ft(p: Player): Double = ((if (lg.pro) 0.675 else 0.715) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
+    private fun ft(p: Player): Double = ((if (lg.pro) 0.632 else 0.735) + ((p[Attr.MID] + p[Attr.OUT]) / 2.0 - 66) * 0.0075).coerceIn(0.4, 0.95)
 
     private fun line(side: Int, p: Player) = lines[side].getOrPut(p.id) { StatLine() }
 
@@ -1011,12 +1029,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         // A ball hawk on the floor forces more; a ball handler with a handle gives fewer away.
         pTo += best(defense, Badge.BALL_HAWK) * Badge.BALL_HAWK.step - bt(handler, Badge.TIGHT_HANDLES) * Badge.TIGHT_HANDLES.step
         pTo -= (coaches[o].off - 70) * 0.0004 * coaching
-        if (lg.pro) pTo *= 0.9
+        if (lg.pro) pTo *= 0.9 * proEra.tov
         pTo = pTo.coerceIn(0.07, 0.3)
         if (Rng.chance(pTo)) {
             val loser = if (Rng.chance(0.6)) handler else Rng.weighted(offense) { usage(o, it) }
             line(o, loser).tov++
-            val kind = Rng.d()
+            // Kinds of turnover: steals are a little over half of them (nearer 60% in the NBA, where hands are quicker).
+            val kind = Rng.d() - (if (lg.pro) 0.05 else 0.0)
             when {
                 kind < 0.55 -> {
                     val stealer = Rng.weighted(defense) { (0.5 * it[Attr.STL] + 0.5 * it[Attr.PER]).pow(3) * Tendency.stl(it) * spec(it) * (1 + bt(it, Badge.BALL_HAWK) * 0.4) }
@@ -1066,13 +1085,13 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             val pd = if (guard != null) perD * 0.6 + guard[Attr.PER] * 0.4 else perD
             val id = if (guard != null) intD * 0.7 + guard[Attr.IDF] * 0.3 else intD
             var pMake = when (type) {
-                0 -> 0.522 + (soft(shooter[Attr.INS] - n[0]) * 0.0055 - soft(id - n[5]) * 0.0038) * talent
+                0 -> 0.522 + (if (lg.pro) 0.0 else -0.022) + (soft(shooter[Attr.INS] - n[0]) * 0.0055 - soft(id - n[5]) * 0.0038) * talent
                 1 -> 0.365 + (soft(shooter[Attr.MID] - n[1]) * 0.0047 - soft(pd - n[6]) * 0.003) * talent
-                else -> 0.312 + (soft(shooter[Attr.OUT] - n[2]) * 0.0043 - soft(pd - n[6]) * 0.0026) * talent + (if (lg.pro) 0.0 else era.threeMake)
+                else -> 0.312 + (soft(shooter[Attr.OUT] - n[2]) * 0.0043 - soft(pd - n[6]) * 0.0026) * talent + (if (lg.pro) 0.0 else era.threeMake - 0.01)
             }
             if (putback != null) pMake += 0.06
-            // Pros finish and shoot a little better than college players at the same ratings.
-            if (lg.pro) pMake += if (type == 2) 0.003 else 0.018 + proEra.fg
+            // Pros finish and shoot a little better than college players at the same ratings (threes most of all).
+            if (lg.pro) pMake += if (type == 2) 0.025 else 0.018 + proEra.fg
             pMake += ((coaches[o].off - 70) * 0.0006 - (coaches[d].def - 70) * 0.0006) * coaching + skillOff[o] - skillDef[d]
             pMake += if (o == 0) 0.012 * homeEdge else -0.004 * homeEdge
             pMake += if (o == 1) -HomeCourt.visitorShooting(court, secondHalf) else if (finalPeriod && clock < 120) HomeCourt.homeClose(court) else 0.0
@@ -1097,6 +1116,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
             if (off(o) == Offense.UPTEMPO && type == 0) pMake += 0.01
             if (shooter.has(Trait.CLUTCH) && finalPeriod && clock < 120 && abs(trail) <= 5) pMake += 0.03
             if (shooter.id == heroId) pMake += (if (type > 0) heroJumper else 0.0) + heroHome + family - heroTired
+            pMake += scoreEffect(trail)
             // Shots at the horn are rushed and contested.
             if (clock <= 1.0) pMake *= if (shooter.has(Trait.CLUTCH)) 0.8 else 0.68
             pMake = pMake.coerceIn(0.12, 0.82)
@@ -1234,12 +1254,12 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
     private fun posReb(p: Pos) = if (lg.pro) when (p) { Pos.C -> 1.12; Pos.PF -> 1.0; Pos.SF -> 1.0; Pos.SG -> 1.0; Pos.PG -> 1.02 }
         else when (p) { Pos.C -> 1.2; Pos.PF -> 1.0; Pos.SF -> 0.95; Pos.SG -> 1.0; Pos.PG -> 1.05 }
 
-    /** Size helps on the glass: about 3% a inch either side of 6'6". */
-    private fun heightReb(p: Player) = (1.0 + (p.height - 78) * 0.03).coerceIn(0.8, 1.25)
+    /** Size helps on the glass: about 2% an inch either side of 6'6". */
+    private fun heightReb(p: Player) = (1.0 + (p.height - 78) * 0.02).coerceIn(0.85, 1.18)
 
     /** Who grabs a rebound: good rebounders, big men and tall wings most, but guards chase long ones too. */
     private fun rebounder(side: List<Player>) = Rng.weighted(side) {
-        (it[Attr.REB] / 70.0).pow(if (lg.pro) 1.6 else 2.0) * posReb(it.pos) * heightReb(it) * Tendency.reb(it) * spec(it) * (1 + bt(it, Badge.GLASS_CLEANER) * Badge.GLASS_CLEANER.step)
+        (it[Attr.REB] / 70.0).pow(if (lg.pro) 1.05 else 1.35) * posReb(it.pos) * heightReb(it) * Tendency.reb(it) * spec(it) * (1 + bt(it, Badge.GLASS_CLEANER) * Badge.GLASS_CLEANER.step)
     }
 
     /** About one rebound in nine in the NBA (one in twenty in college) goes to the team, not a player: out of bounds, a tie-up. */
@@ -1247,6 +1267,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
 
     private fun shotType(o: Int, d: Int, p: Player, trail: Int): Int {
         if (finalPeriod && clock < 25 && trail == -3 && (lg.pro || era.hasThrees)) return 2
+        if (finalPeriod && clock < 20 && trail == -2 && Rng.chance(0.65)) return 0
         val posIns = when (p.pos) { Pos.PG -> .8; Pos.SG -> .8; Pos.SF -> 1.0; Pos.PF -> 1.3; Pos.C -> 1.65 }
         // Modern pro bigs step out more than college bigs; college eras scale volume separately.
         val pos3 = if (lg.pro) when (p.pos) { Pos.PG -> 1.0; Pos.SG -> 1.0; Pos.SF -> .95; Pos.PF -> .85; Pos.C -> .62 }
@@ -1255,7 +1276,7 @@ class GameEngine(private val lg: League, val game: Game, private val pbp: Boolea
         var wi = (p[Attr.INS] / skillScale).pow(3) * posIns * Tendency.inside(p)
         var wm = (p[Attr.MID] / skillScale).pow(3) * 0.5 * Tendency.mid(p) * tough
         // Pros: era threes from Eras.of. College: EraRules volume; with no line, OUT still feeds long jumpers that count as twos.
-        var w3 = if (lg.pro) (p[Attr.OUT] / skillScale).pow(1.5) * pos3 * 1.62 * proEra.threes * Tendency.three(p) * tough
+        var w3 = if (lg.pro) (p[Attr.OUT] / skillScale).pow(1.5) * pos3 * 1.5 * proEra.threes * Tendency.three(p) * tough
             else (p[Attr.OUT] / skillScale).pow(4) * pos3 * 1.2 * (if (era.hasThrees) era.threes else 0.55) * Tendency.three(p) * tough
         when (off(o)) {
             Offense.INSIDE -> { wi *= 1.4; w3 *= 0.72 }

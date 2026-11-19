@@ -1,6 +1,6 @@
 # Hoops Dynasty Pro
 
-A basketball career game for **Android and PC** (version **3.9-pro.285**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
+A basketball career game for **Android and PC** (version **3.9-pro.286**), written in Kotlin with [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/). One shared codebase (`commonMain`) powers both: update the game once and the phone and the PC ship the same changes.
 
 Three ways to play, all in one app:
 
@@ -14,7 +14,7 @@ The design is clean and neutral, with light and dark modes, and takes its accent
 
 ## Install
 
-Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.285.apk`.
+Every push to the branch builds Android and PC packages and publishes them on the **Releases** page (each release lists what changed in that build). File names end with the version, for example `HoopsDynasty-3.9-pro.286.apk`.
 
 | Platform | Artifact | Needs |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - Saves live under `~/.hoopsdynasty/` (on Windows `%USERPROFILE%\.hoopsdynasty\`), with slots in `saves/`.
 - Phone and PC share one save format. Move a dynasty with **Export** / **Import Save**, or over Wi-Fi with **Settings → Phone and PC**.
 
-## What's new (3.9-pro.243 to 3.9-pro.285)
+## What's new (3.9-pro.243 to 3.9-pro.286)
 
 - **On-device AI with Gemini Nano** (Android, Pixel 9 and newer): dialogue written privately on the phone's chip through AICore, with no account and no key. See *AI writing* below.
 - **The Hoops Dispatch**: once a simulated week, the week's biggest stories (upsets, buzzer-beaters, rivalry results, big nights, injuries, hot-seat coaches) as five headlines and three rumors on Today, written by the AI in one batched request when AI is on, or by the game. During the recruiting rounds the Recruit tab has a **crystal ball**: where the top uncommitted players lean, and portal whispers.
@@ -59,6 +59,8 @@ Every push to the branch builds Android and PC packages and publishes them on th
 - **Archetype skill trees**: each archetype has four skills (two Improving, one Enhancing, a Mastery), unlocked with skill points earned each season and raising those ratings for good. Your players' trees are on the player card's Growth tab.
 - **Program building** (college coach): six facilities (arena, practice facility, recruiting office, training and medical, locker room, fan experience) from level 1 to 5, each with a real effect (home-court edge, development, recruiting pull, fewer injuries, morale, fuller crowds); a facilities fund fed by the gate, the boosters and March; donors who pay 40% for naming rights; a booster gala; ticket prices.
 - **Legacy mode**: when your player retires, start over as his son (his name, a few of his strengths, his school's offer pinned) or take his old school's job and recruit the son. The father's career, number and records carry over, and the press brings him up.
+- **Deep polish: the game engine**: games play out more like the real thing. Teams with a big lead coast and teams behind push, so fewer games end in blowouts and more come down to the end (NBA wins by 25 or more dropped from about 1 in 5 games to about 1 in 8; overtime is more common). Late in close games the team ahead tightens up, and a team down two with the last shot usually goes for the tie. Rebounds spread out the way they do in real games (no more 20-rebound seasons), and the Glass Cleaner badge is toned down to match. Shooting is tuned to each level: NBA threes about 36%, free throws about 79% in the NBA and 73% in college; turnovers and steals follow each era. Garbage time starts sooner in a rout. A new college world starts settled, with upperclassmen grown past the freshmen, instead of climbing for the first couple of seasons.
+- **Deep polish: screens**: every main screen checked in all four careers, light and dark. Fixes: a team knocked out of the NIT no longer reads "Champions" when the bracket ends ("Season Over" instead); NBA rosters and the lineup sliders show minutes out of 48 (240 in the rotation) instead of college's 40; the player card shows the full shoe brand ("AND1", not "AND") and no longer repeats its style ("Two-Way Guard", not "Two-Way Guard · Two-Way & All-Around"); and Settings shows a player career as "Road to League" or "NBA Player" with the player's name, not "College Coach".
 - **The commissioner waves the envelope**: his raised forearm is its own layer now and turns at the elbow, so he waves the envelope gently while he reads the picks, with a little flourish now and then. The envelope is redrawn clean: crisp paper, blue folds and a small red wax seal above his knuckles.
 - **The draft stage fits the screen**: the stage now fits between the step header and the footer, so the commissioner's dialogue box is always in full view. When the screen is shorter than the stage, the dark above the lights and the floor under the dialogue box are trimmed; on a short window or a wide PC window, the stage is drawn narrower and centered instead.
 - **Pennants like the draft sheet**: the six pennants over the stage are now long fabric pennants in the style of your draft sheet, made for every club from the sheet's own fabric: recolored to the club's color (the Lakers in gold, as on the sheet) with the club's logo from the game's logo files on it. The old clubs of an era career hang their own: the New Jersey Nets, the Seattle SuperSonics, the Vancouver Grizzlies, the Washington Bullets and the New Orleans Hornets, in their colors with their names.

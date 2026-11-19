@@ -26,6 +26,9 @@ enum class Era(
     Y1986(1986, "1986", "Bird and Magic", "Bird's Celtics, Magic and Kareem's Lakers, a young Jordan, Hakeem and Barkley. Fast breaks, post-ups, and hardly any threes.",
         4_945, 0.96, 0.07, -0.05, 1.0);
 
+    /** Turnovers a possession, against the engine's base: today's teams take care of the ball better than the 90s. */
+    val tov get() = when (this) { TODAY -> 0.89; Y2013 -> 1.0; Y2003 -> 0.97; Y1996 -> 1.08; Y1986 -> 1.08 }
+
     /** The play-in and the NBA Cup are today's; first rounds were best of five until 2003. */
     val playIn get() = this == TODAY
     val cup get() = this == TODAY
